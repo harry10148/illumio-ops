@@ -102,16 +102,26 @@ def _activity(ctx: AppContext, inp: DetectorInput, at: datetime) -> dict[str, An
         out["activity"] = {k: Activity(v[0], v[1], *history.get(k, (0, None))) for k, v in over.items()}
         if over:
             out["activity_gaps"] = tuple(fa.activity_gaps(ctx, start=week[0], end=hour))
-    if hours:
+    # H and J judge only hours a live cycle ran in: a late re-read fills a gap without the hourly activity (review)
+    live_from = fa.live_coverage(ctx)
+    out["hours_days"] = hours_days = _days(live_from, hour)
+    if hours and hours_days >= min(ACTIVITY_DAYS, cfg.quiet / timedelta(days=1)):
         floor = min(cfg.quiet_min_connections, cfg.off_hours_min_connections)
         recent = {src: v[0] for (src, cls), v in now.items()
                   if cls == "all" and v[0] >= floor and not src.startswith("ip:")}
-        if recent:
-            kept = hour - timedelta(days=HISTORY_DAYS)
+        if recent and live_from is not None:
+            kept = max(hour - timedelta(days=HISTORY_DAYS), live_from)
+            last_whole = hour - timedelta(hours=1)
             out["recent"] = recent
-            out["active_hours"] = fa.activity_hours(ctx, recent, start=kept, end=hour - timedelta(hours=1))
+            out["active_hours"] = fa.activity_hours(ctx, recent, start=kept, end=last_whole)
             out["known_before_quiet"] = frozenset(fa.sources_known_before(ctx, recent, before=hour - cfg.quiet))
-            out["hours_gaps"] = tuple(fa.activity_gaps(ctx, start=kept, end=hour))
+            # the part of the last whole hour before the last 60 minutes is in neither (review)
+            if at - SURGE_WINDOW > last_whole:
+                before = fa.activity_now(ctx, since=last_whole, until=at - SURGE_WINDOW)
+                out["active_just_before"] = frozenset(src for src, cls in before if cls == "all" and src in recent)
+            ran = set(fa.live_hours(ctx, start=kept, end=last_whole))
+            missing = [(h, h + timedelta(hours=1), "no_live_cycle") for h in _hours(kept, last_whole) if h not in ran]
+            out["hours_gaps"] = (*fa.activity_gaps(ctx, start=kept, end=hour), *missing)
     if destination_days >= ACTIVITY_DAYS:
         fan = fa.fan_in_now(ctx, since=at - SURGE_WINDOW, until=at)
         out["fan_in_coverage"] = (sum(f.with_bytes for f in fan.values()), sum(f.increments for f in fan.values()))
@@ -123,6 +133,11 @@ def _activity(ctx: AppContext, inp: DetectorInput, at: datetime) -> dict[str, An
                              for d, f in wanted.items()}
             out["fan_in_gaps"] = tuple(fa.activity_gaps(ctx, start=week[0], end=hour))
     return out
+
+
+def _hours(start: datetime, end: datetime) -> list[datetime]:
+    first = start.replace(minute=0, second=0, microsecond=0)
+    return [first + timedelta(hours=i) for i in range(int((end - first) / timedelta(hours=1)))]
 
 
 def _pairs(ctx: AppContext, inp: DetectorInput, rows: Sequence[Obs]) -> dict[str, Any]:
@@ -139,7 +154,9 @@ def _pairs(ctx: AppContext, inp: DetectorInput, rows: Sequence[Obs]) -> dict[str
     asked = {(o.src_key, o.dst_key) for o in candidates} | {(o.dst_key, o.src_key) for o in candidates}
     before = fa.pairs_before(ctx, asked, before=lo)
     ports = {(o.dst_key, o.port, o.proto) for o in candidates if (o.src_key, o.dst_key) in before and o.port is not None}
+    known = {(o.src_key, o.dst_key) for o in candidates} & before
     return {"pairs_before": frozenset(before),
+            "pair_ports": fa.pair_ports(ctx, known, before=lo) if known else {},
             "ports_served": frozenset(fa.ports_served_before(ctx, ports, before=lo)) if ports else frozenset()}
 
 

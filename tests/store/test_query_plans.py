@@ -89,3 +89,12 @@ def test_activity_history_reads_by_hour(tmp_path):
                            "FROM source_activity_hourly "
                            "WHERE src_key IN (?) AND hour >= ? AND hour < ? GROUP BY src_key, port_class", ("a", "x", "y"))
     assert "USING PRIMARY KEY" in plan or "SEARCH" in plan, plan
+
+
+
+def test_served_port_reads_use_the_destination_index(tmp_path):
+    # Codex: "did anyone use this port on this host" per candidate, without walking every row of a busy port
+    with FlowDb(tmp_path / "flows.sqlite").connect() as conn:
+        plan = _plan(conn, "SELECT 1 FROM connection_baseline WHERE port = ? AND proto = ? AND dst_key = ? "
+                           "AND first_seen <= ? LIMIT 1", (443, 6, "d", "x"))
+    assert "ix_baseline_dst_port" in plan, plan

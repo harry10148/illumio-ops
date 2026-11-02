@@ -34,6 +34,14 @@ def seed(ctx, table, rows):
         conn.commit()
 
 
+def live(ctx, days=15):
+    """Live cycles ran every hour of the last `days` (what the quiet and off-hours detectors judge by)."""
+    with ctx.flows().connect() as conn:
+        conn.executemany("INSERT OR IGNORE INTO live_activity_hours VALUES (?)",
+                         [(db_time(HOUR - timedelta(hours=h)),) for h in range(days * 24 + 1)])
+        conn.commit()
+
+
 def test_scenario_direction_reversal(tmp_path):
     ctx = setup(tmp_path, inventory={"app": {}, "db": {}},
                 history=[flow("app", "db", port=5432, minutes_ago=20 * DAY)],
@@ -59,6 +67,7 @@ def test_scenario_quiet_host_wakes(tmp_path):
                 history=[flow("quiet", "b", port=8080, minutes_ago=20 * DAY)],
                 live=[more(flow("quiet", "b", port=8080, minutes_ago=5), conns=150)])
     seed(ctx, "src", [(HOUR - timedelta(days=10), W + "quiet", 4), (HOUR - timedelta(days=14), W + "other", 1)])
+    live(ctx)
     run_detection(ctx, now=NOW)
     assert kinds(ctx) == {"quiet_host_wakes"}
     [d] = by_kind(ctx, "quiet_host_wakes")
@@ -71,6 +80,7 @@ def test_scenario_off_hours(tmp_path):
                 live=[more(flow("night", "b", port=8080, minutes_ago=5), conns=120)])
     seed(ctx, "src", [(HOUR.replace(hour=h) - timedelta(days=d), W + "night", 50)
                       for d in range(1, 8) for h in range(1, 10)])
+    live(ctx)
     run_detection(ctx, now=NOW)
     assert kinds(ctx) == {"off_hours"}
     [d] = by_kind(ctx, "off_hours")
@@ -88,3 +98,21 @@ def test_scenario_data_staging(tmp_path):
     [d] = by_kind(ctx, "data_staging")
     s = json.loads(d["summary_json"])
     assert d["subject_key"] == W + "sink" and s["sources"] == 6 and s["mb"] == 2400
+
+
+
+def test_scenario_quiet_after_a_late_reread_is_not_judged(tmp_path):
+    """Codex: collection stopped, a late re-read filled the gap without the hourly activity; the hours no live cycle
+    ran in leave the quiet detector unjudging, not reporting a wake."""
+    ctx = setup(tmp_path, inventory={"quiet": {}, "b": {}, "other": {}},
+                history=[flow("quiet", "b", port=8080, minutes_ago=20 * DAY)],
+                live=[more(flow("quiet", "b", port=8080, minutes_ago=5), conns=150)])
+    seed(ctx, "src", [(HOUR - timedelta(days=10), W + "quiet", 4), (HOUR - timedelta(days=14), W + "other", 1)])
+    live(ctx)
+    with ctx.flows().connect() as conn:  # three days without a live cycle
+        conn.execute("DELETE FROM live_activity_hours WHERE hour >= ? AND hour < ?",
+                     (db_time(HOUR - timedelta(days=4)), db_time(HOUR - timedelta(days=1))))
+        conn.commit()
+    r = run_detection(ctx, now=NOW)
+    assert "quiet_host_wakes" not in kinds(ctx)
+    assert {s["detector"]: s["state"] for s in r.statuses}["quiet_host_wakes"] == "incomplete"

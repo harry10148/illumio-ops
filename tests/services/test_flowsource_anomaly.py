@@ -270,8 +270,43 @@ def test_activity_kept_fifteen_days(ctx):
     lambda c: fa.fan_in_now(c, since=NOW, until=NOW),
     lambda c: fa.destination_history(c, ["b"], start=NOW, end=NOW),
     lambda c: fa.destination_coverage(c),
+    lambda c: fa.live_hours(c, start=NOW, end=NOW),
+    lambda c: fa.pair_ports(c, [("a", "b")], before=NOW),
 ])
 def test_batch2_reads_raise_stale_generation(ctx, monkeypatch, read):
     _switching(ctx, monkeypatch)
     with pytest.raises(StaleGeneration):
         read(ctx)
+
+
+
+def test_live_cycles_mark_their_hour_even_when_empty(ctx):
+    """Codex: a late re-read fills a collection gap without filling the hourly activity; only hours a live cycle ran
+    are known quiet."""
+    write(ctx, [], now=NOW - timedelta(hours=3), increments="cycle")
+    write(ctx, [rec(1)], now=NOW - timedelta(hours=2), increments="late")
+    write(ctx, [rec(2)], now=NOW, increments="cycle")
+    hour = lambda t: t.replace(minute=0, second=0, microsecond=0)
+    assert fa.live_hours(ctx, start=NOW - timedelta(days=1), end=NOW + timedelta(hours=1)) == [
+        hour(NOW - timedelta(hours=3)), hour(NOW)]
+    assert fa.live_coverage(ctx) == hour(NOW - timedelta(hours=3))
+
+
+def test_fan_in_leaves_out_public_sources(ctx):
+    """Codex: a public sender's bytes must not count toward internal staging (nor its history)."""
+    raw = raw_flow(9, NOW - timedelta(minutes=25), NOW - timedelta(minutes=21))
+    raw["src"] = {"ip": "8.8.4.4"}
+    raw["dst_bi"], raw["dst_bo"] = 5000, 0
+    write(ctx, [normalize_flow(raw), _with_bytes(rec(1, conns=2), 100)], now=NOW - timedelta(minutes=20),
+          increments="cycle")
+    f = fa.fan_in_now(ctx, since=NOW - timedelta(minutes=60), until=NOW)[DST]
+    assert (f.bytes, f.source_keys) == (100, (SRC.format(1),))
+    with ctx.flows().connect() as conn:
+        assert [r[0] for r in conn.execute("SELECT bytes FROM destination_activity_hourly")] == [100]
+
+
+def test_pair_ports_counts_distinct_ports_before(ctx):
+    write(ctx, [rec(1, minutes_ago=3 * DAY, port=p) for p in (8443, 9000, 9001)] + [rec(1, port=7000)],
+          origin=DataOrigin.BACKFILL)
+    assert fa.pair_ports(ctx, [(SRC.format(1), DST), ("x", DST)], before=NOW - timedelta(days=1)) == {
+        (SRC.format(1), DST): 3}

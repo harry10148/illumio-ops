@@ -504,6 +504,8 @@ def apply_directory_followup(dets: Sequence[Detection], recent: Sequence[Recent]
 
 # ── the second batch (spec §6.5.8 第二批) ─────────────────────────────────────
 PAIR_ROLLOUT = 3   # clients starting on one new listener in one run: a service going live (G)
+PAIR_SCAN = 3      # new ports one source starts on one host in one run: one finding, not one per port (G)
+PAIR_VARIETY = 5   # ports a pair had used: a pair that changes ports (tunnels, scanners) says nothing new (G)
 HISTORY_DAYS = 14  # the hourly activity a quiet period and a host's usual hours reach back over (store keeps 15)
 
 
@@ -570,7 +572,9 @@ def detect_new_pair_port(inp: DetectorInput) -> tuple[list[Detection], DetectorS
     """G: a pair of hosts that already talked starting on a port it had never used. Medium when nobody had ever
     connected to the destination on that port (something new is listening there), low when the destination already
     served it to others, or when PAIR_ROLLOUT or more of its known clients start on it in the same run (a service
-    going live). Not when the source's peer group already uses that port toward the same kind of host."""
+    going live). Not on a pair that had already used PAIR_VARIETY ports (it changes ports: tunnels, scanners), nor
+    when the source's peer group already uses that port toward the same kind of host; PAIR_SCAN or more new ports
+    on one host in one run are one low finding."""
     kind = DetectorKind.NEW_PAIR_PORT
     cfg, data = inp.config, inp.anomaly
     if not inp.baseline_full:
@@ -580,6 +584,8 @@ def detect_new_pair_port(inp: DetectorInput) -> tuple[list[Detection], DetectorS
     for o in _pair_candidates(inp):
         if (o.src_key, o.dst_key) not in data.pairs_before or o.port is None:
             continue
+        if data.pair_ports.get((o.src_key, o.dst_key), 0) >= PAIR_VARIETY:
+            continue
         source = _src_host(o, inp)
         group = group_of(source.labels, keys) if source.managed else None
         if group is not None and data.group_sizes.get(group, 0) >= cfg.peer_min_group:
@@ -588,8 +594,13 @@ def detect_new_pair_port(inp: DetectorInput) -> tuple[list[Detection], DetectorS
                 continue
         found.setdefault((o.src_key, o.dst_key, o.port, o.proto), []).append(o)
     starters = Counter((dst, port, proto) for _, dst, port, proto in found)
+    per_pair = Counter((src, dst) for src, dst, _, _ in found)
     out = []
+    scans: dict[tuple[str, str], list[Obs]] = {}
     for (src, dst, port, proto), hits in sorted(found.items()):
+        if per_pair[(src, dst)] >= PAIR_SCAN:
+            scans.setdefault((src, dst), []).extend(hits)
+            continue
         o = hits[0]
         critical = _dst_host(o, inp).critical
         listener = (dst, port, proto) not in data.ports_served
@@ -601,6 +612,20 @@ def detect_new_pair_port(inp: DetectorInput) -> tuple[list[Detection], DetectorS
             first_seen=min(h.first for h in hits), last_seen=max(h.last for h in hits), critical_asset=critical,
             summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "new_listener": listener,
                      "starters": n, "decision": o.decision},
+            segment=_ports_segment(hits),
+            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
+            ends=ends(hits[:1], hits)))
+    for (src, dst), hits in sorted(scans.items()):  # many new ports on one host at once: a probe, low
+        o = hits[0]
+        critical = _dst_host(o, inp).critical
+        ports = sorted({h.port for h in hits if h.port is not None})
+        out.append(Detection(
+            detector=kind, fingerprint=f"pairport|{src}|{dst}|many", subject_key=src,
+            severity=raise_severity(Severity.LOW) if critical else Severity.LOW,
+            first_seen=min(h.first for h in hits), last_seen=max(h.last for h in hits), critical_asset=critical,
+            summary={"target": o.dst_hostname or o.dst_ip, "port": ports[0], "proto": o.proto, "ports": ports,
+                     "new_listener": any((dst, h.port, h.proto) not in data.ports_served for h in hits),
+                     "starters": 1, "decision": o.decision},
             segment=_ports_segment(hits),
             confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
             ends=ends(hits[:1], hits)))
@@ -619,9 +644,9 @@ def _hours_ready(kind: DetectorKind, inp: DetectorInput, required: float) -> Det
     data = inp.anomaly
     if not data.live:
         return _status(kind, reason="detector_live_only")
-    if data.activity_days < required:
+    if data.hours_days < required:
         return _status(kind, DetectorState.ACCUMULATING, "detector_activity_accumulating",
-                       days=round(data.activity_days - 0.05, 1) if data.activity_days else 0.0, required=int(required))
+                       days=round(data.hours_days - 0.05, 1) if data.hours_days else 0.0, required=int(required))
     return None
 
 
@@ -673,7 +698,8 @@ def detect_quiet_host_wakes(inp: DetectorInput) -> tuple[list[Detection], Detect
                            gaps=sum(1 for g in data.hours_gaps if g[0] < end and g[1] > start))
     out = []
     for src, n in sorted(data.recent.items()):
-        if n < cfg.quiet_min_connections or src not in data.known_before_quiet or not _managed_source(inp, src):
+        if (n < cfg.quiet_min_connections or src not in data.known_before_quiet or src in data.active_just_before
+                or not _managed_source(inp, src)):
             continue
         hours = data.active_hours.get(src, ())
         if any(start <= h < end for h in hours):
@@ -709,7 +735,7 @@ def detect_off_hours(inp: DetectorInput) -> tuple[list[Detection], DetectorStatu
     hour = _hour(inp)
     slots = {(hour - timedelta(hours=1)).hour, hour.hour}
     # the kept days, from the first live hour on (before it nothing was recorded, gap or not)
-    start = max(hour - timedelta(days=HISTORY_DAYS), hour - timedelta(days=data.activity_days))
+    start = max(hour - timedelta(days=HISTORY_DAYS), hour - timedelta(days=data.hours_days))
     end = hour - timedelta(hours=1)
     spans = [(start + timedelta(hours=i), start + timedelta(hours=i + 1))
              for i in range(int((end - start) / timedelta(hours=1)))

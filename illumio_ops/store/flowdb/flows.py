@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
+from illumio_ops.domain.anomaly import is_public
 from illumio_ops.domain.flows import FlowRecord, ranges_within, record_key
 from illumio_ops.domain.identity import account_key, endpoint_key
 from illumio_ops.domain.netaddr import outside
@@ -368,7 +369,10 @@ def _add_activity(activity: Activity, dest: DestActivity, row: sqlite3.Row, hour
         return
     classes = ("all", "directory") if (row["port"], row["proto"]) in DIRECTORY_PORTS else ("all",)
     slots = [activity.setdefault((hour, row["src_key"], cls), [0, 0, 0]) for cls in classes]
-    for slot in [*slots, dest.setdefault((hour, row["dst_key"]), [0, 0, 0])]:
+    src = str(row["src_key"])
+    if not (src.startswith("ip:") and is_public(src[3:])):  # staging is internal hosts sending to one
+        slots.append(dest.setdefault((hour, row["dst_key"]), [0, 0, 0]))
+    for slot in slots:
         slot[0] += connections
         if grown_bytes is not None:
             slot[1] += grown_bytes
@@ -449,6 +453,8 @@ def upsert_flows(conn: sqlite3.Connection, records: Sequence[FlowRecord], *, ori
         if increments == "cycle":
             conn.execute("DELETE FROM source_activity_hourly WHERE hour < ?", (db_time(now - ACTIVITY_KEEP),))
             conn.execute("DELETE FROM destination_activity_hourly WHERE hour < ?", (db_time(now - ACTIVITY_KEEP),))
+            conn.execute("INSERT OR IGNORE INTO live_activity_hours (hour) VALUES (?)", (hour,))
+            conn.execute("DELETE FROM live_activity_hours WHERE hour < ?", (db_time(now - ACTIVITY_KEEP),))
         archive.mark_stale(conn, "flows", days)
         conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
                          "ON CONFLICT(day) DO UPDATE SET dirty = 1", [(d,) for d in sorted(days)])

@@ -124,9 +124,9 @@ def test_new_port_to_a_critical_host_is_raised():
 
 # ── H a quiet host waking ────────────────────────────────────────────────────
 
-def quiet(recent, hours, *, known=("/w/a",), days=15.0, gaps=(), live=True):
-    return AnomalyData(recent=recent, active_hours=hours, known_before_quiet=frozenset(known), activity_days=days,
-                       hours_gaps=gaps, live=live)
+def quiet(recent, hours, *, known=("/w/a",), days=15.0, gaps=(), live=True, just_before=()):
+    return AnomalyData(recent=recent, active_hours=hours, known_before_quiet=frozenset(known), hours_days=days,
+                       hours_gaps=gaps, live=live, active_just_before=frozenset(just_before))
 
 
 def test_quiet_host_waking_fires():
@@ -180,7 +180,7 @@ def night_shift(days=6):
 
 
 def off(recent, hours, *, days=15.0, gaps=(), live=True):
-    return AnomalyData(recent=recent, active_hours=hours, activity_days=days, hours_gaps=gaps, live=live)
+    return AnomalyData(recent=recent, active_hours=hours, hours_days=days, hours_gaps=gaps, live=live)
 
 
 def test_off_hours_fires_low():
@@ -332,3 +332,29 @@ def test_new_listener_many_clients_start_at_once_is_a_rollout_and_low():
     two = rows[:2]
     dets, _ = run(two, first_seen=new(two), data=data, detector=detect_new_pair_port)
     assert [d.severity for d in dets] == [Severity.MEDIUM] * 2
+
+
+
+# ── review 2026-11-02 (Codex) and the .106 run ───────────────────────────────
+
+def test_quiet_host_active_just_before_the_last_hour_is_not_quiet():
+    """Codex: at 12:30, activity at 11:10 is in neither the last 60 minutes nor the whole-hour history."""
+    data = quiet({"/w/a": 150}, {"/w/a": [HOUR - timedelta(days=9)]}, just_before=("/w/a",))
+    assert run([], data=data, detector=detect_quiet_host_wakes)[0] == []
+
+
+def test_new_port_on_a_pair_that_keeps_changing_ports_says_nothing():
+    """.106: tunnels and scanners whose pair already used many ports made dozens of detections an hour."""
+    rows = [obs("/w/a", "/w/b", port=4444)]
+    data = AnomalyData(pairs_before=PAIR, pair_ports={("/w/a", "/w/b"): 5})
+    assert run(rows, first_seen=new(rows), data=data, detector=detect_new_pair_port)[0] == []
+    data = AnomalyData(pairs_before=PAIR, pair_ports={("/w/a", "/w/b"): 4})
+    assert len(run(rows, first_seen=new(rows), data=data, detector=detect_new_pair_port)[0]) == 1
+
+
+def test_many_new_ports_on_one_pair_in_a_run_are_one_low_detection():
+    rows = [obs("/w/a", "/w/b", port=p) for p in (9001, 9002, 9003)]
+    [d], _ = run(rows, first_seen=new(rows), data=AnomalyData(pairs_before=PAIR), detector=detect_new_pair_port)
+    assert d.fingerprint == "pairport|/w/a|/w/b|many" and d.severity is Severity.LOW
+    assert d.summary["ports"] == [9001, 9002, 9003] and d.summary["port"] == 9001
+    assert [p.port for p in d.segment.filter.ports] == [9001, 9002, 9003]

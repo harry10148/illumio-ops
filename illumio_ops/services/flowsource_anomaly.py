@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, TypeVar
 
+from illumio_ops.domain.anomaly import is_public
 from illumio_ops.domain.values import DIRECTORY_PORTS, IngestSource
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
@@ -276,7 +277,8 @@ class FanIn:
 
 
 def fan_in_now(ctx: AppContext, *, since: datetime, until: datetime) -> dict[str, FanIn]:
-    """dst_key -> what collection cycles saw grow toward it in (since, until], not blocked and not late."""
+    """dst_key -> what collection cycles saw internal sources grow toward it in (since, until], not blocked and not
+    late."""
     acc: dict[str, list[Any]] = {}
     with _reading(ctx) as conn:
         for src, dst, connections, grown_bytes in conn.execute(
@@ -284,6 +286,8 @@ def fan_in_now(ctx: AppContext, *, since: datetime, until: datetime) -> dict[str
                 f"{INCREMENT_PRIMARY_JOIN} "
                 "WHERE i.late = 0 AND i.observed_at > ? AND i.observed_at <= ? "
                 "AND f.policy_decision NOT LIKE 'blocked%'", (db_time(since), db_time(until))):
+            if src.startswith("ip:") and is_public(src[3:]):  # staging is internal hosts sending to one
+                continue
             slot = acc.setdefault(dst, [0, 0, set(), 0, 0])
             slot[0] += connections
             slot[4] += 1
@@ -313,3 +317,32 @@ def destination_coverage(ctx: AppContext) -> datetime | None:
     with _reading(ctx) as conn:
         row = conn.execute("SELECT MIN(hour) FROM destination_activity_hourly").fetchone()
     return datetime.fromisoformat(row[0]) if row and row[0] else None
+
+
+def live_hours(ctx: AppContext, *, start: datetime, end: datetime) -> list[datetime]:
+    """The hours in [start, end) a live collection cycle ran in (an hour none did is unknown activity)."""
+    with _reading(ctx) as conn:
+        return [datetime.fromisoformat(r[0]) for r in conn.execute(
+            "SELECT hour FROM live_activity_hours WHERE hour >= ? AND hour < ? ORDER BY hour",
+            (db_time(start), db_time(end)))]
+
+
+def live_coverage(ctx: AppContext) -> datetime | None:
+    """The earliest hour a live cycle is recorded for (how far back a quiet period or usual hours can be told)."""
+    with _reading(ctx) as conn:
+        row = conn.execute("SELECT MIN(hour) FROM live_activity_hours").fetchone()
+    return datetime.fromisoformat(row[0]) if row and row[0] else None
+
+
+def pair_ports(ctx: AppContext, pairs: Collection[tuple[str, str]], *, before: datetime) -> dict[tuple[str, str], int]:
+    """(src, dst) -> how many distinct ports the pair had used before `before`."""
+    out: dict[tuple[str, str], int] = {}
+    with _reading(ctx) as conn:
+        for chunk in _chunks(pairs):
+            marks = ",".join("(?, ?)" for _ in chunk)
+            for src, dst, n in conn.execute(
+                    "SELECT src_key, dst_key, COUNT(DISTINCT port) FROM connection_baseline "
+                    f"WHERE (src_key, dst_key) IN (VALUES {marks}) AND first_seen <= ? GROUP BY src_key, dst_key",
+                    [*(v for p in chunk for v in p), db_time(before)]):
+                out[(src, dst)] = n
+    return out

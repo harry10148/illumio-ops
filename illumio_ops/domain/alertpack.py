@@ -77,6 +77,9 @@ ANOMALY: tuple[tuple[str, tuple[DetectorKind, ...]], ...] = (
     ("rule_anomaly_quiet", (DetectorKind.QUIET_HOST_WAKES,)),
     ("rule_anomaly_staging", (DetectorKind.DATA_STAGING,)),
 )
+# The second batch (spec §6.5.8 第二批): what the v12 → v13 settings upgrade adds.
+ANOMALY_BATCH2 = frozenset({"rule_anomaly_direction", "rule_anomaly_pair_port", "rule_anomaly_quiet",
+                            "rule_anomaly_staging"})
 HIGH_BLOCKED = "rule_high_blocked"
 
 PACK_KEYS: frozenset[str] = frozenset(

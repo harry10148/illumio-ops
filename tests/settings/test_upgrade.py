@@ -292,3 +292,14 @@ def test_new_installs_notify_on_batch2_rules():
     assert not any("off_hours" in str(r.pack_key) for r in s.alerts.rules)
     pair = next(r for r in added if r.pack_key == "rule_anomaly_pair_port")
     assert pair.min_severity.value == "medium"
+
+
+
+def test_v12_upgrade_does_not_bring_back_a_deleted_first_batch_rule():
+    """Codex: the v13 step adds the second batch only; a first-batch rule the operator deleted stays deleted."""
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 12
+    d["alerts"]["rules"] = [r for r in d["alerts"]["rules"]
+                            if r.get("pack_key") not in BATCH2_RULES | {"rule_anomaly_volume"}]
+    s = validate_settings(upgrade(d))
+    assert "rule_anomaly_volume" not in {r.pack_key for r in s.alerts.rules}

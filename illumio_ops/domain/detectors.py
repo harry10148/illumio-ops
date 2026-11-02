@@ -192,11 +192,14 @@ class AnomalyData:
     recent_directory: Sequence[tuple[str, str, datetime, datetime]] = ()
     # F, G: (src, dst) pairs the baseline had on any port before the window; G: (dst, port, proto) any source used
     pairs_before: frozenset[tuple[str, str]] = frozenset()
+    pair_ports: Mapping[tuple[str, str], int] = field(default_factory=dict)  # G: distinct ports each pair used
     ports_served: frozenset[tuple[str, int, int]] = frozenset()
     # H, J: source -> live connections in the last hour (those over a floor); the hours each was active before it
     recent: Mapping[str, int] = field(default_factory=dict)
     active_hours: Mapping[str, Sequence[datetime]] = field(default_factory=dict)
     known_before_quiet: frozenset[str] = frozenset()  # H: sources the baseline saw before the quiet period
+    active_just_before: frozenset[str] = frozenset()  # H: active between the last whole hour and the last 60 min
+    hours_days: float = 0.0                            # H, J: how far back live cycles are recorded
     hours_gaps: tuple[Gap, ...] = ()                   # collection gaps over the kept activity
     # I: destination -> fan-in; (growth carrying bytes, all growth) over the hour; destination history depth
     fan_in: Mapping[str, FanInFact] = field(default_factory=dict)
