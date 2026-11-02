@@ -105,3 +105,29 @@ def test_search_by_name_and_ip(ctx):
     ip = hosts.search(ctx, "10.1.2.3").items
     assert [(h.key, h.managed) for h in ip] == [("ip:10.1.2.3", False)]
     assert hosts.search(ctx, "").items == []
+
+
+def test_different_keeps_the_newest_when_many(ctx):
+    with ctx.flows().connect() as conn:
+        for i in range(22):
+            first = NOW - timedelta(days=6) + timedelta(hours=i)
+            analysis.upsert_detections(conn, [DetectionWrite(
+                detector="new_process", fingerprint=f"np{i}|{WEB}", subject_key=WEB, severity="medium",
+                first_seen=first, last_seen=first, critical_asset=False, summary_json="{}", segment_json="{}",
+                confidence_json="{}")], dedup={"new_process": timedelta(minutes=1)}, late=False, at=NOW)
+        conn.commit()
+    p = hosts.profile(ctx, WEB, now=NOW)
+    assert p.different[0].first_seen == NOW - timedelta(days=6) + timedelta(hours=21)
+
+
+def test_search_ip_resolves_a_known_workload(ctx):
+    from illumio_ops.domain.flows import normalize_flow
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.flows import upsert_flows
+    from tests.services.collect.conftest import raw_flow
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [normalize_flow(raw_flow(3, NOW - timedelta(hours=2), NOW - timedelta(hours=1)))],
+                     origin=DataOrigin.INGEST, now=NOW)
+        conn.commit()
+    [hit] = hosts.search(ctx, "10.0.1.3").items
+    assert (hit.key, hit.managed) == ("/orgs/1/workloads/src-3", True)

@@ -39349,7 +39349,8 @@
                   "ok",
                   "no_source_dimension",
                   "needs_destination",
-                  "basic_mode"
+                  "basic_mode",
+                  "accumulating"
                 ],
                 "title": "State",
                 "type": "string"

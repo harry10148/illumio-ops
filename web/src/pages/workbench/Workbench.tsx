@@ -198,7 +198,7 @@ function Detail({ result, mode }: { result: SegmentResult; mode: Req["mode"] }) 
 
 const PEER_STATE_KEYS: Record<string, string> = {
   no_source_dimension: "wb_peer_no_source", needs_destination: "wb_peer_needs_destination",
-  basic_mode: "wb_peer_basic_mode",
+  basic_mode: "wb_peer_basic_mode", accumulating: "wb_peer_accumulating",
 };
 const PEER_ROW_KEYS: Record<string, string> = { no_group: "wb_peer_no_group", group_too_small: "wb_peer_group_too_small" };
 

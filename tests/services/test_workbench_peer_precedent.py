@@ -11,7 +11,7 @@ from illumio_ops.domain.values import SegmentDimension, SegmentView
 from illumio_ops.services.flowsource import AggRow
 from illumio_ops.services.workbench import FlowRequest
 from illumio_ops.services.workbench_peer import peer_precedent
-from illumio_ops.store.flowdb import workloads
+from illumio_ops.store.flowdb import ingest_state, workloads
 from illumio_ops.store.flowdb.db import db_time
 from illumio_ops.store.flowdb.labels import label_set_id
 from tests.services.collect.conftest import configured_ctx
@@ -52,6 +52,9 @@ def ctx(tmp_path):
         _base(conn, D, X, 1433, NOW)               # after the period began: not a precedent
         _base(conn, A, X, 1433, before)            # the row's own source is not a peer
         _base(conn, B, X, 22, before)              # another port
+        ingest_state.add_coverage(conn, "traffic", NOW - timedelta(days=40), NOW)
+        ingest_state.mark_started(conn, "traffic", NOW)
+        ingest_state.mark_ok(conn, "traffic", NOW, watermark=NOW, rows=1)
         conn.commit()
     return c
 
@@ -114,3 +117,21 @@ def test_port_range_and_protocol_only(ctx):
     tcp = peer_precedent(ctx, _req(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST,
                                    ports=(PortProto(proto=6),)), [_row(A, X)], now=NOW)
     assert tcp.values == [2]
+
+
+def test_accumulating_baseline_is_not_zero_precedent(tmp_path):
+    c = configured_ctx(tmp_path, mode="full")  # no traffic coverage: no baseline yet
+    p = peer_precedent(c, _req(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST), [_row(A, X)], now=NOW)
+    assert p.state == "accumulating" and p.values == [None]
+
+
+def test_many_rows_and_pairs_stay_fast(ctx, monkeypatch):
+    import time
+
+    from illumio_ops.services import workbench_peer
+    many = {(B, f"ip:10.9.{i // 250}.{i % 250}") for i in range(20_000)} | {(B, X)}
+    monkeypatch.setattr(workbench_peer, "peer_destinations", lambda *a, **k: many)
+    rows = [_row(A, f"ip:10.8.{i // 250}.{i % 250}") for i in range(1_000)] + [_row(A, X)]
+    t0 = time.monotonic()
+    p = peer_precedent(ctx, _req(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST), rows, now=NOW)
+    assert time.monotonic() - t0 < 3 and p.values[-1] == 1

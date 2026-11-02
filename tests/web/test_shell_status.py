@@ -101,3 +101,24 @@ def test_rule_summary_counts_known(ctx):
     with ctx.db() as conn:
         s = store.rule_summaries(conn, pce_url=pce.url, org_id=pce.org_id, now=NOW)["a" * 32]
     assert (s.fired_7d, s.known_7d) == (2, 1)
+
+
+def test_collection_failure_recorded_by_the_collector_not_the_job(ctx):
+    """A collector records a PCE failure in its ingest state and returns; the job itself ends without error."""
+    from illumio_ops.store.flowdb import ingest_state
+    for job in ("collect_traffic", "collect_events", "collect_inventory"):
+        _job(ctx, job, None)
+    with ctx.flows().connect() as conn:
+        for src in ("traffic", "events", "inventory"):
+            ingest_state.mark_started(conn, src, NOW)
+            ingest_state.mark_ok(conn, src, NOW, watermark=NOW, rows=1)
+        ingest_state.mark_started(conn, "inventory", NOW)
+        ingest_state.mark_failed(conn, "inventory", NOW, "PceTransportError: dns")
+        conn.commit()
+    assert shell.status(ctx, now=NOW).collection == "degraded"
+    with ctx.flows().connect() as conn:
+        for src in ("traffic", "events"):
+            ingest_state.mark_started(conn, src, NOW)
+            ingest_state.mark_failed(conn, src, NOW, "PceTransportError: dns")
+        conn.commit()
+    assert shell.status(ctx, now=NOW).collection == "failing"

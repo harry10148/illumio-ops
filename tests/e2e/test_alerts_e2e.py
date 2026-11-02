@@ -371,3 +371,26 @@ def test_rules_no_overflow_760(narrow_context, live_app):
     page.goto(f"{live_app.url}/alert-rules")
     page.locator("[data-role=rule-list]").wait_for()
     assert no_horizontal_overflow(page)
+
+
+def test_late_detail_does_not_replace_the_selected_one(context, live_app, monkeypatch):
+    """Codex review: a slow answer for the alert left behind must not overwrite the one now selected."""
+    import time
+
+    from illumio_ops.services.alerts import views
+    seed(live_app.ctx)
+    newer = _lateral(live_app.ctx, "new_process")
+    real = views.alert_detail
+
+    def slow(ctx, alert_id):
+        if alert_id == newer:
+            time.sleep(1.5)  # the first selected (newest) answers late; the server serves the others meanwhile
+        return real(ctx, alert_id)
+    monkeypatch.setattr("illumio_ops.web.routes.alerts.views.alert_detail", slow)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.locator("[data-alert-id]").nth(1).click()  # the disk alert, while the first is still loading
+    side = page.locator("[data-role=alert-side] [data-role=alert-summary]")
+    expect(side).to_contain_text("Disk space is low")
+    page.wait_for_timeout(2500)
+    expect(side).to_contain_text("Disk space is low", timeout=100)

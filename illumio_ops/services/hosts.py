@@ -28,7 +28,7 @@ from illumio_ops.services.analysis.ransomware import HostRansomware
 from illumio_ops.services.analysis.tamper import HostTamper
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.flowsource import host_addresses
+from illumio_ops.services.flowsource import host_addresses, workload_at
 from illumio_ops.services.reports.common import unnamed_host
 from illumio_ops.store.flowdb import analysis, capabilities, labels, workloads
 from illumio_ops.store.flowdb import flows as flows_store
@@ -292,7 +292,10 @@ def search(ctx: AppContext, q: str) -> HostSearch:
             if (n := w.hostname or w.name) and low in n.lower()]
     hits.sort(key=lambda h: h.name.lower())
     if ip is not None and not hits:
-        hits = [HostHit(key=f"ip:{ip}", name=ip, managed=False)]
+        href = workload_at(ctx, ip)
+        known = next((w for w in rows if w.href == href), None) if href else None
+        hits = ([HostHit(key=href, name=(known.hostname or known.name or ip) if known else ip, managed=True)] if href
+                else [HostHit(key=f"ip:{ip}", name=ip, managed=False)])
     return HostSearch(items=hits[:SEARCH_LIMIT])
 
 

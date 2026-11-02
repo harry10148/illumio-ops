@@ -206,17 +206,19 @@ def _link(ctx: AppContext, row: sqlite3.Row) -> str:
     return console_url(ctx.settings.current().pce)
 
 
-def _detection(ctx: AppContext, facts: dict[str, Any]) -> sqlite3.Row | None:
-    """The detection a lateral alert was raised for, when it is still stored."""
+def _detection(ctx: AppContext, facts: dict[str, Any], subject: str) -> sqlite3.Row | None:
+    """The detection a lateral alert was raised for, when it is still stored: the same id and the alert's subject (its
+    fingerprint) — a flow store rebuilt after a PCE switch gives ids again to other detections."""
     det_id = facts.get("detection_id")
     if not isinstance(det_id, int):
         return None
     try:
         with ctx.flows().connect() as conn:
             require_same_pce(conn, ctx.settings.current().pce)
-            return detection_store.detection_by_id(conn, det_id)
+            row = detection_store.detection_by_id(conn, det_id)
     except BindingMismatch:
         return None
+    return row if row is not None and row["fingerprint"] == subject else None
 
 
 def _timeline(ctx: AppContext, row: sqlite3.Row, rule: str, detection: sqlite3.Row | None,
@@ -299,7 +301,7 @@ def alert_detail(ctx: AppContext, alert_id: int) -> AlertDetail | None:
     lang = ctx.settings.current().display.language
     params = json.loads(row["params_json"])
     facts = json.loads(row["facts_json"])
-    detection = _detection(ctx, facts) if item.rule_type is AlertRuleType.LATERAL else None
+    detection = _detection(ctx, facts, row["subject_key"]) if item.rule_type is AlertRuleType.LATERAL else None
     return AlertDetail(
         **item.model_dump(), params=params, facts=facts,
         confidence=json.loads(row["confidence_json"]), first_seen=datetime.fromisoformat(row["first_seen"]),

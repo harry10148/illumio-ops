@@ -916,6 +916,15 @@ def increment_times(ctx: AppContext, *, start: datetime, end: datetime) -> list[
     return [datetime.fromisoformat(r[0]) for r in found]
 
 
+def workload_at(ctx: AppContext, ip: str) -> str | None:
+    """The workload the flows saw with this address (the inventory keeps no addresses): the first row is enough."""
+    with ctx.flows().connect() as conn:
+        row = conn.execute("SELECT src_key FROM flows WHERE src_ip = ? AND src_key LIKE '/orgs/%' UNION ALL "
+                           "SELECT dst_key FROM flows WHERE dst_ip = ? AND dst_key LIKE '/orgs/%' LIMIT 1",
+                           (ip, ip)).fetchone()
+    return str(row[0]) if row else None
+
+
 def host_addresses(ctx: AppContext, hrefs: set[str]) -> dict[str, str]:
     """What the flows called each workload href, else an address it was seen with: how to show a host the
     inventory does not hold (a Kubernetes, container or deleted workload)."""

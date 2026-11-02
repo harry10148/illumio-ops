@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from illumio_ops.domain.values import CollectionMode, IngestSource
 from illumio_ops.services.analysis.context import load_lateral_context
+from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
 
@@ -55,6 +56,7 @@ def status(ctx: AppContext, *, now: datetime | None = None) -> DataStatus:
     s = ctx.settings.current()
     basic = s.collection.mode is CollectionMode.LIGHTWEIGHT
     with ctx.flows().connect() as conn:
+        require_same_pce(conn, s.pce)  # another PCE's store not yet cleared after a switch is not this one's state
         events = ingest_state.get(conn, IngestSource.EVENTS)
         traffic = ingest_state.get(conn, IngestSource.TRAFFIC)
         gaps = ingest_state.open_gaps(conn)

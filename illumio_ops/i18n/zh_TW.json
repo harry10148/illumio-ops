@@ -2650,5 +2650,6 @@
   "modes_disk_reports": "報表",
   "home_basic_now": "目前只收集事件：告警頁只有事件與系統告警。",
   "home_basic_advanced_adds": "進階模式另外提供橫向移動偵測、允許流量異常與流量型告警，需要保留流量的磁碟與記憶體。",
-  "home_basic_investigate": "基本模式的調查：在「調查」頁即時向 PCE 查詢，查完即丟。"
+  "home_basic_investigate": "基本模式的調查：在「調查」頁即時向 PCE 查詢，查完即丟。",
+  "wb_peer_accumulating": "同群先例：基準期還在累積（或初始回填未完成），先例數目前不完整，暫不顯示。"
 }

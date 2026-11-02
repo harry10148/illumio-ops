@@ -2885,7 +2885,7 @@ timestamp: string
 export interface PeerPrecedent {
 ports: string[]
 reasons: (("no_group" | "group_too_small") | null)[]
-state: ("ok" | "no_source_dimension" | "needs_destination" | "basic_mode")
+state: ("ok" | "no_source_dimension" | "needs_destination" | "basic_mode" | "accumulating")
 values: (number | null)[]
 }
 /**

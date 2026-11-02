@@ -100,7 +100,7 @@ class DimensionTop(BaseModel):
     pulled: PullInfo | None = None  # read from the PCE for this period (lightweight mode)
 
 
-PeerState = Literal["ok", "no_source_dimension", "needs_destination", "basic_mode"]
+PeerState = Literal["ok", "no_source_dimension", "needs_destination", "basic_mode", "accumulating"]
 PeerRowReason = Literal["no_group", "group_too_small"]
 
 
@@ -165,14 +165,14 @@ def run(ctx: AppContext, req: FlowRequest | EventRequest, *, now: datetime | Non
         result = run_segment(read, seg, now=now)
         if result.ranking:
             result = result.model_copy(update={"ranking": _named(read, result.ranking, req.group_by)})
-        check()
-    peer = None
-    if isinstance(req, FlowRequest) and result.ranking is not None:
-        from illumio_ops.services.workbench_peer import (
-            peer_precedent,  # imports this module
-        )
-        peer = peer_precedent(ctx, req, result.ranking, now=now)
-    return WorkbenchResult(result=result, pulled=pulled, peer=peer)
+        peer = None
+        if isinstance(req, FlowRequest) and result.ranking is not None:
+            from illumio_ops.services.workbench_peer import (
+                peer_precedent,  # it imports this module
+            )
+            peer = peer_precedent(ctx, req, result.ranking, now=now)
+        check()  # after the peer column too: both answers belong to the PCE this request started with
+        return WorkbenchResult(result=result, pulled=pulled, peer=peer)
 
 
 class PredictedView(BaseModel):

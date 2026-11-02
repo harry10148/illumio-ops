@@ -144,7 +144,16 @@ def test_from_alert_back_link(context, live_app):
 
 
 def test_peer_precedent_column_states(context, live_app):
+    from datetime import timedelta
+
+    from illumio_ops.store.flowdb import ingest_state
     alert_id = _seed(live_app)
+    now = datetime.now(UTC)
+    with live_app.ctx.flows().connect() as conn:  # a complete baseline, so the column is computed
+        ingest_state.add_coverage(conn, "traffic", now - timedelta(days=40), now)
+        ingest_state.mark_started(conn, "traffic", now)
+        ingest_state.mark_ok(conn, "traffic", now, watermark=now, rows=1)
+        conn.commit()
     page = context.new_page()
     sign_in(page, live_app.url)
     _ranking(page, live_app, alert_id, "service")

@@ -42,3 +42,16 @@ def test_disk_parts_sum_files(tmp_path):
     (c.paths.reports_dir / "sub" / "b.xlsx").write_bytes(b"y" * 500)
     parts = {p.name: p.bytes for p in data_status.status(c, now=NOW).disk}
     assert parts["reports"] == 1500 and parts["flows"] > 0 and parts["app"] > 0 and parts["archive"] == 0
+
+
+def test_refuses_another_pces_data(tmp_path):
+    import pytest
+
+    from illumio_ops.services.collect.guard import BindingMismatch
+    from illumio_ops.store.flowdb import binding
+    c = configured_ctx(tmp_path, mode="full")
+    with c.flows().connect() as conn:
+        binding.bind(conn, "https://other.example:8443", "9", NOW)
+        conn.commit()
+    with pytest.raises(BindingMismatch):
+        data_status.status(c, now=NOW)

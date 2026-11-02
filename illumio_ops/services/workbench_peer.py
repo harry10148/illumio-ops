@@ -55,6 +55,8 @@ def peer_precedent(ctx: AppContext, req: FlowRequest, rows: Sequence[AggRow], *,
     lat = ctx.settings.current().lateral
     keys = lat.peer_group_keys
     lc = load_lateral_context(ctx, now=at)
+    if lc.baseline_backfilling or lc.baseline_days < lc.baseline_required:
+        return blank("accumulating")  # a missing history is not a 0: the baseline is still filling
     members: dict[str, list[str]] = {}
     for key, host in lc.hosts.items():
         group = group_of(host.labels, keys) if host.managed else None
@@ -84,12 +86,18 @@ def peer_precedent(ctx: AppContext, req: FlowRequest, rows: Sequence[AggRow], *,
             sig_cache[key] = _signature(lc, key, keys)
         return sig_cache[key]
 
+    by_sig: dict[str, set[str]] = {}  # destination kind -> the sources that reached one before the period
+    for source, dst in pairs:
+        kind = sig(dst)
+        if kind is not None:
+            by_sig.setdefault(kind, set()).add(source)
+    group_set = {g: frozenset(members[g]) for g in set(groups) if g is not None}
     values: list[int | None] = []
     for r, group in zip(rows, groups, strict=True):
         if group is None:
             values.append(None)
             continue
         src_key, dst_sig = str(r.keys[si]), sig(str(r.keys[di]))
-        peers = set(members[group]) - {src_key}
-        values.append(len({s for s, d in pairs if s in peers and dst_sig is not None and sig(d) == dst_sig}))
+        reached = by_sig.get(dst_sig, set()) if dst_sig is not None else set()
+        values.append(len((reached & group_set[group]) - {src_key}))
     return PeerPrecedent(state="ok", values=values, reasons=reasons, ports=port_words)

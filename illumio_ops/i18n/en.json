@@ -2650,5 +2650,6 @@
   "modes_disk_reports": "Reports",
   "home_basic_now": "Only events are collected now: the alerts page has event and system alerts only.",
   "home_basic_advanced_adds": "Advanced mode adds lateral-movement detection, allowed-traffic anomalies and traffic alerts; it needs disk and memory to keep traffic.",
-  "home_basic_investigate": "Investigating in basic mode: the Investigate page asks the PCE live and keeps nothing."
+  "home_basic_investigate": "Investigating in basic mode: the Investigate page asks the PCE live and keeps nothing.",
+  "wb_peer_accumulating": "Peer precedent: the baseline is still accumulating (or the initial backfill has not finished); the counts would be incomplete, so they are not shown yet."
 }

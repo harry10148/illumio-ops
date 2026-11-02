@@ -51,13 +51,17 @@ function Side({ id, onKnown }: { id: number; onKnown: () => void }) {
   const [isolating, setIsolating] = useState(false);
 
   useEffect(() => {
+    let live = true;  // an answer for an alert no longer selected must not replace this one (nor its quarantine target)
     setD(null);
+    setIsolating(false);
     void call("alerts.get", undefined, { alert_id: String(id) }).then((env) => {
+      if (!live) return;
       if (env.ok && env.data) {
         setD(env.data);
         setError(null);
       } else setError(env.error);
     });
+    return () => { live = false; };
   }, [id]);
 
   if (error) return <p className="form-error">{t(error.message_key, error.params)}</p>;
@@ -222,7 +226,7 @@ export function AlertsHome() {
           </div>
           {selected !== null && (
             <DetailPane label={t("alert_detail_title")}>
-              <Side id={selected} onKnown={() => undefined} />
+              <Side key={selected} id={selected} onKnown={() => undefined} />
             </DetailPane>
           )}
         </div>

@@ -72,7 +72,10 @@ def delete_events_before(conn: sqlite3.Connection, cutoff: datetime, *, archived
 
 def events_for_workload(conn: sqlite3.Connection, href: str, *, start: datetime, end: datetime,
                         limit: int) -> list[sqlite3.Row]:
-    """A workload's events between start and end, oldest first (the alert detail's timeline)."""
-    return conn.execute("SELECT event_type, severity, timestamp, tamper_classification FROM events "
-                        "WHERE workload_href = ? AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp, id LIMIT ?",
+    """A workload's events between start and end, newest first (the alert detail's timeline): the events that name it,
+    and those its VEN sent (collected events name no workload; the VEN is matched as the event pages match it)."""
+    return conn.execute("SELECT e.event_type, e.severity, e.timestamp, e.tamper_classification FROM events e "
+                        "LEFT JOIN workloads w ON w.ven_href = e.created_by_href "
+                        "WHERE COALESCE(e.workload_href, w.href) = ? AND e.timestamp >= ? AND e.timestamp <= ? "
+                        "ORDER BY e.timestamp DESC, e.id DESC LIMIT ?",
                         (href, db_time(start), db_time(end), limit)).fetchall()

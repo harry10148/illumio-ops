@@ -126,9 +126,11 @@ def detection_by_id(conn: sqlite3.Connection, detection_id: int) -> sqlite3.Row 
 
 def detections_of_subject(conn: sqlite3.Connection, subject: str, *, start: datetime, end: datetime,
                           limit: int) -> list[sqlite3.Row]:
-    """A subject's detections first seen between start and end, oldest first (ix_detections_subject)."""
+    """A subject's detections first seen between start and end, newest first (ix_detections_subject): a cap keeps the
+    latest."""
     return conn.execute("SELECT * FROM detections WHERE subject_key = ? AND first_seen >= ? AND first_seen <= ? "
-                        "ORDER BY first_seen, id LIMIT ?", (subject, db_time(start), db_time(end), limit)).fetchall()
+                        "ORDER BY first_seen DESC, id DESC LIMIT ?",
+                        (subject, db_time(start), db_time(end), limit)).fetchall()
 
 
 def detections_about(conn: sqlite3.Connection, subjects: Collection[str], *, since: datetime,
