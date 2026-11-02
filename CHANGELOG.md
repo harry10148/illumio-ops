@@ -24,8 +24,19 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Four best-practice rules for them. New installs notify; an upgraded install records them, and the operator turns
   each on from the rules page.
 
+- A light security console (UI redesign, plan A): alerts are the home page — filtered by lateral movement,
+  allowed-traffic anomaly, traffic, events and system, unprocessed first, with the alert's timeline, the facts its
+  detection recorded that the vendor's tools cannot show, and quarantine offered only for a managed host in the
+  inventory. Detection (attack surface with the previous day, every detector's state, paths, needs attention),
+  Investigate (peer-precedent column), Hosts (search; usual destinations, processes and accounts over 30 days;
+  what differs this week), Alert rules and notifications on one page with 7-day triggers and a rule test that
+  writes and sends nothing, and System › Modes and data sources (both modes side by side, data status, disk use).
+
 ### Changed
 - Hourly activity is kept 15 days (was 8). An alert-rule file may hold 400 rules (was 360).
+- Old addresses redirect: `/alerts` → `/`, `/lateral` → `/detect`, `/alerts/rules` → `/alert-rules`,
+  `/system/channels` → `/alert-rules?tab=channels`. The home page summary API (`/api/home/summary`) is gone; the PCE
+  probe result is on System › PCE connection.
 
 ## [6.0.0] - 2026-11-01
 
