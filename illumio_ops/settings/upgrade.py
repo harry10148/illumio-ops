@@ -131,6 +131,11 @@ def _v12_to_v13(data: dict[str, Any]) -> dict[str, Any]:
     if isinstance(lateral, dict) and isinstance(lateral.get("detectors"), dict):
         for key, value in fresh.items():
             lateral["detectors"].setdefault(key, value)
+    # Their rules join the pack recording only, as the first batch's did (v4 → v5).
+    alerts = data.get("alerts")
+    if isinstance(alerts, dict) and isinstance(alerts.get("rules"), list):
+        have = {r.get("pack_key") for r in alerts["rules"] if isinstance(r, dict)}
+        alerts["rules"] += [r.model_dump(mode="json") for r in anomaly_rules(notify=False) if r.pack_key not in have]
     return data
 
 

@@ -117,7 +117,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -1147,7 +1152,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -2279,7 +2289,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -3399,7 +3414,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -4540,7 +4560,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -5659,7 +5684,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -6738,7 +6768,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -7768,7 +7803,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -17947,7 +17987,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -19563,7 +19608,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -30001,7 +30051,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -31296,7 +31351,12 @@
               "new_process",
               "auth_to_non_dc",
               "new_dc_client",
-              "directory_surge"
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
             ],
             "title": "DetectorKind",
             "type": "string"
@@ -37956,14 +38016,19 @@
       "auth_to_non_dc",
       "blocked_surge",
       "cross_env",
+      "data_staging",
+      "direction_reversal",
       "directory_surge",
       "fanout",
       "new_admin_connection",
       "new_dc_client",
+      "new_pair_port",
       "new_process",
       "non_admin_group",
+      "off_hours",
       "peer_deviation",
       "pivot_chain",
+      "quiet_host_wakes",
       "suspicious_tool",
       "unexpected_initiator",
       "volume_surge"

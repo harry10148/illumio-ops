@@ -306,3 +306,10 @@ def destination_history(ctx: AppContext, dsts: Collection[str], *, start: dateti
                     [*chunk, db_time(start), db_time(end)]):
                 out[dst] = grown_bytes
     return out
+
+
+def destination_coverage(ctx: AppContext) -> datetime | None:
+    """The earliest hour the destination activity table holds (how long the history behind data staging is)."""
+    with _reading(ctx) as conn:
+        row = conn.execute("SELECT MIN(hour) FROM destination_activity_hourly").fetchone()
+    return datetime.fromisoformat(row[0]) if row and row[0] else None

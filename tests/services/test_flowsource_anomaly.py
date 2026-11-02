@@ -269,6 +269,7 @@ def test_activity_kept_fifteen_days(ctx):
     lambda c: fa.activity_hours(c, ["a"], start=NOW, end=NOW),
     lambda c: fa.fan_in_now(c, since=NOW, until=NOW),
     lambda c: fa.destination_history(c, ["b"], start=NOW, end=NOW),
+    lambda c: fa.destination_coverage(c),
 ])
 def test_batch2_reads_raise_stale_generation(ctx, monkeypatch, read):
     _switching(ctx, monkeypatch)

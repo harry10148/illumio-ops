@@ -182,6 +182,12 @@ class DetectorKind(StrEnum):
     AUTH_TO_NON_DC = "auth_to_non_dc"
     NEW_DC_CLIENT = "new_dc_client"
     DIRECTORY_SURGE = "directory_surge"
+    # the second batch (spec §6.5.8 第二批)
+    DIRECTION_REVERSAL = "direction_reversal"
+    NEW_PAIR_PORT = "new_pair_port"
+    QUIET_HOST_WAKES = "quiet_host_wakes"
+    DATA_STAGING = "data_staging"
+    OFF_HOURS = "off_hours"
 
 
 class PortClass(StrEnum):

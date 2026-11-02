@@ -24,10 +24,16 @@ export const DETECTOR_KEYS: Record<string, string> = {
   auth_to_non_dc: "detector_name_auth_to_non_dc",
   new_dc_client: "detector_name_new_dc_client",
   directory_surge: "detector_name_directory_surge",
+  direction_reversal: "detector_name_direction_reversal",
+  new_pair_port: "detector_name_new_pair_port",
+  quiet_host_wakes: "detector_name_quiet_host_wakes",
+  data_staging: "detector_name_data_staging",
+  off_hours: "detector_name_off_hours",
 };
 // The allowed-traffic anomaly detectors (spec §6.5.8), listed apart from the lateral-movement ones.
 const ANOMALY_DETECTORS = new Set(["peer_deviation", "volume_surge", "account_new_source", "suspicious_tool", "new_process",
-                                   "auth_to_non_dc", "new_dc_client", "directory_surge"]);
+                                   "auth_to_non_dc", "new_dc_client", "directory_surge", "direction_reversal",
+                                   "new_pair_port", "quiet_host_wakes", "data_staging", "off_hours"]);
 const CLASS_KEYS: Record<string, string> = {
   remote: "port_class_remote", directory: "port_class_directory", database: "port_class_database",
 };
@@ -64,6 +70,12 @@ const NUMBERS: { key: string; labelKey: string }[] = [
   { key: "directory_followup_minutes", labelKey: "det_directory_followup" },
   { key: "account_history_days", labelKey: "det_account_history" },
   { key: "process_history_days", labelKey: "det_process_history" },
+  { key: "quiet_days", labelKey: "det_quiet_days" },
+  { key: "quiet_min_connections", labelKey: "det_quiet_min_connections" },
+  { key: "staging_min_sources", labelKey: "det_staging_min_sources" },
+  { key: "staging_min_mb", labelKey: "det_staging_min_mb" },
+  { key: "off_hours_min_connections", labelKey: "det_off_hours_min_connections" },
+  { key: "off_hours_min_days", labelKey: "det_off_hours_min_days" },
 ];
 const GRAPH_FIELDS = new Set(["graph_hops", "observation_days"]);
 

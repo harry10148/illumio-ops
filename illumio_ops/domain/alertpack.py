@@ -64,13 +64,18 @@ _LATERAL: tuple[tuple[str, DetectorKind], ...] = (
     ("rule_lateral_new_admin", DetectorKind.NEW_ADMIN_CONNECTION),
     ("rule_lateral_cross_env", DetectorKind.CROSS_ENV),
 )
-# Anomalies in allowed traffic (spec §6.5.8); a new process is low and is left to the focus list.
+# Anomalies in allowed traffic (spec §6.5.8); a new process and off-hours activity are low and are left to the focus
+# list, and a new port on a known pair alerts only when it is a new listener (medium).
 ANOMALY: tuple[tuple[str, tuple[DetectorKind, ...]], ...] = (
     ("rule_anomaly_peer", (DetectorKind.PEER_DEVIATION,)),
     ("rule_anomaly_volume", (DetectorKind.VOLUME_SURGE,)),
     ("rule_anomaly_account_source", (DetectorKind.ACCOUNT_NEW_SOURCE,)),
     ("rule_anomaly_tool", (DetectorKind.SUSPICIOUS_TOOL,)),
     ("rule_anomaly_directory", (DetectorKind.AUTH_TO_NON_DC, DetectorKind.NEW_DC_CLIENT, DetectorKind.DIRECTORY_SURGE)),
+    ("rule_anomaly_direction", (DetectorKind.DIRECTION_REVERSAL,)),
+    ("rule_anomaly_pair_port", (DetectorKind.NEW_PAIR_PORT,)),
+    ("rule_anomaly_quiet", (DetectorKind.QUIET_HOST_WAKES,)),
+    ("rule_anomaly_staging", (DetectorKind.DATA_STAGING,)),
 )
 HIGH_BLOCKED = "rule_high_blocked"
 

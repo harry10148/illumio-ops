@@ -16,7 +16,7 @@ export type Severity = ("low" | "medium" | "high" | "critical")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DetectorKind".
  */
-export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator" | "peer_deviation" | "volume_surge" | "account_new_source" | "suspicious_tool" | "new_process" | "auth_to_non_dc" | "new_dc_client" | "directory_surge")
+export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator" | "peer_deviation" | "volume_surge" | "account_new_source" | "suspicious_tool" | "new_process" | "auth_to_non_dc" | "new_dc_client" | "directory_surge" | "direction_reversal" | "new_pair_port" | "quiet_host_wakes" | "data_staging" | "off_hours")
 /**
  * An event rule fires on the matches of one evaluation (immediate) or on a count within its window.
  * 
@@ -3036,14 +3036,19 @@ export const VALUES = {
     "auth_to_non_dc",
     "blocked_surge",
     "cross_env",
+    "data_staging",
+    "direction_reversal",
     "directory_surge",
     "fanout",
     "new_admin_connection",
     "new_dc_client",
+    "new_pair_port",
     "new_process",
     "non_admin_group",
+    "off_hours",
     "peer_deviation",
     "pivot_chain",
+    "quiet_host_wakes",
     "suspicious_tool",
     "unexpected_initiator",
     "volume_surge"

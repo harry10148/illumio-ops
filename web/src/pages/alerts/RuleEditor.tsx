@@ -22,7 +22,8 @@ const DETECTOR_GROUPS: { titleKey: string; kinds: DetectorKind[] }[] = [
             "account_fanout", "unexpected_initiator"] },
   { titleKey: "lateral_detectors_anomaly",
     kinds: ["peer_deviation", "volume_surge", "account_new_source", "suspicious_tool", "new_process", "auth_to_non_dc",
-            "new_dc_client", "directory_surge"] },
+            "new_dc_client", "directory_surge", "direction_reversal", "new_pair_port", "quiet_host_wakes", "data_staging",
+            "off_hours"] },
 ];
 const DETECTOR_KEYS: Record<string, string> = {
   fanout: "detector_name_fanout", new_admin_connection: "detector_name_new_admin_connection",
@@ -33,6 +34,9 @@ const DETECTOR_KEYS: Record<string, string> = {
   account_new_source: "detector_name_account_new_source", suspicious_tool: "detector_name_suspicious_tool",
   new_process: "detector_name_new_process", auth_to_non_dc: "detector_name_auth_to_non_dc",
   new_dc_client: "detector_name_new_dc_client", directory_surge: "detector_name_directory_surge",
+  direction_reversal: "detector_name_direction_reversal", new_pair_port: "detector_name_new_pair_port",
+  quiet_host_wakes: "detector_name_quiet_host_wakes", data_staging: "detector_name_data_staging",
+  off_hours: "detector_name_off_hours",
 };
 const CHECKS: SystemCheck[] = ["pce_health", "collection_failing", "data_loss", "job_failing", "disk_low", "siem_backlog"];
 const CHECK_KEYS: Record<string, string> = {

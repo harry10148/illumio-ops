@@ -154,7 +154,8 @@ def test_pack_lateral_notify_follows_flag():
             [DetectorKind.FANOUT, DetectorKind.NEW_ADMIN_CONNECTION, DetectorKind.CROSS_ENV,
              DetectorKind.PEER_DEVIATION, DetectorKind.VOLUME_SURGE, DetectorKind.ACCOUNT_NEW_SOURCE,
              DetectorKind.SUSPICIOUS_TOOL, DetectorKind.AUTH_TO_NON_DC, DetectorKind.NEW_DC_CLIENT,
-             DetectorKind.DIRECTORY_SURGE])
+             DetectorKind.DIRECTORY_SURGE, DetectorKind.DIRECTION_REVERSAL, DetectorKind.NEW_PAIR_PORT,
+             DetectorKind.QUIET_HOST_WAKES, DetectorKind.DATA_STAGING])
         assert all(r.notify is flag for r in lateral)
         assert all(r.notify for r in rules if r.type != "lateral")
     systems = sorted(r.check.value for r in best_practice_rules(notify_new_defaults=True) if r.type == "system")

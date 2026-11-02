@@ -154,6 +154,17 @@ class Activity:
 
 
 @dataclass(frozen=True)
+class FanInFact:
+    """A destination's live growth over the last hour (I): connections, the bytes of the growth that carried them,
+    the sources that sent those bytes, and its most bytes in any hour of the 7 days before (None: no hour carried
+    byte counts — unknown, not zero)."""
+    connections: int
+    bytes: int
+    sources: tuple[str, ...]
+    previous_bytes: int | None
+
+
+@dataclass(frozen=True)
 class AnomalyData:
     """What the service looked up for the anomaly detectors, by the keys this run's connections name."""
     # A: (source group, port, proto) -> destination signatures the group's hosts used before the window
@@ -179,6 +190,19 @@ class AnomalyData:
     directory_clients_before: frozenset[str] = frozenset()
     # E④: (subject, detector, first seen, last seen) of directory detections stored by earlier runs
     recent_directory: Sequence[tuple[str, str, datetime, datetime]] = ()
+    # F, G: (src, dst) pairs the baseline had on any port before the window; G: (dst, port, proto) any source used
+    pairs_before: frozenset[tuple[str, str]] = frozenset()
+    ports_served: frozenset[tuple[str, int, int]] = frozenset()
+    # H, J: source -> live connections in the last hour (those over a floor); the hours each was active before it
+    recent: Mapping[str, int] = field(default_factory=dict)
+    active_hours: Mapping[str, Sequence[datetime]] = field(default_factory=dict)
+    known_before_quiet: frozenset[str] = frozenset()  # H: sources the baseline saw before the quiet period
+    hours_gaps: tuple[Gap, ...] = ()                   # collection gaps over the kept activity
+    # I: destination -> fan-in; (growth carrying bytes, all growth) over the hour; destination history depth
+    fan_in: Mapping[str, FanInFact] = field(default_factory=dict)
+    fan_in_coverage: tuple[int, int] = (0, 0)
+    fan_in_gaps: tuple[Gap, ...] = ()                  # collection gaps in the 7 days compared with
+    destination_days: float = 0.0
 
 
 HostLookup = Callable[[str, str, str | None, Mapping[str, str]], HostInfo]  # (key, ip, hostname, flow labels)
@@ -668,6 +692,11 @@ DETECTORS: dict[DetectorKind, DetectorFn] = {
     DetectorKind.AUTH_TO_NON_DC: lambda i: anomaly.detect_auth_to_non_dc(i),
     DetectorKind.NEW_DC_CLIENT: lambda i: anomaly.detect_new_dc_client(i),
     DetectorKind.DIRECTORY_SURGE: lambda i: anomaly.detect_directory_surge(i),
+    DetectorKind.DIRECTION_REVERSAL: lambda i: anomaly.detect_direction_reversal(i),
+    DetectorKind.NEW_PAIR_PORT: lambda i: anomaly.detect_new_pair_port(i),
+    DetectorKind.QUIET_HOST_WAKES: lambda i: anomaly.detect_quiet_host_wakes(i),
+    DetectorKind.DATA_STAGING: lambda i: anomaly.detect_data_staging(i),
+    DetectorKind.OFF_HOURS: lambda i: anomaly.detect_off_hours(i),
 }
 
 
@@ -683,6 +712,9 @@ def dedup_windows(cfg: DetectorConfig) -> dict[str, timedelta]:
         DetectorKind.ACCOUNT_NEW_SOURCE: timedelta(days=30), DetectorKind.SUSPICIOUS_TOOL: day,
         DetectorKind.NEW_PROCESS: timedelta(days=30), DetectorKind.AUTH_TO_NON_DC: day,
         DetectorKind.NEW_DC_CLIENT: timedelta(days=30), DetectorKind.DIRECTORY_SURGE: anomaly.SURGE_WINDOW,
+        DetectorKind.DIRECTION_REVERSAL: timedelta(days=30), DetectorKind.NEW_PAIR_PORT: timedelta(days=30),
+        DetectorKind.QUIET_HOST_WAKES: anomaly.SURGE_WINDOW, DetectorKind.DATA_STAGING: anomaly.SURGE_WINDOW,
+        DetectorKind.OFF_HOURS: anomaly.SURGE_WINDOW,
     }
 
 
@@ -710,7 +742,7 @@ def run_detectors(inp: DetectorInput) -> tuple[list[Detection], list[DetectorSta
         found, status = DETECTORS[kind](inp)
         detections += found
         statuses.append(status)
-    raised = apply_precursors(detections, inp.precursors, window=inp.config.precursor_window)
+    raised = apply_precursors(anomaly.drop_covered(detections), inp.precursors, window=inp.config.precursor_window)
     directory = [(d.subject_key, d.detector.value, d.first_seen, d.last_seen) for d in detections
                  if d.detector in anomaly.DIRECTORY_DETECTORS]
     return anomaly.apply_directory_followup(raised, [*inp.anomaly.recent_directory, *directory],

@@ -13,7 +13,7 @@ import ipaddress
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from illumio_ops.domain.detectors import (
     AnomalyData,
@@ -499,4 +499,300 @@ def apply_directory_followup(dets: Sequence[Detection], recent: Sequence[Recent]
         out.append(replace(d, severity=raise_severity(d.severity),
                            summary=dict(d.summary) | {"after_directory": {"detector": last[1],
                                                                          "last_seen": last[3].isoformat()}}))
+    return out
+
+
+# ── the second batch (spec §6.5.8 第二批) ─────────────────────────────────────
+HISTORY_DAYS = 14  # the hourly activity a quiet period and a host's usual hours reach back over (store keeps 15)
+
+
+def _internal_end(key: str, ip: str, host: HostInfo) -> bool:
+    return host.managed or not is_public(ip or (key[3:] if key.startswith("ip:") else ""))
+
+
+def _pair_candidates(inp: DetectorInput) -> list[Obs]:
+    """Connections first seen in this window, on a service port (not management, not dynamic), between two
+    internal hosts: what F and G judge."""
+    cfg = inp.config
+    lo, hi = inp.window
+    out = []
+    for o in _in_window(inp):
+        if o.port is None or o.port >= DYNAMIC_PORTS or cfg.admin_ports.matches(o.port, o.proto):
+            continue
+        first = inp.baseline_first_seen.get((o.src_key, o.dst_key, o.port, o.proto))
+        if first is None or not lo < first <= hi:
+            continue
+        if _internal_end(o.src_key, o.src_ip, _src_host(o, inp)) and _internal_end(o.dst_key, o.dst_ip,
+                                                                                    _dst_host(o, inp)):
+            out.append(o)
+    return out
+
+
+def _ports_segment(hits: Sequence[Obs]) -> FlowSegment:
+    start, end = _span(hits)
+    o = hits[0]
+    ports = tuple(PortProto(port=p, proto=pr) for p, pr in sorted({(h.port, h.proto) for h in hits if h.port}))
+    return FlowSegment(filter=FilterSpec(start=start, end=end, src=_endpoint(o.src_key, o.src_ip),
+                                         dst=_endpoint(o.dst_key, o.dst_ip), ports=ports),
+                       view=SegmentView.DETAIL, limit=200)
+
+
+def detect_direction_reversal(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """F: B starting a connection to A where A had always been the one to start them — A→B on some port before the
+    window, B→A on none (blocked attempts count as having happened). Example: a database server connecting to its
+    application server."""
+    kind = DetectorKind.DIRECTION_REVERSAL
+    data = inp.anomaly
+    if not inp.baseline_full:
+        return [], _accumulating(kind, inp)
+    found: dict[tuple[str, str], list[Obs]] = {}
+    for o in _pair_candidates(inp):
+        if (o.dst_key, o.src_key) in data.pairs_before and (o.src_key, o.dst_key) not in data.pairs_before:
+            found.setdefault((o.src_key, o.dst_key), []).append(o)
+    out = []
+    for (src, dst), hits in sorted(found.items()):
+        o = hits[0]
+        critical = _dst_host(o, inp).critical
+        out.append(Detection(
+            detector=kind, fingerprint=f"reverse|{src}|{dst}", subject_key=src,
+            severity=raise_severity(Severity.MEDIUM) if critical else Severity.MEDIUM,
+            first_seen=min(h.first for h in hits), last_seen=max(h.last for h in hits), critical_asset=critical,
+            summary={"target": o.dst_hostname or o.dst_ip, "port": o.port, "proto": o.proto,
+                     "ports": sorted({h.port for h in hits if h.port is not None}), "decision": o.decision},
+            segment=_ports_segment(hits),
+            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
+            ends=ends(hits[:1], hits)))
+    return out, _status(kind)
+
+
+def detect_new_pair_port(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """G: a pair of hosts that already talked starting on a port it had never used. Medium when nobody had ever
+    connected to the destination on that port (something new is listening there), low when the destination already
+    served it to others. Not when the source's peer group already uses that port toward the same kind of host."""
+    kind = DetectorKind.NEW_PAIR_PORT
+    cfg, data = inp.config, inp.anomaly
+    if not inp.baseline_full:
+        return [], _accumulating(kind, inp)
+    keys = cfg.peer_group_keys
+    found: dict[tuple[str, str, int, int], list[Obs]] = {}
+    for o in _pair_candidates(inp):
+        if (o.src_key, o.dst_key) not in data.pairs_before or o.port is None:
+            continue
+        source = _src_host(o, inp)
+        group = group_of(source.labels, keys) if source.managed else None
+        if group is not None and data.group_sizes.get(group, 0) >= cfg.peer_min_group:
+            sig = target_signature(o.dst_key, o.dst_ip, _dst_host(o, inp), keys)
+            if sig is not None and sig in data.peer_seen.get((group, o.port, o.proto), frozenset()):
+                continue
+        found.setdefault((o.src_key, o.dst_key, o.port, o.proto), []).append(o)
+    out = []
+    for (src, dst, port, proto), hits in sorted(found.items()):
+        o = hits[0]
+        critical = _dst_host(o, inp).critical
+        listener = (dst, port, proto) not in data.ports_served
+        base = Severity.MEDIUM if listener else Severity.LOW
+        out.append(Detection(
+            detector=kind, fingerprint=f"pairport|{src}|{dst}|{port}|{proto}", subject_key=src,
+            severity=raise_severity(base) if critical else base,
+            first_seen=min(h.first for h in hits), last_seen=max(h.last for h in hits), critical_asset=critical,
+            summary={"target": o.dst_hostname or o.dst_ip, "port": port, "proto": proto, "new_listener": listener,
+                     "decision": o.decision},
+            segment=_ports_segment(hits),
+            confidence=DetectionConfidence(baseline_days=round(inp.baseline_days, 1), incomplete_gaps=inp.gaps),
+            ends=ends(hits[:1], hits)))
+    return out, _status(kind)
+
+
+def _hour(inp: DetectorInput) -> datetime:
+    return inp.window[1].astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+
+
+def _overlaps(gaps: Sequence[tuple[datetime, datetime, str]], start: datetime, end: datetime) -> bool:
+    return any(g[0] < end and g[1] > start for g in gaps)
+
+
+def _hours_ready(kind: DetectorKind, inp: DetectorInput, required: float) -> DetectorStatus | None:
+    data = inp.anomaly
+    if not data.live:
+        return _status(kind, reason="detector_live_only")
+    if data.activity_days < required:
+        return _status(kind, DetectorState.ACCUMULATING, "detector_activity_accumulating",
+                       days=round(data.activity_days - 0.05, 1) if data.activity_days else 0.0, required=int(required))
+    return None
+
+
+def _src_ip(inp: DetectorInput, src: str) -> str:
+    return src[3:] if src.startswith("ip:") else next((o.src_ip for o in inp.traffic_obs if o.src_key == src), "")
+
+
+def _dst_ip(inp: DetectorInput, dst: str) -> str:
+    return dst[3:] if dst.startswith("ip:") else next((o.dst_ip for o in inp.traffic_obs if o.dst_key == dst), "")
+
+
+def _last_hour(inp: DetectorInput, *, src: EndpointFilter | None = None,
+               dst: EndpointFilter | None = None) -> FlowSegment:
+    hi = inp.window[1]
+    return FlowSegment(filter=FilterSpec(start=hi - SURGE_WINDOW, end=hi, src=src, dst=dst, decisions=NOT_BLOCKED),
+                       view=SegmentView.DETAIL, limit=200)
+
+
+def _host_hour(inp: DetectorInput, kind: DetectorKind, fingerprint: str, src: str, base: Severity,
+               summary: dict[str, object], gaps: tuple[tuple[datetime, datetime, str], ...] = ()) -> Detection:
+    ip = _src_ip(inp, src)
+    host = inp.hosts(src, ip, None, {})
+    hi = inp.window[1]
+    return Detection(
+        detector=kind, fingerprint=fingerprint, subject_key=src,
+        severity=raise_severity(base) if host.critical else base, first_seen=hi - SURGE_WINDOW, last_seen=hi,
+        critical_asset=host.critical, summary=summary | {"window_minutes": int(SURGE_WINDOW / timedelta(minutes=1))},
+        segment=_last_hour(inp, src=_endpoint(src, ip)),
+        confidence=DetectionConfidence(incomplete_gaps=(*inp.gaps, *gaps)), ends=(("s", src, ip),))
+
+
+def _managed_source(inp: DetectorInput, src: str) -> bool:
+    return inp.hosts(src, _src_ip(inp, src), None, {}).managed
+
+
+def detect_quiet_host_wakes(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """H: a managed host that had started no connection for `quiet` (and was known before that) starting at least
+    quiet_min_connections in the last hour. A collection gap in the quiet period leaves it unjudged: a host is not
+    told quiet from data that was never collected."""
+    kind = DetectorKind.QUIET_HOST_WAKES
+    cfg, data = inp.config, inp.anomaly
+    off = _hours_ready(kind, inp, cfg.quiet / timedelta(days=1))
+    if off is not None:
+        return [], off
+    hour = _hour(inp)
+    start, end = hour - cfg.quiet, hour - timedelta(hours=1)
+    if _overlaps(data.hours_gaps, start, end):
+        return [], _status(kind, DetectorState.INCOMPLETE, "detector_quiet_gaps",
+                           gaps=sum(1 for g in data.hours_gaps if g[0] < end and g[1] > start))
+    out = []
+    for src, n in sorted(data.recent.items()):
+        if n < cfg.quiet_min_connections or src not in data.known_before_quiet or not _managed_source(inp, src):
+            continue
+        hours = data.active_hours.get(src, ())
+        if any(start <= h < end for h in hours):
+            continue
+        last = max((h for h in hours if h < start), default=None)
+        out.append(_host_hour(inp, kind, f"quiet|{src}", src, Severity.MEDIUM,
+                              {"connections": n, "quiet_days": cfg.quiet.days,
+                               "last_active": last.isoformat() if last else None}))
+    return out, _status(kind)
+
+
+def _usual(hours: Sequence[datetime]) -> str:
+    """The hours of the day a host was active in, as ranges: "01–09", "08–12, 14"."""
+    seen = sorted({h.hour for h in hours})
+    runs: list[list[int]] = []
+    for h in seen:
+        if runs and h == runs[-1][1] + 1:
+            runs[-1][1] = h
+        else:
+            runs.append([h, h])
+    return ", ".join(f"{a:02d}" if a == b else f"{a:02d}–{b:02d}" for a, b in runs)
+
+
+def detect_off_hours(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """J: a managed host with a routine (active on off_hours_min_days days of the kept history) starting at least
+    off_hours_min_connections in the last hour, when neither clock hour that hour touches had ever seen it active.
+    Low: maintenance windows do this too. A collection gap at those hours on any day leaves it unjudged."""
+    kind = DetectorKind.OFF_HOURS
+    cfg, data = inp.config, inp.anomaly
+    off = _hours_ready(kind, inp, ACTIVITY_DAYS)
+    if off is not None:
+        return [], off
+    hour = _hour(inp)
+    slots = {(hour - timedelta(hours=1)).hour, hour.hour}
+    start, end = hour - timedelta(days=HISTORY_DAYS), hour - timedelta(hours=1)
+    spans = [(start + timedelta(hours=i), start + timedelta(hours=i + 1))
+             for i in range(int((end - start) / timedelta(hours=1)))
+             if (start + timedelta(hours=i)).hour in slots]
+    if any(_overlaps(data.hours_gaps, a, b) for a, b in spans):
+        return [], _status(kind, DetectorState.INCOMPLETE, "detector_off_hours_gaps")
+    out = []
+    for src, n in sorted(data.recent.items()):
+        if n < cfg.off_hours_min_connections or not _managed_source(inp, src):
+            continue
+        hours = [h for h in data.active_hours.get(src, ()) if start <= h < end]
+        days = {h.date() for h in hours}
+        if len(days) < cfg.off_hours_min_days or any(h.hour in slots for h in hours):
+            continue
+        out.append(_host_hour(inp, kind, f"offhours|{src}|{hour.hour}", src, Severity.LOW,
+                              {"connections": n, "active_days": len(days), "usual_hours": _usual(hours),
+                               "hour": f"{hour.hour:02d}"}))
+    return out, _status(kind)
+
+
+def _public_key(key: str) -> bool:
+    return key.startswith("ip:") and is_public(key[3:])
+
+
+def detect_data_staging(inp: DetectorInput) -> tuple[list[Detection], DetectorStatus]:
+    """I: an internal host receiving, over the last hour, at least staging_min_bytes from at least
+    staging_min_sources internal hosts, and volume_surge_factor times its own most in any hour of the 7 days before
+    (the floors alone when no hour carried bytes). Bytes are the connections' (both directions): only as good as
+    the byte field's coverage, which every result states."""
+    kind = DetectorKind.DATA_STAGING
+    cfg, data = inp.config, inp.anomaly
+    if not data.live:
+        return [], _status(kind, reason="detector_live_only")
+    if data.destination_days < ACTIVITY_DAYS:
+        return [], _status(kind, DetectorState.ACCUMULATING, "detector_activity_accumulating",
+                           days=round(data.destination_days - 0.05, 1) if data.destination_days else 0.0,
+                           required=ACTIVITY_DAYS)
+    with_bytes, total = data.fan_in_coverage
+    if total and not with_bytes:
+        return [], _status(kind, DetectorState.NO_DATA, "detector_no_byte_data", covered=0, total=total)
+    out = []
+    for dst, f in sorted(data.fan_in.items()):
+        if _public_key(dst):
+            continue
+        sources = [s for s in f.sources if not _public_key(s)]
+        if len(sources) < cfg.staging_min_sources or f.bytes < cfg.staging_min_bytes:
+            continue
+        if f.previous_bytes is not None and f.bytes < cfg.volume_surge_factor * f.previous_bytes:
+            continue
+        ip = _dst_ip(inp, dst)
+        host = inp.hosts(dst, ip, None, {})
+        if not _internal_end(dst, ip, host):
+            continue
+        hi = inp.window[1]
+        names = [inp.hosts(s, _src_ip(inp, s), None, {}).hostname or s for s in sources]
+        out.append(Detection(
+            detector=kind, fingerprint=f"staging|{dst}", subject_key=dst,
+            severity=raise_severity(Severity.MEDIUM) if host.critical else Severity.MEDIUM,
+            first_seen=hi - SURGE_WINDOW, last_seen=hi, critical_asset=host.critical,
+            summary={"target": host.hostname or ip or dst, "sources": len(sources), "connections": f.connections,
+                     "bytes": f.bytes, "mb": _mb(f.bytes), "previous_max_bytes": f.previous_bytes,
+                     "previous_max_mb": _mb(f.previous_bytes), "sample_sources": sorted(names)[:SAMPLE],
+                     "window_minutes": int(SURGE_WINDOW / timedelta(minutes=1))},
+            segment=_last_hour(inp, dst=_endpoint(dst, ip)),
+            confidence=DetectionConfidence(field="bytes", covered=with_bytes, total=total,
+                                           incomplete_gaps=(*inp.gaps, *data.fan_in_gaps)),
+            ends=(*(("s", s, _src_ip(inp, s)) for s in sources), ("t", dst, ip))))
+    if data.fan_in_gaps:
+        return out, _status(kind, DetectorState.INCOMPLETE, history_gaps=len(data.fan_in_gaps))
+    if with_bytes < total:
+        return out, _status(kind, reason="detector_partial_bytes", covered=with_bytes, total=total)
+    return out, _status(kind)
+
+
+def drop_covered(dets: Sequence[Detection]) -> list[Detection]:
+    """One thing, one detection: a surge (B) of a host covers its waking (H), and either covers its off-hours
+    activity (J); a peer-group deviation (A) covers a new port (G) on the same connection."""
+    surged = {d.subject_key for d in dets if d.detector is DetectorKind.VOLUME_SURGE}
+    woke = {d.subject_key for d in dets if d.detector is DetectorKind.QUIET_HOST_WAKES} - surged
+    peer = {(d.subject_key, k, d.summary.get("port")) for d in dets if d.detector is DetectorKind.PEER_DEVIATION
+            for role, k, _ in d.ends if role == "t"}
+    out = []
+    for d in dets:
+        if d.detector is DetectorKind.QUIET_HOST_WAKES and d.subject_key in surged:
+            continue
+        if d.detector is DetectorKind.OFF_HOURS and d.subject_key in surged | woke:
+            continue
+        if d.detector is DetectorKind.NEW_PAIR_PORT and any(
+                (d.subject_key, k, d.summary.get("port")) in peer for role, k, _ in d.ends if role == "t"):
+            continue
+        out.append(d)
     return out

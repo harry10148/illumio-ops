@@ -113,7 +113,7 @@ def test_v3_file_upgrades_to_v4_with_pack(tmp_path):
     p.write_text(json.dumps(d))
     p.chmod(0o600)
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION and len(s.alerts.rules) == 31 and all(r.notify for r in s.alerts.rules)
+    assert s.schema_version == SCHEMA_VERSION and len(s.alerts.rules) == 35 and all(r.notify for r in s.alerts.rules)
     assert not s.alerts.channels.smtp.enabled
 
 
@@ -151,20 +151,31 @@ def test_v4_upgrade_adds_anomaly_rules_record_only():
     kept = len(d["alerts"]["rules"])
     s = validate_settings(upgrade(d))
     added = [r for r in s.alerts.rules if r.pack_key.startswith("rule_anomaly")]
-    assert len(s.alerts.rules) == kept + 5 and len(added) == 5 and not any(r.notify for r in added)
+    assert len(s.alerts.rules) == kept + 9 and len(added) == 9 and not any(r.notify for r in added)
     again = validate_settings(upgrade(_v4_dict()))  # already has them: nothing is added twice
-    assert len(again.alerts.rules) == 31
+    assert len(again.alerts.rules) == 35
 
 
 def test_v4_at_the_old_rule_limit_still_loads_after_the_anomaly_rules_join():
-    """Review: 300 rules (the v4 limit) plus the five anomaly rules must not make the file invalid."""
+    """Review: 300 rules (the v4 limit) plus the anomaly rules must not make the file invalid."""
     d = _v4_dict()
     d["alerts"]["rules"] = [r for r in d["alerts"]["rules"] if not str(r.get("pack_key")).startswith("rule_anomaly")]
     template = next(r for r in d["alerts"]["rules"] if r["type"] == "event")
     while len(d["alerts"]["rules"]) < 300:
         d["alerts"]["rules"].append({**template, "id": f"{len(d['alerts']['rules']):032x}", "pack_key": None,
                                        "name": f"r{len(d['alerts']['rules'])}"})
-    assert len(validate_settings(upgrade(d)).alerts.rules) == 305
+    assert len(validate_settings(upgrade(d)).alerts.rules) == 309
+
+
+def test_v12_at_the_old_rule_limit_still_loads_after_the_second_batch_joins():
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 12
+    d["alerts"]["rules"] = [r for r in d["alerts"]["rules"] if r.get("pack_key") not in BATCH2_RULES]
+    template = next(r for r in d["alerts"]["rules"] if r["type"] == "event")
+    while len(d["alerts"]["rules"]) < 360:
+        d["alerts"]["rules"].append({**template, "id": f"{len(d['alerts']['rules']):032x}", "pack_key": None,
+                                       "name": f"r{len(d['alerts']['rules'])}"})
+    assert len(validate_settings(upgrade(d)).alerts.rules) == 364
 
 
 def test_v5_file_upgrades_to_v6_with_reports():
@@ -251,3 +262,33 @@ def test_v12_settings_gain_batch2_detector_defaults():
     assert s.schema_version == SCHEMA_VERSION == 13
     assert {k: getattr(s.lateral.detectors, k) for k in BATCH2_DETECTORS} == BATCH2_DETECTORS
     assert s.lateral.detectors.volume_min_connections == 4321
+
+
+
+BATCH2_RULES = {"rule_anomaly_direction", "rule_anomaly_pair_port", "rule_anomaly_quiet", "rule_anomaly_staging"}
+
+
+def test_v12_settings_gain_batch2_rules_recording_only():
+    """An upgraded install records the new anomaly rules and turns each on itself (as the first batch, v4 → v5)."""
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 12
+    d["alerts"]["rules"] = [r for r in d["alerts"]["rules"] if r.get("pack_key") not in BATCH2_RULES]
+    s = validate_settings(upgrade(d))
+    added = [r for r in s.alerts.rules if r.pack_key in BATCH2_RULES]
+    assert {r.pack_key for r in added} == BATCH2_RULES and not any(r.notify for r in added)
+
+
+def test_v12_upgrade_does_not_add_a_rule_twice():
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 12
+    s = validate_settings(upgrade(d))
+    assert sorted(r.pack_key for r in s.alerts.rules if r.pack_key in BATCH2_RULES) == sorted(BATCH2_RULES)
+
+
+def test_new_installs_notify_on_batch2_rules():
+    s = default_settings(password_hash=HASH, secret_key=KEY)
+    added = [r for r in s.alerts.rules if r.pack_key in BATCH2_RULES]
+    assert {r.pack_key for r in added} == BATCH2_RULES and all(r.notify for r in added)
+    assert not any("off_hours" in str(r.pack_key) for r in s.alerts.rules)
+    pair = next(r for r in added if r.pack_key == "rule_anomaly_pair_port")
+    assert pair.min_severity.value == "medium"

@@ -26,6 +26,11 @@ DETECTOR_NAME_KEYS: Mapping[str, str] = {
     DetectorKind.AUTH_TO_NON_DC: "detector_name_auth_to_non_dc",
     DetectorKind.NEW_DC_CLIENT: "detector_name_new_dc_client",
     DetectorKind.DIRECTORY_SURGE: "detector_name_directory_surge",
+    DetectorKind.DIRECTION_REVERSAL: "detector_name_direction_reversal",
+    DetectorKind.NEW_PAIR_PORT: "detector_name_new_pair_port",
+    DetectorKind.QUIET_HOST_WAKES: "detector_name_quiet_host_wakes",
+    DetectorKind.DATA_STAGING: "detector_name_data_staging",
+    DetectorKind.OFF_HOURS: "detector_name_off_hours",
 }
 PORT_CLASS_KEYS: Mapping[PortClass, str] = {
     PortClass.REMOTE: "rpt_port_class_remote", PortClass.DIRECTORY: "rpt_port_class_directory",

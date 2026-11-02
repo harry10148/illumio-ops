@@ -5,12 +5,14 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from illumio_ops.domain.anomaly import (
     ACTIVITY_DAYS,
     DIRECTORY,
     DIRECTORY_DETECTORS,
     DYNAMIC_PORTS,
+    HISTORY_DAYS,
     SURGE_WINDOW,
     group_of,
     is_public,
@@ -20,6 +22,7 @@ from illumio_ops.domain.detectors import (
     Activity,
     AnomalyData,
     DetectorInput,
+    FanInFact,
     Obs,
     evaluable,
     not_blocked,
@@ -74,22 +77,70 @@ def _peers(ctx: AppContext, lc: LateralContext, inp: DetectorInput, rows: Sequen
     return sizes, seen
 
 
-def _activity(ctx: AppContext, inp: DetectorInput, at: datetime) -> tuple[
-        dict[tuple[str, str], Activity], float, tuple[tuple[datetime, datetime, str], ...]]:
+def _days(covered: datetime | None, hour: datetime) -> float:
+    return max((hour - covered) / timedelta(days=1), 0.0) if covered is not None else 0.0
+
+
+def _activity(ctx: AppContext, inp: DetectorInput, at: datetime) -> dict[str, Any]:
+    """The hourly-activity fields of AnomalyData: B and E③ (sources over a surge floor and their 7 days), H and J
+    (managed sources over their floors, the hours each was active in, who was known before the quiet period, and
+    the gaps of the kept history), and I (destinations over the staging floors and their 7 days)."""
     cfg = inp.config
-    covered = fa.activity_coverage(ctx)
     hour = at.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
-    days = (hour - covered) / timedelta(days=1) if covered is not None else 0.0
-    if days < ACTIVITY_DAYS:
-        return {}, max(days, 0.0), ()
-    now = fa.activity_now(ctx, since=at - SURGE_WINDOW, until=at)
-    floors = {"all": cfg.volume_min_connections, "directory": cfg.directory_min_connections}
-    over = {k: v for k, v in now.items()
-            if v[0] >= floors[k[1]] or (k[1] == "all" and v[1] is not None and v[1] >= cfg.volume_min_bytes)}
-    history = fa.activity_history(ctx, sorted({src for src, _ in over}), start=hour - timedelta(days=ACTIVITY_DAYS),
-                                  end=hour - timedelta(hours=1)) if over else {}
-    gaps = tuple(fa.activity_gaps(ctx, start=hour - timedelta(days=ACTIVITY_DAYS), end=hour)) if over else ()
-    return {k: Activity(v[0], v[1], *history.get(k, (0, None))) for k, v in over.items()}, days, gaps
+    days = _days(fa.activity_coverage(ctx), hour)
+    destination_days = _days(fa.destination_coverage(ctx), hour)
+    out: dict[str, Any] = {"activity_days": days, "destination_days": destination_days}
+    surges = days >= ACTIVITY_DAYS
+    hours = days >= min(ACTIVITY_DAYS, cfg.quiet / timedelta(days=1))
+    week = (hour - timedelta(days=ACTIVITY_DAYS), hour - timedelta(hours=1))
+    now = fa.activity_now(ctx, since=at - SURGE_WINDOW, until=at) if surges or hours else {}
+    if surges:
+        floors = {"all": cfg.volume_min_connections, "directory": cfg.directory_min_connections}
+        over = {k: v for k, v in now.items()
+                if v[0] >= floors[k[1]] or (k[1] == "all" and v[1] is not None and v[1] >= cfg.volume_min_bytes)}
+        history = fa.activity_history(ctx, sorted({src for src, _ in over}), start=week[0], end=week[1]) if over else {}
+        out["activity"] = {k: Activity(v[0], v[1], *history.get(k, (0, None))) for k, v in over.items()}
+        if over:
+            out["activity_gaps"] = tuple(fa.activity_gaps(ctx, start=week[0], end=hour))
+    if hours:
+        floor = min(cfg.quiet_min_connections, cfg.off_hours_min_connections)
+        recent = {src: v[0] for (src, cls), v in now.items()
+                  if cls == "all" and v[0] >= floor and not src.startswith("ip:")}
+        if recent:
+            kept = hour - timedelta(days=HISTORY_DAYS)
+            out["recent"] = recent
+            out["active_hours"] = fa.activity_hours(ctx, recent, start=kept, end=hour - timedelta(hours=1))
+            out["known_before_quiet"] = frozenset(fa.sources_known_before(ctx, recent, before=hour - cfg.quiet))
+            out["hours_gaps"] = tuple(fa.activity_gaps(ctx, start=kept, end=hour))
+    if destination_days >= ACTIVITY_DAYS:
+        fan = fa.fan_in_now(ctx, since=at - SURGE_WINDOW, until=at)
+        out["fan_in_coverage"] = (sum(f.with_bytes for f in fan.values()), sum(f.increments for f in fan.values()))
+        wanted = {d: f for d, f in fan.items()
+                  if f.sources >= cfg.staging_min_sources and f.bytes >= cfg.staging_min_bytes}
+        if wanted:
+            previous = fa.destination_history(ctx, wanted, start=week[0], end=week[1])
+            out["fan_in"] = {d: FanInFact(f.connections, f.bytes, f.source_keys, previous.get(d))
+                             for d, f in wanted.items()}
+            out["fan_in_gaps"] = tuple(fa.activity_gaps(ctx, start=week[0], end=hour))
+    return out
+
+
+def _pairs(ctx: AppContext, inp: DetectorInput, rows: Sequence[Obs]) -> dict[str, Any]:
+    """F and G: which of the candidates' pairs (both directions) the baseline had before the window, and for G's
+    candidates whether anyone had used the destination's port."""
+    cfg = inp.config
+    if not inp.baseline_full:
+        return {}
+    candidates = [o for o in rows if o.port is not None and o.port < DYNAMIC_PORTS
+                  and not cfg.admin_ports.matches(o.port, o.proto) and _first_in_window(inp, o)]
+    if not candidates:
+        return {}
+    lo = inp.window[0]
+    asked = {(o.src_key, o.dst_key) for o in candidates} | {(o.dst_key, o.src_key) for o in candidates}
+    before = fa.pairs_before(ctx, asked, before=lo)
+    ports = {(o.dst_key, o.port, o.proto) for o in candidates if (o.src_key, o.dst_key) in before and o.port is not None}
+    return {"pairs_before": frozenset(before),
+            "ports_served": frozenset(fa.ports_served_before(ctx, ports, before=lo)) if ports else frozenset()}
 
 
 @dataclass(frozen=True)
@@ -155,7 +206,7 @@ def load_anomaly_data(ctx: AppContext, lc: LateralContext, inp: DetectorInput, *
     """inp carries the run's window, traffic_obs and baseline_first_seen (for every candidate tuple)."""
     rows = _candidates(inp)
     sizes, peer_seen = _peers(ctx, lc, inp, rows)
-    activity, days, gaps = _activity(ctx, inp, at) if live else ({}, 0.0, ())
+    hourly = _activity(ctx, inp, at) if live else {}
     lo, hi = inp.window
     pairs = {(a, o.src_key) for o in rows if (a := account_key(o.initiator_user)) is not None}
     account_first = fa.account_first_seen(ctx, pairs) if pairs else {}
@@ -164,7 +215,7 @@ def load_anomaly_data(ctx: AppContext, lc: LateralContext, inp: DetectorInput, *
     process_first = fa.process_first_seen(ctx, procs) if procs else {}
     hosts = {s for (s, _), first in process_first.items() if lo < first <= hi}
     data = AnomalyData(
-        peer_seen=peer_seen, group_sizes=sizes, activity=activity, activity_days=days, activity_gaps=gaps, live=live,
+        peer_seen=peer_seen, group_sizes=sizes, live=live, **hourly, **_pairs(ctx, inp, rows),
         account_first=account_first,
         account_since=fa.account_since(ctx, accounts) if accounts else {},
         account_sources=fa.account_history(ctx, accounts, before=lo) if accounts else {},

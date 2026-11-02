@@ -465,7 +465,8 @@ class AlertSettings(StrictModel):
     channels: AlertChannels
     # 300 of the operator's own and room for the pack's later additions: an upgrade adds pack rules (v5 five, v9 one),
     # and a file at the old limit must still load after it — raise this with every rule an upgrade adds.
-    rules: tuple[AlertRule, ...] = Field(max_length=360)
+    # 300 operator rules plus the pack (v13 raised it with the second anomaly batch, so a full file still loads)
+    rules: tuple[AlertRule, ...] = Field(max_length=400)
     retention_days: int = Field(ge=1, le=3650)
 
     @field_validator("rules")

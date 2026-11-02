@@ -95,7 +95,7 @@ def test_default_alerts(initial):
     a = initial.alerts
     assert a.retention_days == 90 and not any(getattr(a.channels, c).enabled for c in
                                               ("smtp", "line", "telegram", "teams", "webhook"))
-    assert len(a.rules) == 31 and all(r.notify for r in a.rules)
+    assert len(a.rules) == 35 and all(r.notify for r in a.rules)
 
 
 def test_redact_masks_channel_secrets(initial):
