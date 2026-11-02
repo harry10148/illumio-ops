@@ -91,3 +91,13 @@ def test_route_requires_login_and_answers(client):
     login(client)
     data = client.get("/api/shell/status", environ_overrides=LOCAL).get_json()["data"]
     assert set(data) == {"mode", "collection_mode", "collection", "unprocessed_alerts", "write_key"}
+
+
+def test_rule_summary_counts_known(ctx):
+    _alert(ctx, at=NOW - timedelta(hours=1))
+    _alert(ctx, at=NOW - timedelta(hours=2), grouped=4)
+    _alert(ctx, at=NOW - timedelta(days=9), grouped=4)  # older than 7 days
+    pce = ctx.settings.current().pce
+    with ctx.db() as conn:
+        s = store.rule_summaries(conn, pce_url=pce.url, org_id=pce.org_id, now=NOW)["a" * 32]
+    assert (s.fired_7d, s.known_7d) == (2, 1)

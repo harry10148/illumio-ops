@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type { RuleListItem, RulesView } from "../../api/generated";
@@ -10,7 +10,7 @@ import { STATUS_KEYS, TYPE_KEYS, word } from "./common";
 
 type Mode = "append_missing" | "replace";
 
-export function Rules() {
+export function Rules({ embedded = false }: { embedded?: boolean }) {
   const lang = useLang();
   const [view, setView] = useState<RulesView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -39,9 +39,9 @@ export function Rules() {
 
   return (
     <section className="page stack">
-      <p><Link to="/alerts">{t("alert_back")}</Link></p>
+      {!embedded && <p><Link to="/">{t("alert_back")}</Link></p>}
       <div className="page-head">
-        <h1>{t("rules_title")}</h1>
+        {!embedded && <h1>{t("rules_title")}</h1>}
         <Link to="/alerts/rules/new" className="btn-primary">{t("rules_new")}</Link>
       </div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
@@ -68,7 +68,9 @@ export function Rules() {
               <thead>
                 <tr>
                   <th>{t("rules_col_name")}</th><th>{t("rules_col_type")}</th><th>{t("rules_col_enabled")}</th>
-                  <th>{t("rules_col_notify")}</th><th>{t("rules_col_last")}</th><th>{t("rules_col_status")}</th>
+                  <th>{t("rules_col_notify")}</th><th>{t("rules_col_last")}</th>
+                  <th className="wb-num">{t("rules_col_7d")}</th><th className="wb-num">{t("rules_col_known")}</th>
+                  <th>{t("rules_col_status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -90,9 +92,10 @@ export function Rules() {
                       </td>
                       <td>
                         {s?.last_fired_at ? formatTime(s.last_fired_at, lang) : t("rules_never")}
-                        {s && s.fired_7d > 0 && <span className="hint"> · {t("rules_fired_7d", { n: String(s.fired_7d) })}</span>}
                         {held > 0 && <span className="hint"> · {t("rules_held", { n: String(held) })}</span>}
                       </td>
+                      <td className="wb-num mono" data-role="fired-7d">{s?.fired_7d ?? 0}</td>
+                      <td className="wb-num mono" data-role="known-7d">{s?.known_7d ?? 0}</td>
                       <td>{s?.last_status ? word(STATUS_KEYS, s.last_status) : ""}</td>
                     </tr>
                   );
@@ -106,4 +109,10 @@ export function Rules() {
   );
 }
 
-registerNav({ section: "bottom", path: "/alerts/rules", labelKey: "nav_alert_rules", order: 10, component: Rules });
+/** The rule list is the first tab of the alert rules page (UI redesign spec §4.9). */
+function RulesRedirect() {
+  return <Navigate to="/alert-rules" replace />;
+}
+
+registerNav({ section: "main", path: "/alerts/rules", labelKey: "nav_alert_rules", order: 12, component: RulesRedirect,
+              hidden: true });

@@ -98,3 +98,13 @@ def test_pack_modes(client):
     assert rid in {i["rule"]["id"] for i in out.get_json()["data"]["items"]}
     bad = post(client, "/api/alert-rules/pack", {"revision": out.get_json()["data"]["revision"], "mode": "everything"})
     assert bad.status_code == 400
+
+
+def test_rule_test_routes(client, ctx):
+    from .conftest import post
+    assert client.get("/api/alert-rules/test-candidates", environ_overrides=LOCAL).status_code == 401
+    login(client)
+    assert client.get("/api/alert-rules/test-candidates", environ_overrides=LOCAL).get_json()["data"] == {"items": []}
+    r = post(client, "/api/alert-rules/test", {"source": "detection", "id": 99})
+    assert r.status_code == 404 and r.get_json()["error"]["code"] == "not_found"
+    assert post(client, "/api/alert-rules/test", {"source": "alert", "id": 1}).status_code == 400

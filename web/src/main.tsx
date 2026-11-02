@@ -6,6 +6,7 @@ import "./pages/alerts/AlertsHome";
 import "./pages/alerts/AlertDetail";
 import "./pages/alerts/Rules";
 import "./pages/alerts/RuleEditor";
+import "./pages/alerts/RulesAndChannels";
 import "./pages/reports/Reports";
 import "./pages/workbench/Workbench";
 import "./pages/hosts/HostProfile";

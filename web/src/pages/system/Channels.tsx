@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type { ChannelsInput, ChannelsView } from "../../api/generated";
@@ -28,7 +29,7 @@ const SECURITY_KEYS: Record<string, string> = { none: "smtp_security_none", star
 
 type Result = { ok: boolean; error: string | null } | ApiError;
 
-export function Channels() {
+export function Channels({ embedded = false }: { embedded?: boolean }) {
   const lang = useLang();
   const [view, setView] = useState<ChannelsView | null>(null);
   const [channels, setChannels] = useState<ChannelsInput | null>(null);
@@ -47,7 +48,7 @@ export function Channels() {
   if (!view || !channels) {
     return (
       <section className="page">
-        <h1>{t("nav_system_channels")}</h1>
+        {!embedded && <h1>{t("nav_system_channels")}</h1>}
         {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       </section>
     );
@@ -74,7 +75,7 @@ export function Channels() {
 
   return (
     <section className="page stack">
-      <h1>{t("nav_system_channels")}</h1>
+      {!embedded && <h1>{t("nav_system_channels")}</h1>}
       <p className="hint">{t("channels_intro")}</p>
       <form className="stack" onSubmit={save} data-role="channels">
         {KINDS.map((kind) => {
@@ -141,4 +142,10 @@ export function Channels() {
   );
 }
 
-registerNav({ section: "system", path: "/system/channels", labelKey: "nav_system_channels", order: 25, component: Channels });
+/** Channels live on the alert rules page now (UI redesign spec §4.9); old bookmarks land on its tab. */
+function ChannelsRedirect() {
+  return <Navigate to="/alert-rules?tab=channels" replace />;
+}
+
+registerNav({ section: "system", path: "/system/channels", labelKey: "nav_system_channels", order: 25,
+              component: ChannelsRedirect, hidden: true });

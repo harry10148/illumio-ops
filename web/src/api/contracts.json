@@ -1766,6 +1766,11 @@
                 "title": "Fired 7D",
                 "type": "integer"
               },
+              "known_7d": {
+                "default": 0,
+                "title": "Known 7D",
+                "type": "integer"
+              },
               "last_fired_at": {
                 "anyOf": [
                   {
@@ -2903,6 +2908,11 @@
                 "title": "Fired 7D",
                 "type": "integer"
               },
+              "known_7d": {
+                "default": 0,
+                "title": "Known 7D",
+                "type": "integer"
+              },
               "last_fired_at": {
                 "anyOf": [
                   {
@@ -4026,6 +4036,11 @@
             "properties": {
               "fired_7d": {
                 "title": "Fired 7D",
+                "type": "integer"
+              },
+              "known_7d": {
+                "default": 0,
+                "title": "Known 7D",
                 "type": "integer"
               },
               "last_fired_at": {
@@ -5172,6 +5187,11 @@
             "properties": {
               "fired_7d": {
                 "title": "Fired 7D",
+                "type": "integer"
+              },
+              "known_7d": {
+                "default": 0,
+                "title": "Known 7D",
                 "type": "integer"
               },
               "last_fired_at": {
@@ -6648,6 +6668,177 @@
           "coverage_note"
         ],
         "title": "RulePreview",
+        "type": "object"
+      }
+    },
+    "alert_rules.test": {
+      "method": "POST",
+      "path": "/api/alert-rules/test",
+      "request_schema": {
+        "properties": {
+          "id": {
+            "minimum": 1,
+            "title": "Id",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "detection",
+              "event"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "id"
+        ],
+        "title": "RuleTestRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "RuleMatch": {
+            "properties": {
+              "channels": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Channels",
+                "type": "array"
+              },
+              "params": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Params",
+                "type": "object"
+              },
+              "reason_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason Key"
+              },
+              "rule_id": {
+                "title": "Rule Id",
+                "type": "string"
+              },
+              "rule_name": {
+                "title": "Rule Name",
+                "type": "string"
+              },
+              "would_alert": {
+                "title": "Would Alert",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "rule_id",
+              "rule_name",
+              "would_alert",
+              "reason_key",
+              "params",
+              "channels"
+            ],
+            "title": "RuleMatch",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RuleMatch"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "detection",
+              "event"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "record_id",
+          "title",
+          "items"
+        ],
+        "title": "RuleTestResult",
+        "type": "object"
+      }
+    },
+    "alert_rules.test_candidates": {
+      "method": "GET",
+      "path": "/api/alert-rules/test-candidates",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "Candidate": {
+            "properties": {
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "record_id": {
+                "title": "Record Id",
+                "type": "integer"
+              },
+              "source": {
+                "enum": [
+                  "detection",
+                  "event"
+                ],
+                "title": "Source",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              }
+            },
+            "required": [
+              "source",
+              "record_id",
+              "at",
+              "title"
+            ],
+            "title": "Candidate",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/Candidate"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Candidates",
         "type": "object"
       }
     },
@@ -8415,6 +8606,11 @@
             "properties": {
               "fired_7d": {
                 "title": "Fired 7D",
+                "type": "integer"
+              },
+              "known_7d": {
+                "default": 0,
+                "title": "Known 7D",
                 "type": "integer"
               },
               "last_fired_at": {

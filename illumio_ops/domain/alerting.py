@@ -357,18 +357,30 @@ def excluded(exclude: EndpointFilter | None, ends: Sequence[EndFact] | None, ip_
     return any(bool(side) and all(side) for side in ([h for role, h in hit if role == r] for r in ("s", "t")))
 
 
+LateralMiss = Literal["other_detector", "below_severity", "not_critical", "excluded"]
+
+
+def lateral_rule_reason(rule: LateralRule, d: DetectionFact, *, ip_lists: IpLists | None = None) -> LateralMiss | None:
+    """Why the rule does not take this detection (None: it does — new or risen, it alerts). The rule test on the
+    alert rules page reads the same answer."""
+    if d.detector not in rule.detectors:
+        return "other_detector"
+    if SEVERITY_ORDER.index(d.severity) < SEVERITY_ORDER.index(rule.min_severity):
+        return "below_severity"
+    if rule.critical_assets_only and not d.critical_asset:
+        return "not_critical"
+    if excluded(rule.exclude, d.ends, ip_lists):
+        return "excluded"
+    return None
+
+
 def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact], *,
                           ip_lists: IpLists | None = None) -> list[Trigger]:
     """A detection alerts when it is new and again when its severity rises — not on every repeat. ip_lists: the
     networks of the IP lists the rule's exclusion names."""
-    floor = SEVERITY_ORDER.index(rule.min_severity)
     out = []
     for d in changed:
-        if not (d.is_new or d.severity_rose) or d.detector not in rule.detectors:
-            continue
-        if SEVERITY_ORDER.index(d.severity) < floor or (rule.critical_assets_only and not d.critical_asset):
-            continue
-        if excluded(rule.exclude, d.ends, ip_lists):
+        if not (d.is_new or d.severity_rose) or lateral_rule_reason(rule, d, ip_lists=ip_lists) is not None:
             continue
         c = d.confidence
         out.append(Trigger(

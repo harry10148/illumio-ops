@@ -202,22 +202,25 @@ class RuleSummary:
     suppressed_cooldown: int
     suppressed_throttle: int
     last_status: str | None
+    known_7d: int = 0  # of the 7 days' alerts, those marked as known (grouped)
 
 
 def rule_summaries(conn: sqlite3.Connection, *, pce_url: str, org_id: str, now: datetime) -> dict[str, RuleSummary]:
-    fired = {r["rule_id"]: (r["last"], r["n"]) for r in conn.execute(
-        "SELECT rule_id, MAX(fired_at) AS last, SUM(fired_at >= ?) AS n FROM alerts WHERE pce_url = ? AND org_id = ? "
-        "GROUP BY rule_id", (_t(now - timedelta(days=7)), pce_url, org_id))}
+    week = _t(now - timedelta(days=7))
+    fired = {r["rule_id"]: (r["last"], r["n"], r["k"]) for r in conn.execute(
+        "SELECT rule_id, MAX(fired_at) AS last, SUM(fired_at >= ?) AS n, "
+        "SUM(fired_at >= ? AND grouped_annotation IS NOT NULL) AS k FROM alerts WHERE pce_url = ? AND org_id = ? "
+        "GROUP BY rule_id", (week, week, pce_url, org_id))}
     held = {r["rule_id"]: (r["c"], r["t"]) for r in conn.execute(
         "SELECT rule_id, SUM(suppressed_cooldown) AS c, SUM(suppressed_throttle) AS t FROM alert_rule_state "
         "GROUP BY rule_id")}
     status = {r["rule_id"]: r["status"] for r in conn.execute("SELECT rule_id, status FROM alert_rule_status")}
     out = {}
     for rule_id in set(fired) | set(held) | set(status):
-        last, n = fired.get(rule_id, (None, 0))
+        last, n, k = fired.get(rule_id, (None, 0, 0))
         c, t = held.get(rule_id, (0, 0))
         out[rule_id] = RuleSummary(datetime.fromisoformat(last) if last else None, int(n or 0), int(c or 0),
-                                   int(t or 0), status.get(rule_id))
+                                   int(t or 0), status.get(rule_id), int(k or 0))
     return out
 
 

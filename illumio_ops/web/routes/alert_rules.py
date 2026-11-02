@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 
 from illumio_ops.domain.alertpack import PACK_KEYS
 from illumio_ops.domain.alertrules import AlertRule
+from illumio_ops.services.alerts import rule_test
+from illumio_ops.services.alerts.rule_test import Candidates, RuleTestResult
 from illumio_ops.services.alerts.rules import (
     RuleListItem,
     RulePreview,
@@ -17,6 +19,7 @@ from illumio_ops.services.alerts.rules import (
     preview_rule,
     rule_list,
 )
+from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
 
@@ -41,6 +44,11 @@ class RulePreviewRequest(BaseModel):
     hours: int = Field(ge=1, le=168)
 
 
+class RuleTestRequest(BaseModel):
+    source: Literal["detection", "event"]
+    id: int = Field(ge=1)
+
+
 class PackApply(BaseModel):
     revision: int
     mode: Literal["append_missing", "replace"]
@@ -52,6 +60,9 @@ OP_UPDATE = operation("alert_rules.update", "PUT", "/api/alert-rules/<rule_id>",
 OP_DELETE = operation("alert_rules.delete", "DELETE", "/api/alert-rules/<rule_id>", RuleDelete, RulesView)
 OP_PREVIEW = operation("alert_rules.preview", "POST", "/api/alert-rules/preview", RulePreviewRequest, RulePreview)
 OP_PACK = operation("alert_rules.pack", "POST", "/api/alert-rules/pack", PackApply, RulesView)
+OP_TEST = operation("alert_rules.test", "POST", "/api/alert-rules/test", RuleTestRequest, RuleTestResult)
+OP_TEST_CANDIDATES = operation("alert_rules.test_candidates", "GET", "/api/alert-rules/test-candidates", None,
+                               Candidates)
 
 bp = Blueprint("alert_rules", __name__)
 
@@ -119,3 +130,22 @@ def apply(body: PackApply) -> RulesView:
     dumped = [r.model_dump(mode="json") for r in rules]
     ctx.settings.update(body.revision, lambda d: d["alerts"].__setitem__("rules", dumped))
     return _view()
+
+
+@api_route(bp, OP_TEST)
+def test_rules(body: RuleTestRequest) -> RuleTestResult:
+    """Read-only: evaluates, never records or sends (services/alerts/rule_test.py)."""
+    try:
+        return rule_test.run(get_ctx(), body.source, body.id)
+    except LookupError:
+        raise ApiFailure(404, "not_found", "rule_test_not_found") from None
+    except BindingMismatch:
+        raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
+
+
+@api_route(bp, OP_TEST_CANDIDATES)
+def test_candidates() -> Candidates:
+    try:
+        return rule_test.candidates(get_ctx())
+    except BindingMismatch:
+        raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None

@@ -246,7 +246,9 @@ def _lateral(ctx, detector, *, subject="ip:10.0.0.9"):
         analysis.upsert_detections(conn, [DetectionWrite(
             detector=detector, fingerprint=f"{detector}|{subject}", subject_key=subject, severity="high",
             first_seen=now - timedelta(minutes=30), last_seen=now - timedelta(minutes=10), critical_asset=False,
-            summary_json=json.dumps({"process": "psexesvc.exe", "port": 445, "target": "db-01"}), segment_json="{}",
+            summary_json=json.dumps({"process": "psexesvc.exe", "port": 445, "target": "db-01"}),
+            segment_json=json.dumps({"filter": {"start": (now - timedelta(hours=1)).isoformat(), "end": now.isoformat()},
+                                     "view": "detail", "limit": 50}),
             confidence_json="{}")], dedup={detector: timedelta(hours=1)}, late=False, at=now)
         conn.commit()
         det = int(conn.execute("SELECT id FROM detections WHERE fingerprint = ?", (f"{detector}|{subject}",))
@@ -315,4 +317,57 @@ def test_detail_below_list_at_760(narrow_context, live_app):
     table_box = page.locator("[data-role=alert-list]").bounding_box()
     side_box = side.bounding_box()
     assert table_box and side_box and side_box["y"] > table_box["y"] + table_box["height"] - 1
+    assert no_horizontal_overflow(page)
+
+
+# ── alert rules and notifications (UI redesign sample 10) ───────────────────
+
+def test_rules_tab_columns(context, live_app):
+    seed(live_app.ctx)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.click(".sidenav .nav-item[data-nav='/alert-rules']")
+    table = page.locator("[data-role=rule-list]")
+    expect(table).to_contain_text("Triggers (7 days)")
+    row = table.locator(f"tr[data-rule-id='{'a' * 32}'] [data-role=fired-7d]")
+    expect(row).to_have_count(0)  # the seeded alert's rule id is not a configured rule
+    expect(table.locator("[data-role=fired-7d]").first).to_have_text("0")
+
+
+def test_rule_test_shows_matches(context, live_app):
+    _lateral(live_app.ctx, "new_process")
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alert-rules")
+    select = page.locator("select[name=rule_test_record]")
+    select.locator("option").nth(1).wait_for(state="attached")
+    value = select.locator("option").nth(1).get_attribute("value")
+    select.select_option(value)
+    panel = page.locator("[data-role=rule-test]")
+    expect(panel.locator("[data-role=verdict]").first).to_be_visible()
+    assert panel.locator("[data-role=verdict]").count() >= 1
+
+
+def test_channels_tab(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alert-rules?tab=channels")
+    expect(page.locator("[data-role=channels]")).to_have_count(1)
+
+
+def test_old_rule_and_channel_urls_redirect(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules")
+    page.wait_for_url(f"{live_app.url}/alert-rules")
+    page.goto(f"{live_app.url}/system/channels")
+    page.wait_for_url(f"{live_app.url}/alert-rules?tab=channels")
+
+
+def test_rules_no_overflow_760(narrow_context, live_app):
+    from tests.e2e.conftest import no_horizontal_overflow
+    page = narrow_context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alert-rules")
+    page.locator("[data-role=rule-list]").wait_for()
     assert no_horizontal_overflow(page)
