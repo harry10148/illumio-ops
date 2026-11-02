@@ -47,10 +47,10 @@ def _detection(ctx, subject, detector="fanout", *, summary=None, first=NOW - tim
 
 
 def _alert(ctx, *, rule_type=AlertRuleType.SYSTEM, severity=Severity.HIGH, at=None, grouped=None, params=None,
-           facts=None, subject="disk_low"):
+           facts=None, subject="disk_low", message_key="alert_system_disk_low"):
     at = at or NOW
     t = Trigger(rule_id="r" * 32, rule_type=rule_type, subject_key=subject, severity=severity, first_seen=at,
-                last_seen=at, late=False, message_key="alert_system_disk_low",
+                last_seen=at, late=False, message_key=message_key,
                 params=params or {"free": "1 GB", "warn": "10 GB"}, facts=facts or {}, evidence=None,
                 confidence=Confidence(), grouped_annotation=grouped)
     pce = ctx.settings.current().pce
@@ -186,3 +186,14 @@ def test_timeline_finds_events_through_the_ven(tmp_path):
     det = _detection(ctx, WEB, "fanout")
     d = views.alert_detail(ctx, _lateral(ctx, "fanout", det_id=det, at=NOW))
     assert d is not None and "event" in [e.kind for e in d.timeline]
+
+
+def test_hrefs_in_alert_params_are_shown_as_names(tmp_path):
+    """Acceptance on .106: a host the evaluation had no name for was written into the alert as its href."""
+    ctx = _ctx(tmp_path)
+    alert = _alert(ctx, rule_type=AlertRuleType.LATERAL, subject="new_pair_port|x",
+                   message_key="focus_title_new_pair_port", params={"detector": "new_pair_port", "host": WEB, "target": IDLE, "port": 445, "proto": 6})
+    [item] = views.list_alerts(ctx, AlertQuery(), now=NOW).items
+    assert (item.src, item.dst) == ("web-01", "idle-01")
+    d = views.alert_detail(ctx, alert)
+    assert d is not None and "/orgs/" not in d.summary and "/orgs/" not in item.summary

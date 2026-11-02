@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
@@ -32,7 +34,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import Coverage
 from illumio_ops.services.eventsource import event_detail
 from illumio_ops.services.flowsource import query_flows
-from illumio_ops.services.hosts import QuarantineEligibility
+from illumio_ops.services.hosts import HOST_HREF, QuarantineEligibility, display_names
 from illumio_ops.services.reports.common import DETECTOR_NAME_KEYS
 from illumio_ops.store import alerts as store
 from illumio_ops.store.flowdb import analysis as detection_store
@@ -166,11 +168,22 @@ def ends(params: dict[str, Any]) -> tuple[str | None, str | None]:
     return src, dst
 
 
-def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row]) -> AlertItem:
+def _hrefs(rows: Sequence[sqlite3.Row]) -> set[str]:
+    return {v for r in rows for v in json.loads(r["params_json"]).values() if isinstance(v, str) and HOST_HREF.match(v)}
+
+
+def _named_params(params: dict[str, Any], names: Mapping[str, str]) -> dict[str, Any]:
+    """A host the evaluation had no name for was written into the alert as its href; it is shown by name (or in
+    words) as every page shows hosts, never as an href."""
+    return {k: names.get(v, v) if isinstance(v, str) else v for k, v in params.items()}
+
+
+def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row],
+          names: Mapping[str, str] | None = None) -> AlertItem:
     lang = ctx.settings.current().display.language
-    v = alert_view(row)
+    params = _named_params(json.loads(row["params_json"]), names or {})
+    v = replace(alert_view(row), params=params)
     rule_type = AlertRuleType(row["rule_type"])
-    params = json.loads(row["params_json"])
     src, dst = ends(params) if rule_type is AlertRuleType.LATERAL else (None, None)
     return AlertItem(id=v.id, fired_at=v.fired_at, severity=v.severity, rule_id=row["rule_id"],
                      rule_type=rule_type, rule_name=rule_title(v, lang),
@@ -196,7 +209,8 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
     for d in found:
         by_alert.setdefault(d["alert_id"], []).append(d)
     counts = AlertCounts(**{k: counted.get(k, 0) for k in ("critical", "high", "medium", "low", "grouped")})
-    return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], [])) for r in rows], total=total, page=q.page,
+    names = display_names(ctx, _hrefs(rows))
+    return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], []), names) for r in rows], total=total, page=q.page,
                      page_size=PAGE, counts=counts)
 
 
@@ -296,7 +310,7 @@ def alert_detail(ctx: AppContext, alert_id: int) -> AlertDetail | None:
             return None
         deliveries = store.deliveries(conn, [alert_id])
         notes = store.notes(conn, alert_id)
-    item = _item(ctx, row, deliveries)
+    item = _item(ctx, row, deliveries, display_names(ctx, _hrefs([row])))
     evidence = json.loads(row["evidence_json"]) if row["evidence_json"] else None
     lang = ctx.settings.current().display.language
     params = json.loads(row["params_json"])
