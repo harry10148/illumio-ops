@@ -116,4 +116,4 @@ export function Security() {
   );
 }
 
-registerNav({ section: "system", path: "/system/security", labelKey: "nav_system_security", order: 40, component: Security });
+registerNav({ section: "system", path: "/system/security", labelKey: "nav_system_security", order: 60, component: Security });

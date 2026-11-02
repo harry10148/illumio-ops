@@ -70,4 +70,4 @@ export function ReportSettings() {
   );
 }
 
-registerNav({ section: "system", path: "/system/reports", labelKey: "nav_system_reports", order: 27, component: ReportSettings });
+registerNav({ section: "system", path: "/system/reports", labelKey: "nav_system_reports", order: 90, component: ReportSettings });

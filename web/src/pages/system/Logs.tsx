@@ -95,4 +95,4 @@ export function Logs() {
   );
 }
 
-registerNav({ section: "system", path: "/system/logs", labelKey: "nav_system_logs", order: 25, component: Logs });
+registerNav({ section: "system", path: "/system/logs", labelKey: "nav_system_logs", order: 70, component: Logs });

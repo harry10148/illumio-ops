@@ -155,6 +155,14 @@ export function AlertsHome() {
           </select>
         </label>
       </PageHead>
+      {basic && (
+        <div className="needs-advanced" data-role="basic-mode-box">
+          <p><Tag tone="ok">● {t("mode_basic")}</Tag> {t("home_basic_now")}</p>
+          <p><Tag tone="adv">◆ {t("mode_advanced")}</Tag> {t("home_basic_advanced_adds")}</p>
+          <p className="hint">{t("home_basic_investigate")}</p>
+          <Link to="/system/collection">{t("needs_advanced_link")}</Link>
+        </div>
+      )}
       <KpiStrip items={[
         { key: "critical", label: t("severity_critical"), value: c ? c.critical : null, tone: "crit" },
         { key: "high", label: t("severity_high"), value: c ? c.high : null, tone: "high" },

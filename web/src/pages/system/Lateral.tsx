@@ -485,4 +485,4 @@ export function Lateral() {
   );
 }
 
-registerNav({ section: "system", path: "/system/lateral", labelKey: "nav_system_lateral", order: 14, component: Lateral });
+registerNav({ section: "system", path: "/system/lateral", labelKey: "nav_system_lateral", order: 30, component: Lateral });

@@ -10,10 +10,12 @@ from pydantic import BaseModel, Field
 
 from illumio_ops.domain.values import IngestSource
 from illumio_ops.jobs.scheduler import apply_schedule, instrument
-from illumio_ops.services import logs
+from illumio_ops.services import data_status, logs
 from illumio_ops.services.collect import backfill
+from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.collect.mode import backfill_sources
 from illumio_ops.services.collect.status import CollectionStatus, collection_status
+from illumio_ops.services.data_status import DataStatus
 from illumio_ops.settings.schema import CollectionSettings
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
@@ -60,6 +62,7 @@ class LogLines(BaseModel):
 
 OP_GET = operation("system.collection.get", "GET", "/api/system/collection", None, CollectionView)
 OP_UPDATE = operation("system.collection.update", "PUT", "/api/system/collection", CollectionUpdate, CollectionView)
+OP_DATA = operation("system.collection.data", "GET", "/api/system/collection/data", None, DataStatus)
 OP_STATUS = operation("system.collection.status", "GET", "/api/system/collection/status", None, CollectionStatus)
 OP_BACKFILL = operation("system.collection.backfill", "POST", "/api/system/collection/backfill", BackfillRequest,
                         BackfillAccepted)
@@ -128,3 +131,11 @@ def query_logs(body: LogQuery) -> LogLines:
                                    contains=body.contains, limit=body.limit)
     return LogLines(lines=[LogLine(ts=e.ts, level=e.level, module=e.module, message=e.message) for e in entries],
                     truncated=truncated)
+
+
+@api_route(bp, OP_DATA)
+def data_view() -> DataStatus:
+    try:
+        return data_status.status(get_ctx())
+    except BindingMismatch:
+        raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None

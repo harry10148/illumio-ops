@@ -251,4 +251,4 @@ export function PceConnection() {
   );
 }
 
-registerNav({ section: "system", path: "/system/pce", labelKey: "nav_system_pce", order: 10, component: PceConnection });
+registerNav({ section: "system", path: "/system/pce", labelKey: "nav_system_pce", order: 20, component: PceConnection });

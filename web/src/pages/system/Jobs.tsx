@@ -92,4 +92,4 @@ export function Jobs() {
   );
 }
 
-registerNav({ section: "system", path: "/system/jobs", labelKey: "nav_system_jobs", order: 20, component: Jobs });
+registerNav({ section: "system", path: "/system/jobs", labelKey: "nav_system_jobs", order: 40, component: Jobs });

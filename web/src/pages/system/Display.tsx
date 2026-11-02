@@ -57,4 +57,4 @@ export function Display() {
   );
 }
 
-registerNav({ section: "system", path: "/system/display", labelKey: "nav_system_display", order: 50, component: Display });
+registerNav({ section: "system", path: "/system/display", labelKey: "nav_system_display", order: 80, component: Display });

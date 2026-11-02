@@ -12,7 +12,7 @@ def _point_at(live_app, pce_url: str) -> None:
 
 def _open_collection(page, base_url: str) -> None:
     sign_in(page, base_url)
-    open_system(page, "Data collection")
+    open_system(page, "Modes and data sources")
     page.wait_for_selector("[data-role=collection-status]")
 
 

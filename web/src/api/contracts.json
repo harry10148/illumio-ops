@@ -30422,6 +30422,155 @@
         "type": "object"
       }
     },
+    "system.collection.data": {
+      "method": "GET",
+      "path": "/api/system/collection/data",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "DiskPart": {
+            "properties": {
+              "bytes": {
+                "title": "Bytes",
+                "type": "integer"
+              },
+              "name": {
+                "enum": [
+                  "flows",
+                  "archive",
+                  "app",
+                  "reports"
+                ],
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "bytes"
+            ],
+            "title": "DiskPart",
+            "type": "object"
+          },
+          "OpenGap": {
+            "properties": {
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "kind": {
+                "title": "Kind",
+                "type": "string"
+              },
+              "source": {
+                "title": "Source",
+                "type": "string"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              }
+            },
+            "required": [
+              "source",
+              "start",
+              "end",
+              "kind"
+            ],
+            "title": "OpenGap",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "baseline_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Days"
+          },
+          "baseline_target_days": {
+            "title": "Baseline Target Days",
+            "type": "integer"
+          },
+          "disk": {
+            "items": {
+              "$ref": "#/$defs/DiskPart"
+            },
+            "title": "Disk",
+            "type": "array"
+          },
+          "events_latest": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events Latest"
+          },
+          "flows_latest": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flows Latest"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/$defs/OpenGap"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "live_hours_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Hours Days"
+          },
+          "mode": {
+            "enum": [
+              "basic",
+              "advanced"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "events_latest",
+          "flows_latest",
+          "baseline_days",
+          "baseline_target_days",
+          "live_hours_days",
+          "gaps",
+          "disk"
+        ],
+        "title": "DataStatus",
+        "type": "object"
+      }
+    },
     "system.collection.get": {
       "method": "GET",
       "path": "/api/system/collection",

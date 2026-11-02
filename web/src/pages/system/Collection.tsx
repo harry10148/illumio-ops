@@ -5,6 +5,7 @@ import type { CollectionMode, CollectionSettings, CollectionStatus, SourceStatus
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { Modes } from "./Modes";
 
 const SOURCE_KEYS: Record<string, string> = {
   traffic: "source_traffic",
@@ -227,6 +228,7 @@ export function Collection() {
   return (
     <section className="page stack">
       <h1>{t("nav_system_collection")}</h1>
+      <Modes />
       {status && (
         <div className="card" data-role="collection-status">
           <h2>{t("collection_status_title")}</h2>
@@ -364,4 +366,4 @@ export function Collection() {
   );
 }
 
-registerNav({ section: "system", path: "/system/collection", labelKey: "nav_system_collection", order: 12, component: Collection });
+registerNav({ section: "system", path: "/system/collection", labelKey: "nav_system_collection", order: 10, component: Collection });

@@ -249,4 +249,4 @@ export function Tls() {
   );
 }
 
-registerNav({ section: "system", path: "/system/tls", labelKey: "nav_system_tls", order: 30, component: Tls });
+registerNav({ section: "system", path: "/system/tls", labelKey: "nav_system_tls", order: 50, component: Tls });
