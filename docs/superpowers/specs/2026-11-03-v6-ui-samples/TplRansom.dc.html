@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>14 範本：勒索防護</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; background: #DDE1E7; display: flex; justify-content: center; align-items: center; gap: 24px; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; font-size: 11px">
+  <article aria-label="第 1 頁" style="width: 580px; height: 780px; background: #FFFFFF; box-shadow: 0 3px 14px rgba(15, 23, 42, 0.18); padding: 0 32px 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px">
+    <div style="height: 4px; background: #DC2626; margin: 0 -32px"></div>
+    <div style="display: flex; justify-content: space-between; padding-top: 14px"><div style="font-family: 'JetBrains Mono', monospace; letter-spacing: 2px; color: #64748B; font-size: 10px">ILLUMIO-OPS・勒索防護</div><span style="color: #64748B">● 基本模式可產生；◆ 疊加流量需進階模式</span></div>
+    <h1 style="margin: 0; font-size: 21px; line-height: 1.4">46 台主機有人正在使用未防護的高風險服務，先處理這些</h1>
+    <div style="color: #4B5563">2026 年 10 月・PCE 原廠涵蓋 71%・產出 11/01 09:00</div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <div style="border: 1px solid #FCA5A5; background: #FEF2F2; padding: 10px"><div style="font-family: 'JetBrains Mono', monospace; font-size: 22px; color: #B91C1C">46</div><div style="color: #4B5563">最優先：未防護＋監聽中＋近 30 天有人用</div></div>
+      <div style="border: 1px solid #BBF7D0; background: #F0FDF4; padding: 10px"><div style="font-family: 'JetBrains Mono', monospace; font-size: 22px; color: #15803D">132</div><div style="color: #4B5563">可直接封：未防護但 30 天沒人用</div></div>
+      <div style="border: 1px solid #FDE68A; background: #FFFBEB; padding: 10px"><div style="font-family: 'JetBrains Mono', monospace; font-size: 22px; color: #A16207">9</div><div style="color: #4B5563">可疑：inactive 卻有連線嘗試</div></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px"><span style="background: #DC2626; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S01</span><strong style="font-size: 13px">依服務</strong></div>
+    <div style="display: flex; flex-direction: column; gap: 7px">
+      <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 40px; gap: 8px; align-items: center"><span>RDP 3389・critical</span><div style="height: 10px; background: #F3F4F6"><div style="width: 72%; height: 10px; background: #B91C1C"></div></div><span style="font-family: 'JetBrains Mono', monospace">18</span></div>
+      <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 40px; gap: 8px; align-items: center"><span>SMB 445・critical</span><div style="height: 10px; background: #F3F4F6"><div style="width: 56%; height: 10px; background: #B91C1C"></div></div><span style="font-family: 'JetBrains Mono', monospace">14</span></div>
+      <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 40px; gap: 8px; align-items: center"><span>WinRM 5985・high</span><div style="height: 10px; background: #F3F4F6"><div style="width: 32%; height: 10px; background: #EA580C"></div></div><span style="font-family: 'JetBrains Mono', monospace">8</span></div>
+      <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 40px; gap: 8px; align-items: center"><span>SSH 22・high</span><div style="height: 10px; background: #F3F4F6"><div style="width: 24%; height: 10px; background: #EA580C"></div></div><span style="font-family: 'JetBrains Mono', monospace">6</span></div>
+    </div>
+    <div style="background: #F9FAFB; border: 1px solid #E5E7EB; padding: 8px 10px; line-height: 1.7; color: #4B5563"><strong>原廠數字與明細不一致：</strong>13 台的服務明細全部為 protected_closed，但原廠防護百分比為 0%；這 13 台不列入排序。</div>
+    <div style="flex-grow: 1"></div>
+    <div style="color: #6B7280; font-size: 10px; border-top: 1px solid #E5E7EB; padding-top: 6px; display: flex; justify-content: space-between"><span>來源：PCE 勒索防護 API＋本機 30 天流量</span><span>1／5</span></div>
+  </article>
+  <article aria-label="第 3 頁" style="width: 580px; height: 780px; background: #FFFFFF; box-shadow: 0 3px 14px rgba(15, 23, 42, 0.18); padding: 22px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px"><span style="background: #475569; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S03</span><strong style="font-size: 13px">分數怎麼算出來的（逐台）</strong></div>
+    <div style="font-size: 13px; font-weight: 700">pos-21：暴露 critical，防護 12%</div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 64px 56px minmax(0, 1.3fr); font-size: 11px">
+      <div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">服務</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">權重</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">覆蓋</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">扣分原因</div>
+      <div style="padding: 6px; border-bottom: 1px solid #E5E7EB">RDP 3389</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">critical</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB; font-family: 'JetBrains Mono', monospace">0%</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">無規則</div>
+      <div style="padding: 6px; border-bottom: 1px solid #E5E7EB">SMB 445</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">critical</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB; font-family: 'JetBrains Mono', monospace">40%</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">規則 POS-Admin 允許了部分來源</div>
+      <div style="padding: 6px">WinRM 5985</div><div style="padding: 6px">high</div><div style="padding: 6px; font-family: 'JetBrains Mono', monospace">100%</div><div style="padding: 6px">—</div>
+    </div>
+    <div style="color: #4B5563; line-height: 1.7">被允許的來源仍算攻擊面，這是原廠刻意的設計。</div>
+    <div style="border: 1px solid #FCA5A5; border-left: 4px solid #DC2626; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px">
+      <div><span style="background: #DC2626; color: #FFFFFF; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">CRITICAL</span>　<strong>RDP 對全網開放</strong></div>
+      <div><strong>判定依據：</strong>PCE 回報 protection_state = unprotected、port_status = listening，且 Active 中沒有規則限制來源。</div>
+      <div><strong>近 30 天的使用者：</strong>3 個來源（jump-02、ws-0188、ws-0412）・412 條連線</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding: 6px 0"><span style="background: #475569; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S05</span><strong style="font-size: 13px">與上月比較</strong></div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) 70px 70px 90px; font-size: 11px">
+      <div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB">最優先主機</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">58</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">46</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB"><span style="background: #F0FDF4; color: #15803D; padding: 0 5px">↓ 12</span></div>
+      <div style="padding: 5px 6px">原廠涵蓋</div><div style="padding: 5px 6px; text-align: right; font-family: 'JetBrains Mono', monospace">64%</div><div style="padding: 5px 6px; text-align: right; font-family: 'JetBrains Mono', monospace">71%</div><div style="padding: 5px 6px"><span style="background: #F0FDF4; color: #15803D; padding: 0 5px">↑ 7%</span></div>
+    </div>
+    <div style="flex-grow: 1"></div>
+    <div style="color: #6B7280; font-size: 10px; border-top: 1px solid #E5E7EB; padding-top: 6px; display: flex; justify-content: space-between"><span>illumio-ops 6.1</span><span>3／5</span></div>
+  </article>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>07 報表</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 12px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #6D28D9; padding: 2px 10px 14px">◆ 進階模式・收集正常</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; color: #FFFFFF; border-radius: 9px; padding: 0 7px; font-size: 12px">4</span></a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">偵測</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 14px 18px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; min-width: 0">
+    <div style="display: flex; align-items: center; gap: 10px"><h1 style="margin: 0; font-size: 18px">報表</h1><span style="background: #2563EB; border-radius: 3px; padding: 4px 10px">範本</span><span style="border: 1px solid #CBD5E1; border-radius: 3px; padding: 4px 10px">排程寄送（5）</span><span style="border: 1px solid #CBD5E1; border-radius: 3px; padding: 4px 10px">已產出（42）</span><div style="flex-grow: 1"></div><span style="color: #4B5563"><span style="color: #15803D">●</span> 基本模式可用　<span style="color: #6D28D9">◆</span> 需要進階模式</span></div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+      <div style="color: #4B5563; font-weight: 700">資安評估</div><div style="color: #4B5563; font-weight: 700">流量分析</div><div style="color: #4B5563; font-weight: 700">政策</div><div style="color: #4B5563; font-weight: 700">維運與稽核</div>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>橫向移動態勢</strong><span style="color: #6D28D9">◆</span></div><div style="color: #6B7280">每週一 08:00 寄出・8 份</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span><span style="color: #0369A1">看範例</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>流量明細</strong><span style="color: #6D28D9">◆</span></div><div style="color: #6B7280">未排程・24 份</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>Policy Diff</strong><span style="color: #15803D">●</span></div><div style="color: #6B7280">每週五 17:00・3 份</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>VEN 狀態</strong><span style="color: #15803D">●</span></div><div style="color: #6B7280">每天 07:00・12 份</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>Enforcement 就緒度</strong><span style="color: #6D28D9">◆</span></div><div style="color: #6B7280">未排程・3 份</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>新連線</strong><span style="color: #6D28D9">◆</span></div><div style="color: #6B7280">未排程</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>政策使用</strong><span style="color: #15803D">●</span></div><div style="color: #6B7280">每月 1 日</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>稽核</strong><span style="color: #15803D">●</span></div><div style="color: #6B7280">每週五 → 稽核窗口</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>勒索防護</strong><span style="color: #15803D">●</span></div><div style="color: #6B7280">每月 1 日 → 主管</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>應用摘要</strong><span style="color: #6D28D9">◆</span></div><div style="color: #6B7280">選一個 app</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>規則命中次數</strong><span style="color: #15803D">●</span></div><div style="color: #6B7280">需 PCE 範本權限</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>自訂報表</strong><span style="color: #6D28D9">◆</span></div><div style="color: #6B7280">從調查存的章節・2 份範本</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">編輯</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>資安與風險</strong><span style="color: #6D28D9">◆</span></div><div style="color: #6B7280">成熟度評分・6 份</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>未受管端點・網路盤點</strong><span style="color: #6D28D9">◆</span></div><div style="color: #6B7280">2 型</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span><span style="color: #0369A1">排程</span></div></article>
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><strong>Policy Resolver</strong><span style="color: #15803D">●</span></div><div style="color: #6B7280">JSON／CSV</div><div style="display: flex; gap: 6px"><span style="color: #0369A1">產生</span></div></article>
+      <div></div>
+    </div>
+    <section aria-label="產生" style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 10px 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; align-items: end">
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">報表</span><select style="background: #FFFFFF; color: #111827; border: 1px solid #CBD5E1; padding: 6px; font-family: inherit"><option>橫向移動態勢</option></select></label>
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">期間</span><select style="background: #FFFFFF; color: #111827; border: 1px solid #CBD5E1; padding: 6px; font-family: inherit"><option>近 7 天</option></select></label>
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">範圍</span><select style="background: #FFFFFF; color: #111827; border: 1px solid #CBD5E1; padding: 6px; font-family: inherit"><option>全部・可用標籤篩選</option></select></label>
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">格式・語言</span><select style="background: #FFFFFF; color: #111827; border: 1px solid #CBD5E1; padding: 6px; font-family: inherit"><option>PDF＋HTML・繁中</option></select></label>
+      <div style="display: flex; gap: 6px"><button style="flex-grow: 1; background: #2563EB; color: #FFFFFF; border: 0; border-radius: 4px; padding: 7px; font-family: inherit">立即產生</button><button style="flex-grow: 1; background: transparent; color: #111827; border: 1px solid #94A3B8; border-radius: 4px; padding: 7px; font-family: inherit">排程寄送</button></div>
+    </section>
+    <section aria-label="最近產出" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; flex-grow: 1">
+      <div style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 100px 100px 140px; gap: 8px; padding: 7px 12px; color: #6B7280; border-bottom: 1px solid #E5E7EB"><span>報表・一句結論</span><span>類型</span><span>產出</span><span>寄送</span><span>動作</span></div>
+      <div style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 100px 100px 140px; gap: 8px; padding: 7px 12px"><span>可觸及重要資產的管理連線增加 27 條</span><span>橫向移動態勢</span><span style="font-family: 'JetBrains Mono', monospace">11-03 08:00</span><span style="color: #15803D">已寄 2 人</span><span style="color: #0369A1">檢視　PDF　HTML</span></div>
+      <div style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 100px 100px 140px; gap: 8px; padding: 7px 12px; border-top: 1px solid #E5E7EB"><span>3 台離線、11 台版本落後</span><span>VEN 狀態</span><span style="font-family: 'JetBrains Mono', monospace">11-03 07:00</span><span style="color: #15803D">已寄 3 人</span><span style="color: #0369A1">檢視　PDF　HTML</span></div>
+      <div style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 100px 100px 140px; gap: 8px; padding: 7px 12px; border-top: 1px solid #E5E7EB"><span>Draft 有 6 項變更未佈署，2 項為高風險</span><span>Policy Diff</span><span style="font-family: 'JetBrains Mono', monospace">10-31 17:00</span><span style="color: #B91C1C">寄送失敗</span><span style="color: #0369A1">檢視　重寄</span></div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

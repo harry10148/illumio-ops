@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>12 範本：橫向移動態勢</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; background: #DDE1E7; display: flex; justify-content: center; align-items: center; gap: 24px; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; font-size: 11px">
+  <article aria-label="第 1 頁" style="width: 580px; height: 780px; background: #FFFFFF; box-shadow: 0 3px 14px rgba(15, 23, 42, 0.18); padding: 0 32px 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px">
+    <div style="height: 4px; background: #DC2626; margin: 0 -32px"></div>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-top: 14px">
+      <div style="font-family: 'JetBrains Mono', monospace; letter-spacing: 2px; color: #64748B; font-size: 10px">ILLUMIO-OPS・橫向移動態勢</div>
+      <span style="border: 1px solid #FCA5A5; background: #FEF2F2; color: #B91C1C; padding: 3px 8px; font-family: 'JetBrains Mono', monospace; font-weight: 700">D 48/100</span>
+    </div>
+    <h1 style="margin: 0; font-size: 21px; line-height: 1.4">能碰到重要資產的管理連線 318 條，比上週多 27 條；樞紐主機 4 台（新增 jump-02）</h1>
+    <div style="color: #4B5563">2026/10/27–11/02・[客戶名稱]・PCE pce.corp.local・產出 11/03 08:00</div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; background: #F5F7FA; padding: 10px 12px; border-left: 4px solid #1F2937">
+      <div><div style="color: #64748B; font-size: 10px">可觸及重要資產</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 19px">318</div><div style="color: #B91C1C; font-size: 10px">↑27</div></div>
+      <div><div style="color: #64748B; font-size: 10px">新偵測</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 19px">14</div><div style="color: #64748B; font-size: 10px">高 2・中 9</div></div>
+      <div><div style="color: #64748B; font-size: 10px">強制模式</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 19px">62%</div><div style="color: #15803D; font-size: 10px">↑4%</div></div>
+      <div><div style="color: #64748B; font-size: 10px">全部強制後剩下</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 19px">12</div><div style="color: #64748B; font-size: 10px">條路徑</div></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px"><span style="background: #DC2626; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S01</span><strong style="font-size: 13px">發現與行動</strong><div style="flex-grow: 1"></div><span style="border: 1px solid #DC2626; color: #DC2626; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">CRITICAL 1</span><span style="border: 1px solid #EA580C; color: #EA580C; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">HIGH 2</span><span style="border: 1px solid #CA8A04; color: #CA8A04; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">MEDIUM 2</span></div>
+    <div style="display: grid; grid-template-columns: 66px minmax(0, 1.8fr) minmax(0, 1fr); font-size: 11px">
+      <div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">嚴重度</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">行動</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">證據</div>
+      <div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB"><span style="background: #DC2626; color: #FFFFFF; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">CRITICAL</span></div><div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB">封鎖 jump-02 對資料庫的 22、1433</div><div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB">切斷 41 條路徑</div>
+      <div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB"><span style="border: 1px solid #EA580C; color: #EA580C; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">HIGH</span></div><div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB">確認 ws-0412 竄改後扇出的處置（已隔離）</div><div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB">14 台，2 台重要資產</div>
+      <div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB"><span style="border: 1px solid #EA580C; color: #EA580C; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">HIGH</span></div><div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB">Finance 11 台切到強制模式</div><div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB">0 條使用中連線會被擋</div>
+      <div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB"><span style="border: 1px solid #CA8A04; color: #CA8A04; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">MEDIUM</span></div><div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB">db-07 首次主動連到 app-02（過去只有 app-02 → db-07）</div><div style="padding: 7px 6px; border-bottom: 1px solid #E5E7EB">方向反轉・8080</div>
+      <div style="padding: 7px 6px"><span style="border: 1px solid #CA8A04; color: #CA8A04; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">MEDIUM</span></div><div style="padding: 7px 6px">pay-web0 開始連 HR / App 8443，同群組在此之前沒有主機這樣連</div><div style="padding: 7px 6px">同群 6 台沒人做過</div>
+    </div>
+    <div style="flex-grow: 1"></div>
+    <div style="color: #6B7280; font-size: 10px; border-top: 1px solid #E5E7EB; padding-top: 6px; display: flex; justify-content: space-between"><span>資料涵蓋：流量完整・程式／帳號 38%・缺口 1 段</span><span>1／6</span></div>
+  </article>
+  <article aria-label="第 3 頁" style="width: 580px; height: 780px; background: #FFFFFF; box-shadow: 0 3px 14px rgba(15, 23, 42, 0.18); padding: 22px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; gap: 8px; color: #64748B; font-size: 10px"><span>00 摘要</span><span>01 發現</span><span style="color: #DC2626; font-weight: 700">02 路徑與切點</span><span>03 新偵測</span><span>04 異常</span><span>05 使用者與程式</span><span>06 評分與比較</span></div>
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px"><span style="background: #EA580C; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S02</span><strong style="font-size: 13px">誰能碰到重要資產</strong></div>
+    <div style="background: #F8FAFC; border: 1px solid #E5E7EB; padding: 14px; display: flex; align-items: center; justify-content: center; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px">
+      <div style="display: flex; flex-direction: column; gap: 6px"><span style="border: 1px solid #94A3B8; padding: 3px 6px">ws-0412</span><span style="border: 1px solid #94A3B8; padding: 3px 6px">vpn-pool (38)</span></div>
+      <span style="color: #64748B">445／3389 →</span><span style="border: 2px solid #D97706; padding: 6px 8px">jump-02</span><span style="color: #64748B">22／1433 →</span>
+      <div style="display: flex; flex-direction: column; gap: 6px"><span style="border: 2px solid #DC2626; padding: 3px 6px">fin-db-01</span><span style="border: 2px solid #DC2626; padding: 3px 6px">hr-db</span></div>
+    </div>
+    <div style="border: 1px solid #FCD34D; border-left: 4px solid #F59E0B; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px">
+      <div><span style="border: 1px solid #CA8A04; color: #CA8A04; padding: 0 5px; font-family: 'JetBrains Mono', monospace; font-size: 9px">HIGH</span>　<strong>樞紐主機</strong></div>
+      <div><strong>判定依據：</strong>經過 jump-02 的管理 port 路徑 41 條，占可觸及重要資產路徑的 13%。</div>
+      <div><strong>切點（圖演算法算出）：</strong>封鎖 jump-02 → fin-db-01、fin-db-02、hr-db 的 22、1433，可切斷 41 條路徑。</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding: 6px 0"><span style="background: #475569; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S06</span><strong style="font-size: 13px">與上週比較</strong></div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) 70px 70px 90px; font-size: 11px">
+      <div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">指標</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700; text-align: right">上週</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700; text-align: right">本週</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">變化</div>
+      <div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB">可觸及重要資產</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">291</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">318</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB"><span style="background: #FEF2F2; color: #B91C1C; padding: 0 5px">↑ 27</span></div>
+      <div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB">樞紐主機</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">3</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">4</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB"><span style="background: #FEF2F2; color: #B91C1C; padding: 0 5px">↑ 1</span></div>
+      <div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB">強制模式覆蓋</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">58%</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">62%</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB"><span style="background: #F0FDF4; color: #15803D; padding: 0 5px">↑ 4%</span></div>
+      <div style="padding: 5px 6px">新偵測</div><div style="padding: 5px 6px; text-align: right; font-family: 'JetBrains Mono', monospace">9</div><div style="padding: 5px 6px; text-align: right; font-family: 'JetBrains Mono', monospace">14</div><div style="padding: 5px 6px"><span style="background: #FEF2F2; color: #B91C1C; padding: 0 5px">↑ 5</span></div>
+    </div>
+    <div style="flex-grow: 1"></div>
+    <div style="color: #6B7280; font-size: 10px; border-top: 1px solid #E5E7EB; padding-top: 6px; display: flex; justify-content: space-between"><span>illumio-ops 6.1</span><span>3／6</span></div>
+  </article>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>15 範本：VEN 狀態</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; background: #DDE1E7; display: flex; justify-content: center; align-items: center; gap: 24px; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; font-size: 11px">
+  <article aria-label="第 1 頁" style="width: 580px; height: 780px; background: #FFFFFF; box-shadow: 0 3px 14px rgba(15, 23, 42, 0.18); padding: 0 32px 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px">
+    <div style="height: 4px; background: #2563EB; margin: 0 -32px"></div>
+    <div style="display: flex; justify-content: space-between; padding-top: 14px"><div style="font-family: 'JetBrains Mono', monospace; letter-spacing: 2px; color: #64748B; font-size: 10px">ILLUMIO-OPS・VEN 狀態</div><span style="color: #15803D">● 基本模式</span></div>
+    <h1 style="margin: 0; font-size: 21px; line-height: 1.4">1,024 台中 3 台離線（app=POS 3 台）、11 台 VEN 版本落後兩個大版以上</h1>
+    <div style="color: #4B5563">快照 2026/11/03 07:00・每日寄送</div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; background: #F5F7FA; padding: 10px 12px; border-left: 4px solid #1F2937">
+      <div><div style="color: #64748B; font-size: 10px">線上</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 19px">1,021</div></div>
+      <div><div style="color: #64748B; font-size: 10px">離線</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 19px; color: #B91C1C">3</div></div>
+      <div><div style="color: #64748B; font-size: 10px">版本落後</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 19px; color: #C2410C">11</div></div>
+      <div><div style="color: #64748B; font-size: 10px">強制模式</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 19px">62%</div></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px"><span style="background: #DC2626; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S01</span><strong style="font-size: 13px">需要處理</strong></div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 110px minmax(0, 1fr); font-size: 11px">
+      <div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">主機</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">狀態</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">最後 heartbeat</div><div style="background: #F5F7FA; padding: 5px 6px; font-weight: 700">標籤</div>
+      <div style="padding: 6px; border-bottom: 1px solid #E5E7EB; font-family: 'JetBrains Mono', monospace">pos-21</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB; color: #B91C1C">離線</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">11/02 09:44</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">app=POS</div>
+      <div style="padding: 6px; border-bottom: 1px solid #E5E7EB; font-family: 'JetBrains Mono', monospace">pos-22</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB; color: #B91C1C">離線</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">11/02 09:46</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">app=POS</div>
+      <div style="padding: 6px; border-bottom: 1px solid #E5E7EB; font-family: 'JetBrains Mono', monospace">pos-23</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB; color: #B91C1C">離線</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">11/02 10:02</div><div style="padding: 6px; border-bottom: 1px solid #E5E7EB">app=POS</div>
+      <div style="padding: 6px; font-family: 'JetBrains Mono', monospace">版本 23.2.x（11 台）</div><div style="padding: 6px; color: #C2410C">版本落後</div><div style="padding: 6px">正常</div><div style="padding: 6px">app=Legacy</div>
+    </div>
+    <div style="flex-grow: 1"></div>
+    <div style="color: #6B7280; font-size: 10px; border-top: 1px solid #E5E7EB; padding-top: 6px; display: flex; justify-content: space-between"><span>來源：PCE workloads／vens API</span><span>1／3</span></div>
+  </article>
+  <article aria-label="第 2 頁" style="width: 580px; height: 780px; background: #FFFFFF; box-shadow: 0 3px 14px rgba(15, 23, 42, 0.18); padding: 22px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px"><span style="background: #475569; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S02</span><strong style="font-size: 13px">分布</strong></div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 6px"><strong>模式</strong>
+        <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 40px; gap: 6px; align-items: center"><span>full</span><div style="height: 9px; background: #F3F4F6"><div style="width: 40%; height: 9px; background: #15803D"></div></div><span>410</span></div>
+        <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 40px; gap: 6px; align-items: center"><span>selective</span><div style="height: 9px; background: #F3F4F6"><div style="width: 22%; height: 9px; background: #2563EB"></div></div><span>225</span></div>
+        <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 40px; gap: 6px; align-items: center"><span>visibility</span><div style="height: 9px; background: #F3F4F6"><div style="width: 36%; height: 9px; background: #94A3B8"></div></div><span>371</span></div>
+        <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 40px; gap: 6px; align-items: center"><span>idle</span><div style="height: 9px; background: #F3F4F6"><div style="width: 2%; height: 9px; background: #CBD5E1"></div></div><span>18</span></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px"><strong>版本</strong>
+        <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 40px; gap: 6px; align-items: center"><span>26.2.x</span><div style="height: 9px; background: #F3F4F6"><div style="width: 81%; height: 9px; background: #15803D"></div></div><span>830</span></div>
+        <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 40px; gap: 6px; align-items: center"><span>25.4.x</span><div style="height: 9px; background: #F3F4F6"><div style="width: 18%; height: 9px; background: #CA8A04"></div></div><span>183</span></div>
+        <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr) 40px; gap: 6px; align-items: center"><span>23.2.x</span><div style="height: 9px; background: #F3F4F6"><div style="width: 1%; height: 9px; background: #DC2626"></div></div><span>11</span></div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E5E7EB; padding: 6px 0"><span style="background: #475569; color: #FFFFFF; font-family: 'JetBrains Mono', monospace; padding: 1px 5px">S03</span><strong style="font-size: 13px">與昨天比較</strong></div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) 70px 70px 90px; font-size: 11px">
+      <div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB">離線</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">0</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB; text-align: right; font-family: 'JetBrains Mono', monospace">3</div><div style="padding: 5px 6px; border-bottom: 1px solid #E5E7EB"><span style="background: #FEF2F2; color: #B91C1C; padding: 0 5px">↑ 3</span></div>
+      <div style="padding: 5px 6px">強制模式</div><div style="padding: 5px 6px; text-align: right; font-family: 'JetBrains Mono', monospace">61%</div><div style="padding: 5px 6px; text-align: right; font-family: 'JetBrains Mono', monospace">62%</div><div style="padding: 5px 6px"><span style="background: #F0FDF4; color: #15803D; padding: 0 5px">↑ 1%</span></div>
+    </div>
+    <div style="flex-grow: 1"></div>
+    <div style="color: #6B7280; font-size: 10px; border-top: 1px solid #E5E7EB; padding-top: 6px; display: flex; justify-content: space-between"><span>illumio-ops 6.1</span><span>2／3</span></div>
+  </article>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

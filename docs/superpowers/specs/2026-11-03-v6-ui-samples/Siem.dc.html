@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>09 SIEM 轉送</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 12px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #6D28D9; padding: 2px 10px 14px">◆ 進階模式・收集正常</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; color: #FFFFFF; border-radius: 9px; padding: 0 7px; font-size: 12px">4</span></a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">偵測</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 14px 18px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; min-width: 0">
+    <div style="display: flex; align-items: center; gap: 10px"><h1 style="margin: 0; font-size: 18px">SIEM 轉送</h1><span style="color: #4B5563">有 SIEM 的客戶：把這裡收到、判斷出來的東西送過去</span><div style="flex-grow: 1"></div><button style="background: #2563EB; color: #FFFFFF; border: 0; border-radius: 4px; padding: 7px 12px; font-family: inherit">＋ 新增目的地</button></div>
+    <section aria-label="目的地" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <article style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between"><strong style="font-size: 14px">Graylog（CEF over TCP）</strong><span style="color: #15803D">● 正常</span></div>
+        <div style="font-family: 'JetBrains Mono', monospace; color: #4B5563">graylog.lab:5514・TLS 關・格式 cef_pce</div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+          <div style="background: #FFFFFF; padding: 6px 8px"><div style="color: #6B7280">稽核事件</div><div style="font-family: 'JetBrains Mono', monospace">送到 14:55</div></div>
+          <div style="background: #FFFFFF; padding: 6px 8px"><div style="color: #6B7280">告警</div><div style="font-family: 'JetBrains Mono', monospace">送到 14:52</div></div>
+          <div style="background: #FFFFFF; padding: 6px 8px"><div style="color: #6B7280">偵測</div><div style="font-family: 'JetBrains Mono', monospace">送到 14:47</div></div>
+          <div style="background: #FFFFFF; padding: 6px 8px"><div style="color: #6B7280">新連線</div><div style="font-family: 'JetBrains Mono', monospace">內部・送到 14:50</div></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; color: #4B5563"><span>24 小時送出 18,402・積壓 0・DLQ 0</span><span style="color: #0369A1">送測試訊息</span></div>
+      </article>
+      <article style="background: #FFFFFF; border: 1px solid #FDBA74; border-radius: 4px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between"><strong style="font-size: 14px">Splunk HEC</strong><span style="color: #C2410C">● 重試中</span></div>
+        <div style="font-family: 'JetBrains Mono', monospace; color: #4B5563">https://splunk.corp:8088・token ••••••</div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+          <div style="background: #FFFFFF; padding: 6px 8px"><div style="color: #6B7280">稽核事件</div><div style="font-family: 'JetBrains Mono', monospace; color: #C2410C">落後 12 分</div></div>
+          <div style="background: #FFFFFF; padding: 6px 8px"><div style="color: #6B7280">告警</div><div style="font-family: 'JetBrains Mono', monospace">送到 14:52</div></div>
+          <div style="background: #FFFFFF; padding: 6px 8px"><div style="color: #6B7280">偵測</div><div style="font-family: 'JetBrains Mono', monospace">關</div></div>
+          <div style="background: #FFFFFF; padding: 6px 8px"><div style="color: #6B7280">新連線</div><div style="font-family: 'JetBrains Mono', monospace">關</div></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; color: #4B5563"><span>最後錯誤：503 Service Unavailable（3 分鐘前）・DLQ 4</span><span style="color: #0369A1">看 DLQ</span></div>
+      </article>
+    </section>
+    <section aria-label="送了什麼" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; flex-grow: 1">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div style="font-weight: 700; color: #374151">每筆送出的樣子（cef_pce）</div>
+        <div style="background: #FFFFFF; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.7; color: #374151">CEF:0|Illumio|illumio-ops|6.1|fanout|橫向移動：扇出|8|src=10.20.4.12 shost=ws-0412 cnt=14 dpt=445 cs1Label=detection cs1=fanout cs2Label=precursor cs2=agent.tampering externalId=det-8812 rt=1793632320000</div>
+        <div style="color: #6B7280">與 PCE 原生 syslog 對齊欄位；SIEM 用 externalId 去重</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div style="font-weight: 700; color: #374151">東西向分析指引</div>
+        <div style="line-height: 1.7; color: #374151">偵測已經在這裡算好，SIEM 端只需依 cs1（偵測器）與嚴重度建儀表板。<br>建議查詢：同一 src 一小時內多種偵測器；竄改後 30 分鐘內任何執行類偵測。</div>
+        <a href="#">下載 SIEM 查詢範例</a>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

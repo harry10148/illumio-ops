@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>11 系統：模式與資料來源</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 13px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #6D28D9; padding: 2px 10px 14px">◆ 進階模式・收集正常</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; color: #FFFFFF; border-radius: 9px; padding: 0 7px; font-size: 12px">4</span></a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">偵測</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 16px 20px; box-sizing: border-box; display: flex; gap: 16px; min-width: 0">
+    <div style="width: 180px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; border-right: 1px solid #E5E7EB; padding-right: 12px">
+      <div style="color: #6B7280; font-size: 11px; padding: 0 8px 6px">系統</div>
+      <span style="background: #EEF2F7; padding: 7px 8px; border-radius: 4px">模式與資料來源</span>
+      <span style="padding: 7px 8px; color: #374151">PCE 連線</span>
+      <span style="padding: 7px 8px; color: #374151">橫向移動設定</span>
+      <span style="padding: 7px 8px; color: #374151">背景工作</span>
+      <span style="padding: 7px 8px; color: #374151">TLS 憑證</span>
+      <span style="padding: 7px 8px; color: #374151">帳號與安全</span>
+      <span style="padding: 7px 8px; color: #374151">日誌</span>
+      <span style="padding: 7px 8px; color: #374151">顯示</span>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0">
+      <div style="display: flex; align-items: center; gap: 12px"><h1 style="margin: 0; font-size: 18px">模式與資料來源</h1><span style="color: #4B5563">PCE pce.corp.local（地端 26.2）・唯讀＋佈署權限</span></div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+        <section aria-label="基本模式" style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; justify-content: space-between"><strong style="font-size: 15px"><span style="color: #15803D">●</span> 基本模式</strong><span style="color: #4B5563; font-size: 12px">只用 API，不存流量</span></div>
+          <div style="color: #374151; line-height: 1.7; font-size: 12px">事件告警（竄改、VEN 離線、政策變更、登入失敗）<br>VEN 狀態、稽核、勒索防護、政策類報表與排程寄送<br>調查時即時向 PCE 查詢，查完即丟<br>規則排程、隔離、SIEM 轉送稽核事件</div>
+          <div style="color: #6B7280; font-size: 12px">約 2 vCPU／2 GB／20 GB</div>
+        </section>
+        <section aria-label="進階模式" style="background: #FFFFFF; border: 2px solid #6D28D9; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; justify-content: space-between"><strong style="font-size: 15px"><span style="color: #6D28D9">◆</span> 進階模式 <span style="font-size: 12px; color: #6D28D9">使用中</span></strong><span style="color: #4B5563; font-size: 12px">本機保存流量與基準</span></div>
+          <div style="color: #374151; line-height: 1.7; font-size: 12px">基本模式全部，加上：<br>橫向移動偵測與 13 種允許流量異常<br>流量類、評估類報表與 Enforcement 就緒度<br>調查可跨天比對、看同群先例</div>
+          <div style="color: #6B7280; font-size: 12px">1,000 台約 4 vCPU／8 GB／60 GB・基準期 30 天</div>
+        </section>
+      </div>
+      <section aria-label="資料狀態" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px; padding: 14px 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+        <div><div style="color: #4B5563; font-size: 11px">事件</div><div style="font-size: 18px; font-weight: 700; color: #15803D">正常</div><div style="color: #6B7280; font-size: 11px">每 5 分鐘・延遲 1 分</div></div>
+        <div><div style="color: #4B5563; font-size: 11px">流量</div><div style="font-size: 18px; font-weight: 700; color: #15803D">正常</div><div style="color: #6B7280; font-size: 11px">每 10 分鐘・回補 30 天完成</div></div>
+        <div><div style="color: #4B5563; font-size: 11px">基準期</div><div style="font-size: 18px; font-weight: 700">30／30 天</div><div style="color: #6B7280; font-size: 11px">每小時活動 4／7 天</div></div>
+        <div><div style="color: #4B5563; font-size: 11px">缺口</div><div style="font-size: 18px; font-weight: 700; color: #A16207">1 段</div><div style="color: #6B7280; font-size: 11px">10/31 18:03–18:07（升級）</div></div>
+      </section>
+      <section aria-label="磁碟" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; font-size: 12px">
+        <div style="display: flex; justify-content: space-between"><strong>磁碟</strong><span style="font-family: 'JetBrains Mono', monospace">23.4 GB／60 GB</span></div>
+        <div style="height: 10px; background: #EEF2F7; display: flex"><div style="width: 28%; background: #6D28D9"></div><div style="width: 8%; background: #2563EB"></div><div style="width: 3%; background: #0EA5E9"></div></div>
+        <div style="color: #4B5563">流量 35 天　彙總 90 天　事件 90 天　報表 30 份／型</div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

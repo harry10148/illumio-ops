@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>02 偵測</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 13px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #6D28D9; padding: 2px 10px 14px">◆ 進階模式・收集正常</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; color: #FFFFFF; border-radius: 9px; padding: 0 7px; font-size: 12px">4</span></a>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none">偵測</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 16px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+    <div style="display: flex; align-items: center; gap: 12px"><h1 style="margin: 0; font-size: 18px">偵測</h1><span style="font-family: 'JetBrains Mono', monospace; color: #6B7280; font-size: 12px">最近一輪 15:20・每 10 分鐘・圖每小時重算</span><div style="flex-grow: 1"></div><span style="color: #4B5563">近 7 天 ▾</span></div>
+    <section aria-label="攻擊面" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">可觸及重要資產（管理 port）</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 22px">318 <span style="font-size: 12px; color: #B91C1C">+27</span></div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">樞紐主機</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 22px">4</div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">全部強制後剩下</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 22px">12</div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">跨環境管理連線</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 22px">7</div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">本週新偵測</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 22px">14</div></div>
+    </section>
+    <div style="display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; flex-grow: 1; min-height: 0">
+      <section aria-label="偵測器狀態" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12px">
+        <div style="font-weight: 700; color: #374151; padding-bottom: 4px">偵測器（18）</div>
+        <div style="color: #6B7280; font-size: 11px">橫向移動</div>
+        <div style="display: flex; justify-content: space-between"><span>扇出</span><span style="font-family: 'JetBrains Mono', monospace; color: #15803D">正常 2</span></div>
+        <div style="display: flex; justify-content: space-between"><span>新管理連線</span><span style="font-family: 'JetBrains Mono', monospace; color: #15803D">正常 5</span></div>
+        <div style="display: flex; justify-content: space-between"><span>跳板鏈</span><span style="font-family: 'JetBrains Mono', monospace; color: #15803D">正常 0</span></div>
+        <div style="display: flex; justify-content: space-between"><span>跨環境</span><span style="color: #A16207">缺 env 標籤</span></div>
+        <div style="display: flex; justify-content: space-between"><span>非預期發起程式</span><span style="color: #A16207">程式欄位 38%</span></div>
+        <div style="color: #6B7280; font-size: 11px; padding-top: 6px">允許流量中的異常</div>
+        <div style="display: flex; justify-content: space-between"><span>同群偏離</span><span style="font-family: 'JetBrains Mono', monospace; color: #15803D">正常 1</span></div>
+        <div style="display: flex; justify-content: space-between"><span>量暴增</span><span style="font-family: 'JetBrains Mono', monospace; color: #15803D">正常 0</span></div>
+        <div style="display: flex; justify-content: space-between"><span>方向反轉</span><span style="font-family: 'JetBrains Mono', monospace; color: #15803D">正常 1</span></div>
+        <div style="display: flex; justify-content: space-between"><span>既有主機對的新 port</span><span style="font-family: 'JetBrains Mono', monospace; color: #15803D">正常 3</span></div>
+        <div style="display: flex; justify-content: space-between"><span>安靜主機甦醒</span><span style="color: #1D4ED8">累積中 4/7 天</span></div>
+        <div style="display: flex; justify-content: space-between"><span>資料匯集</span><span style="color: #A16207">位元組 5%</span></div>
+        <div style="display: flex; justify-content: space-between"><span>時段偏離</span><span style="color: #1D4ED8">累積中 4/7 天</span></div>
+        <div style="display: flex; justify-content: space-between"><span>目錄／認證</span><span style="font-family: 'JetBrains Mono', monospace; color: #15803D">推論 2 台 DC</span></div>
+        <div style="flex-grow: 1"></div>
+        <a href="#">調整門檻與管理 port →</a>
+      </section>
+      <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0">
+        <section aria-label="可觸及路徑" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between"><span style="font-weight: 700; color: #374151">誰能碰到重要資產（3 跳內）</span><span style="color: #4B5563">現在 ／ 全部強制後</span></div>
+          <div style="display: flex; align-items: center; gap: 16px; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 8px 0">
+            <div style="display: flex; flex-direction: column; gap: 8px"><span style="border: 1px solid #CBD5E1; border-radius: 4px; padding: 5px 10px">ws-0412</span><span style="border: 1px solid #CBD5E1; border-radius: 4px; padding: 5px 10px">ws-0188</span><span style="border: 1px solid #CBD5E1; border-radius: 4px; padding: 5px 10px">vpn-pool (38)</span></div>
+            <span style="color: #6B7280">— 445／3389 →</span>
+            <span style="border: 2px solid #F59E0B; border-radius: 4px; padding: 8px 12px; color: #A16207">jump-02<br>樞紐 41 路徑</span>
+            <span style="color: #6B7280">— 22／1433 →</span>
+            <div style="display: flex; flex-direction: column; gap: 8px"><span style="border: 2px solid #EF4444; border-radius: 4px; padding: 5px 10px; color: #B91C1C">fin-db-01</span><span style="border: 2px solid #EF4444; border-radius: 4px; padding: 5px 10px; color: #B91C1C">fin-db-02</span><span style="border: 2px solid #EF4444; border-radius: 4px; padding: 5px 10px; color: #B91C1C">hr-db</span></div>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: center"><span>建議切點：封鎖 jump-02 → 資料庫的 22、1433</span><a href="#">模擬強制後的結果</a><a href="#">產生 deny 規則草稿</a></div>
+        </section>
+        <section aria-label="最近偵測" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; flex-grow: 1; font-size: 12px">
+          <div style="display: grid; grid-template-columns: 60px 50px 140px minmax(0, 1fr) 90px; gap: 8px; padding: 8px 14px; color: #6B7280; border-bottom: 1px solid #E5E7EB"><span>首見</span><span>等級</span><span>偵測器</span><span>內容</span><span>狀態</span></div>
+          <div style="display: grid; grid-template-columns: 60px 50px 140px minmax(0, 1fr) 90px; gap: 8px; padding: 8px 14px"><span style="font-family: 'JetBrains Mono', monospace">14:47</span><span style="color: #B91C1C">嚴重</span><span>扇出</span><span>ws-0412 → 14 台（445），竄改後</span><span>已告警</span></div>
+          <div style="display: grid; grid-template-columns: 60px 50px 140px minmax(0, 1fr) 90px; gap: 8px; padding: 8px 14px; border-top: 1px solid #E5E7EB"><span style="font-family: 'JetBrains Mono', monospace">14:31</span><span style="color: #C2410C">高</span><span>方向反轉</span><span>db-07 主動連到 app-02（8080）</span><span>已告警</span></div>
+          <div style="display: grid; grid-template-columns: 60px 50px 140px minmax(0, 1fr) 90px; gap: 8px; padding: 8px 14px; border-top: 1px solid #E5E7EB"><span style="font-family: 'JetBrains Mono', monospace">11:05</span><span style="color: #4B5563">低</span><span>既有主機對的新 port</span><span>4 台開始用 report-01:9443（服務上線）</span><span style="color: #4B5563">只記錄</span></div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

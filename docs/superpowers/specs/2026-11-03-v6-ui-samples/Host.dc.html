@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>04 主機側寫＋隔離</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 13px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #6D28D9; padding: 2px 10px 14px">◆ 進階模式・收集正常</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; color: #FFFFFF; border-radius: 9px; padding: 0 7px; font-size: 12px">4</span></a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">偵測</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 16px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; min-width: 0; position: relative">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <h1 style="margin: 0; font-size: 18px; font-family: 'JetBrains Mono', monospace">ws-0412</h1>
+      <span style="background: #EEF2F7; padding: 3px 8px; border-radius: 3px; font-size: 12px">Finance / Workstation / Prod</span>
+      <span style="color: #4B5563">10.20.4.12・Windows 11・VEN 26.2.20・selective</span>
+      <div style="flex-grow: 1"></div>
+      <span style="background: #FCA5A5; color: #991B1B; padding: 3px 8px; border-radius: 3px; font-size: 12px">隔離中</span>
+    </div>
+    <section aria-label="重點" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">相關告警（7 天）</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px">3</div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">可觸及重要資產</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px">5</div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">竄改</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px; color: #B91C1C">1 signal</div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">勒索暴露</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px">high</div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">慣常時段</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px">08–19</div></div>
+    </section>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; flex-grow: 1; min-height: 0">
+      <section aria-label="平常的樣子" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12px">
+        <div style="font-weight: 700; color: #374151">平常的樣子（30 天基準）</div>
+        <div style="display: flex; justify-content: space-between"><span>常連的目的</span><span>file-01:445、mail:443、dc-01:88/389</span></div>
+        <div style="display: flex; justify-content: space-between"><span>常用的發起程式</span><span style="font-family: 'JetBrains Mono', monospace">outlook.exe、teams.exe、svchost.exe</span></div>
+        <div style="display: flex; justify-content: space-between"><span>常見帳號</span><span style="font-family: 'JetBrains Mono', monospace">CORP\amy.lin</span></div>
+        <div style="font-weight: 700; color: #374151; padding-top: 10px">這次不一樣的地方</div>
+        <div style="color: #B91C1C">psexesvc.exe 第一次發起連線</div>
+        <div style="color: #B91C1C">CORP\temp-admin 第一次出現</div>
+        <div style="color: #B91C1C">同群組沒有人連過 Finance / DB 的 445</div>
+      </section>
+      <section aria-label="隔離" style="background: #FFFFFF; border: 1px solid #FCA5A5; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 12px">
+        <div style="font-weight: 700; color: #991B1B">隔離</div>
+        <div style="display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 6px"><span style="color: #4B5563">可隔離</span><span style="color: #15803D">是：受管 workload，在清冊中</span><span style="color: #4B5563">已套用</span><span>Quarantine = Severe（14:58，harry）</span><span style="color: #4B5563">原本標籤</span><span>app=Finance role=Workstation env=Prod</span><span style="color: #4B5563">enforcement</span><span>selective</span></div>
+        <div style="color: #374151; line-height: 1.6">隔離是在這台套上 Quarantine 標籤；實際擋掉哪些連線，取決於 PCE 上的 Quarantine 規則集與這台的 enforcement 模式。</div>
+        <div style="background: #FFFFFF; border: 1px solid #E5E7EB; padding: 8px; color: #4B5563; line-height: 1.6">非受管位址（例：ip:10.9.3.7）沒有 VEN、不在清冊，隔離按鈕不出現；idle 或 visibility 模式的主機可以套標籤，但會標示「不會生效」。</div>
+        <div style="flex-grow: 1"></div>
+        <div style="display: flex; gap: 8px"><button style="background: transparent; color: #111827; border: 1px solid #94A3B8; border-radius: 4px; padding: 8px 12px; font-family: inherit">調整隔離等級</button><button style="background: transparent; color: #991B1B; border: 1px solid #FCA5A5; border-radius: 4px; padding: 8px 12px; font-family: inherit">解除隔離</button></div>
+        <div style="color: #6B7280">每次套用與解除都寫進稽核並送 SIEM</div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

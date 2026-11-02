@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>03 調查</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 13px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #6D28D9; padding: 2px 10px 14px">◆ 進階模式・收集正常</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; color: #FFFFFF; border-radius: 9px; padding: 0 7px; font-size: 12px">4</span></a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">偵測</a>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 14px 18px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; min-width: 0">
+    <div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><a href="#">← 告警：ws-0412 扇出 SMB</a><span style="color: #6B7280">／調查</span><div style="flex-grow: 1"></div><button style="background: transparent; color: #111827; border: 1px solid #94A3B8; border-radius: 4px; padding: 7px 12px; font-family: inherit">存成報表章節</button><button style="background: transparent; color: #111827; border: 1px solid #94A3B8; border-radius: 4px; padding: 7px 12px; font-family: inherit">在 PCE 主控台開啟</button><button style="background: #2563EB; color: #FFFFFF; border: 0; border-radius: 4px; padding: 8px 14px; font-family: inherit">隔離 ws-0412</button></div>
+    <section aria-label="條件" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px">
+      <span style="color: #4B5563">篩選</span><span style="background: #EEF2F7; border-radius: 3px; padding: 4px 8px">來源 = ws-0412</span><span style="background: #EEF2F7; border-radius: 3px; padding: 4px 8px">14:30–15:10</span><span style="background: #EEF2F7; border-radius: 3px; padding: 4px 8px">判定：全部</span><span style="color: #0369A1">＋ 條件</span>
+      <span style="color: #4B5563; padding-left: 14px">分組</span><span style="background: #DBEAFE; border-radius: 3px; padding: 4px 8px">發起程式</span><span style="background: #DBEAFE; border-radius: 3px; padding: 4px 8px">目的群組</span>
+      <span style="color: #4B5563; padding-left: 14px">排名</span><span style="background: #DBEAFE; border-radius: 3px; padding: 4px 8px">不重複目的主機</span>
+      <div style="flex-grow: 1"></div><span style="color: #6B7280">◆ 本機資料・或即時向 PCE 查詢</span>
+    </section>
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; flex-grow: 1; min-height: 0">
+      <section aria-label="時間軸" style="grid-column: span 2; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 12px">
+        <div style="font-weight: 700; color: #374151">事件＋流量時間軸</div>
+        <div><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">14:38</span>　登入 CORP\temp-admin<span style="color: #A16207">（第一次出現在這台）</span></div>
+        <div><span style="font-family: 'JetBrains Mono', monospace; color: #B91C1C">14:41</span>　<span style="color: #B91C1C">VEN 防火牆被竄改（signal）</span></div>
+        <div><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">14:44</span>　psexesvc.exe 首次發起連線</div>
+        <div><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">14:47</span>　445 → fin-db-01（重要資產）</div>
+        <div><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">14:48–52</span>　445 → 另外 13 台</div>
+        <div><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">14:55</span>　3389 → jump-02（被擋）</div>
+        <div style="flex-grow: 1"></div>
+        <div style="color: #6B7280">帶程式或帳號的連線佔 38%；右邊的分組只涵蓋這部分</div>
+      </section>
+      <section aria-label="分組結果" style="grid-column: span 3; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12px">
+        <div style="display: flex; justify-content: space-between"><span style="font-weight: 700; color: #374151">發起程式 × 目的群組</span><span style="color: #6B7280">原廠只能篩選，不能分組、排名、比對同儕</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 70px 70px 90px; gap: 8px; color: #6B7280; padding: 4px 0"><span>發起程式</span><span>目的群組</span><span>主機</span><span>連線</span><span>同群先例</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 70px 70px 90px; gap: 8px; padding: 6px 0; border-top: 1px solid #E5E7EB"><span style="font-family: 'JetBrains Mono', monospace">psexesvc.exe</span><span>Finance / DB</span><span>3</span><span>41</span><span style="color: #B91C1C">從沒有</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 70px 70px 90px; gap: 8px; padding: 6px 0; border-top: 1px solid #E5E7EB"><span style="font-family: 'JetBrains Mono', monospace">psexesvc.exe</span><span>HR / App</span><span>6</span><span>58</span><span style="color: #B91C1C">從沒有</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 70px 70px 90px; gap: 8px; padding: 6px 0; border-top: 1px solid #E5E7EB"><span style="font-family: 'JetBrains Mono', monospace">svchost.exe</span><span>Infra / DC</span><span>2</span><span>310</span><span style="color: #15803D">23 台都有</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 70px 70px 90px; gap: 8px; padding: 6px 0; border-top: 1px solid #E5E7EB"><span style="color: #4B5563">（沒有程式資料）</span><span>Pay / Web</span><span>5</span><span>77</span><span style="color: #4B5563">—</span></div>
+        <div style="flex-grow: 1"></div>
+        <div style="display: flex; gap: 14px"><a href="#">看每條連線</a><a href="#">全部強制後會被擋嗎</a><a href="#">這條連線被哪條規則允許</a></div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

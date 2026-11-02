@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>06 基本模式下的首頁</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 13px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #15803D; padding: 2px 10px 14px">● 基本模式・只用 API</div>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; border-radius: 9px; padding: 0 7px; font-size: 12px">2</span></a>
+    <a href="#" style="color: #6B7280; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>偵測</span><span style="color: #7C3AED; font-size: 12px">◆</span></a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 16px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+    <div style="display: flex; align-items: center; gap: 12px"><h1 style="margin: 0; font-size: 18px">告警</h1><span style="color: #4B5563">事件告警每 5 分鐘・PCE 事件延遲 1 分鐘</span></div>
+    <section aria-label="事件告警" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; font-size: 13px">
+      <div style="display: grid; grid-template-columns: 56px 52px minmax(0, 1fr) 160px 70px; gap: 10px; padding: 8px 16px; color: #6B7280; font-size: 12px; border-bottom: 1px solid #E5E7EB"><span>時間</span><span>等級</span><span>告警</span><span>對象</span><span>通知</span></div>
+      <div style="display: grid; grid-template-columns: 56px 52px minmax(0, 1fr) 160px 70px; gap: 10px; padding: 10px 16px; border-left: 3px solid #EF4444; background: #EFF6FF"><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">14:41</span><span style="color: #B91C1C">嚴重</span><span>VEN 防火牆被竄改（signal）</span><span style="font-family: 'JetBrains Mono', monospace">ws-0412</span><span style="color: #15803D">已送 2</span></div>
+      <div style="display: grid; grid-template-columns: 56px 52px minmax(0, 1fr) 160px 70px; gap: 10px; padding: 10px 16px; border-top: 1px solid #E5E7EB"><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">13:20</span><span style="color: #C2410C">高</span><span>5 次登入失敗（10 分鐘內）</span><span style="font-family: 'JetBrains Mono', monospace">admin@corp</span><span style="color: #15803D">已送 2</span></div>
+      <div style="display: grid; grid-template-columns: 56px 52px minmax(0, 1fr) 160px 70px; gap: 10px; padding: 10px 16px; border-top: 1px solid #E5E7EB"><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">09:44</span><span style="color: #A16207">中</span><span>VEN 離線超過 1 小時</span><span style="font-family: 'JetBrains Mono', monospace">pos-21</span><span style="color: #15803D">已送 1</span></div>
+      <div style="display: grid; grid-template-columns: 56px 52px minmax(0, 1fr) 160px 70px; gap: 10px; padding: 10px 16px; border-top: 1px solid #E5E7EB"><span style="font-family: 'JetBrains Mono', monospace; color: #4B5563">08:02</span><span style="color: #A16207">中</span><span>Security Policy 已佈署</span><span style="font-family: 'JetBrains Mono', monospace">admin@corp</span><span style="color: #15803D">已送 1</span></div>
+    </section>
+    <section aria-label="進階模式才有" style="border: 1px dashed #6D28D9; border-radius: 4px; padding: 16px 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; background: #F5F3FF">
+      <div><div style="color: #6D28D9; font-weight: 700">◆ 橫向移動偵測</div><div style="color: #4B5563; font-size: 12px; line-height: 1.6; padding-top: 4px">扇出、跳板鏈、新管理連線、跨環境，需要本機保存流量</div></div>
+      <div><div style="color: #6D28D9; font-weight: 700">◆ 允許流量的異常</div><div style="color: #4B5563; font-size: 12px; line-height: 1.6; padding-top: 4px">同群偏離、量暴增、方向反轉等 13 種，需要 30 天基準</div></div>
+      <div><div style="color: #6D28D9; font-weight: 700">◆ 流量類報表與就緒度</div><div style="color: #4B5563; font-size: 12px; line-height: 1.6; padding-top: 4px">誰能碰到重要資產、切到強制模式會擋掉什麼</div></div>
+      <div style="grid-column: span 3; display: flex; align-items: center; gap: 12px"><span style="color: #374151">開啟進階模式約需 4 vCPU／8 GB／60 GB（1,000 台），會先回補 PCE 上保留的流量。</span><div style="flex-grow: 1"></div><button style="background: #6D28D9; color: #FFFFFF; border: 0; border-radius: 4px; padding: 9px 14px; font-family: inherit">看進階模式需要什麼</button></div>
+    </section>
+    <section aria-label="基本模式可做的調查" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 12px 16px; font-size: 12px; color: #374151; line-height: 1.7">
+      <strong>在基本模式也能調查：</strong>從告警按「開始調查」時，向 PCE 即時查詢那段時間的流量，查完即丟，不佔磁碟。分組、排名同樣可用，跨天比對與同群先例需要進階模式。
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

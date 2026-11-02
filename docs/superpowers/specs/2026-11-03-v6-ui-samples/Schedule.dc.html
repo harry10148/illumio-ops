@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>05 規則排程</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 13px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #6D28D9; padding: 2px 10px 14px">◆ 進階模式・收集正常</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; color: #FFFFFF; border-radius: 9px; padding: 0 7px; font-size: 12px">4</span></a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">偵測</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 16px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+    <div style="display: flex; align-items: center; gap: 12px"><h1 style="margin: 0; font-size: 18px">規則排程</h1><span style="color: #4B5563">依時間啟用或停用 PCE 上已佈署的規則，到點自動佈署</span><div style="flex-grow: 1"></div><span style="color: #15803D; font-size: 12px">● 基本模式可用</span></div>
+    <section aria-label="狀態" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">排程</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px">4</div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">今日切換</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px">2 <span style="font-size: 12px; color: #15803D">0 失敗</span></div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">本輪跳過</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px; color: #A16207">1 <span style="font-size: 12px">有 Draft</span></div></div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 12px"><div style="font-size: 11px; color: #4B5563">下次動作</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 20px">18:00 <span style="font-size: 12px; color: #4B5563">停用 #293</span></div></div>
+    </section>
+    <div style="display: flex; gap: 12px; flex-grow: 1; min-height: 0">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+        <section aria-label="本週時間表" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12px">
+          <div style="display: grid; grid-template-columns: 150px repeat(7, minmax(0, 1fr)); gap: 3px; color: #6B7280"><span>本週</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div style="display: grid; grid-template-columns: 150px repeat(7, minmax(0, 1fr)); gap: 3px; align-items: center"><span>廠商遠端維護</span><span style="background: #166534; height: 14px"></span><span></span><span style="background: #166534; height: 14px"></span><span></span><span style="background: #166534; height: 14px"></span><span></span><span></span></div>
+          <div style="display: grid; grid-template-columns: 150px repeat(7, minmax(0, 1fr)); gap: 3px; align-items: center"><span>夜間備份 → NAS</span><span style="background: #166534; height: 14px"></span><span style="background: #166534; height: 14px"></span><span style="background: #166534; height: 14px"></span><span style="background: #166534; height: 14px"></span><span style="background: #166534; height: 14px"></span><span style="background: #166534; height: 14px"></span><span style="background: #166534; height: 14px"></span></div>
+          <div style="display: grid; grid-template-columns: 150px repeat(7, minmax(0, 1fr)); gap: 3px; align-items: center"><span>週末停用 SMB 外連</span><span></span><span></span><span></span><span></span><span></span><span style="background: #991B1B; height: 14px"></span><span style="background: #991B1B; height: 14px"></span></div>
+          <div style="color: #6B7280">綠＝時段內啟用　紅＝時段內停用</div>
+        </section>
+        <section aria-label="排程清單" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; font-size: 12px; flex-grow: 1">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) 80px minmax(0, 1.3fr) 80px minmax(0, 1fr); gap: 8px; padding: 8px 14px; color: #6B7280; border-bottom: 1px solid #E5E7EB"><span>目標</span><span>類型</span><span>時間</span><span>現在</span><span>上次結果</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) 80px minmax(0, 1.3fr) 80px minmax(0, 1fr); gap: 8px; padding: 9px 14px"><span>#293 廠商 → jump-02:3389<div style="color: #6B7280">Vendor-Access</div></span><span>每週</span><span>一三五 09:00–18:00</span><span style="color: #15803D">啟用中</span><span style="font-family: 'JetBrains Mono', monospace">09:00 OK</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) 80px minmax(0, 1.3fr) 80px minmax(0, 1fr); gap: 8px; padding: 9px 14px; border-top: 1px solid #E5E7EB"><span>#310 全部 → nas-01:445<div style="color: #6B7280">Backup</div></span><span>每週</span><span>每天 01:00–05:00</span><span style="color: #4B5563">停用中</span><span style="font-family: 'JetBrains Mono', monospace">05:00 OK</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) 80px minmax(0, 1.3fr) 80px minmax(0, 1fr); gap: 8px; padding: 9px 14px; border-top: 1px solid #E5E7EB"><span>Temp-Migration（整組）</span><span>到期</span><span>11/15 00:00 後停用</span><span style="color: #15803D">啟用中</span><span>還有 12 天</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) 80px minmax(0, 1.3fr) 80px minmax(0, 1fr); gap: 8px; padding: 9px 14px; border-top: 1px solid #E5E7EB; background: #FFFBEB"><span>#401 SMB 外連（deny）<div style="color: #6B7280">Office</div></span><span>每週</span><span>六日 全天</span><span style="color: #4B5563">停用中</span><span style="color: #A16207">跳過：有未佈署 Draft</span></div>
+        </section>
+      </div>
+      <aside aria-label="新增排程" style="width: 330px; background: #FFFFFF; border: 1px solid #2563EB; border-radius: 4px; padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12px">
+        <div style="font-weight: 700; font-size: 14px">新增排程</div>
+        <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">目標（搜尋 Ruleset 或規則）</span><input value="Vendor-Access ／ #294" style="background: #FFFFFF; border: 1px solid #CBD5E1; color: #111827; padding: 7px; font-family: inherit"></label>
+        <div style="color: #6B7280">ACTIVE・ON・Vendor-VPN → Finance・全部（deny）</div>
+        <div style="display: flex; gap: 6px"><span style="background: #2563EB; padding: 5px 10px; border-radius: 3px">每週時段</span><span style="border: 1px solid #CBD5E1; padding: 5px 10px; border-radius: 3px">到期停用</span></div>
+        <div style="display: flex; gap: 4px"><span style="background: #DBEAFE; padding: 4px 7px">一</span><span style="border: 1px solid #CBD5E1; padding: 4px 7px">二</span><span style="background: #DBEAFE; padding: 4px 7px">三</span><span style="border: 1px solid #CBD5E1; padding: 4px 7px">四</span><span style="background: #DBEAFE; padding: 4px 7px">五</span><span style="border: 1px solid #CBD5E1; padding: 4px 7px">六</span><span style="border: 1px solid #CBD5E1; padding: 4px 7px">日</span></div>
+        <div style="display: flex; gap: 6px; align-items: center"><input value="18:00" style="width: 70px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #111827; padding: 6px; font-family: 'JetBrains Mono', monospace"><span>到</span><input value="09:00" style="width: 70px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #111827; padding: 6px; font-family: 'JetBrains Mono', monospace"><span style="color: #6B7280">跨午夜・台北</span></div>
+        <div style="display: flex; gap: 6px"><span style="border: 1px solid #CBD5E1; padding: 5px 10px; border-radius: 3px">時段內啟用</span><span style="background: #2563EB; padding: 5px 10px; border-radius: 3px">時段內停用</span></div>
+        <div style="background: #FFFFFF; border: 1px solid #E5E7EB; padding: 8px; color: #374151; line-height: 1.6">預覽：一三五 18:00 停用並佈署，隔天 09:00 啟用並佈署。規則描述會加上排程註記。</div>
+        <div style="flex-grow: 1"></div>
+        <button style="background: #2563EB; color: #FFFFFF; border: 0; border-radius: 4px; padding: 9px; font-family: inherit">建立排程</button>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

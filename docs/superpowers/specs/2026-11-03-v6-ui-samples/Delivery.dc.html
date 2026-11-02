@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>08 排程寄送</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0369A1}a:hover{color:#075985}
+</style>
+</helmet>
+<div style="width: 1280px; height: 820px; display: flex; font-family: 'Noto Sans TC', system-ui, sans-serif; color: #111827; background: #F4F6F8; font-size: 12px">
+  <nav aria-label="主選單" style="width: 200px; background: #FFFFFF; border-right: 1px solid #D1D5DB; display: flex; flex-direction: column; padding: 16px 10px; gap: 2px; box-sizing: border-box; font-size: 14px">
+    <div style="font-weight: 700; font-size: 17px; color: #111827; padding: 2px 10px">illumio-ops</div>
+    <div style="font-size: 11px; color: #6D28D9; padding: 2px 10px 14px">◆ 進階模式・收集正常</div>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none; display: flex; justify-content: space-between"><span>告警</span><span style="background: #DC2626; color: #FFFFFF; border-radius: 9px; padding: 0 7px; font-size: 12px">4</span></a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">偵測</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">調查</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">主機</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">規則排程</a>
+    <div style="font-size: 11px; color: #6B7280; padding: 14px 12px 4px">產出</div>
+    <a href="#" style="color: #1D4ED8; background: #E8EEF7; font-weight: 500; border-radius: 6px; padding: 8px 12px; text-decoration: none">報表與寄送</a>
+    <a href="#" style="color: #374151; padding: 8px 12px; text-decoration: none">SIEM 轉送</a>
+    <div style="flex-grow: 1"></div>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">告警規則與通知</a>
+    <a href="#" style="color: #4B5563; padding: 8px 12px; text-decoration: none">系統</a>
+  </nav>
+  <main style="flex-grow: 1; padding: 14px 18px; box-sizing: border-box; display: flex; gap: 12px; min-width: 0">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0">
+      <div style="display: flex; align-items: center; gap: 10px"><h1 style="margin: 0; font-size: 18px">報表</h1><span style="border: 1px solid #CBD5E1; border-radius: 3px; padding: 4px 10px">範本</span><span style="background: #2563EB; border-radius: 3px; padding: 4px 10px">排程寄送（5）</span><span style="border: 1px solid #CBD5E1; border-radius: 3px; padding: 4px 10px">已產出（42）</span><div style="flex-grow: 1"></div><button style="background: #2563EB; color: #FFFFFF; border: 0; border-radius: 4px; padding: 7px 12px; font-family: inherit">＋ 新增排程</button></div>
+      <section aria-label="排程" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px">
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) 110px 100px; gap: 8px; padding: 8px 12px; color: #6B7280; border-bottom: 1px solid #E5E7EB"><span>報表</span><span>頻率</span><span>收件人</span><span>下次</span><span>上次</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) 110px 100px; gap: 8px; padding: 9px 12px; background: #EFF6FF; border-left: 3px solid #3B82F6"><span><strong>橫向移動態勢</strong><div style="color: #6B7280">近 7 天・全部・PDF</div></span><span>每週一 08:00</span><span>ciso@、soc@</span><span style="font-family: 'JetBrains Mono', monospace">11-10 08:00</span><span style="color: #15803D">已寄</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) 110px 100px; gap: 8px; padding: 9px 12px; border-top: 1px solid #E5E7EB"><span><strong>VEN 狀態</strong><div style="color: #6B7280">快照・HTML</div></span><span>每天 07:00</span><span>ops-team@（3）</span><span style="font-family: 'JetBrains Mono', monospace">11-04 07:00</span><span style="color: #15803D">已寄</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) 110px 100px; gap: 8px; padding: 9px 12px; border-top: 1px solid #E5E7EB"><span><strong>Policy Diff</strong><div style="color: #6B7280">快照・PDF</div></span><span>每週五 17:00</span><span>change-board@</span><span style="font-family: 'JetBrains Mono', monospace">11-07 17:00</span><span style="color: #B91C1C">失敗</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) 110px 100px; gap: 8px; padding: 9px 12px; border-top: 1px solid #E5E7EB"><span><strong>勒索防護</strong><div style="color: #6B7280">上個月・PDF</div></span><span>每月 1 日 09:00</span><span>主管群組</span><span style="font-family: 'JetBrains Mono', monospace">12-01 09:00</span><span style="color: #15803D">已寄</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) 110px 100px; gap: 8px; padding: 9px 12px; border-top: 1px solid #E5E7EB; color: #6B7280"><span><strong>稽核（從 5.x 遷移）</strong><div>暫停：cron 運算式 v6 不支援</div></span><span>—</span><span>稽核窗口</span><span>暫停</span><span>—</span></div>
+      </section>
+      <section aria-label="寄送紀錄" style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 4px; flex-grow: 1">
+        <div style="padding: 8px 12px; border-bottom: 1px solid #E5E7EB; font-weight: 700; color: #374151">寄送紀錄</div>
+        <div style="padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.8; color: #374151">11-03 08:00　橫向移動態勢　產生 41s　寄出 ciso@ ✓ soc@ ✓<br>11-03 07:00　VEN 狀態　產生 6s　寄出 3/3 ✓<br><span style="color: #B91C1C">10-31 17:00　Policy Diff　產生 12s　SMTP 逾時（重試 3 次）</span><br>11-01 09:00　勒索防護　產生 1m12s　寄出 4/4 ✓</div>
+      </section>
+    </div>
+    <aside aria-label="編輯排程" style="width: 330px; background: #FFFFFF; border: 1px solid #2563EB; border-radius: 4px; padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-weight: 700; font-size: 14px">橫向移動態勢・每週</div>
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">頻率</span><span style="display: flex; gap: 4px"><span style="border: 1px solid #CBD5E1; padding: 4px 8px">每天</span><span style="background: #2563EB; padding: 4px 8px">每週</span><span style="border: 1px solid #CBD5E1; padding: 4px 8px">每月</span></span></label>
+      <div style="display: flex; gap: 6px; align-items: center"><span style="background: #DBEAFE; padding: 4px 8px">週一</span><input value="08:00" style="width: 70px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #111827; padding: 6px; font-family: 'JetBrains Mono', monospace"><span style="color: #6B7280">台北</span></div>
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">期間與範圍</span><input value="前 7 天・全部" style="background: #FFFFFF; border: 1px solid #CBD5E1; color: #111827; padding: 6px; font-family: inherit"></label>
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">收件人</span><input value="ciso@corp, soc@corp" style="background: #FFFFFF; border: 1px solid #CBD5E1; color: #111827; padding: 6px; font-family: inherit"></label>
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">信件內容</span><span style="background: #FFFFFF; border: 1px solid #CBD5E1; padding: 8px; line-height: 1.6">主旨帶一句結論；本文放重點數字與前三項行動，附 PDF</span></label>
+      <label style="display: flex; flex-direction: column; gap: 4px"><span style="color: #4B5563">保留份數</span><input value="30" style="width: 70px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #111827; padding: 6px; font-family: 'JetBrains Mono', monospace"></label>
+      <div style="flex-grow: 1"></div>
+      <div style="display: flex; gap: 6px"><button style="flex-grow: 1; background: #2563EB; color: #FFFFFF; border: 0; border-radius: 4px; padding: 8px; font-family: inherit">儲存</button><button style="background: transparent; color: #111827; border: 1px solid #94A3B8; border-radius: 4px; padding: 8px 10px; font-family: inherit">立即寄一次</button></div>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":820}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
