@@ -31,6 +31,7 @@ from illumio_ops.web.routes import (
     report_schedules,
     reports,
     rhc,
+    rule_schedules,
     shell,
     siem,
     system_channels,
@@ -138,6 +139,7 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
     app.register_blueprint(custom_reports.bp)
     app.register_blueprint(siem.bp)
     app.register_blueprint(shell.bp)
+    app.register_blueprint(rule_schedules.bp)
 
     # 8. The single-page app: hashed assets, anything else that is a file, else index.html
     @app.get("/")

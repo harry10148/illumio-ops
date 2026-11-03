@@ -343,3 +343,12 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .mode-card[data-current] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .mode-card p { margin: 0; }
 [data-role=basic-mode-box] { margin-bottom: var(--space-6); }
+
+/* Rule schedules (sample 05) */
+.rs-week { display: grid; gap: var(--space-2); }
+.rs-week-row { display: grid; grid-template-columns: minmax(80px, 140px) repeat(7, 1fr); gap: var(--space-1); align-items: center; }
+.rs-week-head span { font-size: var(--fs-micro); color: var(--text-3); text-align: center; }
+.rs-week-name { font-size: var(--fs-mini); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-week-cell { position: relative; height: 16px; background: var(--surface-2); border-radius: var(--radius-s); }
+.rs-week-cell i { position: absolute; top: 3px; height: 10px; border-radius: 2px; background: var(--ink); }
+.rs-targets li { padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }

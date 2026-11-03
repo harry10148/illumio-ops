@@ -21,6 +21,7 @@ import "./pages/system/Tls";
 import "./pages/system/Security";
 import "./pages/system/Display";
 import "./pages/system/ReportSettings";
+import "./pages/schedules/RuleSchedules";
 import "./pages/siem/Siem";
 import "./pages/siem/Dlq";
 import "@fontsource-variable/jetbrains-mono";
