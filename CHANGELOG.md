@@ -31,9 +31,19 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   Investigate (peer-precedent column), Hosts (search; usual destinations, processes and accounts over 30 days;
   what differs this week), Alert rules and notifications on one page with 7-day triggers and a rule test that
   writes and sends nothing, and System › Modes and data sources (both modes side by side, data status, disk use).
+- **Rule scheduling** is back (UI redesign plan B, the 5.x semantics): enable or disable a provisioned rule, deny
+  rule or rule set in a weekly window or at an expiry, checked every five minutes and provisioned with the optional
+  write key. A target with any pending draft in its rule set is skipped; a provision that would take other
+  unprovisioned objects live is not made and the schedule's own draft change is put back; an expiry is removed only
+  once the disable is provisioned; the PCE's refusals are shown as it gave them. 5.x `config/rule_schedules.json`
+  arrives as paused schedules on an upgrade.
+- **Reports** open with one sentence computed from their own key numbers (in the mail subject too), then the key
+  numbers and a findings-and-actions table; the light palette and print styles match the console. Reports and
+  delivery shows templates in four columns, says what basic mode means for each, and lists each report's sentence.
 
 ### Changed
 - Hourly activity is kept 15 days (was 8). An alert-rule file may hold 400 rules (was 360).
+- Report settings and Rule Hit Count moved to Reports › Scheduled delivery (`/system/reports` redirects).
 - Old addresses redirect: `/alerts` → `/`, `/lateral` → `/detect`, `/alerts/rules` → `/alert-rules`,
   `/system/channels` → `/alert-rules?tab=channels`. The home page summary API (`/api/home/summary`) is gone; the PCE
   probe result is on System › PCE connection.
