@@ -48,7 +48,7 @@ def test_search_lists_ruleset_and_rules_with_names(ctx):
     assert set(hits) == {RS, R9, R10}
     assert hits[RS].is_ruleset and hits[RS].name == "Backups"
     assert hits[R9].summary == "app=backup → Backup servers: 445/TCP" and hits[R9].enabled
-    assert hits[R10].draft_pending and not hits[R9].draft_pending
+    assert hits[R10].draft_pending and hits[R9].draft_pending  # a sibling's pending change holds the whole rule set
     assert "All workloads" in hits[R10].summary
 
 

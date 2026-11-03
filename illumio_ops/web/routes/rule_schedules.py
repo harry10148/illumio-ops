@@ -28,7 +28,7 @@ class RuleSchedulesView(BaseModel):
 
 
 class ScheduleCreate(BaseModel):
-    href: str = Field(pattern=r"^/orgs/\d+/sec_policy/(active|draft)/rule_sets/\d+(/sec_rules/\d+)?$")
+    href: str = Field(pattern=r"^/orgs/\d+/sec_policy/(active|draft)/rule_sets/\d+(/(sec_rules|deny_rules)/\d+)?$")
     plan: PlanField
     name: str = Field(min_length=1, max_length=200)
     ruleset_name: str = Field(max_length=200)

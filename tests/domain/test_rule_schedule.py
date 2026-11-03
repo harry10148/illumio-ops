@@ -122,3 +122,14 @@ def test_preview_keys():
     assert params == {"days": "mon,wed,fri", "start": "18:00", "end": "09:00", "next_day": "1"}
     key, params = preview(Expiry(expire_at=at(2026, 12, 1, 0), timezone="Asia/Taipei"))
     assert key == "rs_preview_expiry" and params == {"at": "2026-12-01 00:00", "timezone": "Asia/Taipei"}
+
+
+def test_next_change_is_the_real_flip_on_a_spring_forward_day():
+    """Codex review: 02:30 does not exist; the window opens when the clock jumps to 03:00 (07:00Z)."""
+    w = weekly(days=("sun",), start="02:30", end="09:00", timezone="America/New_York")
+    assert next_change(w, datetime(2027, 3, 13, 12, tzinfo=UTC)) == datetime(2027, 3, 14, 7, tzinfo=UTC)
+
+
+def test_fixed_utc_offset_zones():
+    w = weekly(days=("mon",), start="08:00", end="09:00", timezone="UTC+05:30")
+    assert desired(w, datetime(2026, 11, 2, 2, 45, tzinfo=UTC)) is True  # 08:15 at +05:30

@@ -18,8 +18,8 @@ from illumio_ops.migrate.report import MigrationItem
 from illumio_ops.store import rule_schedules as store
 
 FILE = "config/rule_schedules.json"
-_TARGET = re.compile(r"^/orgs/\d+/sec_policy/(active|draft)/rule_sets/\d+(/sec_rules/\d+)?$")
-_OFFSET = re.compile(r"^UTC([+-])(\d{1,2})$")
+_TARGET = re.compile(r"^/orgs/\d+/sec_policy/(active|draft)/rule_sets/\d+(/(sec_rules|deny_rules)/\d+)?$")
+_OFFSET = re.compile(r"^UTC([+-])(\d{1,2})(?:\.(\d+))?$")
 DISABLING = ("block", "disable", "deny")
 
 
@@ -40,8 +40,11 @@ def _zone(value: Any, local_zone: str | None) -> tuple[str, bool]:
     if text.lower() == "local":
         return (local_zone, False) if local_zone else ("UTC", True)
     m = _OFFSET.match(text)
-    if m:  # Etc/GMT signs are inverted: UTC+8 is Etc/GMT-8
+    if m and not m.group(3):  # Etc/GMT signs are inverted: UTC+8 is Etc/GMT-8
         return f"Etc/GMT{'-' if m.group(1) == '+' else '+'}{int(m.group(2))}", False
+    if m:  # 5.x accepted UTC+5.5 and UTC+5.75: kept as the fixed offset (no IANA name says it exactly)
+        minutes = round(float(f"0.{m.group(3)}") * 60)
+        return f"UTC{m.group(1)}{int(m.group(2)):02d}:{minutes:02d}", False
     try:
         ZoneInfo(text)
     except (ZoneInfoNotFoundError, ValueError):
@@ -81,7 +84,8 @@ def convert(raw: dict[str, Any] | None, *, local_zone: str | None) -> tuple[list
     items: list[MigrationItem] = []
     for href, entry in raw.items():
         source = f"{FILE}: {href}"
-        name = str((entry or {}).get("detail_name") or (entry or {}).get("name") or href)
+        known = entry if isinstance(entry, dict) else {}
+        name = str(known.get("detail_name") or known.get("name") or href)
         try:
             if not _TARGET.match(str(href)) or not isinstance(entry, dict):
                 raise ValueError("not a rule or rule set")
@@ -95,7 +99,7 @@ def convert(raw: dict[str, Any] | None, *, local_zone: str | None) -> tuple[list
         parts = [str(entry.get(k) or "") for k in ("detail_src", "detail_dst", "detail_svc")]
         summary = f"{parts[0]} → {parts[1]}: {parts[2]}" if any(parts) else ""
         done.append(Converted(href=str(href).replace("/sec_policy/draft/", "/sec_policy/active/"),
-                              is_ruleset="/sec_rules/" not in str(href), name=name,
+                              is_ruleset="/sec_rules/" not in str(href) and "/deny_rules/" not in str(href), name=name,
                               ruleset_name=str(entry.get("detail_rs") or ""), summary=summary, plan=plan))
         items.append(MigrationItem(source, "rule_schedules", "rewritten",
                                    "migrate_rule_schedule_paused_utc" if utc else "migrate_rule_schedule_paused",

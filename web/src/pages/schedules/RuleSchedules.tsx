@@ -19,6 +19,7 @@ const ACTION_KEYS: Record<string, string> = {
   enable: "rs_run_enable", disable: "rs_run_disable", expire: "rs_run_expire", skip_draft: "rs_run_skip_draft",
   not_found: "rs_run_not_found", error: "rs_run_error", note: "rs_run_note", note_cleared: "rs_run_note_cleared",
 };
+const RESULT_KEYS: Record<string, string> = { ok: "rs_result_ok", failed: "rs_result_failed", skipped: "rs_result_skipped" };
 const LIVE_KEYS: Record<string, string> = { enabled: "rs_live_enabled", disabled: "rs_live_disabled", unknown: "rs_live_unknown" };
 const PREVIEW_KEYS: Record<string, string> = {
   rs_preview_weekly_enable: "rs_preview_weekly_enable", rs_preview_weekly_disable: "rs_preview_weekly_disable",
@@ -111,6 +112,8 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
   async function search(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setTarget(null);  // a new search: the earlier pick is no longer on screen (Codex review of plan B)
+    setHits(null);
     const env = await call("rule_schedules.targets", undefined, undefined, { q });
     if (env.ok && env.data) setHits(env.data.items);
     else setError(env.error);
@@ -321,7 +324,7 @@ export function RuleSchedules() {
                 { key: "name", label: t("rs_col_target"), render: (r) => r.name },
                 { key: "action", label: t("rs_col_action"), render: (r) => word(ACTION_KEYS, r.action) },
                 { key: "result", label: t("rs_col_result"), render: (r) => (
-                  <span>{r.result}{r.status !== null ? ` · HTTP ${r.status}` : ""}{r.detail ? ` · ${r.detail}` : ""}</span>) },
+                  <span>{word(RESULT_KEYS, r.result)}{r.status !== null ? ` · HTTP ${r.status}` : ""}{r.detail ? ` · ${r.detail}` : ""}</span>) },
               ]}
             />
           </Panel>

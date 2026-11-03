@@ -2761,5 +2761,12 @@
   "rpt_mode_on_demand": "Basic mode: on demand",
   "rpt_mode_on_demand_hint": "Basic mode keeps no traffic: the report asks the PCE when made — slower, and limited by how long the PCE keeps traffic.",
   "rpt_card_counts": "{schedules} schedules · {copies} made",
-  "rpt_schedule_link": "Schedule delivery"
+  "rpt_schedule_link": "Schedule delivery",
+  "rs_actor_all_workloads": "All workloads",
+  "rs_service_all": "All services",
+  "rs_summary_rules": "{n} rules",
+  "rs_deny_rule_name": "Deny rule #{id}",
+  "rs_result_ok": "Done",
+  "rs_result_failed": "Failed",
+  "rs_result_skipped": "Skipped"
 }

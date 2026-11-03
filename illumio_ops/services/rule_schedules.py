@@ -9,6 +9,7 @@ written when a schedule is made and removed when it ends. The PCE's refusals are
 from __future__ import annotations
 
 import sqlite3
+import threading
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal, cast
 
@@ -33,6 +34,7 @@ from illumio_ops.pce.client import (
     PceTransportError,
 )
 from illumio_ops.services.context import AppContext
+from illumio_ops.settings.schema import PceSettings
 from illumio_ops.store import rule_schedules as store
 
 RUNS_KEEP = timedelta(days=30)
@@ -177,7 +179,14 @@ def _switch(client: PceClient, href: str, enabled: bool, before: bool) -> PceRes
         if back.status != 204:
             raise UndoFailed(dep.hrefs, back) from None
         raise
-    return None if p.status == 201 else p
+    if p.status == 201:
+        return None
+    # Not provisioned: put the schedule's own change back, or later checks would take it for someone's pending draft
+    # and skip the target for good (Codex review of plan B).
+    back = pw.set_fields(client, href, {"enabled": before})
+    if back.status != 204:
+        raise UndoFailed([], back)
+    return p
 
 
 def _clear_note(client: PceClient, href: str, draft: PceResponse) -> PceResponse | None:
@@ -285,10 +294,14 @@ def tick(ctx: AppContext, *, now: datetime | None = None) -> TickResult:
     if not rows:
         return out
     with ctx.pce_write_client(cfg) as client:
-        for row in rows:
+        for first_read in rows:
             if _ident(ctx) != ident:
                 logger.info("rule schedules: the PCE changed during the check; the rest waits for the next run")
                 break
+            with ctx.db() as conn:  # paused, deleted or changed since the round began: not with the old row
+                row = store.get(conn, first_read["id"])
+            if row is None or row["paused"] or row["updated_at"] != first_read["updated_at"]:
+                continue
             out.checked += 1
             try:
                 result = _check_one(ctx, client, row, at)
@@ -345,13 +358,20 @@ def runs(ctx: AppContext, *, schedule_id: int | None = None, limit: int = 200) -
         return [_run_view(r) for r in store.runs(conn, pce_url=url, org_id=org, limit=limit, schedule_id=schedule_id)]
 
 
-def _own(ctx: AppContext, schedule_id: int) -> sqlite3.Row:
-    url, org = _ident(ctx)
+class PceSwitched(Exception):
+    """The PCE changed between the check and the write: nothing was written."""
+
+
+def _own(ctx: AppContext, schedule_id: int, cfg: PceSettings) -> sqlite3.Row:
     with ctx.db() as conn:
         row = store.get(conn, schedule_id)
-    if row is None or (row["pce_url"], row["org_id"]) != (url, org):
+    if row is None or (row["pce_url"], row["org_id"]) != (cfg.url, cfg.org_id):
         raise LookupError(schedule_id)
     return row
+
+
+def _same(ctx: AppContext, cfg: PceSettings) -> bool:
+    return _ident(ctx) == (cfg.url, cfg.org_id)
 
 
 def _write_note(client: PceClient, href: str, plan: Plan) -> None:
@@ -374,9 +394,22 @@ def _write_note(client: PceClient, href: str, plan: Plan) -> None:
         raise PceRefused(p.status, _detail(p))
 
 
+_CREATE = threading.Lock()  # one create at a time: the target is claimed before the PCE is written
+
+
 def create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: str, summary: str, by: str,
            now: datetime | None = None) -> ScheduleView:
     """Raises NoWriteKey, AlreadyScheduled, NotProvisioned, DraftPending, PceRefused (nothing saved then)."""
+    with _CREATE:
+        try:
+            return _create(ctx, href=href, plan=plan, name=name, ruleset_name=ruleset_name, summary=summary, by=by,
+                           now=now)
+        except sqlite3.IntegrityError:
+            raise AlreadyScheduled from None
+
+
+def _create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: str, summary: str, by: str,
+            now: datetime | None = None) -> ScheduleView:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     if not _has_key(ctx):
         raise NoWriteKey
@@ -413,10 +446,13 @@ def create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: s
 
 def update(ctx: AppContext, schedule_id: int, plan: Plan, *, now: datetime | None = None) -> ScheduleView:
     at = (now or datetime.now(UTC)).astimezone(UTC)
-    row = _own(ctx, schedule_id)
-    if not _has_key(ctx):
+    cfg = ctx.settings.current().pce
+    row = _own(ctx, schedule_id, cfg)
+    if not (cfg.write_api_key and cfg.write_api_secret):
         raise NoWriteKey
-    with ctx.pce_write_client(ctx.settings.current().pce) as client:
+    if not _same(ctx, cfg):
+        raise PceSwitched
+    with ctx.pce_write_client(cfg) as client:
         try:
             if pw.draft_pending(client, row["href"]):
                 raise DraftPending
@@ -434,7 +470,7 @@ def update(ctx: AppContext, schedule_id: int, plan: Plan, *, now: datetime | Non
 def set_paused(ctx: AppContext, schedule_id: int, paused: bool, *, now: datetime | None = None) -> ScheduleView:
     """Local only: a paused schedule is not checked; the PCE is not touched."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
-    _own(ctx, schedule_id)
+    _own(ctx, schedule_id, ctx.settings.current().pce)
     with ctx.db() as conn:
         store.set_paused(conn, schedule_id, paused, at)
         conn.commit()
@@ -447,10 +483,13 @@ def delete(ctx: AppContext, schedule_id: int, *, by: str, now: datetime | None =
     """The note is cleared from the description (and provisioned unless another change is pending there); the
     schedule goes either way, and the result says what the PCE did."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
-    row = _own(ctx, schedule_id)
+    cfg = ctx.settings.current().pce
+    row = _own(ctx, schedule_id, cfg)
     out = DeleteResult(note_cleared=False, provisioned=False, status=None, detail="no_write_key")
-    if _has_key(ctx):
-        with ctx.pce_write_client(ctx.settings.current().pce) as client:
+    if not _same(ctx, cfg):  # the schedule is the checked PCE's; another PCE's object is never touched
+        out = DeleteResult(note_cleared=False, provisioned=False, status=None, detail="pce_switched")
+    elif cfg.write_api_key and cfg.write_api_secret:
+        with ctx.pce_write_client(cfg) as client:
             try:
                 draft = pw.get_draft(client, row["href"])
                 if draft.status != 200:

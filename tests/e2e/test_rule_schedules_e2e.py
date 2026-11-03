@@ -78,3 +78,19 @@ def test_rule_schedules_no_overflow_760(narrow_context, live_app):
     page.goto(f"{live_app.url}/rule-schedules")
     page.locator("[data-role=rule-schedules]").wait_for()
     assert no_horizontal_overflow(page)
+
+
+def test_a_new_search_clears_the_earlier_pick(context, live_app, monkeypatch):
+    """Codex review: a target picked from an earlier search stayed selected (and submittable) out of sight."""
+    _write_key(live_app)
+    _targets(monkeypatch)
+    page = _open(context, live_app)
+    page.fill("input[name=rs_q]", "back")
+    page.get_by_role("button", name="Search").click()
+    page.locator("[data-role=rs-targets] input[name=rs_target]").nth(0).check()
+    expect(page.get_by_role("button", name="Create schedule")).to_be_visible()
+    monkeypatch.setattr("illumio_ops.web.routes.rule_schedules.targets.search",
+                        lambda ctx, q: TargetSearch(items=[], limited=False))
+    page.fill("input[name=rs_q]", "nothing")
+    page.get_by_role("button", name="Search").click()
+    expect(page.get_by_role("button", name="Create schedule")).to_have_count(0)

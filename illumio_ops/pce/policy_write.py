@@ -38,7 +38,8 @@ def active_href(href: str) -> str:
 
 
 def ruleset_of(href: str) -> str:
-    """The rule set a rule belongs to (or the rule set itself), in the draft: /orgs/1/sec_policy/draft/rule_sets/5."""
+    """The rule set a rule (allow or deny) belongs to, or the rule set itself, in the draft:
+    /orgs/1/sec_policy/draft/rule_sets/5."""
     return "/".join(draft_href(href).split("/")[:7])
 
 
@@ -51,13 +52,19 @@ def _get(client: PceClient, href: str) -> PceResponse:
 
 
 def draft_pending(client: PceClient, href: str) -> bool:
-    """The target, or the rule set a rule is in, has a change not yet provisioned (update_type set on its draft)."""
+    """Anything in the target's rule set has a change not yet provisioned: the target, the rule set, or any other rule
+    in it — the whole rule set is what gets provisioned, so a sibling's unreviewed change would go live too (Codex
+    review of plan B)."""
     for path in dict.fromkeys((draft_href(href), ruleset_of(href))):
         r = _get(client, path)
         if r.status != 200:
             raise PolicyReadError(r.status, r.body)
-        if (r.json() or {}).get("update_type"):
+        body = r.json() or {}
+        if body.get("update_type"):
             return True
+        for kind in ("rules", "sec_rules", "deny_rules"):
+            if any(isinstance(x, dict) and x.get("update_type") for x in body.get(kind) or []):
+                return True
     return False
 
 

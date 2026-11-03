@@ -267,3 +267,77 @@ def test_a_failed_undo_is_a_failure_that_says_a_draft_change_remains(ctx):
     with ctx.db() as conn:
         [run] = store.runs(conn, pce_url=ctx.settings.current().pce.url, org_id="1", limit=5)
     assert run["result"] == "failed" and run["status"] == 500 and "draft change remains" in run["detail"]
+
+
+# ── Codex review of plan B ──────────────────────────────────────────────────
+
+@responses.activate
+def test_failed_provision_puts_the_draft_back(ctx):
+    """P1: a refused provision left the schedule's own change in the draft; every later check skipped it as a pending
+    draft for good."""
+    _add(ctx)
+    _pce(enabled=False, provision=500)
+    r = rs.tick(ctx, now=NOW)
+    assert r.failed == 1 and _puts() == [{"enabled": True}, {"enabled": False}]
+
+
+@responses.activate
+def test_a_sibling_rules_pending_change_stops_the_provision(ctx):
+    """P1: the whole rule set is provisioned, so another rule's unreviewed change in it must count as pending."""
+    _add(ctx)
+    responses.add(responses.GET, API + pw.draft_href(RULE), json={"update_type": None, "enabled": False})
+    responses.add(responses.GET, API + pw.ruleset_of(RULE), json={
+        "update_type": None, "rules": [{"href": pw.draft_href(RULE), "update_type": None},
+                                       {"href": pw.ruleset_of(RULE) + "/sec_rules/10", "update_type": "update"}]})
+    r = rs.tick(ctx, now=NOW)
+    assert r.skipped == 1 and _puts() == []
+
+
+@responses.activate
+def test_a_schedule_paused_during_the_round_is_not_written(ctx, monkeypatch):
+    """P2: rows read at the start of a round must be checked again before each write."""
+    first = _add(ctx, href=RULE)
+    second = _add(ctx, href=OTHER)
+    _pce(href=RULE, enabled=True)   # already in state: no write
+    _pce(href=OTHER, enabled=False)
+    real = rs._check_one
+
+    def pause_second(c, client, row, at):
+        out = real(c, client, row, at)
+        if row["id"] == first:
+            rs.set_paused(ctx, second, True, now=NOW)
+        return out
+    monkeypatch.setattr(rs, "_check_one", pause_second)
+    rs.tick(ctx, now=NOW)
+    assert _puts() == []
+
+
+@responses.activate
+def test_delete_acts_on_the_pce_it_checked(ctx, monkeypatch):
+    """P1: a PCE switch between the ownership check and the write must not write to the new PCE."""
+    sid = _add(ctx, href=RS)
+    responses.add(responses.GET, API + pw.draft_href(RS), json={"update_type": None, "description": "keep [📅 x]"})
+    responses.add(responses.PUT, API + pw.draft_href(RS), status=204)
+    responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"), json={})
+    responses.add(responses.POST, API + "/orgs/1/sec_policy", status=201, json={})
+    real = rs._own
+
+    def own_then_switch(*a, **kw):
+        row = real(*a, **kw)
+        ctx.settings.update(ctx.settings.current().revision, lambda d: d["pce"].update(url="https://b.example:8443"))
+        return row
+    monkeypatch.setattr(rs, "_own", own_then_switch)
+    out = rs.delete(ctx, sid, by="admin", now=NOW)
+    assert all(c.request.url.startswith(API) for c in responses.calls) and out.note_cleared is False
+    assert out.detail == "pce_switched"
+
+
+@responses.activate
+def test_concurrent_create_is_refused_cleanly(ctx):
+    """P2: the target is claimed before the PCE is written, so a second create cannot change the note."""
+    import sqlite3
+    _pce(href=RS, enabled=True)
+    rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW)
+    with pytest.raises(rs.AlreadyScheduled):
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW)
+    assert sqlite3  # the IntegrityError of a race is answered as AlreadyScheduled (rs.create)

@@ -28255,7 +28255,7 @@
         },
         "properties": {
           "href": {
-            "pattern": "^/orgs/\\d+/sec_policy/(active|draft)/rule_sets/\\d+(/sec_rules/\\d+)?$",
+            "pattern": "^/orgs/\\d+/sec_policy/(active|draft)/rule_sets/\\d+(/(sec_rules|deny_rules)/\\d+)?$",
             "title": "Href",
             "type": "string"
           },

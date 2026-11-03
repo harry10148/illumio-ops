@@ -79,3 +79,21 @@ def test_entries_serialise():
     [s], _ = _one({"type": "recurring", "name": "r", "action": "allow", "days": ["mon"], "start": "08:00",
                    "end": "09:00", "timezone": "Asia/Taipei"})
     assert json.loads(s.plan.model_dump_json())["kind"] == "weekly"
+
+
+def test_deny_rule_targets_are_kept():
+    href = "/orgs/1/sec_policy/active/rule_sets/5/deny_rules/3"
+    [s], _ = _one({"type": "recurring", "name": "d", "action": "block", "days": ["sat"], "start": "00:00",
+                   "end": "23:59", "timezone": "Asia/Taipei"}, href=href)
+    assert s.href == href and not s.is_ruleset
+
+
+def test_fractional_utc_offset():
+    [s], _ = _one({"type": "recurring", "name": "r", "action": "allow", "days": ["mon"], "start": "08:00",
+                   "end": "09:00", "timezone": "UTC+5.5"})
+    assert s.plan.timezone == "UTC+05:30"
+
+
+def test_a_non_object_entry_is_reported_not_raised():
+    done, items = convert({RULE: "oops", RS: ["x"]}, local_zone="UTC")
+    assert done == [] and [i.reason_key for i in items] == ["migrate_rule_schedule_unreadable"] * 2

@@ -2761,5 +2761,12 @@
   "rpt_mode_on_demand": "基本模式：按需查詢",
   "rpt_mode_on_demand_hint": "基本模式不保留流量：產生時向 PCE 查詢，較慢，且受 PCE 的流量保留期限制。",
   "rpt_card_counts": "排程 {schedules}・已產出 {copies}",
-  "rpt_schedule_link": "排程寄送"
+  "rpt_schedule_link": "排程寄送",
+  "rs_actor_all_workloads": "全部 Workload",
+  "rs_service_all": "全部服務",
+  "rs_summary_rules": "{n} 條規則",
+  "rs_deny_rule_name": "Deny Rule #{id}",
+  "rs_result_ok": "完成",
+  "rs_result_failed": "失敗",
+  "rs_result_skipped": "跳過"
 }
