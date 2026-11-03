@@ -151,16 +151,31 @@ def _checked(ctx: AppContext, row: sqlite3.Row, *, pce_status: str, live: str, a
         conn.commit()
 
 
-def _switch(client: PceClient, href: str, enabled: bool) -> PceResponse | None:
-    """Enable or disable on the draft and provision; None when done, else the PCE's refusing answer. When the PCE
-    would need other unprovisioned objects to go live with it, the draft is put back and DependenciesPending raised."""
+class UndoFailed(Exception):
+    """A refused provision's draft change could not be put back: it remains in the draft."""
+
+    def __init__(self, hrefs: list[str], answer: PceResponse) -> None:
+        super().__init__(", ".join(hrefs))
+        self.hrefs = hrefs
+        self.answer = answer
+
+
+def _switch(client: PceClient, href: str, enabled: bool, before: bool) -> PceResponse | None:
+    """Enable or disable on the draft and provision; None when done (or when the draft already has that value), else the
+    PCE's refusing answer. When the PCE would need other unprovisioned objects to go live with it, the draft is put back
+    to `before` — its own value, never the opposite of the target — and DependenciesPending raised; UndoFailed when the
+    put-back is refused (security review 2026-11-03)."""
+    if before == enabled:
+        return None
     r = pw.set_fields(client, href, {"enabled": enabled})
     if r.status != 204:
         return r
     try:
         p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
-    except pw.DependenciesPending:
-        pw.set_fields(client, href, {"enabled": not enabled})
+    except pw.DependenciesPending as dep:
+        back = pw.set_fields(client, href, {"enabled": before})
+        if back.status != 204:
+            raise UndoFailed(dep.hrefs, back) from None
         raise
     return None if p.status == 201 else p
 
@@ -209,13 +224,19 @@ def _check_one(ctx: AppContext, client: PceClient, row: sqlite3.Row, at: datetim
         _run(ctx, row, href=href, name=name, at=at, action="skip_draft", result="skipped",
              detail="needs unprovisioned objects: " + ", ".join(dep.hrefs))
         return "skipped"
+    except UndoFailed as undo:
+        _run(ctx, row, href=href, name=name, at=at, action="error", result="failed", status=undo.answer.status,
+             detail=f"draft change remains (put back refused: {_detail(undo.answer)}); needs unprovisioned objects: "
+                    + ", ".join(undo.hrefs))
+        return "failed"
 
 
 def _apply(ctx: AppContext, client: PceClient, row: sqlite3.Row, plan: Plan, draft: PceResponse,
            want: bool | Literal["expired"], at: datetime) -> Outcome:
     href, name = row["href"], row["name"]
+    before = bool((draft.json() or {}).get("enabled"))  # no pending draft here: the draft is the active value
     if want == "expired":
-        refused = _switch(client, href, False)
+        refused = _switch(client, href, False, before)
         if refused is not None:
             _run(ctx, row, href=href, name=name, at=at, action="expire", result="failed", status=refused.status,
                  detail=_detail(refused))
@@ -240,7 +261,7 @@ def _apply(ctx: AppContext, client: PceClient, row: sqlite3.Row, plan: Plan, dra
     if live == want:
         return "none"
     action: store.Action = "enable" if want else "disable"
-    refused = _switch(client, href, bool(want))
+    refused = _switch(client, href, bool(want), before)
     if refused is not None:
         _run(ctx, row, href=href, name=name, at=at, action=action, result="failed", status=refused.status,
              detail=_detail(refused))
@@ -345,7 +366,9 @@ def _write_note(client: PceClient, href: str, plan: Plan) -> None:
     try:
         p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
     except pw.DependenciesPending:
-        pw.set_fields(client, href, {"description": desc})
+        back = pw.set_fields(client, href, {"description": desc})
+        if back.status != 204:
+            raise PceRefused(back.status, f"the note remains in the draft: {_detail(back)}") from None
         raise DraftPending from None
     if p.status != 201:
         raise PceRefused(p.status, _detail(p))

@@ -40,13 +40,15 @@ def _add(ctx, href=RULE, plan=WINDOW, *, paused=False, pce_url=None):
 
 
 def _pce(href=RULE, *, enabled=False, draft=None, parent_draft=None, active_status=200, put=204, provision=201,
-         deps=None):
-    responses.add(responses.GET, API + pw.draft_href(href), json={"update_type": draft, "description": "keep [⏰ Expires: 2026-01-01 00:00]"})
+         deps=None, revert=204):
+    responses.add(responses.GET, API + pw.draft_href(href), json={"update_type": draft, "enabled": enabled,
+                                                                  "description": "keep [⏰ Expires: 2026-01-01 00:00]"})
     if pw.draft_href(href) != pw.ruleset_of(href):
         responses.add(responses.GET, API + pw.ruleset_of(href), json={"update_type": parent_draft})
     responses.add(responses.GET, API + pw.active_href(href), status=active_status,
                   json={"enabled": enabled, "href": href} if active_status == 200 else {"error": "not found"})
     responses.add(responses.PUT, API + pw.draft_href(href), status=put, body="" if put == 204 else '{"token":"x"}')
+    responses.add(responses.PUT, API + pw.draft_href(href), status=revert, body="" if revert == 204 else '{"token":"y"}')
     responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"),
                   json=deps or {})
     responses.add(responses.POST, API + "/orgs/1/sec_policy", status=provision, json={})
@@ -243,3 +245,25 @@ def test_other_pending_objects_are_not_provisioned_and_the_switch_is_undone(ctx)
     with ctx.db() as conn:
         [run] = store.runs(conn, pce_url=ctx.settings.current().pce.url, org_id="1", limit=5)
     assert (run["action"], run["result"]) == ("skip_draft", "skipped") and "ip_lists/7" in run["detail"]
+
+
+@responses.activate
+def test_expiry_of_a_rule_already_disabled_never_enables_it(ctx):
+    """Security review: the undo after a refused provision must restore the draft's own value, never the opposite."""
+    sid = _add(ctx, plan=Expiry(expire_at=NOW - timedelta(minutes=1), timezone="Asia/Taipei"))
+    _pce(enabled=False, deps={"ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}]})
+    rs.tick(ctx, now=NOW)
+    assert {"enabled": True} not in _puts() and {"enabled": False} not in _puts()  # already disabled: nothing to write
+    with ctx.db() as conn:
+        assert store.get(conn, sid) is None  # expired and disabled: the schedule is done
+
+
+@responses.activate
+def test_a_failed_undo_is_a_failure_that_says_a_draft_change_remains(ctx):
+    _add(ctx)
+    _pce(enabled=False, deps={"ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}]}, revert=500)
+    r = rs.tick(ctx, now=NOW)
+    assert r.failed == 1
+    with ctx.db() as conn:
+        [run] = store.runs(conn, pce_url=ctx.settings.current().pce.url, org_id="1", limit=5)
+    assert run["result"] == "failed" and run["status"] == 500 and "draft change remains" in run["detail"]
