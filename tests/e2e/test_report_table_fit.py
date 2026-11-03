@@ -26,3 +26,19 @@ def test_long_text_columns_wrap_to_the_page(context):
                                      blocks=(table(rows, cols=3),)),))
     for width in (1280, 768):
         assert _overflow(context, render_html(doc, tz=UTC), width) == [0], width
+
+
+def test_print_media_no_overflow(context):
+    """UI redesign spec §8: printed on A4 (≈ 794 CSS px wide), the first page and a long table stay inside the page."""
+    from illumio_ops.domain.report import Finding
+    from illumio_ops.domain.values import Severity
+    rows = [(f"host-{i}", LONG, LINKS) for i in range(40)]
+    doc = make_doc(findings=(Finding(severity=Severity.HIGH, title="Open RDP " * 6, why=LINKS, action=LONG),),
+                   sections=(Section(id="next", title="What to do first", intro="", blocks=(table(rows, cols=3),)),)
+                   ).model_copy(update={"conclusion": LONG})
+    page = context.new_page()
+    page.set_viewport_size({"width": 794, "height": 1123})
+    page.emulate_media(media="print")
+    page.set_content(render_html(doc, tz=UTC))
+    page.wait_for_timeout(300)
+    assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1")

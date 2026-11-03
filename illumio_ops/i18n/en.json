@@ -2754,5 +2754,9 @@
   "rpt_conclusion_policy_diff": "The draft holds {total} changes not yet provisioned: {rule_sets} rulesets, {rules} rules, {objects} policy objects; {high} of them high risk.",
   "rpt_conclusion_policy_resolver": "{rules} active rules ({rulesets} rulesets) expanded into {rows} rows; {not_expanded} could not be expanded.",
   "rpt_conclusion_custom": "Custom report with {sections} sections, {period}.",
-  "rpt_conclusion_incomplete": "{title}: {missing} could not be computed ({reasons})."
+  "rpt_conclusion_incomplete": "{title}: {missing} could not be computed ({reasons}).",
+  "rpt_findings_col_severity": "Severity",
+  "rpt_findings_col_finding": "Finding",
+  "rpt_findings_col_action": "Action",
+  "rpt_findings_col_evidence": "Evidence"
 }

@@ -28,8 +28,35 @@ from illumio_ops.services.reports.sheets import sheet_names
 from illumio_ops.services.reports.svg import bar_svg
 
 SEVERITY_TONE = {Severity.CRITICAL: "crit", Severity.HIGH: "crit", Severity.MEDIUM: "warn", Severity.LOW: "info"}
+# The top rule of the first page shows the report's highest severity (spec §8); no finding: grey.
+TOP_RULE = {Severity.CRITICAL: "crit", Severity.HIGH: "high", Severity.MEDIUM: "medium", Severity.LOW: "low"}
+SEVERITY_RANK = (Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL)
 WIDE_COLUMNS = 9  # report_shell.css: tables this wide get a landscape print page
 EXTRA_CSS = """
+/* The console's light palette (UI redesign spec §7, §8): the same greys, ink and severity colours as the GUI. */
+:root {
+  --canvas: #F4F6F8; --surface-2: #F4F6F8; --text-1: #111827; --text-2: #374151; --text-3: #4B5563;
+  --line: #E5E7EB; --line-soft: #F0F2F5; --track: #E5E7EB; --accent: #2563EB; --accent-fg: #1D4ED8;
+  --tone-crit-border: #FCA5A5; --tone-crit-fg: #B91C1C; --tone-crit-bg: #FEF2F2;
+  --tone-warn-border: #FDBA74; --tone-warn-fg: #C2410C; --tone-warn-bg: #FFF7ED;
+  --tone-info-border: #CBD5E1; --tone-info-fg: #4B5563; --tone-info-bg: #F8FAFC;
+  --tone-ok-border: #86EFAC; --tone-ok-fg: #15803D; --tone-ok-bg: #F0FDF4;
+}
+.cover { border-top: 6px solid #9CA3AF; }
+.cover[data-top="crit"] { border-top-color: #B91C1C; }
+.cover[data-top="high"] { border-top-color: #C2410C; }
+.cover[data-top="medium"] { border-top-color: #A16207; }
+.cover[data-top="low"] { border-top-color: #4B5563; }
+.conclusion { font-size: 1.35em; line-height: 1.5; font-weight: 600; color: var(--text-1); margin: 0.6em 0 0.8em; }
+.findings-table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
+.findings-table th, .findings-table td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.findings-table th { color: var(--text-3); font-weight: 600; }
+@media print {
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  .print-btn { display: none; }
+}
 .report-bars rect { fill: var(--tone-info-border); }
 .report-bars text { fill: var(--ink); }
 .kpi-trend { font-size: 0.8em; color: var(--tone-neutral-fg); }
@@ -162,23 +189,32 @@ def _section_body(s: Section, names: dict[int, str], tz: tzinfo | None, lang: La
 
 
 def _summary(doc: ReportDocument) -> str:
+    """The key numbers, then S01 — findings and actions as a table (severity, finding, action, evidence) — then what
+    the data covers."""
     lang = doc.lang
     kpis = "".join(_kpi(k, lang) for k in doc.kpis)
     if doc.findings:
-        cards = "".join(
-            f'<div class="finding-card" data-tone="{SEVERITY_TONE.get(f.severity, "neutral")}">'
-            f'<div class="finding-header"><span class="badge" data-tone="{SEVERITY_TONE.get(f.severity, "neutral")}">'
-            f'{_esc(tr(lang, "severity_" + f.severity.value))}</span>'
-            f'<span class="finding-title">{_esc(f.title)}</span></div>'
-            f'<p class="finding-desc"><b>{_esc(tr(lang, "rpt_finding_why"))}</b> {_esc(f.why)}</p>'
-            f'<p class="finding-rec"><b>{_esc(tr(lang, "rpt_finding_action"))}</b> {_esc(f.action)}</p></div>'
+        rows = "".join(
+            f'<tr><td><span class="badge" data-tone="{SEVERITY_TONE.get(f.severity, "neutral")}">'
+            f'{_esc(tr(lang, "severity_" + f.severity.value))}</span></td>'
+            f'<td>{_esc(f.title)}</td><td>{_esc(f.action)}</td><td>{_esc(f.why)}</td></tr>'
             for f in doc.findings)
+        head = "".join(f"<th>{_esc(tr(lang, k))}</th>" for k in (
+            "rpt_findings_col_severity", "rpt_findings_col_finding", "rpt_findings_col_action", "rpt_findings_col_evidence"))
+        cards = (f'<table class="findings-table" data-role="findings-table"><thead><tr>{head}</tr></thead>'
+                 f"<tbody>{rows}</tbody></table>")
     else:
-        cards = f'<p class="note">{_esc(tr(lang, "rpt_findings_none"))}</p>'
+        cards = f'<p class="note" data-role="findings-table">{_esc(tr(lang, "rpt_findings_none"))}</p>'
     quality = "".join(f"<li>{_esc(q)}</li>" for q in doc.data_quality)
     return (f'<div class="kpi-strip">{kpis}</div>'
-            f'<h3>{_esc(tr(lang, "rpt_findings_title"))}</h3>{cards}'
+            f'<h3><span class="toc-num">S01</span> {_esc(tr(lang, "rpt_findings_title"))}</h3>{cards}'
             f'<h3>{_esc(tr(lang, "rpt_data_quality_title"))}</h3><ul class="note">{quality}</ul>')
+
+
+def _top(doc: ReportDocument) -> str:
+    if not doc.findings:
+        return "none"
+    return TOP_RULE[max((f.severity for f in doc.findings), key=SEVERITY_RANK.index)]
 
 
 def render_html(doc: ReportDocument, *, tz: tzinfo | None) -> str:
@@ -191,8 +227,9 @@ def render_html(doc: ReportDocument, *, tz: tzinfo | None) -> str:
     meta_html = "".join(f'<div class="cover-meta-pair"><dt>{_esc(k)}</dt><dd>{_esc(v)}</dd></div>' for k, v in meta)
     link = (f'<p class="cover-kicker"><a href="{_esc(doc.gui_link)}">{_esc(tr(lang, "rpt_open_in_gui"))}</a></p>'
             if doc.gui_link else "")
-    cover = (f'<header class="cover" data-shell="cover" data-tone="neutral">'
-             f'<p class="cover-eyebrow">illumio-ops</p><h1>{_esc(doc.title)}</h1>{link}'
+    sentence = (f'<p class="conclusion" data-role="conclusion">{_esc(doc.conclusion)}</p>' if doc.conclusion else "")
+    cover = (f'<header class="cover" data-shell="cover" data-tone="neutral" data-top="{_top(doc)}">'
+             f'<p class="cover-eyebrow">illumio-ops・{_esc(doc.title)}</p><h1>{_esc(doc.title)}</h1>{sentence}{link}'
              f'<dl class="cover-meta">{meta_html}</dl></header>')
     summary_title = tr(lang, "rpt_summary_title")
     summary = (f'<section class="exec" id="summary" data-shell="exec" data-tone="neutral">'

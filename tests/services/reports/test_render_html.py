@@ -116,3 +116,53 @@ def test_bar_width_capped():
     svg = bar_svg((("d1", 3),))
     widths = [float(w) for w in _re.findall(r'<rect [^>]*width="([\d.]+)"', svg)]
     assert widths and max(widths) <= 40
+
+
+# ── the unified first page (UI redesign spec §8) ────────────────────────────
+
+def _first_page(**kw):
+    doc = make_doc(**kw).model_copy(update={"conclusion": "Seven new connections, two into critical assets."})
+    return render_html(doc, tz=UTC)
+
+
+def test_first_page_order():
+    out = _first_page(findings=(Finding(severity=Severity.HIGH, title="Open RDP", why="5 sources", action="Block"),))
+    i_conclusion = out.index('data-role="conclusion"')
+    i_kpis = out.index('class="kpi-strip"')
+    i_findings = out.index('data-role="findings-table"')
+    assert i_conclusion < i_kpis < i_findings
+    assert "Seven new connections, two into critical assets." in out
+
+
+def test_top_rule_color_is_highest_severity():
+    crit = _first_page(findings=(Finding(severity=Severity.LOW, title="a", why="b", action="c"),
+                                 Finding(severity=Severity.CRITICAL, title="d", why="e", action="f")))
+    assert re.search(r'<header class="cover"[^>]*data-top="crit"', crit)
+    none = _first_page(findings=())
+    assert re.search(r'<header class="cover"[^>]*data-top="none"', none)
+
+
+def test_findings_table_rows():
+    out = _first_page(findings=(Finding(severity=Severity.MEDIUM, title="Open RDP", why="5 sources", action="Block"),))
+    table_html = out[out.index('data-role="findings-table"'):]
+    table_html = table_html[:table_html.index("</table>")]
+    assert "Open RDP" in table_html and "Block" in table_html and "5 sources" in table_html
+
+
+def test_sections_numbered():
+    doc = make_doc(sections=(Section(id="a", title="First"), Section(id="b", title="Second")))
+    out = render_html(doc, tz=UTC)
+    assert ">01<" in out and ">02<" in out and "First" in out
+
+
+def test_print_css_repeats_header_and_keeps_rows():
+    out = _first_page()
+    css = out[out.index("<style>"):out.index("</style>")]
+    assert re.search(r"thead\s*\{\s*display:\s*table-header-group", css)
+    assert re.search(r"tr\s*\{\s*break-inside:\s*avoid", css)
+
+
+def test_no_external_requests():
+    out = _first_page()
+    refs = re.findall(r'(?:src|href)="(https?://[^"]+)"', out) + re.findall(r"url\((https?://[^)]+)\)", out)
+    assert refs == []

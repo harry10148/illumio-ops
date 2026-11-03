@@ -2754,5 +2754,9 @@
   "rpt_conclusion_policy_diff": "Draft 有 {total} 項變更尚未 Provision：Ruleset {rule_sets}、規則 {rules}、政策物件 {objects}；其中 {high} 項為高風險。",
   "rpt_conclusion_policy_resolver": "生效中的規則 {rules} 條（{rulesets} 個 Ruleset）展開為 {rows} 列；無法展開 {not_expanded} 條。",
   "rpt_conclusion_custom": "自訂報表 {sections} 個章節，期間 {period}。",
-  "rpt_conclusion_incomplete": "{title}：{missing} 無法計算（{reasons}）。"
+  "rpt_conclusion_incomplete": "{title}：{missing} 無法計算（{reasons}）。",
+  "rpt_findings_col_severity": "嚴重度",
+  "rpt_findings_col_finding": "發現",
+  "rpt_findings_col_action": "行動",
+  "rpt_findings_col_evidence": "依據"
 }
