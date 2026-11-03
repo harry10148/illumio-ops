@@ -75,6 +75,18 @@ def test_none_kpi_gives_incomplete_sentence():
     assert "Flow records" in text and "no traffic kept" in text and " 0 " not in text
 
 
+def test_a_reason_ending_in_a_full_stop_is_not_closed_twice():
+    """lab .106 2026-11-03: 「…設定頁以 Label 選定。）。」 — the note's own full stop inside the brackets."""
+    note = {Language.ZH_TW: "尚未設定重要資產；請到設定頁選定。", Language.EN: "No critical assets are set; choose them."}
+    for lang, end in ((Language.ZH_TW, "選定）。"), (Language.EN, "choose them).")):
+        doc = _doc([Kpi(key="flows", label="F", value=None, previous=None, note=note[lang]),
+                    Kpi(key="connections", label="C", value=5, previous=None),
+                    Kpi(key="sources", label="S", value=1, previous=None),
+                    Kpi(key="destinations", label="D", value=1, previous=None)])
+        doc = doc.model_copy(update={"lang": lang})
+        assert conclusion(doc, _tr(lang)).endswith(end)
+
+
 def test_percent_and_thousands_formatted():
     doc = _doc([Kpi(key="maturity", label="M", value=62, previous=None),
                 Kpi(key="enforced_hosts_pct", label="E", value=45.25, previous=None, unit="percent"),

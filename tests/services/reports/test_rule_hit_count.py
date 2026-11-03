@@ -168,6 +168,18 @@ def test_zero_row_not_in_active_policy_is_not_zero(ctx, monkeypatch):
     assert {x.key: x.value for x in doc.kpis}["zero"] == 1
 
 
+def test_draft_only_rows_are_not_counted_as_provisioned_without_a_record(ctx, monkeypatch):
+    """The no-record tile counts what its table lists (enabled provisioned rules the PCE has no count for): a
+    Draft-only row is in the second table, not among the provisioned rules — lab .106 2026-11-03, the sentence read
+    "2 rules: 0 hit, 2 with 0 hits, 2 with no record"."""
+    draft_only = RhcRow(rule_href="/orgs/1/sec_policy/active/rule_sets/673/deny_rules/309", ruleset_name="tedt",
+                        description="", hit_count=0, last_hit_at=None)
+    monkeypatch.setattr(rule_hit_count, "pull_rhc", lambda ctx, start, end: _pull(rows=[*_pull().rows, draft_only]))
+    k = {x.key: x.value for x in _build(ctx).kpis}
+    assert (k["rules"], k["hit"], k["zero"], k["no_record"]) == (3, 1, 1, 1)
+    assert k["hit"] + k["zero"] + k["no_record"] == k["rules"]
+
+
 def test_zero_table_shows_last_hit_before_the_period(ctx, monkeypatch):
     old = RhcRow(rule_href=f"{A}/sec_rules/11", ruleset_name="Web", description="", hit_count=0,
                  last_hit_at="2026-06-26T09:09:16Z")

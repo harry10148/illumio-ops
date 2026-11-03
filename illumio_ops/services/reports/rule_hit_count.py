@@ -151,7 +151,7 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
 
     enabled_rules = sum(1 for r in rules.values() if r.enabled)
     values = {"rules": enabled_rules, "hit": len(hit), "zero": len(zero),
-              "no_record": len(no_record) + len(unprovisioned)}
+              "no_record": len(no_record)}  # what its table lists: Draft-only, deleted or later rules are no rule here
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None, unit="count",
                      better="neutral" if k in ("rules", "no_record") else "higher" if k == "hit" else "lower")
                  for k, label in _KPI_KEYS.items())

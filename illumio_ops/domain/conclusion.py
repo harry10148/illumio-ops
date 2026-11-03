@@ -67,7 +67,7 @@ def conclusion(doc: ReportDocument, tr: Translate, *, tz: tzinfo | None = None) 
     absent = [w for w in wanted if w not in kpis]
     if missing or absent:
         names = "、" if doc.lang.value == "zh_TW" else ", "
-        reasons = [k.note for k in missing if k.note]
+        reasons = [k.note.rstrip("。.") for k in missing if k.note]  # the sentence closes after the brackets
         return tr("rpt_conclusion_incomplete", {"title": doc.title,
                                                 "missing": names.join([k.label for k in missing] + absent),
                                                 "reasons": names.join(dict.fromkeys(reasons)) or "—"})
