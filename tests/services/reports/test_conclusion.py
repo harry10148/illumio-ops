@@ -118,3 +118,11 @@ def test_html_mail_opens_with_the_conclusion():
     from illumio_ops.services.reports.render_email import render_email
     mail = render_email(_doc([]).model_copy(update={"conclusion": "Seven new connections"}), tz=UTC)
     assert mail.html is not None and "Seven new connections" in mail.html
+
+
+@pytest.mark.parametrize(("lang", "word"), [(Language.ZH_TW, "Draft"), (Language.EN, "draft")])
+def test_policy_usage_says_its_rules_are_the_drafts(lang, word):
+    """lab .135 2026-11-03: policy usage read "64 rules" beside policy resolver's "0 active rules" — it counts the
+    allow rules of the Draft (it recomputes against the Draft), and its sentence and tile have to say so."""
+    assert word in translate(lang, CONCLUSION_KEYS[ReportType.POLICY_USAGE], {})
+    assert word in translate(lang, "rpt_pu_kpi_rules", {})
