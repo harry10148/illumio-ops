@@ -37,12 +37,6 @@ export const TYPE_DESC_KEYS: Record<string, string> = {
   policy_resolver: "gui_reports_desc_policy_resolver",
   custom: "gui_reports_desc_custom",
 };
-export const GROUP_KEYS: Record<string, string> = {
-  lateral: "gui_reports_group_lateral", inventory: "gui_reports_group_inventory",
-  analysis: "gui_reports_group_analysis", assessment: "gui_reports_group_assessment",
-  policy: "gui_reports_group_policy", operations: "gui_reports_group_operations", custom: "gui_reports_group_custom",
-};
-export const GROUP_ORDER = ["lateral", "inventory", "analysis", "assessment", "policy", "operations", "custom"];
 export const STATUS_KEYS: Record<string, string> = {
   queued: "gui_reports_status_queued", running: "gui_reports_status_running",
   done: "gui_reports_status_done", failed: "gui_reports_status_failed",

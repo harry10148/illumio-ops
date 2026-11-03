@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type { ReportSettingsView } from "../../api/generated";
@@ -6,7 +7,7 @@ import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { RhcSection } from "./RhcSection";
 
-export function ReportSettings() {
+export function ReportSettings({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<ReportSettingsView | null>(null);
   const [url, setUrl] = useState("");
   const [days, setDays] = useState(90);
@@ -42,8 +43,8 @@ export function ReportSettings() {
   }
 
   return (
-    <section className="page">
-      <h1>{t("nav_system_reports")}</h1>
+    <section className="page stack" data-role="report-settings">
+      {embedded ? <h2>{t("nav_system_reports")}</h2> : <h1>{t("nav_system_reports")}</h1>}
       {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {view && (
         <form className="card form-grid" onSubmit={save}>
@@ -70,4 +71,10 @@ export function ReportSettings() {
   );
 }
 
-registerNav({ section: "system", path: "/system/reports", labelKey: "nav_system_reports", order: 90, component: ReportSettings });
+/** Report settings (retention, the link address, Rule Hit Count) moved to Reports › Scheduled delivery (spec §4.7). */
+function ReportSettingsRedirect() {
+  return <Navigate to="/reports?tab=schedules" replace />;
+}
+
+registerNav({ section: "system", path: "/system/reports", labelKey: "nav_system_reports", order: 90,
+              component: ReportSettingsRedirect, hidden: true });

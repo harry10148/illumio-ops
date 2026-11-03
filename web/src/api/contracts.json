@@ -25298,6 +25298,11 @@
           }
         },
         "properties": {
+          "conclusion": {
+            "default": "",
+            "title": "Conclusion",
+            "type": "string"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -26625,6 +26630,10 @@
                 "title": "Available",
                 "type": "boolean"
               },
+              "copies": {
+                "title": "Copies",
+                "type": "integer"
+              },
               "formats": {
                 "items": {
                   "$ref": "#/$defs/ReportFormat"
@@ -26647,6 +26656,14 @@
                 ],
                 "title": "Max Lookback"
               },
+              "mode": {
+                "enum": [
+                  "basic",
+                  "on_demand"
+                ],
+                "title": "Mode",
+                "type": "string"
+              },
               "reason_key": {
                 "anyOf": [
                   {
@@ -26664,6 +26681,20 @@
               "requires_app": {
                 "title": "Requires App",
                 "type": "boolean"
+              },
+              "schedules": {
+                "title": "Schedules",
+                "type": "integer"
+              },
+              "ui_group": {
+                "enum": [
+                  "assessment",
+                  "traffic",
+                  "policy",
+                  "operations"
+                ],
+                "title": "Ui Group",
+                "type": "string"
               }
             },
             "required": [
@@ -26674,7 +26705,11 @@
               "accepts_filter",
               "requires_app",
               "max_lookback",
-              "formats"
+              "formats",
+              "ui_group",
+              "mode",
+              "schedules",
+              "copies"
             ],
             "title": "CatalogEntry",
             "type": "object"
@@ -27241,6 +27276,11 @@
           }
         },
         "properties": {
+          "conclusion": {
+            "default": "",
+            "title": "Conclusion",
+            "type": "string"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -27444,6 +27484,11 @@
           }
         },
         "properties": {
+          "conclusion": {
+            "default": "",
+            "title": "Conclusion",
+            "type": "string"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -27637,6 +27682,11 @@
           },
           "ReportItem": {
             "properties": {
+              "conclusion": {
+                "default": "",
+                "title": "Conclusion",
+                "type": "string"
+              },
               "created_at": {
                 "format": "date-time",
                 "title": "Created At",

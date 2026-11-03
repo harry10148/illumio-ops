@@ -352,3 +352,8 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .rs-week-cell { position: relative; height: 16px; background: var(--surface-2); border-radius: var(--radius-s); }
 .rs-week-cell i { position: absolute; top: 3px; height: 10px; border-radius: 2px; background: var(--ink); }
 .rs-targets li { padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }
+
+/* Reports (sample 07) */
+.rpt-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-5); align-items: start; }
+.rpt-column > h2 { font-size: var(--fs-ui); color: var(--text-3); }
+.rpt-card { padding: var(--space-5) var(--space-6); }

@@ -36,6 +36,7 @@ class ReportRow:
     email_status: str | None
     email_detail: str | None
     pce_target: str
+    conclusion: str = ""
 
 
 def _opt(value: str | None) -> datetime | None:
@@ -50,7 +51,8 @@ def _row(r: sqlite3.Row) -> ReportRow:
         period_end=datetime.fromisoformat(r["period_end"]), created_at=datetime.fromisoformat(r["created_at"]),
         started_at=_opt(r["started_at"]), finished_at=_opt(r["finished_at"]), error_key=r["error_key"],
         error_detail=r["error_detail"], files=json.loads(r["files_json"]), kpis=json.loads(r["kpis_json"]),
-        email_status=r["email_status"], email_detail=r["email_detail"], pce_target=r["pce_target"])
+        email_status=r["email_status"], email_detail=r["email_detail"], pce_target=r["pce_target"],
+        conclusion=r["conclusion"])
 
 
 def insert(conn: sqlite3.Connection, *, report_type: str, params_json: str, status: ReportStatus, trigger: str,
@@ -78,11 +80,12 @@ def claim_next(conn: sqlite3.Connection, *, at: datetime) -> ReportRow | None:
 
 
 def finish(conn: sqlite3.Connection, report_id: int, *, status: ReportStatus, at: datetime, files: list[str],
-           kpis: list[dict[str, Any]], error_key: str | None = None, error_detail: str | None = None) -> None:
+           kpis: list[dict[str, Any]], error_key: str | None = None, error_detail: str | None = None,
+           conclusion: str = "") -> None:
     conn.execute("UPDATE reports SET status = ?, finished_at = ?, files_json = ?, kpis_json = ?, error_key = ?, "
-                 "error_detail = ? WHERE id = ?",
+                 "error_detail = ?, conclusion = ? WHERE id = ?",
                  (status.value, _t(at), json.dumps(files), json.dumps(kpis, default=str), error_key, error_detail,
-                  report_id))
+                  conclusion, report_id))
     conn.commit()
 
 
@@ -159,3 +162,9 @@ def done_ending_at(conn: sqlite3.Connection, report_type: str, period_end: datet
     return [_row(r) for r in conn.execute(
         "SELECT * FROM reports WHERE report_type = ? AND status = 'done' AND period_end = ? AND pce_target = ? "
         "ORDER BY id DESC", (report_type, _t(period_end), pce_target))]
+
+
+def done_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    """Finished reports kept, per type (the reports page's copies)."""
+    return {r[0]: int(r[1]) for r in conn.execute(
+        "SELECT report_type, COUNT(*) FROM reports WHERE status = 'done' GROUP BY report_type")}

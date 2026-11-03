@@ -315,7 +315,8 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
                          error_key=key, error_detail=detail)
         return row.id
     with ctx.db() as conn:
-        store.finish(conn, row.id, status=ReportStatus.DONE, at=datetime.now(UTC), files=files, kpis=kpis)
+        store.finish(conn, row.id, status=ReportStatus.DONE, at=datetime.now(UTC), files=files, kpis=kpis,
+                     conclusion=doc.conclusion)
         if params.email:  # the list says so while the email is going out
             store.set_email(conn, row.id, status="sending", detail=None)
     if params.email:

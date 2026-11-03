@@ -1803,6 +1803,7 @@ export interface RunNow {
  * via the `definition` "ReportItem".
  */
 export interface ReportItem {
+conclusion?: string
 created_at: string
 custom_name?: (string | null)
 email_detail: (string | null)
@@ -1830,12 +1831,16 @@ trigger: string
 export interface CatalogEntry {
 accepts_filter: boolean
 available: boolean
+copies: number
 formats: ReportFormat[]
 group: string
 max_lookback: (number | null)
+mode: ("basic" | "on_demand")
 reason_key: (string | null)
 report_type: ReportType
 requires_app: boolean
+schedules: number
+ui_group: ("assessment" | "traffic" | "policy" | "operations")
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema

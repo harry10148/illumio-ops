@@ -157,3 +157,41 @@ def test_lightweight_types_available(client, ctx):
     entries = {e["report_type"]: e for e in get(client, "/api/reports/catalog").get_json()["data"]["entries"]}
     assert all(entries[t]["available"] for t in ("ven_status", "audit", "ransomware"))
     assert entries["readiness"]["available"] and entries["traffic"]["available"]  # pulled on demand
+
+
+# ── the reports page (UI redesign spec §4.7) ────────────────────────────────
+
+def test_report_items_carry_conclusion(client, ctx):
+    _configure(ctx)
+    login(client)
+    rid = _done_report(ctx)
+    item = get(client, f"/api/reports/{rid}").get_json()["data"]
+    assert item["status"] == "done" and item["conclusion"] and "{" not in item["conclusion"]
+
+
+def test_old_reports_without_conclusion_ok(client, ctx):
+    _configure(ctx)
+    login(client)
+    rid = _done_report(ctx)
+    with ctx.db() as conn:
+        conn.execute("UPDATE reports SET conclusion = '' WHERE id = ?", (rid,))
+        conn.commit()
+    assert get(client, f"/api/reports/{rid}").get_json()["data"]["conclusion"] == ""
+
+
+def test_type_groups_and_modes(client, ctx):
+    login(client)
+    entries = {e["report_type"]: e for e in get(client, "/api/reports/catalog").get_json()["data"]["entries"]}
+    assert entries["traffic"]["ui_group"] == "traffic" and entries["traffic"]["mode"] == "on_demand"
+    assert entries["lateral_posture"]["ui_group"] == "assessment" and entries["lateral_posture"]["mode"] == "on_demand"
+    assert entries["policy_diff"]["ui_group"] == "policy" and entries["policy_diff"]["mode"] == "basic"
+    assert entries["audit"]["ui_group"] == "operations"
+    assert all(isinstance(e["copies"], int) and isinstance(e["schedules"], int) for e in entries.values())
+
+
+def test_copies_count_done_reports(client, ctx):
+    _configure(ctx)
+    login(client)
+    _done_report(ctx)
+    entries = {e["report_type"]: e for e in get(client, "/api/reports/catalog").get_json()["data"]["entries"]}
+    assert entries["unmanaged_endpoints"]["copies"] == 1

@@ -196,3 +196,49 @@ def test_audit_in_lightweight_mode(context, live_app):
     with page.expect_download() as dl:
         row.get_by_role("link", name="HTML").click()
     assert "Policy provisions" in Path(dl.value.path()).read_text(encoding="utf-8")
+
+
+# ── the reports page (UI redesign samples 07, 08) ───────────────────────────
+
+def test_template_groups(context, live_app):
+    page = context.new_page()
+    _reports(page, live_app.url)
+    heads = [h.strip() for h in page.locator(".rpt-column > h2").all_inner_texts()]
+    assert heads == ["Security assessment", "Traffic analysis", "Policy", "Operations and audit"]
+
+
+def test_traffic_card_not_marked_advanced(context, live_app):
+    page = context.new_page()
+    _reports(page, live_app.url)
+    card = page.locator("[data-report-type=traffic]")
+    expect(card).to_contain_text("Basic mode: on demand")
+    assert "Advanced mode" not in card.inner_text()
+
+
+def test_recent_shows_conclusion(context, live_app):
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.values import ReportType
+    from illumio_ops.services.reports.registry import ReportParams
+    generate.enqueue(live_app.ctx, ReportParams(report_type=ReportType.UNMANAGED_ENDPOINTS), trigger="manual",
+                     schedule_id=None, now=datetime.now(UTC))
+    generate.run_queued(live_app.ctx)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    cell = page.locator("[data-role=report-list] [data-role=report-conclusion]").first
+    expect(cell).to_contain_text("unmanaged addresses")
+
+
+def test_schedules_tab_holds_the_settings(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(live_app.url + "/system/reports")
+    page.wait_for_url("**/reports?tab=schedules")
+    expect(page.locator("[data-role=report-settings]")).to_have_count(1)
+
+
+def test_reports_no_overflow_760(narrow_context, live_app):
+    from tests.e2e.conftest import no_horizontal_overflow
+    page = narrow_context.new_page()
+    _reports(page, live_app.url)
+    assert no_horizontal_overflow(page)

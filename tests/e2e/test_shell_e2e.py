@@ -15,7 +15,7 @@ def test_nav_order_and_sections(live_app, context):
     sign_in(page, live_app.url)
     texts = _nav_texts(page)
     assert texts[:3] == MAIN_ORDER
-    assert texts.index("Reports") < texts.index("SIEM forwarding") < texts.index("Alert rules and notifications")
+    assert texts.index("Reports and delivery") < texts.index("SIEM forwarding") < texts.index("Alert rules and notifications")
     assert texts[-1] == "System"
     assert page.locator(".nav-section").first.inner_text().strip() == "Output"
 

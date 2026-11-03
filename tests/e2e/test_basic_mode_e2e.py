@@ -48,7 +48,7 @@ def test_system_subnav_order(context, live_app):
     page.locator(".subnav-item").first.wait_for()
     names = [n.strip() for n in page.locator(".subnav-item").all_inner_texts()]
     assert names[:3] == ["Modes and data sources", "PCE connection", "Lateral movement settings"]
-    assert names[-1] == "Report settings" and "Notification channels" not in names
+    assert names[-1] == "Display" and "Notification channels" not in names and "Report settings" not in names
 
 
 def test_modes_page_disk_and_760(narrow_context, live_app):

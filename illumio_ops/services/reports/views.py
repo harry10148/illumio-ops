@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -27,6 +28,10 @@ class CatalogEntry(BaseModel):
     requires_app: bool  # the filter must name an app
     max_lookback: int | None  # the most days back this type can read
     formats: list[ReportFormat]  # the formats this type makes
+    ui_group: Literal["assessment", "traffic", "policy", "operations"]  # the reports page's column (spec §4.7)
+    mode: Literal["basic", "on_demand"]  # on_demand: reads traffic, pulled from the PCE where none is kept (§5)
+    schedules: int  # schedules that make this type
+    copies: int  # finished reports of this type kept
 
 
 class Catalog(BaseModel):
@@ -53,6 +58,7 @@ class ReportItem(BaseModel):
     files: list[str]
     email_status: str | None
     email_detail: str | None
+    conclusion: str = ""  # the report's opening sentence ("" for one made before it existed, or not finished)
     lookback_days: int | None
     lang: Language | None
     custom_name: str | None = None  # a custom report's name (None also when it was deleted since)
@@ -65,6 +71,10 @@ class ReportPage(BaseModel):
     page_size: int
 
 
+UI_GROUPS = {"lateral": "assessment", "assessment": "assessment", "analysis": "traffic", "inventory": "traffic",
+             "custom": "traffic", "policy": "policy", "operations": "operations"}
+
+
 def catalog(ctx: AppContext) -> Catalog:
     avail = availability(ctx)
     settings = ctx.settings.current()
@@ -73,11 +83,18 @@ def catalog(ctx: AppContext) -> Catalog:
     by_key: dict[str, list[str]] = {}
     for k, v in sorted(known):
         by_key.setdefault(k, []).append(v)
+    with ctx.db() as conn:
+        copies = store.done_counts(conn)
+    scheduled: dict[str, int] = {}
+    for sch in settings.reports.schedules:
+        scheduled[sch.report_type.value] = scheduled.get(sch.report_type.value, 0) + 1
     return Catalog(entries=[CatalogEntry(report_type=t, group=s.group, available=avail.get(t) is None,
                                          reason_key=avail.get(t), accepts_filter=s.accepts_filter,
                                          requires_app=s.requires_app,
                                          max_lookback=s.max_lookback(settings) if s.max_lookback else None,
-                                         formats=list(s.formats))
+                                         formats=list(s.formats), ui_group=UI_GROUPS.get(s.group, "traffic"),  # type: ignore[arg-type]
+                                         mode="on_demand" if s.needs_traffic else "basic",
+                                         schedules=scheduled.get(t.value, 0), copies=copies.get(t.value, 0))
                             for t, s in specs().items()],
                    label_choices=[LabelChoice(key=k, values=vs[:MAX_LABEL_VALUES], truncated=len(vs) > MAX_LABEL_VALUES)
                                   for k, vs in sorted(by_key.items())],
@@ -96,7 +113,8 @@ def _item(ctx: AppContext, row: store.ReportRow) -> ReportItem:
                       created_at=row.created_at, finished_at=row.finished_at, error_key=row.error_key,
                       error_detail=row.error_detail, files=row.files, email_status=row.email_status,
                       email_detail=row.email_detail, lookback_days=row.params.get("lookback_days"),
-                      lang=Language(lang) if lang else None, custom_name=custom.name if custom else None)
+                      lang=Language(lang) if lang else None, custom_name=custom.name if custom else None,
+                      conclusion=row.conclusion)
 
 
 def list_reports(ctx: AppContext, *, page: int) -> ReportPage:

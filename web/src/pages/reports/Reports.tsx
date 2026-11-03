@@ -4,12 +4,11 @@ import { Link, useSearchParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { Catalog, CatalogEntry, ReportItem, ReportPage } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { ModeMark, PageHead, Tag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import {
   EMAIL_KEYS,
-  GROUP_KEYS,
-  GROUP_ORDER,
   lookbackChoices,
   STATUS_KEYS,
   STATUS_TONES,
@@ -21,8 +20,10 @@ import {
 import { type FilterRow, ReportFilter, conditionOf, namesApp } from "./ReportFilter";
 import { CustomReports } from "./CustomReports";
 import { Schedules } from "./Schedules";
+import { ReportSettings } from "../system/ReportSettings";
 
 const POLL_MS = 5000;
+type Tab = "templates" | "schedules" | "produced";
 
 function GenerateForm({ entry, catalog, onDone, customId }: {
   entry: CatalogEntry; catalog: Catalog; onDone: () => void; customId?: number;
@@ -112,36 +113,53 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
   );
 }
 
+const UI_GROUPS = ["assessment", "traffic", "policy", "operations"] as const;
+const UI_GROUP_KEYS: Record<string, string> = {
+  assessment: "rpt_group_assessment", traffic: "rpt_group_traffic", policy: "rpt_group_policy",
+  operations: "rpt_group_operations",
+};
+
+/** Templates by the four columns of sample 07: each card says what basic mode means for it (§5), how many schedules
+ * make it and how many copies are kept. */
 function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
-  const groups = GROUP_ORDER.filter((g) => catalog.entries.some((e) => e.group === g));
   return (
-    <div className="stack" data-role="report-catalog">
-      {groups.map((g) => (
-        <div key={g} className="card stack">
-          <h2>{word(GROUP_KEYS, g)}</h2>
-          {catalog.entries.filter((e) => e.group === g).map((e) => (
-            <div key={e.report_type} className="stack" data-report-type={e.report_type} data-available={String(e.available)}>
-              <div className="row spaced">
-                <div>
-                  <strong>{word(TYPE_KEYS, e.report_type)}</strong>
-                  <div className="hint">{word(TYPE_DESC_KEYS, e.report_type)}</div>
-                  {!e.available && e.reason_key && (
-                    <div className="notice" data-role="unavailable">
-                      {t(e.reason_key)}{" "}
-                      {e.report_type === "rule_hit_count"
-                        ? <Link to="/system/reports">{t("nav_system_reports")}</Link>
-                        : <Link to="/system/collection">{t("gui_reports_collection_link")}</Link>}
-                    </div>
-                  )}
+    <div className="rpt-columns" data-role="report-catalog">
+      {UI_GROUPS.filter((g) => catalog.entries.some((e) => e.ui_group === g)).map((g) => (
+        <div key={g} className="stack rpt-column">
+          <h2>{word(UI_GROUP_KEYS, g)}</h2>
+          {catalog.entries.filter((e) => e.ui_group === g).map((e) => (
+            <div key={e.report_type} className="card stack rpt-card" data-report-type={e.report_type}
+                 data-available={String(e.available)}>
+              <div>
+                <strong>{word(TYPE_KEYS, e.report_type)}</strong>
+                <div className="hint">{word(TYPE_DESC_KEYS, e.report_type)}</div>
+              </div>
+              <div className="row">
+                {e.mode === "on_demand"
+                  ? <Tag tone="ok" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</Tag>
+                  : <ModeMark needs="basic" />}
+                <span className="hint" data-role="rpt-counts">
+                  {t("rpt_card_counts", { schedules: String(e.schedules), copies: String(e.copies) })}
+                </span>
+              </div>
+              {!e.available && e.reason_key && (
+                <div className="notice" data-role="unavailable">
+                  {t(e.reason_key)}{" "}
+                  {e.report_type === "rule_hit_count"
+                    ? <Link to="/reports?tab=schedules">{t("nav_system_reports")}</Link>
+                    : <Link to="/system/collection">{t("gui_reports_collection_link")}</Link>}
                 </div>
-                {e.report_type !== "custom" && (
+              )}
+              {e.report_type !== "custom" && (
+                <div className="row">
                   <button type="button" className="btn-quiet" disabled={!e.available}
                     onClick={() => setOpen(open === e.report_type ? null : e.report_type)}>
                     {t("gui_reports_generate_open")}
                   </button>
-                )}
-              </div>
+                  <Link to="/reports?tab=schedules" className="btn-quiet">{t("rpt_schedule_link")}</Link>
+                </div>
+              )}
               {e.report_type === "custom" && (
                 <CustomReports generate={(customId, done) => (
                   <GenerateForm entry={e} catalog={catalog} customId={customId} onDone={() => { done(); onGenerated(); }} />
@@ -192,8 +210,8 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
               <tr key={r.id} data-report-id={r.id} data-status={r.status} data-highlight={r.id === highlight ? "true" : undefined}
                 ref={r.id === highlight ? marked : undefined} className={r.id === highlight ? "notice" : undefined}>
                 <td>
-                  {word(TYPE_KEYS, r.report_type)}{r.custom_name ? `：${r.custom_name}` : ""}
-                  <div className="hint">{r.pce_label}</div>
+                  <div data-role="report-conclusion">{r.conclusion || `${word(TYPE_KEYS, r.report_type)}${r.custom_name ? `：${r.custom_name}` : ""}`}</div>
+                  <div className="hint">{word(TYPE_KEYS, r.report_type)} · {r.pce_label}</div>
                 </td>
                 <td className="nowrap">{periodText(r.period_start, r.period_end, lang)}</td>
                 <td>
@@ -230,7 +248,9 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
 export function Reports() {
   const [params, setParams] = useSearchParams();
   const highlight = params.get("id") ? Number(params.get("id")) : null;
-  const tab = params.get("tab") === "schedules" ? "schedules" : "reports";
+  const raw = params.get("tab");
+  // An email link names a report (?id=): it opens on the produced list
+  const tab: Tab = raw === "schedules" ? "schedules" : raw === "produced" || params.get("id") ? "produced" : "templates";
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ReportPage | null>(null);
@@ -266,37 +286,46 @@ export function Reports() {
   }, [busy, load]);
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
+  const list = data && (
+    <>
+      <History data={linked ? { ...data, items: [linked, ...data.items] } : data} highlight={highlight}
+        onChanged={() => void load()} />
+      {pages > 1 && (
+        <div className="row">
+          <button type="button" className="btn-quiet" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t("page_prev")}</button>
+          <span className="hint">{t("page_of", { page: String(page), pages: String(pages) })}</span>
+          <button type="button" className="btn-quiet" disabled={page >= pages} onClick={() => setPage(page + 1)}>{t("page_next")}</button>
+        </div>
+      )}
+    </>
+  );
+  const tabButton = (id: Tab, key: string) => (
+    <button type="button" role="tab" aria-selected={tab === id} aria-pressed={tab === id} className="chip-btn" data-tab={id}
+      onClick={() => setParams(id === "templates" ? {} : { tab: id })}>{t(key)}</button>
+  );
   return (
-    <section className="page stack">
-      <div className="page-head">
-        <h1>{t("nav_reports")}</h1>
-      </div>
-      <div className="row" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === "reports"} className={tab === "reports" ? "btn-primary" : "btn-quiet"}
-          onClick={() => setParams({})}>{t("gui_reports_tab_reports")}</button>
-        <button type="button" role="tab" aria-selected={tab === "schedules"} className={tab === "schedules" ? "btn-primary" : "btn-quiet"}
-          onClick={() => setParams({ tab: "schedules" })}>{t("gui_reports_tab_schedules")}</button>
+    <section className="page stack" data-role="reports-page">
+      <PageHead title={t("nav_reports")} sub={t("rpt_page_sub")} />
+      <div className="chips-row tabs" role="tablist">
+        {tabButton("templates", "rpt_tab_templates")}
+        {tabButton("schedules", "gui_reports_tab_schedules")}
+        {tabButton("produced", "rpt_tab_produced")}
       </div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
-      {tab === "schedules" ? (
-        catalog && <Schedules catalog={catalog} />
-      ) : (
+      {tab === "schedules" && (
         <>
-          {catalog && <CatalogView catalog={catalog} onGenerated={() => { setPage(1); void load(); }} />}
-          <h2>{t("gui_reports_history")}</h2>
-          {data && (
-            <History data={linked ? { ...data, items: [linked, ...data.items] } : data} highlight={highlight}
-              onChanged={() => void load()} />
-          )}
-          {pages > 1 && (
-            <div className="row">
-              <button type="button" className="btn-quiet" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t("page_prev")}</button>
-              <span className="hint">{t("page_of", { page: String(page), pages: String(pages) })}</span>
-              <button type="button" className="btn-quiet" disabled={page >= pages} onClick={() => setPage(page + 1)}>{t("page_next")}</button>
-            </div>
-          )}
+          {catalog && <Schedules catalog={catalog} />}
+          <ReportSettings embedded />
         </>
       )}
+      {tab === "templates" && (
+        <>
+          {catalog && <CatalogView catalog={catalog} onGenerated={() => { setPage(1); void load(); }} />}
+          <h2>{t("rpt_recent")}</h2>
+          {list}
+        </>
+      )}
+      {tab === "produced" && list}
     </section>
   );
 }
