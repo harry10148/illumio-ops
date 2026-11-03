@@ -39,7 +39,7 @@ DEPRECATED_PREFIXES: tuple[Path_, ...] = (("report", "attack_surface"), ("web_gu
 PHASE_OF_SECTION: dict[str, str] = {}  # a section a later phase migrates (none left after P7)
 REPORT_SECTIONS = ("report", "report_schedules")  # reported by migrate_reports, key by key
 ALERT_SECTIONS = ("alerts", "email", "smtp", "rules")  # reported by migrate_alerts, key by key
-NOT_IN_V6_SECTIONS = ("rule_scheduler", "scheduler", "rule_backups")
+NOT_IN_V6_SECTIONS = ("scheduler", "rule_backups")
 SPECIAL: dict[Path_, tuple[Action, str, dict[str, str]]] = {
     ("api", "profile"): ("dropped", "migrate_no_profiles", {}),
     ("settings", "enable_health_check"): ("dropped", "migrate_always_on", {}),
@@ -59,7 +59,8 @@ SPECIAL: dict[Path_, tuple[Action, str, dict[str, str]]] = {
 }
 # Whole subtrees dropped with one reason: v6 collects every flow, since a filtered or sampled
 # store would hide exactly the lateral movement it exists to find.
-DROPPED_PREFIXES: dict[Path_, str] = {("pce_cache", "traffic_filter"): "migrate_no_sampling",
+DROPPED_PREFIXES: dict[Path_, str] = {("rule_scheduler",): "migrate_rule_scheduler_settings",
+                                      ("pce_cache", "traffic_filter"): "migrate_no_sampling",
                                       ("pce_cache", "traffic_sampling"): "migrate_no_sampling"}
 LOG_LEVELS = ("TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")
 _HEX_KEY = re.compile(r"[0-9a-f]{64,}")

@@ -185,3 +185,27 @@ def test_a_hard_linked_config_is_refused(v5, tmp_path):
     os.link(v5 / "config" / "config.json", tmp_path / "second-name")
     with pytest.raises(UnsafeSource):
         upgrade(v5, tmp_path / "v6", now=NOW)
+
+
+def test_upgrade_carries_rule_schedules_paused(v5, tmp_path):
+    from illumio_ops.store import rule_schedules as rs_store
+    (v5 / "config" / "rule_schedules.json").write_text(json.dumps({
+        "/orgs/1/sec_policy/active/rule_sets/5/sec_rules/9": {
+            "type": "recurring", "name": "r9", "action": "allow", "days": ["mon"], "start": "09:00", "end": "18:00",
+            "timezone": "Asia/Taipei", "detail_rs": "Vendor"},
+        "/orgs/1/workloads/x": {"type": "recurring", "name": "bad"}}))
+    root = tmp_path / "v6"
+    upgrade(v5, root, now=NOW)
+    ctx, s = _ctx(root)
+    with ctx.db() as conn:
+        rows = rs_store.list_for(conn, pce_url=s.pce.url, org_id=s.pce.org_id)
+    assert [(r["href"], r["paused"], r["pce_status"], r["created_by"]) for r in rows] == [
+        ("/orgs/1/sec_policy/active/rule_sets/5/sec_rules/9", 1, "unknown", "migrated-5.x")]
+    report = (root / "logs" / "migration-report.txt").read_text()
+    assert "rule_schedules.json" in report and "/orgs/1/workloads/x" in report
+
+
+def test_upgrade_without_rule_schedules_says_so(v5, tmp_path):
+    root = tmp_path / "v6"
+    upgrade(v5, root, now=NOW)
+    assert "rule_schedules.json" in (root / "logs" / "migration-report.txt").read_text()

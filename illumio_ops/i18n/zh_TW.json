@@ -2732,5 +2732,10 @@
   "rs_err_already_scheduled": "這個目標已經有排程。",
   "rs_err_not_provisioned": "目標尚未 Provision （不在 Active 政策中）。",
   "rs_err_pce_refused": "PCE 拒絕：HTTP {status} {detail}",
-  "rs_err_not_found": "找不到這個排程。"
+  "rs_err_not_found": "找不到這個排程。",
+  "migrate_rule_schedule_paused": "規則排程「{name}」已遷移為暫停；在「規則排程」頁確認後逐筆繼續。",
+  "migrate_rule_schedule_paused_utc": "規則排程「{name}」已遷移為暫停；5.x 用主機時區但讀不到，暫以 UTC 計，請在繼續前確認時區。",
+  "migrate_rule_schedule_unreadable": "規則排程「{name}」無法讀取，未遷移：{why}",
+  "migrate_rule_schedule_none": "5.x 沒有規則排程。",
+  "migrate_rule_scheduler_settings": "v6 每 5 分鐘檢查規則排程（不可設定）；排程本身遷移為暫停。"
 }

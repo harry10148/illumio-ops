@@ -2732,5 +2732,10 @@
   "rs_err_already_scheduled": "This target already has a schedule.",
   "rs_err_not_provisioned": "The target is not provisioned (not in the active policy).",
   "rs_err_pce_refused": "The PCE refused: HTTP {status} {detail}",
-  "rs_err_not_found": "That schedule is not found."
+  "rs_err_not_found": "That schedule is not found.",
+  "migrate_rule_schedule_paused": "Rule schedule \"{name}\" migrated paused; resume it on the Rule schedules page after checking it.",
+  "migrate_rule_schedule_paused_utc": "Rule schedule \"{name}\" migrated paused; 5.x used the host's zone, which could not be read, so UTC is used — check the zone before resuming.",
+  "migrate_rule_schedule_unreadable": "Rule schedule \"{name}\" could not be read and was not migrated: {why}",
+  "migrate_rule_schedule_none": "5.x had no rule schedules.",
+  "migrate_rule_scheduler_settings": "v6 checks rule schedules every five minutes (not configurable); the schedules themselves are migrated paused."
 }

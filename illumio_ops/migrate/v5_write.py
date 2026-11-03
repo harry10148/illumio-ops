@@ -13,14 +13,17 @@ Then, in the new root only (the 5.x installation is read, never written):
 """
 from __future__ import annotations
 
+import json
 import os
 import stat
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from illumio_ops.domain.values import IngestSource, Language
 from illumio_ops.i18n import translate
+from illumio_ops.migrate import v5_rule_schedules
 from illumio_ops.migrate.report import render
 from illumio_ops.migrate.v5 import MigrationResult, migrate_v5, read_v5
 from illumio_ops.migrate.v5_alerts import read_v5_rules
@@ -190,6 +193,15 @@ def _handover(ctx: AppContext, s: Settings, result: MigrationResult, h: Handover
     return lines
 
 
+def _rule_schedules(v5_root: Path, read: Callable[[Path], str]) -> dict[str, Any] | None:
+    """config/rule_schedules.json, read like every 5.x file (no links); None when 5.x had none."""
+    try:
+        data = json.loads(read(v5_root / v5_rule_schedules.FILE))
+    except FileNotFoundError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Language.EN,
             original_root: Path | None = None) -> list[str]:
     """Write v6 at root from the stopped 5.x at v5_root (moved there from original_root, when given); returns what the
@@ -210,8 +222,13 @@ def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Langua
     s, skipped = _copy_tls(v5_root, paths, result.settings, original_root or v5_root)
     store = SettingsStore(paths.settings_file)
     store.create(s)
+    schedules, schedule_items = v5_rule_schedules.convert(_rule_schedules(v5_root, read),
+                                                          local_zone=v5_rule_schedules.host_zone())
+    result.report.items.extend(schedule_items)
     with connect(paths.app_db) as conn:  # as the service's start does (runtime.prepare)
         migrate(conn)
+        v5_rule_schedules.write(conn, schedules, pce_url=s.pce.url, org_id=s.pce.org_id, now=now)
+        conn.commit()
     lines = [translate(lang, "migrate_tls_skipped", {"file": name}) for name in skipped]
     lines += _handover(AppContext(paths=paths, settings=store), s, result, h, now, lang)
     (root / "logs" / REPORT_FILE).write_text(render(result.report, lang) + "\n" + "\n".join(lines) + "\n",
