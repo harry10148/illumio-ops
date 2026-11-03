@@ -166,9 +166,10 @@ class UndoFailed(Exception):
 
 def _switch(client: PceClient, href: str, enabled: bool, before: bool) -> PceResponse | None:
     """Enable or disable on the draft and provision; None when done (or when the draft already has that value), else the
-    PCE's refusing answer. When the PCE would need other unprovisioned objects to go live with it, the draft is put back
-    to `before` — its own value, never the opposite of the target — and DependenciesPending raised; UndoFailed when the
-    put-back is refused (security review 2026-11-03)."""
+    PCE's refusing answer. When the PCE would need other unprovisioned objects to go live with it, the rule set's draft is
+    discarded — back to what is live, never the opposite of the target — and DependenciesPending raised; UndoFailed when
+    the PCE refuses that (security review 2026-11-03). Discarding is safe: the check found nothing pending in the rule
+    set before this write, and writing the old value back would leave it marked as changed (lab 26.2 2026-11-03)."""
     if before == enabled:
         return None
     r = pw.set_fields(client, href, {"enabled": enabled})
@@ -177,14 +178,14 @@ def _switch(client: PceClient, href: str, enabled: bool, before: bool) -> PceRes
     try:
         p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
     except pw.DependenciesPending as dep:
-        back = pw.set_fields(client, href, {"enabled": before})
+        back = pw.revert(client, pw.ruleset_of(href))
         if back.status != 204:
             raise UndoFailed(dep.hrefs, back) from None
         raise
     except PCE_ERRORS:
         # no answer from the dependency read or the provision: put the change back so it is not left pending
         # (Codex review round 2); a put-back that fails too leaves it, said by the failed run
-        back = pw.set_fields(client, href, {"enabled": before})
+        back = pw.revert(client, pw.ruleset_of(href))
         if back.status != 204:
             raise UndoFailed([], back) from None
         raise
@@ -192,7 +193,7 @@ def _switch(client: PceClient, href: str, enabled: bool, before: bool) -> PceRes
         return None
     # Not provisioned: put the schedule's own change back, or later checks would take it for someone's pending draft
     # and skip the target for good (Codex review of plan B).
-    back = pw.set_fields(client, href, {"enabled": before})
+    back = pw.revert(client, pw.ruleset_of(href))
     if back.status != 204:
         raise UndoFailed([], back)
     return p
@@ -394,7 +395,7 @@ def _write_note(client: PceClient, href: str, plan: Plan) -> None:
     if r.status != 204:
         raise PceRefused(r.status, _detail(r))
     def put_back() -> None:
-        back = pw.set_fields(client, href, {"description": desc})
+        back = pw.revert(client, pw.ruleset_of(href))
         if back.status != 204:
             raise PceRefused(back.status, f"the note remains in the draft: {_detail(back)}")
 

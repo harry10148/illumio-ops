@@ -81,17 +81,41 @@ def set_fields(client: PceClient, href: str, fields: dict[str, Any]) -> PceRespo
     return client.request("PUT", draft_href(href), json=fields, org_scoped=False, timeout=TIMEOUT)
 
 
+def _dependency_hrefs(found: Any) -> list[str]:
+    """The objects the PCE says must go live too. It answers a list of {dependency: {<type>: {href}}, required_by}
+    ([] when none; lab 26.2 2026-11-03); a type may hold one object or a list of them."""
+    hrefs: list[str] = []
+    for entry in found if isinstance(found, list) else []:
+        dep = entry.get("dependency") if isinstance(entry, dict) else None
+        for kind in DEPENDENCY_TYPES:
+            items = (dep or {}).get(kind)
+            for item in items if isinstance(items, list) else [items]:
+                if isinstance(item, dict) and item.get("href") and item["href"] not in hrefs:
+                    hrefs.append(item["href"])
+    return hrefs
+
+
+def revert(client: PceClient, ruleset_href: str) -> PceResponse:
+    """Discard the rule set's draft (back to what is live); 204 when done. Writing the old values back is not the same:
+    the PCE keeps the object marked as changed (lab 26.2 2026-11-03). Never sent without the rule set: an empty subset
+    reverts every pending object in the PCE."""
+    if not is_ruleset(ruleset_href) or "/sec_policy/draft/" not in ruleset_href:
+        raise ValueError(f"not a draft rule set: {ruleset_href!r}")
+    org = ruleset_href.split("/")[2]
+    return client.request("PUT", f"/orgs/{org}/sec_policy/delete", org_scoped=False, timeout=TIMEOUT,
+                          json={"change_subset": {"rule_sets": [{"href": ruleset_href}]}})
+
+
 def provision(client: PceClient, ruleset_href: str, description: str) -> PceResponse:
     """Provision the rule set alone; 201 when done. DependenciesPending (nothing provisioned) when the PCE names other
     objects that would have to go live with it."""
     org = ruleset_href.split("/")[2]
+    # `operation` is required (lab 26.2: 406 without it)
     deps = client.request("POST", f"/orgs/{org}/sec_policy/draft/dependencies", org_scoped=False, timeout=TIMEOUT,
-                          json={"change_subset": {"rule_sets": [{"href": ruleset_href}]}})
+                          json={"operation": "commit", "change_subset": {"rule_sets": [{"href": ruleset_href}]}})
     if deps.status != 200:
         return deps
-    found = (deps.json() or {}) if deps.body else {}
-    others = [item["href"] for kind in DEPENDENCY_TYPES for item in found.get(kind) or []
-              if item.get("href") and item["href"] != ruleset_href]
+    others = [h for h in _dependency_hrefs(deps.json() if deps.body else None) if h != ruleset_href]
     if others:
         raise DependenciesPending(others)
     return client.request("POST", f"/orgs/{org}/sec_policy", org_scoped=False, timeout=TIMEOUT,

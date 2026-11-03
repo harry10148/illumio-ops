@@ -21,6 +21,18 @@ RULE = "/orgs/1/sec_policy/active/rule_sets/5/sec_rules/9"
 OTHER = "/orgs/1/sec_policy/active/rule_sets/6"
 PCE_A = ("https://pce.example.com:8443", "1")
 WINDOW = Weekly(days=("mon",), start="08:00", end="18:00", timezone="Asia/Taipei", action="enable_in_window")
+REVERT_URL = API + "/orgs/1/sec_policy/delete"
+
+
+def _reverted(href=RULE):
+    """The body that discards the rule set's draft (PCE `PUT sec_policy/delete`, lab 26.2 2026-11-03)."""
+    return {"change_subset": {"rule_sets": [{"href": pw.ruleset_of(href)}]}}
+
+
+def _needs(href="/orgs/1/sec_policy/draft/ip_lists/7", kind="ip_lists"):
+    """The PCE's dependency answer as lab 26.2 sends it (2026-11-03): a list of {dependency, required_by}."""
+    return [{"dependency": {kind: {"href": href, "caps": ["write", "provision"]}},
+             "required_by": {"rule_sets": [{"href": pw.ruleset_of(RULE), "caps": ["write", "provision"]}]}}]
 
 
 @pytest.fixture
@@ -49,9 +61,9 @@ def _pce(href=RULE, *, enabled=False, draft=None, parent_draft=None, active_stat
     responses.add(responses.GET, API + pw.active_href(href), status=active_status,
                   json={"enabled": enabled, "href": href} if active_status == 200 else {"error": "not found"})
     responses.add(responses.PUT, API + pw.draft_href(href), status=put, body="" if put == 204 else '{"token":"x"}')
-    responses.add(responses.PUT, API + pw.draft_href(href), status=revert, body="" if revert == 204 else '{"token":"y"}')
+    responses.add(responses.PUT, REVERT_URL, status=revert, body="" if revert == 204 else '{"token":"y"}')
     responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"),
-                  json=deps or {})
+                  json=deps or [])
     responses.add(responses.POST, API + "/orgs/1/sec_policy", status=provision, json={})
 
 
@@ -238,10 +250,10 @@ def test_other_pending_objects_are_not_provisioned_and_the_switch_is_undone(ctx)
     """Security review: a switch that would need someone's unprovisioned object provisioned is skipped, and the
     draft is put back as it was."""
     _add(ctx)
-    _pce(enabled=False, deps={"ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}]})
+    _pce(enabled=False, deps=_needs())
     r = rs.tick(ctx, now=NOW)
     assert r.skipped == 1 and r.switched == 0
-    assert _puts() == [{"enabled": True}, {"enabled": False}]
+    assert _puts() == [{"enabled": True}, _reverted()]
     assert not any(c.request.url.endswith("/sec_policy") and c.request.method == "POST" for c in responses.calls)
     with ctx.db() as conn:
         [run] = store.runs(conn, pce_url=ctx.settings.current().pce.url, org_id="1", limit=5)
@@ -252,7 +264,7 @@ def test_other_pending_objects_are_not_provisioned_and_the_switch_is_undone(ctx)
 def test_expiry_of_a_rule_already_disabled_never_enables_it(ctx):
     """Security review: the undo after a refused provision must restore the draft's own value, never the opposite."""
     sid = _add(ctx, plan=Expiry(expire_at=NOW - timedelta(minutes=1), timezone="Asia/Taipei"))
-    _pce(enabled=False, deps={"ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}]})
+    _pce(enabled=False, deps=_needs())
     rs.tick(ctx, now=NOW)
     assert {"enabled": True} not in _puts() and {"enabled": False} not in _puts()  # already disabled: nothing to write
     with ctx.db() as conn:
@@ -262,7 +274,7 @@ def test_expiry_of_a_rule_already_disabled_never_enables_it(ctx):
 @responses.activate
 def test_a_failed_undo_is_a_failure_that_says_a_draft_change_remains(ctx):
     _add(ctx)
-    _pce(enabled=False, deps={"ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}]}, revert=500)
+    _pce(enabled=False, deps=_needs(), revert=500)
     r = rs.tick(ctx, now=NOW)
     assert r.failed == 1
     with ctx.db() as conn:
@@ -279,7 +291,7 @@ def test_failed_provision_puts_the_draft_back(ctx):
     _add(ctx)
     _pce(enabled=False, provision=500)
     r = rs.tick(ctx, now=NOW)
-    assert r.failed == 1 and _puts() == [{"enabled": True}, {"enabled": False}]
+    assert r.failed == 1 and _puts() == [{"enabled": True}, _reverted()]
 
 
 @responses.activate
@@ -319,7 +331,7 @@ def test_delete_acts_on_the_pce_it_checked(ctx, monkeypatch):
     sid = _add(ctx, href=RS)
     responses.add(responses.GET, API + pw.draft_href(RS), json={"update_type": None, "description": "keep [📅 x]"})
     responses.add(responses.PUT, API + pw.draft_href(RS), status=204)
-    responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"), json={})
+    responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"), json=[])
     responses.add(responses.POST, API + "/orgs/1/sec_policy", status=201, json={})
     real = rs._own
 
@@ -355,11 +367,11 @@ def test_a_transport_failure_after_the_switch_puts_the_draft_back(ctx):
     responses.add(responses.GET, API + pw.ruleset_of(RULE), json={"update_type": None})
     responses.add(responses.GET, API + pw.active_href(RULE), json={"enabled": False})
     responses.add(responses.PUT, API + pw.draft_href(RULE), status=204)
-    responses.add(responses.PUT, API + pw.draft_href(RULE), status=204)
+    responses.add(responses.PUT, REVERT_URL, status=204)
     responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"),
                   body=RequestsConnectionError("down"))
     r = rs.tick(ctx, now=NOW)
-    assert r.failed == 1 and _puts() == [{"enabled": True}, {"enabled": False}]
+    assert r.failed == 1 and _puts() == [{"enabled": True}, _reverted()]
 
 
 @responses.activate
@@ -369,7 +381,7 @@ def test_create_refused_provision_puts_the_description_back(ctx):
     with pytest.raises(rs.PceRefused):
         rs.create(ctx, href=RS, plan=WINDOW, name="B", ruleset_name="B", summary="", by="a", now=NOW,
                   pce=("https://pce.example.com:8443", "1"))
-    assert _puts()[-1] == {"description": "keep [⏰ Expires: 2026-01-01 00:00]"}
+    assert _puts()[-1] == _reverted(RS)
 
 
 def test_create_refuses_a_target_from_another_pce(ctx):
@@ -407,3 +419,18 @@ def test_skipped_now_clears_after_a_good_check(ctx):
     _pce(enabled=True)
     rs.tick(ctx, now=NOW + timedelta(minutes=5))
     assert rs.schedules(ctx, now=NOW + timedelta(minutes=5))[0].skipped_now == 0
+
+
+# ── lab 26.2 acceptance (2026-11-03) ────────────────────────────────────────
+
+@responses.activate
+def test_a_put_back_discards_the_draft_rather_than_writing_the_old_value(ctx):
+    """lab .106 2026-11-03: writing the old value back leaves the object `update_type: update` in the draft, so every
+    later check took the schedule's own undone change for someone's pending draft and the next create was refused.
+    The rule set's draft is discarded instead (PCE `PUT sec_policy/delete`)."""
+    _add(ctx)
+    _pce(enabled=False, provision=500)
+    rs.tick(ctx, now=NOW)
+    reverts = [c for c in responses.calls if c.request.url == REVERT_URL]
+    assert len(reverts) == 1 and json.loads(reverts[0].request.body) == _reverted()
+    assert {"enabled": False} not in _puts()

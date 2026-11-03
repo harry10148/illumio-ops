@@ -51,9 +51,9 @@ def test_set_fields_puts_the_draft(client):
 @responses.activate
 def test_provision_refuses_other_pending_objects(client):
     """Security review: provisioning the PCE's dependencies would push someone's unreviewed draft (an edited IP list)."""
-    responses.add(responses.POST, f"{API}/orgs/1/sec_policy/draft/dependencies",
-                  json={"ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}],
-                        "rule_sets": [{"href": pw.ruleset_of(RS)}]})
+    responses.add(responses.POST, f"{API}/orgs/1/sec_policy/draft/dependencies", json=[  # as lab 26.2 answers
+        {"dependency": {"ip_lists": {"href": "/orgs/1/sec_policy/draft/ip_lists/7", "caps": ["write", "provision"]}},
+         "required_by": {"rule_sets": [{"href": pw.ruleset_of(RS), "caps": ["write", "provision"]}]}}])
     with pytest.raises(pw.DependenciesPending) as e:
         pw.provision(client, pw.ruleset_of(RS), "illumio-ops rule schedule")
     assert e.value.hrefs == ["/orgs/1/sec_policy/draft/ip_lists/7"]
@@ -62,8 +62,39 @@ def test_provision_refuses_other_pending_objects(client):
 
 @responses.activate
 def test_provision_only_the_rule_set(client):
-    responses.add(responses.POST, f"{API}/orgs/1/sec_policy/draft/dependencies", json={})
+    responses.add(responses.POST, f"{API}/orgs/1/sec_policy/draft/dependencies", json=[])  # none: lab 26.2 sends []
     responses.add(responses.POST, f"{API}/orgs/1/sec_policy", status=201, json={})
     assert pw.provision(client, pw.ruleset_of(RS), "illumio-ops rule schedule").status == 201
     body = json.loads(responses.calls[1].request.body)
     assert body["change_subset"] == {"rule_sets": [{"href": pw.ruleset_of(RS)}]}
+
+
+@responses.activate
+def test_the_dependency_check_names_the_commit_operation(client):
+    """lab 26.2 2026-11-03: without `operation` the PCE answers 406 input_validation_error and nothing is provisioned."""
+    responses.add(responses.POST, f"{API}/orgs/1/sec_policy/draft/dependencies", json=[])
+    responses.add(responses.POST, f"{API}/orgs/1/sec_policy", status=201, json={})
+    pw.provision(client, pw.ruleset_of(RS), "illumio-ops rule schedule")
+    assert json.loads(responses.calls[0].request.body) == {
+        "operation": "commit", "change_subset": {"rule_sets": [{"href": pw.ruleset_of(RS)}]}}
+
+
+@responses.activate
+def test_a_dependency_given_as_a_list_is_found_too(client):
+    responses.add(responses.POST, f"{API}/orgs/1/sec_policy/draft/dependencies", json=[
+        {"dependency": {"services": [{"href": "/orgs/1/sec_policy/draft/services/3"}]},
+         "required_by": {"rule_sets": [{"href": pw.ruleset_of(RS)}]}}])
+    with pytest.raises(pw.DependenciesPending) as e:
+        pw.provision(client, pw.ruleset_of(RS), "illumio-ops rule schedule")
+    assert e.value.hrefs == ["/orgs/1/sec_policy/draft/services/3"]
+
+
+@responses.activate
+def test_revert_discards_only_the_rule_sets_draft(client):
+    """The PCE reverts every pending object when the subset is empty, so the rule set is always named."""
+    responses.add(responses.PUT, f"{API}/orgs/1/sec_policy/delete", status=204)
+    assert pw.revert(client, pw.ruleset_of(RULE)).status == 204
+    assert json.loads(responses.calls[0].request.body) == {
+        "change_subset": {"rule_sets": [{"href": "/orgs/1/sec_policy/draft/rule_sets/5"}]}}
+    with pytest.raises(ValueError):
+        pw.revert(client, "")

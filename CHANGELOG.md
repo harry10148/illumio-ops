@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [6.1.0] - unreleased
+## [6.1.1] - unreleased
+
+### Fixed
+- Rule scheduling could not create a schedule on a real PCE (found in the lab acceptance on PCE 26.2): the dependency
+  check before each provision lacked the `operation` the PCE requires (406), and the PCE's answer when other objects
+  must go live too — a list of `{dependency, required_by}` — was read as an object, so a schedule needing them failed
+  instead of being skipped.
+- A schedule's own change that could not be provisioned is now discarded from the rule set's draft (the PCE's revert,
+  limited to that rule set). Writing the old value back left the rule set marked as changed, so every later check and
+  the next create took it for someone else's pending draft.
+
+## [6.1.0] - 2026-11-03
 
 ### Added
 - Five more anomaly detectors on allowed traffic (spec §6.5.8, second batch), each comparing a host or a pair of
