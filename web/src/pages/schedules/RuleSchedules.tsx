@@ -295,7 +295,7 @@ export function RuleSchedules() {
                 { key: "target", label: t("rs_col_target"), render: (s) => (
                   <div><div>{s.is_ruleset ? t("rs_whole_ruleset", { name: s.name }) : `${s.name} · ${s.ruleset_name}`}</div>
                     <div className="hint mono">{s.summary}</div></div>) },
-                { key: "type", label: t("rs_col_type"), render: (s) => (weeklyOf(s) ? t("rs_type_weekly") : t("rs_type_expiry")) },
+                { key: "type", label: t("rs_col_type"), render: (s) => <span className="nowrap">{weeklyOf(s) ? t("rs_type_weekly") : t("rs_type_expiry")}</span> },
                 { key: "time", label: t("rs_col_time"), render: (s) => (
                   <div><div>{planText(s, lang)}</div><div className="hint">{previewText(s.preview_key, s.preview_params)}</div></div>) },
                 { key: "now", label: t("rs_col_now"), render: (s) => (
@@ -311,7 +311,7 @@ export function RuleSchedules() {
                     {s.last_run.status !== null && <div className="hint mono">HTTP {s.last_run.status} {s.last_run.detail ?? ""}</div>}
                   </div>) : <span className="hint">{t("rs_never_checked")}</span>) },
                 { key: "act", label: "", render: (s) => (
-                  <div className="row">
+                  <div className="row nowrap">
                     <button type="button" className="btn-quiet" onClick={() => void pause(s)}>{s.paused ? t("rs_resume") : t("rs_pause")}</button>
                     {deleting === s.id
                       ? <button type="button" className="btn-danger" data-role="rs-delete-confirm" onClick={() => void remove(s.id)}>{t("rs_delete_confirm")}</button>
