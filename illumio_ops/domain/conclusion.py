@@ -4,6 +4,7 @@ sentence say which and why, never a 0. Custom reports have no key numbers: their
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import tzinfo
 
 from illumio_ops.domain.report import Kpi, ReportDocument, period_text
 from illumio_ops.domain.values import ReportType
@@ -55,10 +56,11 @@ def _value(k: Kpi) -> str:
     return text + ("%" if k.unit == "percent" else "")
 
 
-def conclusion(doc: ReportDocument, tr: Translate) -> str:
+def conclusion(doc: ReportDocument, tr: Translate, *, tz: tzinfo | None = None) -> str:
+    """tz: the report's display zone (its dates as the cover shows them)."""
     if doc.report_type is ReportType.CUSTOM:
         return tr(CONCLUSION_KEYS[ReportType.CUSTOM], {"sections": f"{len(doc.sections):,}",
-                                                      "period": period_text(doc.period_start, doc.period_end, None)})
+                                                      "period": period_text(doc.period_start, doc.period_end, tz)})
     wanted = CONCLUSION_KPIS[doc.report_type]
     kpis = {k.key: k for k in doc.kpis}
     missing = [kpis[w] for w in wanted if w in kpis and kpis[w].value is None]

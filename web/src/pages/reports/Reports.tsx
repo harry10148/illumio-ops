@@ -211,7 +211,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                 ref={r.id === highlight ? marked : undefined} className={r.id === highlight ? "notice" : undefined}>
                 <td>
                   <div data-role="report-conclusion">{r.conclusion || `${word(TYPE_KEYS, r.report_type)}${r.custom_name ? `：${r.custom_name}` : ""}`}</div>
-                  <div className="hint">{word(TYPE_KEYS, r.report_type)} · {r.pce_label}</div>
+                  <div className="hint">{word(TYPE_KEYS, r.report_type)}{r.custom_name ? `：${r.custom_name}` : ""} · {r.pce_label}</div>
                 </td>
                 <td className="nowrap">{periodText(r.period_start, r.period_end, lang)}</td>
                 <td>

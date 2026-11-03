@@ -2768,5 +2768,6 @@
   "rs_deny_rule_name": "Deny rule #{id}",
   "rs_result_ok": "Done",
   "rs_result_failed": "Failed",
-  "rs_result_skipped": "Skipped"
+  "rs_result_skipped": "Skipped",
+  "rs_err_pce_switched": "The PCE changed: this target was found on another PCE; search again."
 }

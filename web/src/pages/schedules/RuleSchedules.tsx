@@ -1,6 +1,6 @@
 // Rule scheduling (UI redesign spec §4.5, sample 05): enable or disable an active PCE rule or rule set by a weekly
 // window or an expiry; the engine checks every five minutes and provisions with the write key.
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { type ApiError, call } from "../../api/client";
 import type { DeleteResult, RuleSchedulesView, RunView, ScheduleView, TargetHit, Weekly, Expiry } from "../../api/generated";
@@ -98,6 +98,8 @@ function Week({ items }: { items: ScheduleView[] }) {
 function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: () => void }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<TargetHit[] | null>(null);
+  const [found, setFound] = useState<{ pce_url: string; org_id: string } | null>(null);
+  const searchSeq = useRef(0);
   const [target, setTarget] = useState<TargetHit | null>(null);
   const [kind, setKind] = useState<"weekly" | "expiry">("weekly");
   const [days, setDays] = useState<Day[]>(["mon", "tue", "wed", "thu", "fri"]);
@@ -114,9 +116,13 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
     setError(null);
     setTarget(null);  // a new search: the earlier pick is no longer on screen (Codex review of plan B)
     setHits(null);
+    const seq = ++searchSeq.current;
     const env = await call("rule_schedules.targets", undefined, undefined, { q });
-    if (env.ok && env.data) setHits(env.data.items);
-    else setError(env.error);
+    if (seq !== searchSeq.current) return;  // a newer search was sent: this answer is not on screen (review round 2)
+    if (env.ok && env.data) {
+      setHits(env.data.items);
+      setFound({ pce_url: env.data.pce_url ?? "", org_id: env.data.org_id ?? "" });
+    } else setError(env.error);
   }
 
   const plan: Weekly | Expiry = kind === "weekly"
@@ -132,7 +138,7 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
     if (!target) return;
     setBusy(true);
     const env = await call("rule_schedules.create", { href: target.href, plan, name: target.name,
-      ruleset_name: target.ruleset_name, summary: target.summary });
+      ruleset_name: target.ruleset_name, summary: target.summary, pce_url: found?.pce_url ?? "", org_id: found?.org_id ?? "" });
     setBusy(false);
     if (env.ok) {
       setTarget(null);

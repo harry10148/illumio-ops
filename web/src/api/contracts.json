@@ -28265,6 +28265,16 @@
             "title": "Name",
             "type": "string"
           },
+          "org_id": {
+            "maxLength": 50,
+            "title": "Org Id",
+            "type": "string"
+          },
+          "pce_url": {
+            "maxLength": 500,
+            "title": "Pce Url",
+            "type": "string"
+          },
           "plan": {
             "discriminator": {
               "mapping": {
@@ -28299,7 +28309,9 @@
           "plan",
           "name",
           "ruleset_name",
-          "summary"
+          "summary",
+          "pce_url",
+          "org_id"
         ],
         "title": "ScheduleCreate",
         "type": "object"
@@ -29723,6 +29735,16 @@
           "limited": {
             "title": "Limited",
             "type": "boolean"
+          },
+          "org_id": {
+            "default": "",
+            "title": "Org Id",
+            "type": "string"
+          },
+          "pce_url": {
+            "default": "",
+            "title": "Pce Url",
+            "type": "string"
           }
         },
         "required": [

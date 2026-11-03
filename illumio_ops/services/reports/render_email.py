@@ -101,7 +101,8 @@ def render_email(doc: ReportDocument, *, tz: tzinfo | None, note: str | None = N
         f'<div style="font-family:sans-serif;color:{t["text-1"]};max-width:720px">'
         f'<h2 style="margin:0 0 4px">{_e(doc.title)}</h2>'
         f'<div style="color:{t["text-3"]};font-size:12px">{_e(period)} · PCE {_e(doc.pce_label)}</div>'
-        f'<h3>{_e(tr(lang, "rpt_mail_kpis"))}</h3>'
+        + (f'<p style="font-size:16px;font-weight:600;margin:12px 0">{_e(doc.conclusion)}</p>' if doc.conclusion else "")
+        + f'<h3>{_e(tr(lang, "rpt_mail_kpis"))}</h3>'
         f'<table style="border-collapse:collapse;width:100%"><tr>{kpi_cells}</tr></table>'
         f'<h3>{_e(tr(lang, "rpt_findings_title"))}</h3>{findings}'
         f'<p style="color:{t["text-3"]};font-size:12px;border-top:1px dashed {t["line"]};padding-top:6px">'

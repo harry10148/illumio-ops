@@ -1958,6 +1958,8 @@ timezone: string
 export interface ScheduleCreate {
 href: string
 name: string
+org_id: string
+pce_url: string
 plan: (Weekly | Expiry)
 ruleset_name: string
 summary: string
@@ -2056,6 +2058,8 @@ summary: string
 export interface TargetSearch {
 items: TargetHit[]
 limited: boolean
+org_id?: string
+pce_url?: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema

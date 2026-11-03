@@ -13,7 +13,8 @@ from .conftest import LOCAL, csrf, login, post
 RS = "/orgs/1/sec_policy/active/rule_sets/5"
 PLAN = {"kind": "weekly", "days": ["mon"], "start": "08:00", "end": "18:00", "timezone": "Asia/Taipei",
         "action": "enable_in_window"}
-BODY = {"href": RS, "plan": PLAN, "name": "Backups", "ruleset_name": "Backups", "summary": ""}
+BODY = {"href": RS, "plan": PLAN, "name": "Backups", "ruleset_name": "Backups", "summary": "", "pce_url": "",
+        "org_id": ""}
 
 
 def _add(ctx):
@@ -44,7 +45,7 @@ def test_create_without_write_key_412(client):
 
 @pytest.mark.parametrize(("exc", "status", "code"), [
     (rs.DraftPending(), 409, "draft_pending"), (rs.AlreadyScheduled(), 409, "already_scheduled"),
-    (rs.NotProvisioned(), 409, "not_provisioned")])
+    (rs.NotProvisioned(), 409, "not_provisioned"), (rs.PceSwitched(), 409, "pce_switched")])
 def test_create_conflicts(client, monkeypatch, exc, status, code):
     def boom(*a, **kw):
         raise exc

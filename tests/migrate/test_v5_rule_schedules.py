@@ -97,3 +97,9 @@ def test_fractional_utc_offset():
 def test_a_non_object_entry_is_reported_not_raised():
     done, items = convert({RULE: "oops", RS: ["x"]}, local_zone="UTC")
     assert done == [] and [i.reason_key for i in items] == ["migrate_rule_schedule_unreadable"] * 2
+
+
+def test_fractional_offset_expiry():
+    """Codex review round 2: a one-time schedule in UTC+5.5 aborted the upgrade."""
+    [s], _ = _one({"type": "one_time", "name": "t", "expire_at": "2026-12-01T00:00", "timezone": "UTC+5.5"}, href=RS)
+    assert s.plan.expire_at == datetime(2026, 11, 30, 18, 30, tzinfo=UTC)

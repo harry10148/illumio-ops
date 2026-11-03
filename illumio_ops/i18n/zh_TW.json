@@ -2768,5 +2768,6 @@
   "rs_deny_rule_name": "Deny Rule #{id}",
   "rs_result_ok": "完成",
   "rs_result_failed": "失敗",
-  "rs_result_skipped": "跳過"
+  "rs_result_skipped": "跳過",
+  "rs_err_pce_switched": "PCE 已切換：這個目標是在另一個 PCE 上找到的，請重新搜尋。"
 }

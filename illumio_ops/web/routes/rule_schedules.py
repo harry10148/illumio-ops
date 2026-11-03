@@ -33,6 +33,8 @@ class ScheduleCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     ruleset_name: str = Field(max_length=200)
     summary: str = Field(max_length=1000)
+    pce_url: str = Field(max_length=500)  # the PCE the target was found on (TargetSearch): another PCE is refused
+    org_id: str = Field(max_length=50)
 
 
 class RunList(BaseModel):
@@ -60,6 +62,8 @@ def _mapped(exc: Exception) -> ApiFailure:
         return ApiFailure(409, "already_scheduled", "rs_err_already_scheduled")
     if isinstance(exc, rs.NotProvisioned):
         return ApiFailure(409, "not_provisioned", "rs_err_not_provisioned")
+    if isinstance(exc, rs.PceSwitched):
+        return ApiFailure(409, "pce_switched", "rs_err_pce_switched")
     if isinstance(exc, rs.PceRefused):
         return ApiFailure(502, "pce_refused", "rs_err_pce_refused",
                           params={"status": str(exc.status or "—"), "detail": exc.detail})
@@ -93,9 +97,9 @@ def list_runs() -> RunList:
 def create(body: ScheduleCreate) -> ScheduleView:
     try:
         return rs.create(get_ctx(), href=body.href, plan=body.plan, name=body.name, ruleset_name=body.ruleset_name,
-                         summary=body.summary, by=str(current_user.get_id()))
+                         summary=body.summary, by=str(current_user.get_id()), pce=(body.pce_url, body.org_id))
     except (rs.NoWriteKey, PceNotConfigured, rs.DraftPending, rs.AlreadyScheduled, rs.NotProvisioned,
-            rs.PceRefused) as exc:
+            rs.PceRefused, rs.PceSwitched) as exc:
         raise _mapped(exc) from None
 
 

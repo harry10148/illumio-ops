@@ -91,3 +91,18 @@ def test_mail_subject_carries_conclusion_and_caps_200():
     short = render_email(_doc([]).model_copy(update={"conclusion": "Seven new connections"}), tz=UTC)
     assert "Seven new connections" in short.subject and "Seven new connections" in short.text
 
+
+
+def test_custom_period_in_the_report_zone():
+    from datetime import datetime as dt
+    from zoneinfo import ZoneInfo
+    tpe = ZoneInfo("Asia/Taipei")
+    doc = _doc([], ReportType.CUSTOM).model_copy(update={
+        "period_start": dt(2026, 11, 1, tzinfo=tpe), "period_end": dt(2026, 11, 2, tzinfo=tpe)})
+    assert "2026-11-01 – 2026-11-01" in conclusion(doc, _tr(Language.EN), tz=tpe)
+
+
+def test_html_mail_opens_with_the_conclusion():
+    from illumio_ops.services.reports.render_email import render_email
+    mail = render_email(_doc([]).model_copy(update={"conclusion": "Seven new connections"}), tz=UTC)
+    assert mail.html is not None and "Seven new connections" in mail.html

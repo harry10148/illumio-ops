@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import ValidationError
 
 from illumio_ops.domain.rule_schedule import WEEKDAYS, Expiry, Plan, Weekly
+from illumio_ops.domain.rule_schedule import zone as zone_of
 from illumio_ops.migrate.report import MigrationItem
 from illumio_ops.store import rule_schedules as store
 
@@ -72,7 +73,7 @@ def _plan(entry: dict[str, Any], zone: str) -> Plan:
     if kind == "one_time":
         at = datetime.fromisoformat(str(entry.get("expire_at", "")))
         if at.tzinfo is None:  # 5.x compared the wall clock in the schedule's zone
-            at = at.replace(tzinfo=ZoneInfo(zone))
+            at = at.replace(tzinfo=zone_of(zone))
         return Expiry(expire_at=at, timezone=zone)
     raise ValueError(f"unknown schedule type {kind!r}")
 

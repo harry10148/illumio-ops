@@ -139,8 +139,10 @@ def _ident(ctx: AppContext) -> tuple[str, str]:
 
 
 def _run(ctx: AppContext, row: sqlite3.Row | None, *, href: str, name: str, at: datetime, action: store.Action,
-         result: store.Result, status: int | None = None, detail: str | None = None) -> None:
-    url, org = _ident(ctx) if row is None else (row["pce_url"], row["org_id"])
+         result: store.Result, status: int | None = None, detail: str | None = None,
+         pce: tuple[str, str] | None = None) -> None:
+    """pce: the PCE written to, for a schedule already deleted (its row gone): never re-read from the settings."""
+    url, org = (row["pce_url"], row["org_id"]) if row is not None else (pce or _ident(ctx))
     with ctx.db() as conn:
         store.add_run(conn, pce_url=url, org_id=org, schedule_id=row["id"] if row is not None else None, href=href,
                       name=name, at=at, action=action, result=result, status=status, detail=detail)
@@ -178,6 +180,13 @@ def _switch(client: PceClient, href: str, enabled: bool, before: bool) -> PceRes
         back = pw.set_fields(client, href, {"enabled": before})
         if back.status != 204:
             raise UndoFailed(dep.hrefs, back) from None
+        raise
+    except PCE_ERRORS:
+        # no answer from the dependency read or the provision: put the change back so it is not left pending
+        # (Codex review round 2); a put-back that fails too leaves it, said by the failed run
+        back = pw.set_fields(client, href, {"enabled": before})
+        if back.status != 204:
+            raise UndoFailed([], back) from None
         raise
     if p.status == 201:
         return None
@@ -254,7 +263,7 @@ def _apply(ctx: AppContext, client: PceClient, row: sqlite3.Row, plan: Plan, dra
         with ctx.db() as conn:
             store.delete(conn, row["id"])
             conn.commit()
-        _run(ctx, None, href=href, name=name, at=at, action="expire", result="ok",
+        _run(ctx, None, href=href, name=name, at=at, action="expire", result="ok", pce=(row["pce_url"], row["org_id"]),
              detail=None if note is None else f"note not cleared: HTTP {note.status} {_detail(note)}")
         return "switched"
     active = pw.get_active(client, href)
@@ -348,7 +357,8 @@ def schedules(ctx: AppContext, *, now: datetime | None = None) -> tuple[Schedule
         schedules=len(views),
         switched_24h=sum(1 for r in recent if r["result"] == "ok" and r["action"] in ("enable", "disable", "expire")),
         failed_24h=sum(1 for r in recent if r["result"] == "failed"),
-        skipped_now=sum(1 for v in views if v.last_run is not None and v.last_run.action == "skip_draft"),
+        skipped_now=sum(1 for v in views if v.last_run is not None and v.last_run.action == "skip_draft"
+                        and (v.last_checked_at is None or v.last_checked_at <= v.last_run.at)),
         next_change=min(nexts, default=None), write_key=_has_key(ctx)), views
 
 
@@ -383,14 +393,21 @@ def _write_note(client: PceClient, href: str, plan: Plan) -> None:
     r = pw.set_fields(client, href, {"description": with_note(desc, plan)})
     if r.status != 204:
         raise PceRefused(r.status, _detail(r))
+    def put_back() -> None:
+        back = pw.set_fields(client, href, {"description": desc})
+        if back.status != 204:
+            raise PceRefused(back.status, f"the note remains in the draft: {_detail(back)}")
+
     try:
         p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
     except pw.DependenciesPending:
-        back = pw.set_fields(client, href, {"description": desc})
-        if back.status != 204:
-            raise PceRefused(back.status, f"the note remains in the draft: {_detail(back)}") from None
+        put_back()
         raise DraftPending from None
+    except PCE_ERRORS:
+        put_back()
+        raise
     if p.status != 201:
+        put_back()
         raise PceRefused(p.status, _detail(p))
 
 
@@ -398,8 +415,11 @@ _CREATE = threading.Lock()  # one create at a time: the target is claimed before
 
 
 def create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: str, summary: str, by: str,
-           now: datetime | None = None) -> ScheduleView:
-    """Raises NoWriteKey, AlreadyScheduled, NotProvisioned, DraftPending, PceRefused (nothing saved then)."""
+           pce: tuple[str, str], now: datetime | None = None) -> ScheduleView:
+    """pce: the PCE (url, org) the target was found on — a target picked on another PCE is refused (PceSwitched).
+    Raises NoWriteKey, AlreadyScheduled, NotProvisioned, DraftPending, PceRefused, PceSwitched (nothing saved then)."""
+    if _ident(ctx) != tuple(pce):
+        raise PceSwitched
     with _CREATE:
         try:
             return _create(ctx, href=href, plan=plan, name=name, ruleset_name=ruleset_name, summary=summary, by=by,
@@ -411,9 +431,9 @@ def create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: s
 def _create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: str, summary: str, by: str,
             now: datetime | None = None) -> ScheduleView:
     at = (now or datetime.now(UTC)).astimezone(UTC)
-    if not _has_key(ctx):
-        raise NoWriteKey
     cfg = ctx.settings.current().pce
+    if not (cfg.write_api_key and cfg.write_api_secret):
+        raise NoWriteKey
     href = pw.active_href(href)
     with ctx.db() as conn:
         if store.by_href(conn, pce_url=cfg.url, org_id=cfg.org_id, href=href) is not None:
@@ -520,7 +540,7 @@ def delete(ctx: AppContext, schedule_id: int, *, by: str, now: datetime | None =
     with ctx.db() as conn:
         store.delete(conn, schedule_id)
         conn.commit()
-    _run(ctx, None, href=row["href"], name=row["name"], at=at, action="note_cleared",
+    _run(ctx, None, href=row["href"], name=row["name"], at=at, action="note_cleared", pce=(row["pce_url"], row["org_id"]),
          result="ok" if out.note_cleared else "failed", status=out.status, detail=f"by {by}; {out.detail or ''}".strip("; "))
     return out
 

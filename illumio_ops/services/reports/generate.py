@@ -298,7 +298,7 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
         if fdb.generation != generation:
             raise _Fail("rpt_err_pce_switched")
         doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id),
-                                     "conclusion": conclusion(doc, lambda key, p: translate(doc.lang, key, p))})
+                                     "conclusion": conclusion(doc, lambda key, p: translate(doc.lang, key, p), tz=tz)})
         files = _write(out_dir, doc, row.id, params.formats, tz)
         kpis = [{"key": k.key, "label": k.label, "value": k.value, "previous": k.previous} for k in doc.kpis]
     except Exception as exc:  # noqa: BLE001 - a report's failure is recorded on the report, never raised to the job

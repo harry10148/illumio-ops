@@ -34,6 +34,8 @@ class TargetHit(BaseModel):
 class TargetSearch(BaseModel):
     items: list[TargetHit]
     limited: bool  # more rule sets matched than MAX_RULESETS
+    pce_url: str = ""  # the PCE these were found on: a schedule is created only on it (Codex review round 2)
+    org_id: str = ""
 
 
 def _actor(a: dict[str, Any], names: dict[str, str], lang: Language) -> str:
@@ -106,4 +108,4 @@ def search(ctx: AppContext, q: str) -> TargetSearch:
                                    enabled=bool(rule.get("enabled")),
                                    draft_pending=href in pending or rs["href"] in pending,
                                    scheduled=href in scheduled))
-    return TargetSearch(items=items, limited=len(active) > MAX_RULESETS)
+    return TargetSearch(items=items, limited=len(active) > MAX_RULESETS, pce_url=cfg.url, org_id=cfg.org_id)

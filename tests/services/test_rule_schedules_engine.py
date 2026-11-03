@@ -19,6 +19,7 @@ NOW = datetime(2026, 11, 2, 1, tzinfo=UTC)  # Monday 09:00 in Taipei
 RS = "/orgs/1/sec_policy/active/rule_sets/5"
 RULE = "/orgs/1/sec_policy/active/rule_sets/5/sec_rules/9"
 OTHER = "/orgs/1/sec_policy/active/rule_sets/6"
+PCE_A = ("https://pce.example.com:8443", "1")
 WINDOW = Weekly(days=("mon",), start="08:00", end="18:00", timezone="Asia/Taipei", action="enable_in_window")
 
 
@@ -185,31 +186,31 @@ def test_stops_when_pce_changes_mid_tick(ctx, monkeypatch):
 def test_create_refuses_draft_pending(ctx):
     _pce(href=RS, enabled=True, draft="update")
     with pytest.raises(rs.DraftPending):
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A)
 
 
 @responses.activate
 def test_create_refuses_unprovisioned_target(ctx):
     _pce(href=RS, active_status=404)
     with pytest.raises(rs.NotProvisioned):
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A)
 
 
 @responses.activate
 def test_create_writes_note_and_provisions(ctx):
     _pce(href=RS, enabled=True)
     view = rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin",
-                     now=NOW)
+                     now=NOW, pce=PCE_A)
     assert view.id and _puts() == [{"description": "keep\n[📅 Recurring: Mon 08:00-18:00 (Asia/Taipei) Enable in window]"}]
     with pytest.raises(rs.AlreadyScheduled):
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A)
 
 
 @responses.activate
 def test_create_pce_refusal_saves_nothing(ctx):
     _pce(href=RS, enabled=True, put=403)
     with pytest.raises(rs.PceRefused) as e:
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A)
     assert e.value.status == 403
     with ctx.db() as conn:
         assert store.list_for(conn, pce_url=ctx.settings.current().pce.url, org_id="1") == []
@@ -337,7 +338,72 @@ def test_concurrent_create_is_refused_cleanly(ctx):
     """P2: the target is claimed before the PCE is written, so a second create cannot change the note."""
     import sqlite3
     _pce(href=RS, enabled=True)
-    rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW)
+    rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW, pce=PCE_A)
     with pytest.raises(rs.AlreadyScheduled):
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW, pce=PCE_A)
     assert sqlite3  # the IntegrityError of a race is answered as AlreadyScheduled (rs.create)
+
+
+# ── Codex review round 2 ────────────────────────────────────────────────────
+
+@responses.activate
+def test_a_transport_failure_after_the_switch_puts_the_draft_back(ctx):
+    """P1: the dependency read failing in transport after the PUT left the change in the draft for good."""
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+    _add(ctx)
+    responses.add(responses.GET, API + pw.draft_href(RULE), json={"update_type": None, "enabled": False})
+    responses.add(responses.GET, API + pw.ruleset_of(RULE), json={"update_type": None})
+    responses.add(responses.GET, API + pw.active_href(RULE), json={"enabled": False})
+    responses.add(responses.PUT, API + pw.draft_href(RULE), status=204)
+    responses.add(responses.PUT, API + pw.draft_href(RULE), status=204)
+    responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"),
+                  body=RequestsConnectionError("down"))
+    r = rs.tick(ctx, now=NOW)
+    assert r.failed == 1 and _puts() == [{"enabled": True}, {"enabled": False}]
+
+
+@responses.activate
+def test_create_refused_provision_puts_the_description_back(ctx):
+    """P2: a refused provision left the note in the draft with no schedule behind it."""
+    _pce(href=RS, enabled=True, provision=403)
+    with pytest.raises(rs.PceRefused):
+        rs.create(ctx, href=RS, plan=WINDOW, name="B", ruleset_name="B", summary="", by="a", now=NOW,
+                  pce=("https://pce.example.com:8443", "1"))
+    assert _puts()[-1] == {"description": "keep [⏰ Expires: 2026-01-01 00:00]"}
+
+
+def test_create_refuses_a_target_from_another_pce(ctx):
+    """P1: a target picked while PCE A was set is not created on PCE B."""
+    with pytest.raises(rs.PceSwitched):
+        rs.create(ctx, href=RS, plan=WINDOW, name="B", ruleset_name="B", summary="", by="a", now=NOW,
+                  pce=("https://other.example:8443", "1"))
+
+
+@responses.activate
+def test_an_expiry_record_stays_with_its_pce(ctx, monkeypatch):
+    """P2: the run of a deleted schedule kept the PCE read at the end, not the one written."""
+    _add(ctx, plan=Expiry(expire_at=NOW - timedelta(minutes=1), timezone="Asia/Taipei"))
+    _pce(enabled=True)
+    real = rs._clear_note
+
+    def switch(*a, **kw):
+        out = real(*a, **kw)
+        ctx.settings.update(ctx.settings.current().revision, lambda d: d["pce"].update(url="https://b.example:8443"))
+        return out
+    monkeypatch.setattr(rs, "_clear_note", switch)
+    rs.tick(ctx, now=NOW)
+    with ctx.db() as conn:
+        runs = store.runs(conn, pce_url="https://pce.example.com:8443", org_id="1", limit=5)
+    assert [r["action"] for r in runs] == ["expire"]
+
+
+@responses.activate
+def test_skipped_now_clears_after_a_good_check(ctx):
+    _add(ctx)
+    _pce(enabled=True, draft="update")
+    rs.tick(ctx, now=NOW)
+    assert rs.schedules(ctx, now=NOW)[0].skipped_now == 1
+    responses.reset()
+    _pce(enabled=True)
+    rs.tick(ctx, now=NOW + timedelta(minutes=5))
+    assert rs.schedules(ctx, now=NOW + timedelta(minutes=5))[0].skipped_now == 0
