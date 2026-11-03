@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 from loguru import logger
 
+from illumio_ops.domain.conclusion import conclusion
 from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.report import ReportDocument
 from illumio_ops.domain.values import (
@@ -296,7 +297,8 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
                                            pce_label=row.pce_label))
         if fdb.generation != generation:
             raise _Fail("rpt_err_pce_switched")
-        doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id)})
+        doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id),
+                                     "conclusion": conclusion(doc, lambda key, p: translate(doc.lang, key, p))})
         files = _write(out_dir, doc, row.id, params.formats, tz)
         kpis = [{"key": k.key, "label": k.label, "value": k.value, "previous": k.previous} for k in doc.kpis]
     except Exception as exc:  # noqa: BLE001 - a report's failure is recorded on the report, never raised to the job

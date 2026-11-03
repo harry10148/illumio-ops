@@ -121,6 +121,7 @@ class ReportDocument(_Model):
     sections: tuple[Section, ...]
     gui_link: str | None = None
     export: RowsExport | None = None  # the JSON / CSV content, for types that make those formats
+    conclusion: str = ""  # the one opening sentence (domain/conclusion.py), filled by the generator
 
     @model_validator(mode="after")
     def _ids(self) -> ReportDocument:

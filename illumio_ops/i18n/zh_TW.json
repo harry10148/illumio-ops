@@ -2737,5 +2737,22 @@
   "migrate_rule_schedule_paused_utc": "規則排程「{name}」已遷移為暫停；5.x 用主機時區但讀不到，暫以 UTC 計，請在繼續前確認時區。",
   "migrate_rule_schedule_unreadable": "規則排程「{name}」無法讀取，未遷移：{why}",
   "migrate_rule_schedule_none": "5.x 沒有規則排程。",
-  "migrate_rule_scheduler_settings": "v6 每 5 分鐘檢查規則排程（不可設定）；排程本身遷移為暫停。"
+  "migrate_rule_scheduler_settings": "v6 每 5 分鐘檢查規則排程（不可設定）；排程本身遷移為暫停。",
+  "rpt_conclusion_lateral_posture": "可被觸及的重要資產 {assets_reachable} 項、樞紐主機 {pivots} 台、跨環境管理連線 {cross_env} 條；本期新偵測 {new_detections} 則。",
+  "rpt_conclusion_new_connections": "本期新出現的連線 {new} 條，其中管理 port {admin} 條、連入重要資產 {critical} 條、來自非受管來源 {unmanaged_source} 條。",
+  "rpt_conclusion_unmanaged_endpoints": "非受管位址 {total} 個（私有 {private}、公網 {public}），其中 {admin_sources} 個對受管主機使用管理 port。",
+  "rpt_conclusion_traffic": "流量 {flows} 筆、連線 {connections} 條，來源 {sources} 個、目的 {destinations} 個。",
+  "rpt_conclusion_security_risk": "分段成熟度 {maturity}／100；已強制的受管主機 {enforced_hosts_pct}；嚴重與高風險發現 {critical_high_findings} 項。",
+  "rpt_conclusion_network_inventory": "受管主機 {managed_hosts} 台，其中 {hosts_missing_labels} 台缺 Label；有流量進入的 app {apps} 個；跨環境連線 {cross_env_connections} 條。",
+  "rpt_conclusion_app_summary": "連入 {inbound_connections}、連出 {outbound_connections}、App 內 {intra_connections} 條連線；有規則允許的連線 {allowed_pct}。",
+  "rpt_conclusion_ven_status": "受管主機 {managed} 台：在線 {online}、失聯超過 48 小時 {long_offline}、狀態未收集 {status_unknown}；在線但政策同步有問題 {sync_problems} 台。",
+  "rpt_conclusion_audit": "事件 {total} 筆，嚴重與高風險 {high_risk} 筆；登入失敗 {auth_failed}、權限拒絕 {authz_denied}、政策 Provision {policy_provisions} 次。",
+  "rpt_conclusion_ransomware": "有勒索評等的主機 {rated_hosts} 台；優先修補的服務 {priority} 項、可直接封鎖的服務 {safe_to_block} 項。",
+  "rpt_conclusion_readiness": "評估 {apps} 個 app：可切換 {ready}、受阻 {held_back}；Draft 政策會擋下的連線 {predicted_blocked} 條。",
+  "rpt_conclusion_policy_usage": "規則 {rules} 條：有流量命中 {used}、沒有流量命中 {unused}、停用 {disabled}；沒有規則允許的連線 {no_rule} 條。",
+  "rpt_conclusion_rule_hit_count": "已 Provision 的啟用規則 {rules} 條：期間內有命中 {hit}、有紀錄但 0 次 {zero}、沒有紀錄 {no_record}。",
+  "rpt_conclusion_policy_diff": "Draft 有 {total} 項變更尚未 Provision：Ruleset {rule_sets}、規則 {rules}、政策物件 {objects}；其中 {high} 項為高風險。",
+  "rpt_conclusion_policy_resolver": "生效中的規則 {rules} 條（{rulesets} 個 Ruleset）展開為 {rows} 列；無法展開 {not_expanded} 條。",
+  "rpt_conclusion_custom": "自訂報表 {sections} 個章節，期間 {period}。",
+  "rpt_conclusion_incomplete": "{title}：{missing} 無法計算（{reasons}）。"
 }

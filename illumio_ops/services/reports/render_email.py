@@ -37,6 +37,9 @@ def _value(k: Kpi, lang: Language) -> str:
     return fmt_number(k.value) + ("%" if k.unit == "percent" else "")
 
 
+SUBJECT_MAX = 200
+
+
 def _e(value: object) -> str:
     return html.escape(str(value), quote=True)
 
@@ -48,10 +51,17 @@ def render_email(doc: ReportDocument, *, tz: tzinfo | None, note: str | None = N
     n = len(doc.findings)
     subject = tr(lang, "rpt_mail_subject", title=doc.title, period=period,
                  status=tr(lang, "rpt_mail_status_items", n=n) if n else tr(lang, "rpt_mail_status_none"))
+    if doc.conclusion:  # the one sentence the report opens with; the subject is the one place it may be cut
+        subject = f"{subject} — {doc.conclusion}"
+        if len(subject) > SUBJECT_MAX:
+            subject = subject[:SUBJECT_MAX - 1] + "…"
     link_text = (tr(lang, "rpt_mail_link", url=doc.gui_link) if doc.gui_link else tr(lang, "rpt_mail_no_link"))
     quality = "；".join(doc.data_quality) if lang is Language.ZH_TW else " ".join(doc.data_quality)
 
-    lines = [f"{doc.title}  {period}", f"PCE: {doc.pce_label}", "", tr(lang, "rpt_mail_kpis")]
+    lines = [f"{doc.title}  {period}", f"PCE: {doc.pce_label}", ""]
+    if doc.conclusion:
+        lines += [doc.conclusion, ""]
+    lines.append(tr(lang, "rpt_mail_kpis"))
     for k in doc.kpis[:4]:
         trend = kpi_trend(k, lang)
         extra = "; ".join(x for x in (trend, k.note or "") if x)

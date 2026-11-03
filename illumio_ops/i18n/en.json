@@ -2737,5 +2737,22 @@
   "migrate_rule_schedule_paused_utc": "Rule schedule \"{name}\" migrated paused; 5.x used the host's zone, which could not be read, so UTC is used — check the zone before resuming.",
   "migrate_rule_schedule_unreadable": "Rule schedule \"{name}\" could not be read and was not migrated: {why}",
   "migrate_rule_schedule_none": "5.x had no rule schedules.",
-  "migrate_rule_scheduler_settings": "v6 checks rule schedules every five minutes (not configurable); the schedules themselves are migrated paused."
+  "migrate_rule_scheduler_settings": "v6 checks rule schedules every five minutes (not configurable); the schedules themselves are migrated paused.",
+  "rpt_conclusion_lateral_posture": "{assets_reachable} critical assets reachable, {pivots} hub hosts, {cross_env} cross-environment management connections; {new_detections} new detections this period.",
+  "rpt_conclusion_new_connections": "{new} new connections this period: {admin} on management ports, {critical} into critical assets, {unmanaged_source} from unmanaged sources.",
+  "rpt_conclusion_unmanaged_endpoints": "{total} unmanaged addresses ({private} private, {public} public); {admin_sources} use management ports on managed hosts.",
+  "rpt_conclusion_traffic": "{flows} flow records and {connections} connections from {sources} sources to {destinations} destinations.",
+  "rpt_conclusion_security_risk": "Segmentation maturity {maturity}/100; {enforced_hosts_pct} of managed hosts enforced; {critical_high_findings} critical and high findings.",
+  "rpt_conclusion_network_inventory": "{managed_hosts} managed hosts, {hosts_missing_labels} missing labels; {apps} apps receive traffic; {cross_env_connections} cross-environment connections.",
+  "rpt_conclusion_app_summary": "{inbound_connections} inbound, {outbound_connections} outbound and {intra_connections} internal connections; {allowed_pct} allowed by a rule.",
+  "rpt_conclusion_ven_status": "{managed} managed hosts: {online} online, {long_offline} offline over 48 hours, {status_unknown} with no status collected; {sync_problems} online with policy sync problems.",
+  "rpt_conclusion_audit": "{total} events, {high_risk} critical or high; {auth_failed} failed sign-ins, {authz_denied} authorization denials, {policy_provisions} policy provisions.",
+  "rpt_conclusion_ransomware": "{rated_hosts} hosts with a ransomware rating; {priority} services to fix first, {safe_to_block} that can be blocked outright.",
+  "rpt_conclusion_readiness": "{apps} apps assessed: {ready} ready, {held_back} held back; the draft policy would block {predicted_blocked} connections.",
+  "rpt_conclusion_policy_usage": "{rules} rules: {used} hit by traffic, {unused} not hit, {disabled} disabled; {no_rule} connections with no rule allowing them.",
+  "rpt_conclusion_rule_hit_count": "{rules} provisioned enabled rules: {hit} hit in the period, {zero} recorded with 0 hits, {no_record} with no record.",
+  "rpt_conclusion_policy_diff": "The draft holds {total} changes not yet provisioned: {rule_sets} rulesets, {rules} rules, {objects} policy objects; {high} of them high risk.",
+  "rpt_conclusion_policy_resolver": "{rules} active rules ({rulesets} rulesets) expanded into {rows} rows; {not_expanded} could not be expanded.",
+  "rpt_conclusion_custom": "Custom report with {sections} sections, {period}.",
+  "rpt_conclusion_incomplete": "{title}: {missing} could not be computed ({reasons})."
 }
