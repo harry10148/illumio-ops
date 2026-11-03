@@ -40,6 +40,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports.generate import recover_running, run_queued
 from illumio_ops.services.reports.retention import run_report_retention
 from illumio_ops.services.reports.schedules import tick_schedules
+from illumio_ops.services.rule_schedules import tick as rule_schedule_tick
 from illumio_ops.services.siem.dispatch import run_siem
 from illumio_ops.settings.schema import Settings
 from illumio_ops.web.tls import ensure_self_signed
@@ -60,6 +61,9 @@ ALERTS_SYSTEM_SECONDS = 60
 ALERTS_DISPATCH_SECONDS = 60
 # Queued reports are picked up within this; one report per run, so a long one never piles up behind itself.
 REPORTS_RUN_SECONDS = 30
+# Rule schedules are checked every five minutes (5.x tick_rule_schedules); the first check a minute after start-up.
+RULE_SCHEDULES_SECONDS = 300
+RULE_SCHEDULES_FIRST_RUN_DELAY = timedelta(seconds=60)
 # Collectors wait a little after start-up so the listener and the first probe come first.
 COLLECTOR_FIRST_RUN_DELAY = timedelta(seconds=30)
 
@@ -84,6 +88,7 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "reports_run": REPORTS_RUN_SECONDS,
         "reports_retention": DAILY_SECONDS,
         "siem_dispatch": settings.siem.tick_seconds,
+        "rule_schedules_tick": RULE_SCHEDULES_SECONDS,
     }
 
 
@@ -136,6 +141,12 @@ def _tls_renew_job(ctx: AppContext) -> Callable[[], None]:
             # one it started with); the certificate page says so.
             ensure_self_signed(ctx.paths.tls_dir, tls)
     return renew
+
+
+def _rule_schedules_job(ctx: AppContext) -> Callable[[], None]:
+    def rule_schedules() -> None:
+        rule_schedule_tick(ctx)
+    return rule_schedules
 
 
 def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
@@ -223,6 +234,9 @@ def build_scheduler(ctx: AppContext) -> BackgroundScheduler:
                   coalesce=True, max_instances=1)
     sched.add_job(instrument("tls_renew_check", _tls_renew_job(ctx), ctx), "interval", id="tls_renew_check",
                   seconds=intervals["tls_renew_check"], coalesce=True, max_instances=1)
+    sched.add_job(instrument("rule_schedules_tick", _rule_schedules_job(ctx), ctx), "interval", id="rule_schedules_tick",
+                  seconds=intervals["rule_schedules_tick"], next_run_time=datetime.now(UTC) + RULE_SCHEDULES_FIRST_RUN_DELAY,
+                  coalesce=True, max_instances=1)
     first = datetime.now(UTC) + COLLECTOR_FIRST_RUN_DELAY
     for job_id, fn in _collector_jobs(ctx).items():
         sched.add_job(instrument(job_id, fn, ctx), "interval", id=job_id, seconds=intervals[job_id],

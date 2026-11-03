@@ -20,6 +20,8 @@ TABLE_OWNERS: dict[str, str] = {
     "report_schedule_state": "illumio_ops.store.reports",
     "quarantine_actions": "illumio_ops.store.quarantine_actions",
     "custom_reports": "illumio_ops.store.custom_reports",
+    "rule_schedules": "illumio_ops.store.rule_schedules",
+    "rule_schedule_runs": "illumio_ops.store.rule_schedules",
     "alert_id_floor": "illumio_ops.store.alerts",
     "siem_cursor": "illumio_ops.store.siem",
     "siem_dlq": "illumio_ops.store.siem",
