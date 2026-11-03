@@ -49,13 +49,21 @@ def test_set_fields_puts_the_draft(client):
 
 
 @responses.activate
-def test_provision_includes_dependencies(client):
+def test_provision_refuses_other_pending_objects(client):
+    """Security review: provisioning the PCE's dependencies would push someone's unreviewed draft (an edited IP list)."""
     responses.add(responses.POST, f"{API}/orgs/1/sec_policy/draft/dependencies",
                   json={"ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}],
                         "rule_sets": [{"href": pw.ruleset_of(RS)}]})
+    with pytest.raises(pw.DependenciesPending) as e:
+        pw.provision(client, pw.ruleset_of(RS), "illumio-ops rule schedule")
+    assert e.value.hrefs == ["/orgs/1/sec_policy/draft/ip_lists/7"]
+    assert not any(c.request.url.endswith("/sec_policy") for c in responses.calls)
+
+
+@responses.activate
+def test_provision_only_the_rule_set(client):
+    responses.add(responses.POST, f"{API}/orgs/1/sec_policy/draft/dependencies", json={})
     responses.add(responses.POST, f"{API}/orgs/1/sec_policy", status=201, json={})
     assert pw.provision(client, pw.ruleset_of(RS), "illumio-ops rule schedule").status == 201
     body = json.loads(responses.calls[1].request.body)
-    assert body["update_description"] == "illumio-ops rule schedule"
-    assert body["change_subset"] == {"rule_sets": [{"href": pw.ruleset_of(RS)}],
-                                     "ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}]}
+    assert body["change_subset"] == {"rule_sets": [{"href": pw.ruleset_of(RS)}]}

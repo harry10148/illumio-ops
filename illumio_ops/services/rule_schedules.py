@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal, cast
 
 from loguru import logger
 from pydantic import BaseModel, Field, TypeAdapter
@@ -41,7 +41,7 @@ DETAIL_MAX = 300
 PCE_ERRORS = (PceTransportError, PceBudgetExhausted, pw.PolicyReadError)
 
 PlanField = Annotated[Weekly | Expiry, Field(discriminator="kind")]
-_PLAN: TypeAdapter[Weekly | Expiry] = TypeAdapter(PlanField)
+_PLAN: TypeAdapter[Weekly | Expiry] = TypeAdapter(cast(Any, PlanField))
 
 
 class NoWriteKey(Exception):
@@ -152,11 +152,16 @@ def _checked(ctx: AppContext, row: sqlite3.Row, *, pce_status: str, live: str, a
 
 
 def _switch(client: PceClient, href: str, enabled: bool) -> PceResponse | None:
-    """Enable or disable on the draft and provision; None when done, else the PCE's refusing answer."""
+    """Enable or disable on the draft and provision; None when done, else the PCE's refusing answer. When the PCE
+    would need other unprovisioned objects to go live with it, the draft is put back and DependenciesPending raised."""
     r = pw.set_fields(client, href, {"enabled": enabled})
     if r.status != 204:
         return r
-    p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
+    try:
+        p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
+    except pw.DependenciesPending:
+        pw.set_fields(client, href, {"enabled": not enabled})
+        raise
     return None if p.status == 201 else p
 
 
@@ -168,7 +173,10 @@ def _clear_note(client: PceClient, href: str, draft: PceResponse) -> PceResponse
     r = pw.set_fields(client, href, {"description": clean})
     if r.status != 204:
         return r
-    p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
+    try:
+        p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
+    except pw.DependenciesPending:
+        return None  # cleared in the draft; provisioning it would take others' changes live
     return None if p.status == 201 else p
 
 
@@ -195,6 +203,17 @@ def _check_one(ctx: AppContext, client: PceClient, row: sqlite3.Row, at: datetim
             _run(ctx, row, href=href, name=name, at=at, action="skip_draft", result="skipped")
         return "skipped"
     want = desired(plan, at)
+    try:
+        return _apply(ctx, client, row, plan, draft, want, at)
+    except pw.DependenciesPending as dep:
+        _run(ctx, row, href=href, name=name, at=at, action="skip_draft", result="skipped",
+             detail="needs unprovisioned objects: " + ", ".join(dep.hrefs))
+        return "skipped"
+
+
+def _apply(ctx: AppContext, client: PceClient, row: sqlite3.Row, plan: Plan, draft: PceResponse,
+           want: bool | Literal["expired"], at: datetime) -> Outcome:
+    href, name = row["href"], row["name"]
     if want == "expired":
         refused = _switch(client, href, False)
         if refused is not None:
@@ -315,6 +334,7 @@ def _own(ctx: AppContext, schedule_id: int) -> sqlite3.Row:
 
 
 def _write_note(client: PceClient, href: str, plan: Plan) -> None:
+    """DraftPending (the description put back) when provisioning would take other unprovisioned objects live."""
     draft = pw.get_draft(client, href)
     if draft.status != 200:
         raise PceRefused(draft.status, _detail(draft))
@@ -322,7 +342,11 @@ def _write_note(client: PceClient, href: str, plan: Plan) -> None:
     r = pw.set_fields(client, href, {"description": with_note(desc, plan)})
     if r.status != 204:
         raise PceRefused(r.status, _detail(r))
-    p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
+    try:
+        p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
+    except pw.DependenciesPending:
+        pw.set_fields(client, href, {"description": desc})
+        raise DraftPending from None
     if p.status != 201:
         raise PceRefused(p.status, _detail(p))
 
@@ -418,10 +442,16 @@ def delete(ctx: AppContext, schedule_id: int, *, by: str, now: datetime | None =
                     elif pending:  # someone's change waits in that draft: leave provisioning to them
                         out = DeleteResult(note_cleared=True, provisioned=False, status=None, detail="draft_pending")
                     else:
-                        p = pw.provision(client, pw.ruleset_of(row["href"]), PROVISION_NOTE)
-                        out = DeleteResult(note_cleared=True, provisioned=p.status == 201,
-                                           status=None if p.status == 201 else p.status,
-                                           detail=None if p.status == 201 else _detail(p))
+                        try:
+                            p = pw.provision(client, pw.ruleset_of(row["href"]), PROVISION_NOTE)
+                        except pw.DependenciesPending as dep:  # cleared in the draft; leave provisioning to people
+                            out = DeleteResult(note_cleared=True, provisioned=False, status=None,
+                                               detail="needs unprovisioned objects: " + ", ".join(dep.hrefs))
+                            p = None
+                        if p is not None:
+                            out = DeleteResult(note_cleared=True, provisioned=p.status == 201,
+                                               status=None if p.status == 201 else p.status,
+                                               detail=None if p.status == 201 else _detail(p))
             except PCE_ERRORS as exc:
                 out = DeleteResult(note_cleared=False, provisioned=False, status=getattr(exc, "status", None),
                                    detail=f"{type(exc).__name__}: {exc}")

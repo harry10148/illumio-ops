@@ -39,14 +39,16 @@ def _add(ctx, href=RULE, plan=WINDOW, *, paused=False, pce_url=None):
     return sid
 
 
-def _pce(href=RULE, *, enabled=False, draft=None, parent_draft=None, active_status=200, put=204, provision=201):
+def _pce(href=RULE, *, enabled=False, draft=None, parent_draft=None, active_status=200, put=204, provision=201,
+         deps=None):
     responses.add(responses.GET, API + pw.draft_href(href), json={"update_type": draft, "description": "keep [⏰ Expires: 2026-01-01 00:00]"})
     if pw.draft_href(href) != pw.ruleset_of(href):
         responses.add(responses.GET, API + pw.ruleset_of(href), json={"update_type": parent_draft})
     responses.add(responses.GET, API + pw.active_href(href), status=active_status,
                   json={"enabled": enabled, "href": href} if active_status == 200 else {"error": "not found"})
     responses.add(responses.PUT, API + pw.draft_href(href), status=put, body="" if put == 204 else '{"token":"x"}')
-    responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"), json={})
+    responses.add(responses.POST, re.compile(re.escape(API) + r"/orgs/1/sec_policy/draft/dependencies"),
+                  json=deps or {})
     responses.add(responses.POST, API + "/orgs/1/sec_policy", status=provision, json={})
 
 
@@ -226,3 +228,18 @@ def test_delete_clears_note_even_when_draft_pending(ctx):
 def test_job_registered_every_300s(tmp_path):
     from illumio_ops.jobs.scheduler import job_intervals
     assert job_intervals(configured_ctx(tmp_path).settings.current())["rule_schedules_tick"] == 300
+
+
+@responses.activate
+def test_other_pending_objects_are_not_provisioned_and_the_switch_is_undone(ctx):
+    """Security review: a switch that would need someone's unprovisioned object provisioned is skipped, and the
+    draft is put back as it was."""
+    _add(ctx)
+    _pce(enabled=False, deps={"ip_lists": [{"href": "/orgs/1/sec_policy/draft/ip_lists/7"}]})
+    r = rs.tick(ctx, now=NOW)
+    assert r.skipped == 1 and r.switched == 0
+    assert _puts() == [{"enabled": True}, {"enabled": False}]
+    assert not any(c.request.url.endswith("/sec_policy") and c.request.method == "POST" for c in responses.calls)
+    with ctx.db() as conn:
+        [run] = store.runs(conn, pce_url=ctx.settings.current().pce.url, org_id="1", limit=5)
+    assert (run["action"], run["result"]) == ("skip_draft", "skipped") and "ip_lists/7" in run["detail"]

@@ -1,6 +1,8 @@
 """The PCE calls rule scheduling makes (UI redesign spec §4.5; 5.x api_client toggle_and_provision, has_draft_changes,
 update_rule_note, provision_changes). Hrefs are the PCE's own (/orgs/<n>/sec_policy/...), so calls are not
-org-scoped again. Writes go to the draft and are provisioned with the dependencies the PCE names."""
+org-scoped again. Writes go to the draft, and only the rule set is provisioned: when the PCE says the change needs
+other objects provisioned with it, nothing is provisioned — 5.x added them to the change, which would push someone
+else's unreviewed draft (an edited IP list) live (security review 2026-11-03)."""
 from __future__ import annotations
 
 from typing import Any
@@ -10,6 +12,14 @@ from illumio_ops.pce.client import PceClient, PceResponse
 DEPENDENCY_TYPES = ("rule_sets", "ip_lists", "services", "label_groups", "virtual_services", "firewall_settings",
                     "enforcement_boundaries", "virtual_servers", "secure_connect_gateways")
 TIMEOUT = 30
+
+
+class DependenciesPending(Exception):
+    """Provisioning the rule set would need these other draft objects provisioned too."""
+
+    def __init__(self, hrefs: list[str]) -> None:
+        super().__init__(", ".join(hrefs))
+        self.hrefs = hrefs
 
 
 class PolicyReadError(Exception):
@@ -65,18 +75,18 @@ def set_fields(client: PceClient, href: str, fields: dict[str, Any]) -> PceRespo
 
 
 def provision(client: PceClient, ruleset_href: str, description: str) -> PceResponse:
-    """Provision a rule set with what it depends on; 201 when done."""
+    """Provision the rule set alone; 201 when done. DependenciesPending (nothing provisioned) when the PCE names other
+    objects that would have to go live with it."""
     org = ruleset_href.split("/")[2]
-    subset: dict[str, list[dict[str, str]]] = {"rule_sets": [{"href": ruleset_href}]}
     deps = client.request("POST", f"/orgs/{org}/sec_policy/draft/dependencies", org_scoped=False, timeout=TIMEOUT,
                           json={"change_subset": {"rule_sets": [{"href": ruleset_href}]}})
-    if deps.status == 200 and deps.body:
-        found = deps.json() or {}
-        for kind in DEPENDENCY_TYPES:
-            have = {x["href"] for x in subset.get(kind, [])}
-            for item in found.get(kind) or []:
-                if item.get("href") and item["href"] not in have:
-                    subset.setdefault(kind, []).append({"href": item["href"]})
-                    have.add(item["href"])
+    if deps.status != 200:
+        return deps
+    found = (deps.json() or {}) if deps.body else {}
+    others = [item["href"] for kind in DEPENDENCY_TYPES for item in found.get(kind) or []
+              if item.get("href") and item["href"] != ruleset_href]
+    if others:
+        raise DependenciesPending(others)
     return client.request("POST", f"/orgs/{org}/sec_policy", org_scoped=False, timeout=TIMEOUT,
-                          json={"update_description": description, "change_subset": subset})
+                          json={"update_description": description,
+                                "change_subset": {"rule_sets": [{"href": ruleset_href}]}})
