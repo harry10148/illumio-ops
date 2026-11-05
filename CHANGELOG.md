@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [6.1.2] - unreleased
+## [6.1.2] - 2026-11-05
 
 ### Fixed
 - Policy resolver: rules whose sides resolve to no address (a label no host carries, a scope with no hosts) are
