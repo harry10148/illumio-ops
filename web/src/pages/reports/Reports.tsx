@@ -137,7 +137,7 @@ function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: 
               </div>
               <div className="row">
                 {e.mode === "on_demand"
-                  ? <Tag tone="ok" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</Tag>
+                  ? <Tag tone="muted" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</Tag>
                   : <ModeMark needs="basic" />}
                 <span className="hint" data-role="rpt-counts">
                   {t("rpt_card_counts", { schedules: String(e.schedules), copies: String(e.copies) })}

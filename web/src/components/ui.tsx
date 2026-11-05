@@ -40,7 +40,7 @@ export function SeverityTag({ severity }: { severity: string }) {
 export function ModeMark({ needs }: { needs: "advanced" | "basic" }) {
   return needs === "advanced"
     ? <Tag tone="adv">◆ {t("mode_advanced")}</Tag>
-    : <Tag tone="ok">● {t("mode_basic")}</Tag>;
+    : <Tag tone="muted">● {t("mode_basic")}</Tag>;
 }
 
 /** What basic mode leaves out, said where the missing thing would be — never an empty panel. */

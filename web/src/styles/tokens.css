@@ -3,9 +3,11 @@
 
    · Light only: no theme switch, no dark values (spec §2 non-goal).
    · Colour carries severity and state only, and never alone (a word goes with it).
-   · Times, numbers, host and program names are set in JetBrains Mono, bundled with the
-     frontend (no request leaves the server). Chinese uses the system font: a Chinese web
-     font is several MB and the emailed report HTML could not embed one either.
+   · 5.x Direction D look: warm paper, hairlines, no shadows; Illumio orange marks actions and
+     the current place only. Titles and numerals are set in Montserrat; times, host and program
+     names in JetBrains Mono. Both are bundled with the frontend (no request leaves the server).
+     Chinese uses the system font: a Chinese web font is several MB and the emailed report HTML
+     could not embed one either.
 
    CONTRACT (components may use ONLY tokens declared here):
      --tone-{ok,warn,crit,high,med,low,accum,adv,info,neutral}-{bg,fg,border}
@@ -14,17 +16,26 @@
    --chrome*, --track, --overlay, --shadow-{1,2}, --fs-*, --row-h, --ctl-h, --chrome-h, --nav-w, --lead.
    ============================================================================ */
 
+@font-face {
+  font-family: "Montserrat";
+  src: url("./fonts/Montserrat-VF.woff2") format("woff2-variations"), url("./fonts/Montserrat-VF.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
 
+  /* 5.x Direction D: Montserrat sets titles and numerals; Chinese falls through to the system font. */
   --font-ui: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", system-ui, sans-serif;
-  --font-display: var(--font-ui);
+  --font-display: "Montserrat", var(--font-ui);
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
-  --font-num: var(--font-mono);
+  --font-num: "Montserrat", var(--font-ui);
 
-  --radius-s: 3px;
-  --radius-m: 4px;
-  --radius-l: 6px;
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 8px;
 
   --space-1: 2px;
   --space-2: 4px;
@@ -32,79 +43,82 @@
   --space-4: 8px;
   --space-5: 12px;
   --space-6: 16px;
-  --space-7: 20px;
-  --space-8: 28px;
+  --space-7: 24px;
+  --space-8: 32px;
 
   --fs-micro: 11px;
   --fs-mini: 12px;
   --fs-body: 13px;
-  --fs-ui: 13px;
-  --fs-lead: 18px;
-  --fs-num: 18px;
-  --fs-display: 28px;
+  --fs-ui: 14px;
+  --fs-lead: 17px;
+  --fs-num: 22px;
+  --fs-title: 26px;
+  --fs-display: 32px;
   --lead: 1.5;
 
-  --row-h: 36px;
-  --ctl-h: 32px;
-  --chrome-h: 52px;
-  --nav-w: 200px;
+  --row-h: 40px;
+  --ctl-h: 34px;
+  --chrome-h: 60px;
+  --nav-w: 212px;
 
-  /* surfaces and text */
+  /* paper: white surfaces, warm hairlines; the warm tint marks hover, the current place and empty states */
   --surface-0: #FFFFFF;
   --surface-1: #FFFFFF;
-  --surface-2: #F4F6F8;
-  --surface-hover: #F3F4F6;
-  --surface-active: #E8EEF7;
+  --surface-2: #F7F4EE;
+  --surface-hover: #F7F4EE;
+  --surface-active: #F3EEE4;
 
-  --text-1: #111827;
-  --text-2: #374151;
-  --text-3: #4B5563;
+  --text-1: #313638;
+  --text-2: #5B6164;
+  --text-3: #646B6E;  /* 4.5:1 on the warm hover and selected rows too */
 
-  --line: #E5E7EB;
-  --line-soft: #F0F2F5;
-  --line-strong: #CBD5E1;
-  --track: #E5E7EB;
+  --line: #E6E2DA;
+  --line-soft: #F0EDE6;
+  --line-strong: #D9D3C7;
+  --track: #EEEAE2;
 
-  /* the one action colour; destructive actions use the crit tone as a border */
-  --accent: #2563EB;
-  --accent-fg: #2563EB;
+  /* Illumio orange is for actions and the current place only. Filled controls use the deeper
+     #C24300 (white on it 5.1:1); #FF5500 is a mark, never under text. */
+  --accent: #FF5500;
+  --accent-fg: #C24300;
+  --accent-fg-hover: #A83A00;
   --accent-on: #FFFFFF;
-  --accent-text: #1D4ED8;
-  --brand-deep: #1D4ED8;
+  --accent-text: #BA4000;  /* links: 4.5:1 on white, the warm rows and the tinted notices */
+  --brand-deep: #2D454C;
 
   --chrome: #FFFFFF;
-  --chrome-edge: #E5E7EB;
-  --chrome-text-1: #111827;
-  --chrome-text-2: #4B5563;
-  --chrome-text-3: #6B7280;
+  --chrome-edge: #E6E2DA;
+  --chrome-text-1: #313638;
+  --chrome-text-2: #5B6164;
+  --chrome-text-3: #646B6E;
 
-  --overlay: rgba(17, 24, 39, .32);
-  --shadow-1: 0 1px 2px rgba(17, 24, 39, .06);
-  --shadow-2: 0 10px 30px rgba(17, 24, 39, .12);
+  --overlay: rgba(49, 54, 56, .38);
+  --shadow-1: none;
+  --shadow-2: 0 12px 32px rgba(49, 54, 56, .16);
 
-  /* severity (spec §7): text colours pass 4.5:1 on white and on their own fill */
-  --tone-crit-border: #FCA5A5;
-  --tone-crit-bg: #FEF2F2;
-  --tone-crit-fg: #B91C1C;
-  --tone-high-border: #FDBA74;
-  --tone-high-bg: #FFF7ED;
-  --tone-high-fg: #C2410C;
-  --tone-med-border: #FCD34D;
-  --tone-med-bg: #FEFCE8;
-  --tone-med-fg: #A16207;
-  --tone-low-border: #CBD5E1;
-  --tone-low-bg: #F8FAFC;
-  --tone-low-fg: #4B5563;
+  /* severity: text colours pass 4.5:1 on white and on their own fill */
+  --tone-crit-border: #BE122F;
+  --tone-crit-bg: #F9E6E9;
+  --tone-crit-fg: #BE122F;
+  --tone-high-border: #E8762E;
+  --tone-high-bg: #FDEEE4;
+  --tone-high-fg: #A63A08;
+  --tone-med-border: #FFA22F;
+  --tone-med-bg: #FFF3E0;
+  --tone-med-fg: #8A5600;
+  --tone-low-border: #9AA3A6;
+  --tone-low-bg: #F1F0EC;
+  --tone-low-fg: #5B6164;
   /* states */
-  --tone-ok-border: #86EFAC;
-  --tone-ok-bg: #F0FDF4;
-  --tone-ok-fg: #15803D;
-  --tone-accum-border: #93C5FD;
-  --tone-accum-bg: #EFF6FF;
-  --tone-accum-fg: #1D4ED8;
-  --tone-adv-border: #C4B5FD;
-  --tone-adv-bg: #F5F3FF;
-  --tone-adv-fg: #6D28D9;
+  --tone-ok-border: #166644;
+  --tone-ok-bg: #E7F1EC;
+  --tone-ok-fg: #166644;
+  --tone-accum-border: #2D454C;
+  --tone-accum-bg: #E5F2F9;
+  --tone-accum-fg: #2D454C;
+  --tone-adv-border: #7A5AA6;
+  --tone-adv-bg: #F2EEF7;
+  --tone-adv-fg: #5E3F8A;
   /* older names the pages still use: warn reads as high, info as accumulating */
   --tone-warn-border: var(--tone-high-border);
   --tone-warn-bg: var(--tone-high-bg);
@@ -112,9 +126,9 @@
   --tone-info-border: var(--tone-accum-border);
   --tone-info-bg: var(--tone-accum-bg);
   --tone-info-fg: var(--tone-accum-fg);
-  --tone-neutral-border: #CBD5E1;
-  --tone-neutral-bg: #F3F4F6;
-  --tone-neutral-fg: #4B5563;
+  --tone-neutral-border: #9AA3A6;
+  --tone-neutral-bg: #F1F0EC;
+  --tone-neutral-fg: #5B6164;
 }
 
 /* Tone carrier: any element with data-tone exposes --mark / --ink / --fill so components never name a tone. */

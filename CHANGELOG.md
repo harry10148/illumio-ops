@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.2.0] - 2026-11-05
+
+### Changed
+- The console takes the 5.x look (Direction D) without changing a page, a menu or a word: warm white paper with
+  hairlines and no shadows; Illumio orange only on actions, links and the current place (an orange rule beside the
+  current menu item and under the current tab); page titles and numbers in Montserrat, bundled with the frontend
+  (no request leaves the server; its OFL licence sits beside the font); severity and state colours from the 5.x set.
+- KPI tiles read as one strip: an eyebrow with the tone's square, the number, the tone as a rule along the bottom.
+- Section names in panels and cards are small spaced eyebrows; notices are a rule on the left instead of a box.
+- The investigate page's 流量／事件 and 明細／排名 switches are segmented controls, not two filled buttons; basic mode
+  and the on-demand report mark are neutral grey instead of the green used for "OK".
+- Secondary text and links are a shade darker so they keep 4.5:1 on the warm hover and selected rows.
+
 ## [6.1.2] - 2026-11-05
 
 ### Fixed

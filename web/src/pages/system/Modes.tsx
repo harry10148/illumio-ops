@@ -23,7 +23,7 @@ function ModeCard({ mode, current }: { mode: "basic" | "advanced"; current: bool
   return (
     <div className="mode-card" data-mode={mode} data-current={current || undefined}>
       <div className="row">
-        <Tag tone={basic ? "ok" : "adv"}>{basic ? `● ${t("mode_basic")}` : `◆ ${t("mode_advanced")}`}</Tag>
+        <Tag tone={basic ? "muted" : "adv"}>{basic ? `● ${t("mode_basic")}` : `◆ ${t("mode_advanced")}`}</Tag>
         {current && <Tag tone="accum">{t("modes_current")}</Tag>}
       </div>
       <p>{t(basic ? "modes_basic_does" : "modes_advanced_does")}</p>

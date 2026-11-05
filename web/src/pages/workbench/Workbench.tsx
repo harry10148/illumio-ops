@@ -360,11 +360,11 @@ export function Workbench() {
       {alertId && <p><Link to={`/alerts/${alertId}`} data-role="back-to-alert">{t("wb_back_to_alert", { id: alertId })}</Link></p>}
       <div className="page-head">
         <h1>{t("nav_workbench")}</h1>
-        <div className="row" role="group" aria-label={t("wb_mode")}>
-          <button type="button" className={req.mode === "flows" ? "btn-primary" : "btn-quiet"} onClick={() => switchMode("flows")}>
+        <div className="chips-row" role="group" aria-label={t("wb_mode")}>
+          <button type="button" className="chip-btn" aria-pressed={req.mode === "flows"} onClick={() => switchMode("flows")}>
             {t("wb_mode_flows")}
           </button>
-          <button type="button" className={req.mode === "events" ? "btn-primary" : "btn-quiet"} onClick={() => switchMode("events")}>
+          <button type="button" className="chip-btn" aria-pressed={req.mode === "events"} onClick={() => switchMode("events")}>
             {t("wb_mode_events")}
           </button>
         </div>
@@ -418,10 +418,10 @@ export function Workbench() {
         </aside>
         <div className="wb-main card stack">
           <div className="row">
-            <div className="row" role="tablist">
+            <div className="chips-row" role="tablist">
               {(["detail", "ranking"] as const).map((v) => (
                 <button key={v} type="button" role="tab" aria-selected={req.view === v}
-                  className={req.view === v ? "btn-primary" : "btn-quiet"}
+                  className="chip-btn"
                   onClick={() => update(v === "ranking"
                     ? { view: v, group_by: (req.group_by?.length ? req.group_by : [{ dimension: groupDims[0] }]) as Req["group_by"] }
                     : { view: v, group_by: [] })}>

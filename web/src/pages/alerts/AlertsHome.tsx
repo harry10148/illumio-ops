@@ -161,7 +161,7 @@ export function AlertsHome() {
       </PageHead>
       {basic && (
         <div className="needs-advanced" data-role="basic-mode-box">
-          <p><Tag tone="ok">● {t("mode_basic")}</Tag> {t("home_basic_now")}</p>
+          <p><Tag tone="muted">● {t("mode_basic")}</Tag> {t("home_basic_now")}</p>
           <p><Tag tone="adv">◆ {t("mode_advanced")}</Tag> {t("home_basic_advanced_adds")}</p>
           <p className="hint">{t("home_basic_investigate")}</p>
           <Link to="/system/collection">{t("needs_advanced_link")}</Link>
