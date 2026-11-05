@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [6.2.0] - 2026-11-05
+## [6.2.0] - 2026-11-06
 
 ### Changed
 - The console takes the 5.x look (Direction D) without changing a page, a menu or a word: warm white paper with
