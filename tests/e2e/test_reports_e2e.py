@@ -226,7 +226,7 @@ def test_recent_shows_conclusion(context, live_app):
     page = context.new_page()
     _reports(page, live_app.url)
     cell = page.locator("[data-role=report-list] [data-role=report-conclusion]").first
-    expect(cell).to_contain_text("unmanaged addresses")
+    expect(cell).to_contain_text("Unmanaged addresses:")
 
 
 def test_schedules_tab_holds_the_settings(context, live_app):

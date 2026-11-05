@@ -22,7 +22,7 @@ ROW = {"ruleset_name": "Web", "rule_href": "/r/1", "action": "allow", "src_ip": 
 
 def _resolved(**kw):
     base = {"rows": [ROW], "per_ruleset": {"Web": 1}, "rule_count": 1, "rules_capped": 0, "truncated_rulesets": [],
-            "rows_omitted": 0, "not_expanded": [], "computed_at": NOW}
+            "rows_omitted": 0, "not_expanded": [], "rules_no_address": 0, "computed_at": NOW}
     return Resolved(**{**base, **kw})
 
 
@@ -80,3 +80,16 @@ def test_top_level_flag_counts_summarized_and_not_expanded(ctx, monkeypatch):
     doc = _build(ctx)
     assert doc.export.meta["truncated"] is True and doc.export.meta["rules_not_expanded"] == 1
     assert {k.key: k.value for k in doc.kpis}["not_expanded"] == 1 and doc.findings
+
+
+@pytest.mark.parametrize(("lang", "words"), [(Language.ZH_TW, "解析不到位址 2 條"), (Language.EN, "resolving to no address: 2")])
+def test_rules_without_addresses_are_in_the_sentence_and_the_files(ctx, monkeypatch, lang, words):
+    """lab .106 2026-11-03: "2 rules in force expanded into 0 rows; 0 could not be expanded" — the reader needs the
+    number that makes it add up."""
+    monkeypatch.setattr(report, "resolve", lambda ctx, **kw: _resolved(rows=[], per_ruleset={}, rule_count=2,
+                                                                       rules_no_address=2))
+    doc = _build(ctx, lang)
+    assert {k.key: k.value for k in doc.kpis}["no_address"] == 2 and doc.export.meta["rules_no_address"] == 2
+    from illumio_ops.domain.conclusion import conclusion
+    from illumio_ops.i18n import translate
+    assert words in conclusion(doc, lambda key, params: translate(lang, key, params))

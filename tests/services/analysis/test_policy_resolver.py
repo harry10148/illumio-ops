@@ -61,3 +61,18 @@ def test_not_expanded_rule_disclosed(ctx, monkeypatch):
     r = policy_resolver.resolve(ctx)
     assert r.not_expanded == [("Web", f"{A}/rule_sets/1/sec_rules/1", "virtual_services")]
     assert r.rows[-1]["truncated"] == "not_expanded" and "virtual_services" in r.rows[-1]["src_ip"]
+
+
+def test_a_rule_resolving_to_no_address_is_counted(ctx, monkeypatch):
+    """lab .106 2026-11-03: two rules in force, 0 rows and "0 not expanded" — the rules' labels held no host. They are
+    counted, with no row: there is nothing for a firewall to import."""
+    empty = "/orgs/1/labels/9"
+    rs = [{**SETS[0], "rules": [*SETS[0]["rules"], {**SETS[0]["rules"][0], "href": f"{A}/rule_sets/1/sec_rules/2",
+                                                     "providers": [{"label": {"href": empty}}]}]}]
+    monkeypatch.setattr(policy_resolver, "fetch_rule_sets", lambda client, pversion, *, deadline: rs)
+    monkeypatch.setattr(policy_resolver, "get_all", lambda client, path, *, params, deadline:
+                        WORKLOADS if path == "/workloads" else
+                        [{"href": WEB, "key": "role"}, {"href": DB, "key": "role"}, {"href": empty, "key": "app"}])
+    r = policy_resolver.resolve(ctx)
+    assert r.rule_count == 2 and r.rules_no_address == 1 and r.per_ruleset == {"Web": 2}
+    assert not any(x.get("truncated") for x in r.rows)

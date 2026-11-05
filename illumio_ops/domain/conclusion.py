@@ -44,7 +44,7 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.POLICY_USAGE: ("rules", "used", "unused", "disabled", "no_rule"),
     ReportType.RULE_HIT_COUNT: ("rules", "hit", "zero", "no_record"),
     ReportType.POLICY_DIFF: ("total", "rule_sets", "rules", "objects", "high"),
-    ReportType.POLICY_RESOLVER: ("rules", "rulesets", "rows", "not_expanded"),
+    ReportType.POLICY_RESOLVER: ("rules", "rulesets", "rows", "not_expanded", "no_address"),
     ReportType.CUSTOM: ("sections", "period"),
 }
 

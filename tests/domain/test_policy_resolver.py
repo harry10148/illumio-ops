@@ -621,7 +621,7 @@ def L(h, **kw):
 
 def test_labels_of_different_keys_are_anded():
     """Review #1: role=Web and env=Prod is Web ∩ Prod, not Web ∪ Prod; same key stays OR."""
-    rows, _, _ = _strict(_ruleset([_rule([L("/l/web"), L("/l/prod")], [L("/l/db"), L("/l/web")])]))
+    rows, _, _, _ = _strict(_ruleset([_rule([L("/l/web"), L("/l/prod")], [L("/l/db"), L("/l/web")])]))
     assert {r["src_ip"] for r in rows} == {"10.0.0.1"}
     assert {r["dst_ip"] for r in rows} == {"10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"}
 
@@ -629,7 +629,7 @@ def test_labels_of_different_keys_are_anded():
 def test_each_scope_expanded_on_its_own():
     """Review #2: Prod and Dev scopes with All Workloads → All Workloads: no Prod → Dev rows."""
     rs = _ruleset([_rule([{"actors": "ams"}], [{"actors": "ams"}])], scopes=[[L("/l/prod")], [L("/l/dev")]])
-    rows, _, _ = _strict(rs)
+    rows, _, _, _ = _strict(rs)
     pairs = {(r["src_ip"], r["dst_ip"]) for r in rows}
     prod, dev = {"10.0.0.1", "10.0.0.3"}, {"10.0.0.2", "10.0.0.4"}
     assert pairs == {(a, b) for s in (prod, dev) for a in s for b in s}
@@ -640,7 +640,7 @@ def test_explicit_workload_actor_scoped():
     rs = _ruleset([_rule([{"ip_list": {"href": "/ipl/x"}}], [{"workload": {"href": "/wl/2"}},
                                                                {"workload": {"href": "/wl/1"}}])],
                   scopes=[[L("/l/prod")]])
-    rows, _, _ = _strict(rs)
+    rows, _, _, _ = _strict(rs)
     assert {r["dst_ip"] for r in rows} == {"10.0.0.1"}
 
 
@@ -648,32 +648,50 @@ def test_virtual_service_rule_not_expanded():
     """Review #4: providers resolved as virtual services take their services from the virtual service: not ANY."""
     rs = _ruleset([_rule([L("/l/web")], [L("/l/db")], ingress_services=[],
                          resolve_labels_as={"providers": ["virtual_services"], "consumers": ["workloads"]})])
-    rows, _, issues = _strict(rs)
+    rows, _, issues, _ = _strict(rs)
     assert rows == [] and issues == [("/r/1", "virtual_services")]
 
 
 def test_unknown_reference_disclosed_not_dropped():
     """Review #5: an unknown include or exclusion is disclosed; an unknown exclusion never yields the full set."""
-    rows, _, issues = _strict(_ruleset([_rule([{"actors": "ams"}, {"ip_list": {"href": "/ipl/gone"}, "exclusion": True}],
+    rows, _, issues, _ = _strict(_ruleset([_rule([{"actors": "ams"}, {"ip_list": {"href": "/ipl/gone"}, "exclusion": True}],
                                               [L("/l/db")])]))
     assert rows == [] and issues == [("/r/1", "unknown_reference")]
-    rows2, _, issues2 = _strict(_ruleset([_rule([L("/l/nope")], [L("/l/db")])]))
+    rows2, _, issues2, _ = _strict(_ruleset([_rule([L("/l/nope")], [L("/l/db")])]))
     assert rows2 == [] and issues2 == [("/r/1", "unknown_reference")]
 
 
 def test_known_but_empty_is_not_an_issue():
     keys = {**KEYS, "/l/empty": "app"}
-    rows, _, issues = resolve_ruleset_within(
+    rows, _, issues, no_address = resolve_ruleset_within(
         _ruleset([_rule([L("/l/empty")], [L("/l/db")])]), limit=None, label_to_ips=L2IP, iplist_to_cidrs={},
         label_group_to_labels={}, workload_to_ips=W2IP, label_keys=keys, known={**KNOWN, "label": set(keys)})
     assert rows == [] and issues == []
+    assert no_address == ["/r/1"]  # lab .106 2026-11-03: "2 rules expanded into 0 rows; 0 not expanded" read as a contradiction
+
+
+def test_a_rule_with_addresses_in_one_scope_is_not_counted_as_without():
+    """Each scope is expanded on its own: a rule empty in Dev but not in Prod has addresses."""
+    keys = {**KEYS, "/l/qa": "env"}
+    rs = _ruleset([_rule([{"actors": "ams"}], [{"actors": "ams"}])], scopes=[[L("/l/prod")], [L("/l/qa")]])
+    rows, _, _, no_address = resolve_ruleset_within(
+        rs, limit=None, label_to_ips=L2IP, iplist_to_cidrs={}, label_group_to_labels={}, workload_to_ips=W2IP,
+        label_keys=keys, known={**KNOWN, "label": set(keys)})
+    assert rows and no_address == []
+
+
+def test_a_rule_left_out_at_the_row_limit_is_not_counted_as_without_addresses():
+    rows, omitted, _, no_address = resolve_ruleset_within(
+        _ruleset([_rule([L("/l/web")], [L("/l/db")])]), limit=0, label_to_ips=L2IP, iplist_to_cidrs={},
+        label_group_to_labels={}, workload_to_ips=W2IP, label_keys=KEYS, known=KNOWN)
+    assert rows == [] and omitted == 4 and no_address == []
 
 
 def test_workload_subnets_used_when_asked():
     """Review #6: use_workload_subnets on the provider side gives the interface's network, not its address."""
     rs = _ruleset([_rule([{"ip_list": {"href": "/ipl/x"}}], [{"workload": {"href": "/wl/1"}}],
                          use_workload_subnets=["providers"])])
-    rows, _, _ = _strict(rs, ip_to_subnet={"10.0.0.1": "10.0.0.0/24"})
+    rows, _, _, _ = _strict(rs, ip_to_subnet={"10.0.0.1": "10.0.0.0/24"})
     assert {r["dst_ip"] for r in rows} == {"10.0.0.0/24"}
 
 

@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [6.1.1] - unreleased
+## [6.1.2] - unreleased
+
+### Fixed
+- Policy resolver: rules whose sides resolve to no address (a label no host carries, a scope with no hosts) are
+  counted — tile, opening sentence and the JSON/CSV `rules_no_address` — so "2 rules in force expanded into 0 rows;
+  0 not expanded" no longer reads as a contradiction. They still add no rows.
+- English opening sentences read "label: number", so a count of 1 is never "1 rules".
+- Chinese reports count the PCE's connection counts added up in 「次」 (traffic, app summary, network inventory,
+  readiness, policy usage; tiles and table columns 「連線次數」) and keep 「條」 for distinct connections (new
+  connections), which had read as the same figure.
+- A section's intro is the size of the paragraphs after it (the "how to read" sections showed two sizes).
+
+## [6.1.1] - 2026-11-03
 
 ### Fixed
 - Rule scheduling could not create a schedule on a real PCE (found in the lab acceptance on PCE 26.2): the dependency

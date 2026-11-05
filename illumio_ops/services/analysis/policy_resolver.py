@@ -40,6 +40,7 @@ class Resolved(BaseModel):
     truncated_rulesets: list[str]
     rows_omitted: int
     not_expanded: list[tuple[str, str, str]]  # (ruleset, rule href, reason): disclosed, never dropped or widened
+    rules_no_address: int  # rules whose sides resolve to no address (no host carries their labels): no rows
     computed_at: datetime
 
 
@@ -82,15 +83,17 @@ def resolve(ctx: AppContext, *, now: datetime | None = None) -> Resolved:
     rule_count = 0
     capped: set[str] = set()
     not_expanded: list[tuple[str, str, str]] = []
+    no_address = 0
     for rs in rule_sets:
         name = str(rs.get("name") or rs.get("href") or "ruleset")
         if rs.get("enabled", True):
             rule_count += sum(1 for r in [*(rs.get("rules") or []), *(rs.get("deny_rules") or [])]
                               if isinstance(r, dict) and r.get("enabled", True))
-        kept, left_out, issues = resolve_ruleset_within(rs, limit=max(MAX_TOTAL_ROWS - sum(per.values()), 0),
+        kept, left_out, issues, empty = resolve_ruleset_within(rs, limit=max(MAX_TOTAL_ROWS - sum(per.values()), 0),
                                                         **lookups)
         capped.update(r["rule_href"] for r in kept if r.get("truncated"))
         per[name] = per.get(name, 0) + len(kept)
+        no_address += len(empty)
         rows.extend(kept)
         for rule, reason in issues:
             not_expanded.append((name, rule, reason))
@@ -100,4 +103,4 @@ def resolve(ctx: AppContext, *, now: datetime | None = None) -> Resolved:
             truncated.append(name)
             rows.append(_notice(name, left_out))
     return Resolved(rows=rows, per_ruleset=per, rule_count=rule_count, rules_capped=len(capped),
-                    truncated_rulesets=truncated, rows_omitted=omitted, not_expanded=not_expanded, computed_at=at)
+                    truncated_rulesets=truncated, rows_omitted=omitted, not_expanded=not_expanded, rules_no_address=no_address, computed_at=at)

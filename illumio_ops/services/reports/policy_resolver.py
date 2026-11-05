@@ -35,7 +35,8 @@ COLUMN_GUIDE = ("ruleset_name, rule_href, action (allow / deny / override_deny),
                 "that side is a summary; total_row_cap: rows left out; not_expanded: the rule could not be expanded)")
 BROAD_EXAMPLE = "All Workloads → All Workloads"
 _KPI_KEYS = {"rulesets": "rpt_prs_kpi_rulesets", "rules": "rpt_prs_kpi_rules", "rows": "rpt_prs_kpi_rows",
-             "capped": "rpt_prs_kpi_capped", "omitted": "rpt_prs_kpi_omitted", "not_expanded": "rpt_prs_kpi_not_expanded"}
+             "capped": "rpt_prs_kpi_capped", "omitted": "rpt_prs_kpi_omitted", "not_expanded": "rpt_prs_kpi_not_expanded",
+             "no_address": "rpt_prs_kpi_no_address"}
 
 
 def build_policy_resolver(inp: BuildInput) -> ReportDocument:
@@ -51,9 +52,9 @@ def build_policy_resolver(inp: BuildInput) -> ReportDocument:
         raise ReportFailed("rpt_prs_err_read", f"{type(exc).__name__}: {exc}"[:200]) from exc
     kept = len(r.rows) - len(r.truncated_rulesets) - len(r.not_expanded)  # notice rows are not policy rows
     values = {"rulesets": len(r.per_ruleset), "rules": r.rule_count, "rows": kept, "capped": r.rules_capped,
-              "omitted": r.rows_omitted, "not_expanded": len(r.not_expanded)}
+              "omitted": r.rows_omitted, "not_expanded": len(r.not_expanded), "no_address": r.rules_no_address}
     kpis = tuple(Kpi(key=k, label=t(lbl), value=values[k], previous=None, unit="count",
-                     better="neutral" if k in ("rulesets", "rules", "rows") else "lower")
+                     better="neutral" if k in ("rulesets", "rules", "rows", "no_address") else "lower")
                  for k, lbl in _KPI_KEYS.items())
     findings: list[Finding] = []
     if r.rows_omitted:
@@ -81,6 +82,7 @@ def build_policy_resolver(inp: BuildInput) -> ReportDocument:
                         meta={"truncated": bool(r.rows_omitted or r.rules_capped or r.not_expanded),
                               "row_cap": MAX_TOTAL_ROWS, "rows_omitted": r.rows_omitted,
                               "rules_summarized": r.rules_capped, "rules_not_expanded": len(r.not_expanded),
+                              "rules_no_address": r.rules_no_address,
                               "truncated_rulesets": ", ".join(r.truncated_rulesets)})
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_policy_resolver"), period_start=inp.start,

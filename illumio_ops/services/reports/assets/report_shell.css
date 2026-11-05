@@ -649,11 +649,13 @@ h2.chapter-title {
 }
 
 /* == 9. 說明區塊 =========================================================== */
-.note,
-.section-intro {
+.note {
   font-size: var(--fs-body);
   color: var(--text-2);
 }
+
+/* 與段落同字級：「如何閱讀」這類節的導言和其後段落是同一段說明（lab 2026-11-03 rule_hit_count 兩段字級不同） */
+.section-intro { color: var(--text-2); }
 
 .note-warn,
 .bp-box {

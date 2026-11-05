@@ -239,16 +239,18 @@ def resolve_ruleset_within(
     label_keys: dict[str, str] | None = None,
     known: dict[str, set[str]] | None = None,
     ip_to_subnet: dict[str, str] | None = None,
-) -> tuple[list[dict[str, Any]], int, list[tuple[str, str]]]:
-    """(rows, omitted, not_expanded). At most `limit` rows: a rule that would pass it is counted, never built
+) -> tuple[list[dict[str, Any]], int, list[tuple[str, str]], list[str]]:
+    """(rows, omitted, not_expanded, no_address). At most `limit` rows: a rule that would pass it is counted, never built
     (security review). not_expanded: (rule href, reason) for a rule that cannot be expanded faithfully — a
     reference the PCE does not hold, or providers resolved as virtual services (their services come from the virtual
     service) — disclosed by the caller, never dropped or widened (final review #4, #5). Each scope is expanded on
-    its own and the rows merged (final review #2). Disabled rulesets and rules are skipped."""
+    its own and the rows merged (final review #2). Disabled rulesets and rules are skipped. no_address: rule hrefs
+    whose sides resolve to no address in every scope (e.g. a label no host carries): no rows, and nothing wrong."""
     omitted = 0
     issues: list[tuple[str, str]] = []
+    no_address: list[str] = []
     if not ruleset.get("enabled", True):
-        return [], 0, issues
+        return [], 0, issues, no_address
     lk: Lookups = {"label_to_ips": label_to_ips, "iplist_to_cidrs": iplist_to_cidrs,
                    "label_group_to_labels": label_group_to_labels, "workload_to_ips": workload_to_ips,
                    "label_keys": label_keys, "known": known, "ip_to_subnet": ip_to_subnet}
@@ -276,6 +278,7 @@ def resolve_ruleset_within(
                 continue
             svcs = _services(rule, service_to_ports, service_to_names)
             subnet_sides = set(rule.get("use_workload_subnets") or [])
+            addressed = False
             for scope_ips in (scope_sets if scope_sets is not None else [None]):
                 cons_scope = None if rule.get("unscoped_consumers") else scope_ips
                 srcs, src_kind = _side_ips(rule.get("consumers") or [], lk, scope_ips=cons_scope,
@@ -284,6 +287,7 @@ def resolve_ruleset_within(
                                            subnets="providers" in subnet_sides)
                 if not srcs or not dsts:  # nothing in this scope (or a side resolves to no address)
                     continue
+                addressed = True
                 srcs, dsts, truncated = _cap_sides(srcs, dsts, len(svcs))
                 if limit is not None and len(rows) + len(srcs) * len(dsts) * len(svcs) > limit:
                     omitted += len(srcs) * len(dsts) * len(svcs)  # counted, never built (security review)
@@ -303,7 +307,9 @@ def resolve_ruleset_within(
                             if truncated:
                                 row["truncated"] = truncated
                             rows.append(row)
-    return rows, omitted, issues
+            if not addressed:
+                no_address.append(rule_href)
+    return rows, omitted, issues, no_address
 
 
 def _all_workloads(workload_to_ips: dict[str, list[str]]) -> list[str]:

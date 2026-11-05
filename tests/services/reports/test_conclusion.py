@@ -126,3 +126,14 @@ def test_policy_usage_says_its_rules_are_the_drafts(lang, word):
     allow rules of the Draft (it recomputes against the Draft), and its sentence and tile have to say so."""
     assert word in translate(lang, CONCLUSION_KEYS[ReportType.POLICY_USAGE], {})
     assert word in translate(lang, "rpt_pu_kpi_rules", {})
+
+
+@pytest.mark.parametrize("report_type", [ReportType.TRAFFIC, ReportType.NETWORK_INVENTORY, ReportType.APP_SUMMARY,
+                                         ReportType.READINESS, ReportType.POLICY_USAGE])
+def test_a_sum_of_connection_counts_is_counted_in_times(report_type):
+    """lab .106 2026-11-03: traffic's 「連線 9,201,239 條」 (the PCE's per-flow connection counts added up) beside new
+    connections' 「新出現的連線 70,223 條」 (distinct source, destination and port) read as the same thing. A sum is
+    「次」; a distinct connection stays 「條」."""
+    text = dictionary(Language.ZH_TW)[CONCLUSION_KEYS[report_type]]
+    assert "次" in text and not re.search(r"連線[^；。]*\{\w+\} 條", text)
+    assert "條" in dictionary(Language.ZH_TW)[CONCLUSION_KEYS[ReportType.NEW_CONNECTIONS]]
