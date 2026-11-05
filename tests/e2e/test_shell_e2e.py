@@ -17,7 +17,7 @@ def test_nav_order_and_sections(live_app, context):
     assert texts[:3] == MAIN_ORDER
     assert texts.index("Reports and delivery") < texts.index("SIEM forwarding") < texts.index("Alert rules and notifications")
     assert texts[-1] == "System"
-    assert page.locator(".nav-section").first.inner_text().strip() == "Output"
+    assert page.locator(".nav-section").first.text_content().strip() == "Output"  # the words; the eyebrow shows them in capitals
 
 
 def test_status_line_says_mode_and_collection(live_app, context):

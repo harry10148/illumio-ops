@@ -203,7 +203,7 @@ def test_audit_in_lightweight_mode(context, live_app):
 def test_template_groups(context, live_app):
     page = context.new_page()
     _reports(page, live_app.url)
-    heads = [h.strip() for h in page.locator(".rpt-column > h2").all_inner_texts()]
+    heads = [h.strip() for h in page.locator(".rpt-column > h2").all_text_contents()]
     assert heads == ["Security assessment", "Traffic analysis", "Policy", "Operations and audit"]
 
 
