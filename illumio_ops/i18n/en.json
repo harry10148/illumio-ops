@@ -2828,5 +2828,9 @@
   "gui_reports_custom_period": "Choose dates",
   "gui_reports_period_from": "From",
   "gui_reports_period_to": "To",
-  "gui_reports_period_hint": "Whole days in the display time zone, both ends included; from {first} to {last}. Days the store no longer keeps are read from the archive, and the report says so."
+  "gui_reports_period_hint": "Whole days in the display time zone, both ends included; from {first} to {last}. Days the store no longer keeps are read from the archive, and the report says so.",
+  "err_siem_tls_unverified": "Certificate verification is off for {names}: the lines are encrypted, but anyone who can answer in the SIEM's place receives them. Save only if you accept that.",
+  "siem_save_anyway": "Save anyway",
+  "siem_tls_unverified_warning": "Certificate verification is off: the connection is encrypted, but whether it reaches your SIEM is not checked.",
+  "siem_tls_unverified_badge": "Certificate not verified"
 }

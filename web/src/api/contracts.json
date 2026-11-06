@@ -30710,6 +30710,11 @@
           }
         },
         "properties": {
+          "confirm_tls_unverified": {
+            "default": false,
+            "title": "Confirm Tls Unverified",
+            "type": "boolean"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -30974,6 +30979,10 @@
                 "title": "Sources",
                 "type": "array"
               },
+              "tls_unverified": {
+                "title": "Tls Unverified",
+                "type": "boolean"
+              },
               "transport": {
                 "$ref": "#/$defs/SiemTransport"
               }
@@ -30986,6 +30995,7 @@
               "format",
               "host",
               "port",
+              "tls_unverified",
               "dlq",
               "dlq_max",
               "sources"

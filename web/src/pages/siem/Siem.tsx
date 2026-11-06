@@ -80,6 +80,7 @@ function StatusTable({ status }: { status: SiemStatusView }) {
                 <td rowSpan={d.sources.length}>
                   <strong>{d.name}</strong>
                   <div className="hint">{t(TRANSPORT_KEYS[d.transport])} · {d.host}:{d.port}</div>
+                  {d.tls_unverified && <div><span className="badge" data-tone="warn" data-role="siem-tls-unverified">{t("siem_tls_unverified_badge")}</span></div>}
                   <div className="hint">
                     <Link to={`/siem/dlq?destination=${d.id}`} data-role="siem-dlq-link">
                       {t("siem_dlq_count", { n: String(d.dlq), max: String(d.dlq_max) })}
@@ -177,6 +178,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
               <input name="siem_ca_bundle" value={caPath} placeholder="/etc/ssl/certs/siem-ca.pem" disabled={d.verify_tls === false}
                      onChange={(e) => set("verify_tls", e.target.value.trim() || true)} />
             </label>
+            {d.verify_tls === false && <p className="notice" data-role="siem-tls-warning">{t("siem_tls_unverified_warning")}</p>}
           </>
         )}
         {d.transport === "hec" && (
@@ -267,10 +269,10 @@ export function Siem() {
   const change = (next: SiemSettingsInput) => { setSiem(next); setSaved(false); };
   const setDest = (i: number, d: SiemDestinationInput) => change({ ...siem, destinations: siem.destinations.map((x, j) => (j === i ? d : x)) });
 
-  async function save(e: FormEvent) {
-    e.preventDefault();
+  async function save(e: FormEvent | null, confirmUnverified = false) {
+    e?.preventDefault();
     if (!view || !siem) return;
-    const env = await call("siem.settings.update", { revision: view.revision, siem });
+    const env = await call("siem.settings.update", { revision: view.revision, siem, confirm_tls_unverified: confirmUnverified });
     if (env.ok && env.data) { setView(env.data); setSiem(env.data.siem); setError(null); setSaved(true); loadStatus(); }
     else { setError(env.error); setSaved(false); }
   }
@@ -318,7 +320,15 @@ export function Siem() {
             </label>
           </div>
         </details>
-        {error && <p className="form-error" data-field={error.field ?? ""}>{t(error.message_key, error.params)}</p>}
+        {error && (
+          <p className="form-error" data-field={error.field ?? ""}>
+            {t(error.message_key, error.params)}
+            {error.code === "tls_unverified" && (
+              <button type="button" className="btn-quiet inline-action" data-role="siem-save-anyway"
+                      onClick={() => void save(null, true)}>{t("siem_save_anyway")}</button>
+            )}
+          </p>
+        )}
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
         <div className="actions">
           <button type="submit" className="btn-primary">{t("btn_save")}</button>

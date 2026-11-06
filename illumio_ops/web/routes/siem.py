@@ -17,7 +17,7 @@ from illumio_ops.domain.values import (
 )
 from illumio_ops.services.siem import dlq
 from illumio_ops.services.siem.cursors import place_new_cursors
-from illumio_ops.services.siem.status import SiemStatusView, siem_status
+from illumio_ops.services.siem.status import SiemStatusView, siem_status, tls_unverified
 from illumio_ops.services.siem.tester import send_test
 from illumio_ops.settings.schema import SiemDestination, SiemSettings
 from illumio_ops.settings.secrets import (
@@ -69,6 +69,9 @@ class SiemSettingsView(BaseModel):
 class SiemSettingsUpdate(BaseModel):
     revision: int
     siem: SiemSettingsInput
+    # Turning certificate verification off for a TLS or HEC destination is refused until the page has shown which
+    # destinations and the person chose "save anyway" (5.x refused it outright under its production profile).
+    confirm_tls_unverified: bool = False
 
 
 class SiemTestRequest(BaseModel):
@@ -173,9 +176,15 @@ def update_settings(body: SiemSettingsUpdate) -> SiemSettingsView:
     ctx = get_ctx()
     merged = _merged(body.siem)
     try:
-        SiemSettings.model_validate(merged)
+        new = SiemSettings.model_validate(merged)
     except ValidationError as exc:
         raise _invalid(exc, "siem.") from None
+    # Only a destination newly unverified asks: one saved that way was confirmed then (or carried over from 5.x).
+    already = {d.id for d in ctx.settings.current().siem.destinations if tls_unverified(d)}
+    newly = [(i, d) for i, d in enumerate(new.destinations) if tls_unverified(d) and d.id not in already]
+    if newly and not body.confirm_tls_unverified:
+        raise ApiFailure(409, "tls_unverified", "err_siem_tls_unverified", field=f"siem.destinations.{newly[0][0]}.verify_tls",
+                         params={"names": ", ".join(d.name for _, d in newly)})
     ctx.settings.update(body.revision, lambda d: d.__setitem__("siem", merged))
     place_new_cursors(ctx)  # a new destination or source starts now, not at the next run
     return _view()

@@ -124,3 +124,51 @@ def test_dlq_list_resend_purge_and_export(client, ctx, monkeypatch):
 def test_the_export_needs_a_session(client):
     r = client.get("/siem/dlq/export", environ_overrides=LOCAL)
     assert r.status_code == 401
+
+
+def test_turning_certificate_verification_off_needs_a_confirmation(client, ctx):
+    login(client)
+    s = configured(client)["siem"]
+    s["destinations"][0].update(verify_tls=False, hec_token="HEC-SECRET")  # a saved token follows no such change
+    r = put(client, s)
+    assert r.status_code == 409
+    err = r.get_json()["error"]
+    assert err["code"] == "tls_unverified" and err["field"] == "siem.destinations.0.verify_tls"
+    assert err["params"] == {"names": "splunk"}
+    assert ctx.settings.current().siem.destinations[0].verify_tls is True
+    r = client.open("/api/siem/settings", method="PUT",
+                    json={"revision": view(client)["revision"], "siem": s, "confirm_tls_unverified": True},
+                    environ_overrides=LOCAL, headers={"X-CSRFToken": csrf(client)})
+    assert r.status_code == 200, r.get_json()
+    assert ctx.settings.current().siem.destinations[0].verify_tls is False
+    # Already confirmed: an unrelated change saves without asking again.
+    s = view(client)["siem"]
+    s["destinations"][0]["name"] = "renamed"
+    assert put(client, s).status_code == 200
+
+
+def test_a_new_unverified_destination_and_a_switch_to_tls_ask_too_but_plain_syslog_does_not(client):
+    login(client)
+    s = view(client)["siem"]
+    s.update(enabled=True, destinations=[dest(transport="tls", hec_token="", port=6514, verify_tls=False)])
+    assert put(client, s).status_code == 409
+    s["destinations"] = [dest(transport="tcp", hec_token="", port=514, verify_tls=False)]
+    assert put(client, s).status_code == 200  # verification means nothing to plain TCP
+    s = view(client)["siem"]
+    s["destinations"][0].update(transport="tls", port=6514)
+    r = put(client, s)
+    assert r.status_code == 409 and r.get_json()["error"]["code"] == "tls_unverified"
+
+
+def test_the_status_says_which_destinations_do_not_verify(client):
+    login(client)
+    s = configured(client)["siem"]
+    st = client.get("/api/siem/status", environ_overrides=LOCAL).get_json()["data"]
+    assert st["destinations"][0]["tls_unverified"] is False
+    s["destinations"][0].update(verify_tls=False, hec_token="HEC-SECRET")
+    r = client.open("/api/siem/settings", method="PUT",
+                    json={"revision": view(client)["revision"], "siem": s, "confirm_tls_unverified": True},
+                    environ_overrides=LOCAL, headers={"X-CSRFToken": csrf(client)})
+    assert r.status_code == 200
+    st = client.get("/api/siem/status", environ_overrides=LOCAL).get_json()["data"]
+    assert st["destinations"][0]["tls_unverified"] is True

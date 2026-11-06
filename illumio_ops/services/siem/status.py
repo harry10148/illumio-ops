@@ -12,12 +12,20 @@ from illumio_ops.domain.values import CollectionMode, SiemFormat, SiemTransport
 from illumio_ops.services.analysis.context import baseline_full
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.siem import sources
+from illumio_ops.settings.schema import SiemDestination
 from illumio_ops.store import siem as store
 
 SourceName = Literal["audit", "alerts", "detections", "new_connections"]
 SourceState = Literal["ok", "behind", "failing", "dlq_full", "waiting", "needs_alert_mode", "baseline_building",
                       "off"]
 NEEDS_TRAFFIC = ("detections", "new_connections")
+TLS_TRANSPORTS = (SiemTransport.TLS, SiemTransport.HEC)
+
+
+def tls_unverified(dest: SiemDestination) -> bool:
+    """A TLS or HEC destination whose certificate is not checked: encrypted, but to whoever answers (5.x refused this
+    under its production profile; v6 asks for a confirmation when it is turned off and keeps saying so)."""
+    return dest.transport in TLS_TRANSPORTS and dest.verify_tls is False
 
 
 class SiemSourceStatus(BaseModel):
@@ -40,6 +48,7 @@ class SiemDestinationStatus(BaseModel):
     format: SiemFormat
     host: str
     port: int
+    tls_unverified: bool         # TLS or HEC without certificate verification (an explicit choice, shown as a warning)
     dlq: int
     dlq_max: int
     sources: list[SiemSourceStatus]
@@ -98,7 +107,8 @@ def siem_status(ctx: AppContext) -> SiemStatusView:
                 last_sent_at=cur.last_sent_at if cur else None, last_error=cur.last_error if cur else None,
                 last_error_at=cur.last_error_at if cur else None, head_attempts=cur.head_attempts if cur else 0))
         out.append(SiemDestinationStatus(id=d.id, name=d.name, enabled=d.enabled, transport=d.transport,
-                                         format=d.format, host=d.host, port=d.port, dlq=dlq.get(d.id, 0),
+                                         format=d.format, host=d.host, port=d.port, tls_unverified=tls_unverified(d),
+                                         dlq=dlq.get(d.id, 0),
                                          dlq_max=s.siem.dlq_max_per_dest, sources=rows))
     return SiemStatusView(enabled=s.siem.enabled, lightweight=light, baseline_full=full,
                           baseline_days=s.collection.retention.baseline_days,

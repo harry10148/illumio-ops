@@ -2197,6 +2197,7 @@ siem: SiemSettingsInput
  * via the `definition` "SiemSettingsUpdate".
  */
 export interface SiemSettingsUpdate {
+confirm_tls_unverified?: boolean
 revision: number
 siem: SiemSettingsInput
 }
@@ -2214,6 +2215,7 @@ id: string
 name: string
 port: number
 sources: SiemSourceStatus[]
+tls_unverified: boolean
 transport: SiemTransport
 }
 /**
