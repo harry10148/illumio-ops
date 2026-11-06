@@ -130,3 +130,31 @@ def test_all_kpis_rendered(ctx):
 def test_zh_tw_builds(ctx):
     _inventory(ctx, [host("on"), host("d1", online=0, hb=timedelta(hours=5))])
     assert _build(ctx, Language.ZH_TW).title
+
+
+def test_compat_state_four_states():
+    """5.x analysis/fleet.compat_state: only VEN health entries about compatibility count; none reported is unknown."""
+    from illumio_ops.services.reports.ven_status import compat_state
+    assert compat_state(None) == "unknown"
+    assert compat_state(json.dumps([{"type": "agent.missing_heartbeats", "severity": "error"}])) == "unknown"
+    assert compat_state(json.dumps([{"type": "workload_compatibility", "severity": "info"}])) == "pass"
+    assert compat_state(json.dumps([{"type": "Compatibility.report", "severity": "Warning"}])) == "warn"
+    assert compat_state(json.dumps([{"type": "compatibility", "severity": "warning"},
+                                    {"type": "compatibility", "severity": "err"}])) == "fail"
+    assert compat_state("not json") == "unknown"
+
+
+def test_online_list_and_compat_tally(ctx):
+    _inventory(ctx, [host("b-on", health=[{"type": "compatibility", "severity": "warning"}], mode="idle"),
+                     host("a-on", version="25.2.1"),
+                     host("off", online=0, hb=timedelta(hours=5), health=[{"type": "compatibility", "severity": "error"}])])
+    doc = _build(ctx)
+    online = _table(doc, "online")
+    assert [r[0] for r in online.rows] == ["a-on", "b-on"] and online.total_rows == 2
+    cols = [c.key for c in online.columns]
+    assert len(cols) < 9  # stays a portrait table
+    row = dict(zip(cols, online.rows[1], strict=True))
+    assert row["app"] == "Web (Prod)" and row["version"] == "26.2.20" and row["compat"] == "Warning"
+    assert row["mode"] == "Idle"
+    tally = {r[0]: r[1] for r in _table(doc, "online", 1).rows}
+    assert tally == {"Pass": 0, "Warning": 1, "Fail": 1, "Unknown": 1}

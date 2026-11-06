@@ -2829,5 +2829,17 @@
   "gui_reports_period_from": "From",
   "gui_reports_period_to": "To",
   "gui_reports_period_hint": "Whole days in the display time zone, both ends included; from {first} to {last}. Days the store no longer keeps are read from the archive, and the report says so.",
-  "rpt_col_mitre": "MITRE ATT&CK"
+  "rpt_col_mitre": "MITRE ATT&CK",
+  "rpt_ven_sec_online": "Online VENs",
+  "rpt_ven_online_intro": "Every online VEN with its version, operating system, mode, last heartbeat, policy sync and compatibility. The compatibility count below covers every managed host, online or not.",
+  "rpt_ven_tbl_online": "Online VENs",
+  "rpt_ven_col_mode": "Enforcement mode",
+  "rpt_ven_col_compat": "Compatibility",
+  "rpt_ven_none_online": "No VEN is online: none is marked online by the PCE with a heartbeat in the last hour.",
+  "rpt_ven_tbl_compat": "Managed hosts by compatibility",
+  "rpt_ven_compat_pass": "Pass",
+  "rpt_ven_compat_warn": "Warning",
+  "rpt_ven_compat_fail": "Fail",
+  "rpt_ven_compat_unknown": "Unknown",
+  "rpt_ven_quality_compat": "Compatibility comes from the VEN health entries about compatibility in the inventory (an error: fail; a warning: warning; otherwise pass); {n} hosts report none and are unknown."
 }

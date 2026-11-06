@@ -2829,5 +2829,17 @@
   "gui_reports_period_from": "從",
   "gui_reports_period_to": "到",
   "gui_reports_period_hint": "以顯示時區的整天計算，含起訖兩天；可選 {first} 到 {last}。本機已不保留的日子從封存讀取，報表會註明。",
-  "rpt_col_mitre": "MITRE ATT&CK"
+  "rpt_col_mitre": "MITRE ATT&CK",
+  "rpt_ven_sec_online": "在線的 VEN",
+  "rpt_ven_online_intro": "每一台在線的 VEN 與它的版本、作業系統、模式、最後心跳、政策同步與相容性。下方的相容性統計涵蓋所有受管主機，不論是否在線。",
+  "rpt_ven_tbl_online": "在線的 VEN",
+  "rpt_ven_col_mode": "強制模式",
+  "rpt_ven_col_compat": "相容性",
+  "rpt_ven_none_online": "沒有在線的 VEN：沒有一台被 PCE 標為在線且 1 小時內有心跳。",
+  "rpt_ven_tbl_compat": "依相容性的受管主機數",
+  "rpt_ven_compat_pass": "通過",
+  "rpt_ven_compat_warn": "警告",
+  "rpt_ven_compat_fail": "不通過",
+  "rpt_ven_compat_unknown": "未知",
+  "rpt_ven_quality_compat": "相容性取自清冊中 VEN 健康裡與相容性有關的項目（有錯誤＝不通過；有警告＝警告；其餘＝通過）；{n} 台主機沒有回報，列為未知。"
 }
