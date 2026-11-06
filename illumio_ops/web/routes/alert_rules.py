@@ -228,6 +228,9 @@ def set_retention(body: RetentionUpdate) -> RulesView:
 # The scheduled jobs that end in an alert evaluation (jobs/scheduler.py): events, traffic with the lateral and anomaly
 # detectors, the system checks, and the PCE probe (its health check).
 EVALUATING_JOBS = ("collect_events", "collect_traffic", "alerts_system", "pce_probe")
+# APScheduler skips a run picked up later than its grace time (1 s by default) as missed: a run asked for now must not
+# be dropped because the executor was busy for a moment. It stays on the job, where a late run also beats a skipped one.
+EVALUATE_GRACE_SECONDS = 60
 
 
 @api_route(bp, OP_EVALUATE)
@@ -239,5 +242,5 @@ def evaluate_now() -> EvaluateRequested:
         raise ApiFailure(503, "jobs_not_running", "err_jobs_not_running")
     now = datetime.now(UTC)
     for job_id in EVALUATING_JOBS:
-        ctx.scheduler.modify_job(job_id, next_run_time=now)
+        ctx.scheduler.modify_job(job_id, next_run_time=now, misfire_grace_time=EVALUATE_GRACE_SECONDS)
     return EvaluateRequested(jobs=list(EVALUATING_JOBS), requested_at=now)

@@ -184,3 +184,38 @@ def test_workbench_no_overflow_760(narrow_context, live_app):
     page.click("[data-role=open-workbench]")
     page.wait_for_selector("[data-role=wb-detail]")
     assert no_horizontal_overflow(page)
+
+
+def test_a_pick_keeps_the_label_group_a_side_holds(context, live_app):
+    """5.x parity 2026-11-06: an alert's evidence can name a label group; narrowing that side by a host keeps it."""
+    from illumio_ops.domain.filter import EndpointFilter
+    from illumio_ops.store.flowdb import policy_objects
+    ctx = live_app.ctx
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="full"))
+    group = "/orgs/1/sec_policy/active/label_groups/dev"
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [flow(src="adm", dst="db", port=3389), flow(src="bak", dst="web", port=443)],
+                     origin=DataOrigin.INGEST, now=END)
+        policy_objects.replace_label_groups(conn, [policy_objects.LabelGroupRow(group, "Dev estate", "env", ("Dev",))],
+                                            at=END)
+        conn.commit()
+    seg = FlowSegment(filter=FlowCondition(dst=EndpointFilter(label_groups=(group,))).within(START, END),
+                      view=SegmentView.DETAIL, limit=50)
+    now = datetime.now(UTC)
+    t = Trigger(rule_id="c" * 32, rule_type=AlertRuleType.TRAFFIC, subject_key="x", severity=Severity.HIGH,
+                first_seen=now, last_seen=now, late=False, message_key="alert_system_disk_low",
+                params={"free": "1", "warn": "2"}, facts={}, evidence=seg, confidence=Confidence())
+    pce = ctx.settings.current().pce
+    with ctx.db() as conn:
+        alert_id = store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="Dev", pack_key=None,
+                                      trigger=t, at=now, channels=[], hold=None)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/investigate?alert={alert_id}")
+    page.wait_for_selector("[data-role=wb-detail]")
+    expect(page.locator(f"[data-chip='dst:g:{group}']")).to_contain_text("Dev estate")
+    dst = page.locator("[data-dim=dst_host]")
+    dst.locator(".wb-dim-row", has_text="db").click()
+    page.wait_for_selector("[data-chip^='dst:h:']")
+    expect(page.locator(f"[data-chip='dst:g:{group}']")).to_contain_text("Dev estate")
+    expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(1)

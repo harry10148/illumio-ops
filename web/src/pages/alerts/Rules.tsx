@@ -161,8 +161,10 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
               <input name="alert_retention_days" type="number" min={0} max={3650} className="narrow" value={keep}
                      onChange={(e) => { setKeep(e.target.value); setKeepSaved(false); }} />
             </label>
-            <span className="hint">{Number(keep) === 0 ? t("rules_retention_forever") : t("rules_retention_hint")}</span>
-            <button type="button" className="btn-quiet" onClick={() => void saveKeep()}>{t("btn_save")}</button>
+            <span className="hint">{/^\d+$/.test(keep) && Number(keep) === 0 ? t("rules_retention_forever") : t("rules_retention_hint")}</span>
+            <button type="button" className="btn-quiet" disabled={!/^\d+$/.test(keep)} onClick={() => void saveKeep()}>
+              {t("btn_save")}
+            </button>
             {keepSaved && <span className="form-ok" role="status">{t("saved_ok")}</span>}
           </div>
         </>

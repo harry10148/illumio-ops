@@ -35,9 +35,12 @@ const SETS: Partial<Record<SegmentDimension, FlowSet>> = {
 /** A value picked on one end narrows it: labels AND hosts (match "all"); values of the same kind OR. An end that
  * already holds both labels and hosts as a union (an alert's evidence) keeps its meaning. */
 function endpoint(f: EndpointFilter | null | undefined, key: string, labelKey?: string): EndpointFilter {
-  const union = f?.match !== "all" && !!f?.labels?.length && !!(f?.hrefs?.length || f?.ips?.length);
-  const e: EndpointFilter = { hrefs: [...(f?.hrefs ?? [])], ips: [...(f?.ips ?? [])], labels: [...(f?.labels ?? [])],
-    match: union ? "any" : "all" };
+  // what the side holds besides hosts and labels (label groups, IP lists, public) is kept, and counts as its own part
+  const labelled = !!(f?.labels?.length || f?.label_groups?.length);
+  const hosted = !!(f?.hrefs?.length || f?.ips?.length || f?.ip_lists?.length || f?.public);
+  const union = f?.match !== "all" && labelled && hosted;
+  const e: EndpointFilter = { ...(f ?? {}), hrefs: [...(f?.hrefs ?? [])], ips: [...(f?.ips ?? [])],
+    labels: [...(f?.labels ?? [])], match: union ? "any" : "all" };
   if (labelKey) {
     const found = (e.labels ?? []).find((l) => l.key === labelKey);
     if (!found) e.labels = [...(e.labels ?? []), { key: labelKey, values: [key] }];

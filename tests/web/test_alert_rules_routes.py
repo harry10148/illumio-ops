@@ -237,6 +237,7 @@ def test_evaluate_now_asks_the_existing_jobs_to_run(client, ctx):
         for job_id in jobs:
             assert ctx.scheduler.get_job(job_id).next_run_time <= datetime.now(UTC)
             assert ctx.scheduler.get_job(job_id).next_run_time >= before.replace(microsecond=0)
+            assert ctx.scheduler.get_job(job_id).misfire_grace_time == 60  # a busy executor never skips it as missed
         assert {j.id for j in ctx.scheduler.get_jobs()} == scheduled  # the same jobs, none added
     finally:
         ctx.scheduler = None
