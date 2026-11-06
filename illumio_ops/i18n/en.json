@@ -2883,5 +2883,9 @@
   "rsb_kind_deny": "Deny",
   "rsb_kind_override_deny": "Override deny",
   "rsb_draft_pending": "Draft change pending",
-  "rsb_scheduled": "Scheduled"
+  "rsb_scheduled": "Scheduled",
+  "err_invalid_username": "The username must be 1 to {max} characters (spaces at either end are removed).",
+  "security_username_hint": "Changing the username takes the current password. Like a password change, everyone else who is signed in is signed out; this browser stays signed in under the new name.",
+  "security_username_save": "Change username",
+  "security_username_changed": "Username changed. Everyone else who was signed in has been signed out."
 }

@@ -2883,5 +2883,9 @@
   "rsb_kind_deny": "Deny Rule",
   "rsb_kind_override_deny": "Override deny",
   "rsb_draft_pending": "有未 Provision 的變更",
-  "rsb_scheduled": "已排程"
+  "rsb_scheduled": "已排程",
+  "err_invalid_username": "使用者名稱須為 1 到 {max} 個字元（前後空白會移除）。",
+  "security_username_hint": "變更使用者名稱需要目前的密碼。與變更密碼相同，其他已登入的人都會被登出；這個瀏覽器以新名稱保持登入。",
+  "security_username_save": "變更使用者名稱",
+  "security_username_changed": "已變更使用者名稱。其他已登入的人都已被登出。"
 }

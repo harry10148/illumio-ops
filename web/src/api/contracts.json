@@ -10875,6 +10875,43 @@
         "type": "object"
       }
     },
+    "auth.username": {
+      "method": "POST",
+      "path": "/api/auth/username",
+      "request_schema": {
+        "properties": {
+          "current_password": {
+            "maxLength": 1024,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 1024,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "current_password"
+        ],
+        "title": "UsernameChangeRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CsrfToken",
+        "type": "object"
+      }
+    },
     "custom_reports.add_section": {
       "method": "POST",
       "path": "/api/custom-reports/sections",

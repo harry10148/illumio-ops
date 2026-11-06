@@ -1,6 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
-import { type ApiError, call } from "../../api/client";
+import { type ApiError, call, setCsrfToken } from "../../api/client";
 import type { SecurityView } from "../../api/generated";
 import { t } from "../../i18n";
 import { notifyMeChanged } from "../../shell/Shell";
@@ -76,6 +76,62 @@ function AllowedAddresses({ view, onSaved, onReload }: AllowedProps) {
   );
 }
 
+/** 5.x changed the admin name in its security settings; here it takes the current password and, like a password
+ * change, signs everyone else out. */
+function Username({ view, onChanged }: { view: SecurityView; onChanged: () => void }) {
+  const [name, setName] = useState(view.username);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<ApiError | null>(null);
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    const env = await call("auth.username", { username: name, current_password: password });
+    setBusy(false);
+    setPassword("");
+    if (env.ok && env.data) {
+      setCsrfToken(env.data.csrf_token);
+      setError(null);
+      setDone(true);
+      onChanged();
+    } else {
+      setDone(false);
+      setError(env.error);
+    }
+  }
+
+  return (
+    <form className="card" onSubmit={submit} data-role="username-change">
+      <h2>{t("security_account_title")}</h2>
+      <label className="block">
+        {t("login_username")}
+        <input name="username" autoComplete="username" value={name} maxLength={256}
+               onChange={(e) => { setName(e.target.value); setDone(false); }} />
+        {error?.field === "username" && <span className="field-error">{t(error.message_key, error.params)}</span>}
+      </label>
+      <label className="block">
+        {t("pw_old")}
+        <input name="current_password" type="password" autoComplete="current-password" value={password}
+               onChange={(e) => setPassword(e.target.value)} />
+        {error?.field === "current_password" && <span className="field-error">{t(error.message_key, error.params)}</span>}
+      </label>
+      <p className="hint">{t("security_username_hint")}</p>
+      {error && error.field !== "username" && error.field !== "current_password" && (
+        <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>
+      )}
+      {done && <p className="form-ok" role="status">{t("security_username_changed")}</p>}
+      <div className="actions spaced">
+        <button type="submit" className="btn-primary"
+                disabled={busy || !password || name.trim() === "" || name.trim() === view.username}>
+          {t("security_username_save")}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export function Security() {
   const [view, setView] = useState<SecurityView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -97,13 +153,8 @@ export function Security() {
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {view && (
         <>
-          <div className="card">
-            <h2>{t("security_account_title")}</h2>
-            <dl className="kv-list">
-              <dt>{t("login_username")}</dt>
-              <dd>{view.username}</dd>
-            </dl>
-          </div>
+          {/* a rename saves the settings too: reload so the next save is not stale */}
+          <Username view={view} onChanged={() => { notifyMeChanged(); void load(); }} />
           <div>
             {/* a password change saves the settings too: reload so the next save is not stale */}
             <PasswordChange requireOld onChanged={() => { setChanged(true); notifyMeChanged(); void load(); }} />
