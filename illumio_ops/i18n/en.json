@@ -2817,5 +2817,16 @@
   "guide_det_quiet_host_wakes": "A long-quiet host became active. Confirm someone brought it back into use; idle hosts are a common place to hide. If it is normal, mark it known below and the same pattern stops alerting.",
   "guide_det_data_staging": "Several internal hosts sent data to this host, a common step before exfiltration. Check it is known work (backups, reporting); if not, see where the host sends the data next. If it is normal, mark it known below and the same pattern stops alerting.",
   "guide_det_off_hours": "The host was active at an hour it usually is not. Check for a scheduled job or someone on duty. If it is normal, mark it known below and the same pattern stops alerting.",
-  "guide_title": "What to do next"
+  "guide_title": "What to do next",
+  "rpt_err_before_archive": "The period starts before any data that can be read: neither the store nor the archive has older traffic. Start it on or after the earliest day the date field allows.",
+  "rpt_err_period_not_over": "Reports count whole days: the last day can be yesterday at the latest.",
+  "rpt_quality_archive_flows": "Traffic from {first} to {last} ({n} days) comes from the archive: the store no longer keeps those days.",
+  "rpt_quality_archive_events": "Events from {first} to {last} ({n} days) come from the archive: the store no longer keeps those days.",
+  "rpt_quality_archive_missing": "{n} days are in neither the store nor the archive, and the report leaves them out: {days}.",
+  "rpt_quality_archive_unreadable": "{n} archive records could not be read (a damaged file or an unknown format) and are not in the report.",
+  "rpt_quality_archive_truncated": "Loading from the archive stopped at {n} records: archived data after {start} is not in the report. Shorten the period.",
+  "gui_reports_custom_period": "Choose dates",
+  "gui_reports_period_from": "From",
+  "gui_reports_period_to": "To",
+  "gui_reports_period_hint": "Whole days in the display time zone, both ends included; from {first} to {last}. Days the store no longer keeps are read from the archive, and the report says so."
 }

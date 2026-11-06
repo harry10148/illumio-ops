@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 from werkzeug.exceptions import NotFound
 
 from illumio_ops.services.reports import retention, views
-from illumio_ops.services.reports.generate import REFUSAL_FIELDS, refusal
+from illumio_ops.services.reports.generate import REFUSAL_FIELDS, reach, refusal
 from illumio_ops.services.reports.registry import ReportParams
 from illumio_ops.services.reports.views import Catalog, ReportItem, ReportPage
 from illumio_ops.web.auth import get_ctx
@@ -56,7 +56,8 @@ def get_report(report_id: int) -> ReportItem:
 @api_route(bp, OP_GENERATE)
 def generate(body: ReportParams) -> ReportItem:
     ctx = get_ctx()
-    reason = refusal(ctx.settings.current(), body, now=datetime.now(UTC))
+    now = datetime.now(UTC)
+    reason = refusal(ctx.settings.current(), body, now=now, reached=reach(ctx, now))
     if reason:
         raise ApiFailure(400, "invalid_input", reason, field=f"report.{REFUSAL_FIELDS[reason]}")
     return views.generate_now(ctx, body)

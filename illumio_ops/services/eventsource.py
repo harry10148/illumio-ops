@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from loguru import logger
@@ -74,7 +74,7 @@ def query_events(ctx: AppContext, *, start: datetime, end: datetime, event_types
                  now: datetime | None = None) -> EventQuery:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     settings = ctx.settings.current()
-    floor = at - timedelta(days=settings.collection.retention.event_days)
+    floor = ctx.event_floor(settings.collection.retention.event_days, at)
     with ctx.flows().connect() as conn:
         require_same_pce(conn, settings.pce)
         cov = store_coverage(conn, IngestSource.EVENTS, (start, end), floor=floor,
@@ -165,7 +165,7 @@ def _segment_read(ctx: AppContext, seg: EventSegment, at: datetime,
     fdb = ctx.flows()
     gen = fdb.generation  # noted before the settings it goes with (FlowDb.generation)
     settings = ctx.settings.current()
-    floor = at - timedelta(days=settings.collection.retention.event_days)
+    floor = ctx.event_floor(settings.collection.retention.event_days, at)
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         cov = store_coverage(conn, IngestSource.EVENTS, (seg.filter.start, seg.filter.end), floor=floor,

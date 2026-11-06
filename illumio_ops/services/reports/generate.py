@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import traceback
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -28,7 +29,7 @@ from illumio_ops.domain.values import (
     ReportType,
 )
 from illumio_ops.i18n import translate
-from illumio_ops.services import custom_reports, rhc
+from illumio_ops.services import archive_read, custom_reports, rhc
 from illumio_ops.services.collect.guard import (
     BindingMismatch,
     normalize_target,
@@ -46,6 +47,7 @@ from illumio_ops.services.reports.registry import (
     ReportParams,
     ReportSpec,
     app_filter_ok,
+    flow_retention,
     names_app,
     specs,
 )
@@ -81,6 +83,56 @@ def period(now: datetime, lookback_days: int, tz: tzinfo | None) -> tuple[dateti
     """The last `lookback_days` whole days in the display zone, ending at today's 00:00 there (end exclusive)."""
     today = now.astimezone(tz).date()
     return _midnight(today - timedelta(days=lookback_days), tz), _midnight(today, tz)
+
+
+def params_period(params: ReportParams, now: datetime, tz: tzinfo | None) -> tuple[datetime, datetime]:
+    """The report's period: its own calendar days when it names them (both included), else the last lookback_days."""
+    if params.period_from is not None and params.period_to is not None:
+        return _midnight(params.period_from, tz), _midnight(params.period_to + timedelta(days=1), tz)
+    return period(now, params.lookback_days, tz)
+
+
+def days_back(params: ReportParams, now: datetime, tz: tzinfo | None) -> int:
+    """How many days before today the period starts."""
+    if params.period_from is not None:
+        return (now.astimezone(tz).date() - params.period_from).days
+    return params.lookback_days
+
+
+def reach(ctx: AppContext, now: datetime) -> dict[str, datetime]:
+    """Per kind ("flows", "events"), the earliest time the archive can be read back from, where it goes further
+    back than the store. Lightweight mode keeps no traffic and archives none: its reports pull from the PCE."""
+    collection = ctx.settings.current().collection
+    if collection.mode is CollectionMode.LIGHTWEIGHT or not collection.archive.enabled:
+        return {}
+    edge = archive_read.floors(ctx, now)
+    out = {}
+    for kind in ("flows", "events"):
+        first = archive_read.earliest(ctx, kind, now)
+        if first < edge[kind]:
+            out[kind] = first
+    return out
+
+
+def earliest_start(settings: Settings, spec: ReportSpec, now: datetime,
+                   reached: Mapping[str, datetime]) -> datetime | None:
+    """The earliest a period of this type may start (None: no limit). A traffic report reaches the PCE's on-demand
+    window or, further back, the first archived day; a type with its own limit counts its days back from today."""
+    if spec.retention is not None or spec.needs_traffic:
+        base = now - timedelta(days=(spec.retention or flow_retention)(settings))
+        return min(base, reached["flows"]) if "flows" in reached else base
+    if spec.max_lookback is not None:
+        tz = settings.display.zone()
+        return _midnight(now.astimezone(tz).date() - timedelta(days=spec.max_lookback(settings)), tz)
+    return None
+
+
+def first_day(start: datetime | None, tz: tzinfo | None) -> date | None:
+    """The first whole calendar day in the display zone at or after `start` (what a date picker may offer)."""
+    if start is None:
+        return None
+    d = start.astimezone(tz).date()
+    return d if _midnight(d, tz) >= start else d + timedelta(days=1)
 
 
 def previous_period(start: datetime, end: datetime, tz: tzinfo | None) -> tuple[datetime, datetime]:
@@ -152,11 +204,61 @@ def _ondemand_lines(res: OnDemandResult, start: datetime, lang: Language, tz: tz
     return tuple(lines)
 
 
+def _archive_kinds(ctx: AppContext, spec: ReportSpec, inp: BuildInput, lead: timedelta) -> tuple[str, ...]:
+    """What this report reads from the archive: traffic, events or both, when its period starts before what the
+    store keeps of it and the archive is on (lightweight mode keeps no traffic: it pulls from the PCE). Traffic
+    comes from the archive only when the archive reaches the period's start (and the baseline before it); a period
+    the archive covers only in part is pulled from the PCE as before."""
+    collection = ctx.settings.current().collection
+    if collection.mode is CollectionMode.LIGHTWEIGHT or not collection.archive.enabled:
+        return ()
+    edge = archive_read.floors(ctx, inp.now)
+    traffic = spec.needs_traffic and (spec.needs_traffic_for is None or spec.needs_traffic_for(ctx, inp.params))
+    kinds = []
+    if traffic and inp.start - lead < edge["flows"] and archive_read.earliest(ctx, "flows", inp.now) <= inp.start - lead:
+        kinds.append("flows")
+    if spec.reads_events and inp.start < edge["events"] and archive_read.archive_files(ctx, "events"):
+        kinds.append("events")
+    return tuple(kinds)
+
+
+ARCHIVE_LINE_KEYS = {"flows": "rpt_quality_archive_flows", "events": "rpt_quality_archive_events"}
+
+
+def _archive_lines(res: archive_read.ArchiveResult, lang: Language, tz: tzinfo | None) -> tuple[str, ...]:
+    def tr(key: str, **params: object) -> str:
+        return translate(lang, key, {k: str(v) for k, v in params.items()})
+
+    lines = []
+    for kind in ("flows", "events"):
+        days = res.archived_days.get(kind) or []
+        if days:
+            lines.append(tr(ARCHIVE_LINE_KEYS[kind], first=days[0], last=days[-1], n=len(days)))
+        missing = res.missing_days.get(kind) or []
+        if missing:
+            shown = ", ".join(missing[:MAX_GAP_LINES]) + ("…" if len(missing) > MAX_GAP_LINES else "")
+            lines.append(tr("rpt_quality_archive_missing", n=len(missing), days=shown))
+    if res.unreadable:
+        lines.append(tr("rpt_quality_archive_unreadable", n=res.unreadable))
+    if res.unread_from is not None:
+        lines.append(tr("rpt_quality_archive_truncated", n=archive_read.ARCHIVE_MAX_ROWS,
+                        start=fmt_time(res.unread_from.isoformat(), tz)))
+    return tuple(lines)
+
+
 def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument:
-    if not pulls_on_demand(ctx, spec, inp.start, inp.now, inp.params):
-        return spec.build(inp)
     settings = ctx.settings.current()
     lead = spec.ondemand_lead(settings) if spec.ondemand_lead else timedelta(0)
+    kinds = _archive_kinds(ctx, spec, inp, lead)
+    if kinds:
+        with archive_read.archive_period(ctx, start=inp.start - lead, end=inp.end, now=inp.now, kinds=kinds) as arc:
+            if spec.ondemand_prepare is not None and "flows" in kinds:
+                spec.ondemand_prepare(arc.ctx, inp.now)
+            built = spec.build(dataclasses.replace(inp, ctx=arc.ctx))
+        return built.model_copy(update={"data_quality": (*built.data_quality,
+                                                         *_archive_lines(arc, inp.lang, inp.tz))})
+    if not pulls_on_demand(ctx, spec, inp.start, inp.now, inp.params):
+        return spec.build(inp)
     try:
         pushed = None if inp.params.filter is None else FilterSpec.model_validate(
             {**inp.params.filter.model_dump(), "start": inp.start - lead, "end": inp.end})
@@ -174,24 +276,33 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
 REFUSAL_FIELDS = {"rpt_err_custom_required": "custom_id", "rpt_err_custom_not_supported": "custom_id",
                   "rpt_err_custom_missing": "custom_id", "rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter",
                   "rpt_err_filter_not_supported": "filter", "rpt_err_app_filter_shape": "filter",
-                  "rpt_err_format_unsupported": "formats"}
+                  "rpt_err_format_unsupported": "formats", "rpt_err_before_archive": "period_from",
+                  "rpt_err_period_not_over": "period_to"}
 
 
-def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = None) -> str | None:
+def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = None,
+            reached: Mapping[str, datetime] | None = None) -> str | None:
     """Why these parameters cannot make this report (the reason is stored on a failed row), or None. With
-    `now`, the period's actual start is checked against the retention floor (a DST change or a short
-    retention can put it a few hours past what the lookback limit allows)."""
+    `now`, the period's actual start is checked against earliest_start (a DST change or a short retention can put
+    it a few hours past what the lookback limit allows); `reached` is reach(), where the archive goes further."""
     spec = specs().get(params.report_type)
     if spec is None:
         return None
     if not set(params.formats) <= set(spec.formats):
         return "rpt_err_format_unsupported"
-    if spec.max_lookback is not None and params.lookback_days > spec.max_lookback(settings):
+    tz = settings.display.zone()
+    if now is not None and params.period_to is not None and params.period_to >= now.astimezone(tz).date():
+        return "rpt_err_period_not_over"  # whole days only: today is not over yet
+    reached = reached or {}
+    traffic = spec.retention is not None or spec.needs_traffic
+    # A schedule's lookback past the type's own limit; a traffic type whose archive reaches further may go on
+    # (earliest_start below has the last word). A named period is checked against earliest_start only.
+    if (spec.max_lookback is not None and params.period_from is None
+            and params.lookback_days > spec.max_lookback(settings) and not (traffic and "flows" in reached)):
         return "rpt_err_lookback_beyond_retention"
-    if spec.retention is not None and now is not None:
-        start, _ = period(now, params.lookback_days, settings.display.zone())
-        if start < now - timedelta(days=spec.retention(settings)):
-            return "rpt_err_lookback_beyond_retention"
+    limit = earliest_start(settings, spec, now, reached) if now is not None else None
+    if limit is not None and now is not None and params_period(params, now, tz)[0] < limit:
+        return "rpt_err_before_archive" if traffic and "flows" in reached else "rpt_err_lookback_beyond_retention"
     if params.filter is not None and not spec.accepts_filter:
         return "rpt_err_filter_not_supported"
     if params.report_type is ReportType.CUSTOM and params.custom_id is None:
@@ -208,9 +319,9 @@ def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = 
 def enqueue(ctx: AppContext, params: ReportParams, *, trigger: str, schedule_id: str | None, now: datetime) -> int:
     """A queued report, or a failed one at once when it cannot be made (the reason is stored, no files)."""
     settings = ctx.settings.current()
-    start, end = period(now, params.lookback_days, settings.display.zone())
-    reason = availability(ctx).get(params.report_type, "rpt_unavailable_not_built") or refusal(settings, params,
-                                                                                                now=now)
+    start, end = params_period(params, now, settings.display.zone())
+    reason = availability(ctx).get(params.report_type, "rpt_unavailable_not_built") or refusal(
+        settings, params, now=now, reached=reach(ctx, now))
     if reason is None and params.report_type is ReportType.CUSTOM and custom_reports.get(ctx, params.custom_id or 0) is None:
         reason = "rpt_err_custom_missing"
     with ctx.db() as conn:

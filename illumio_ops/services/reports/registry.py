@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, tzinfo
+from datetime import date, datetime, timedelta, tzinfo
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from illumio_ops.domain.filter import FlowCondition
 from illumio_ops.domain.report import ReportDocument
@@ -36,6 +36,10 @@ class ReportParams(BaseModel):
     email: bool = False
     recipients: tuple[str, ...] = Field(default=(), max_length=50)  # empty: the SMTP channel's recipients
     custom_id: int | None = None  # the custom report to make (report_type custom only)
+    # A manual report's own period: calendar days in the display zone, both included. None: the last lookback_days
+    # (schedules always). A period before the store's floor is read from the archive (parity audit 2026-11-06 A2).
+    period_from: date | None = None
+    period_to: date | None = None
 
     @field_validator("recipients")
     @classmethod
@@ -44,6 +48,14 @@ class ReportParams(BaseModel):
         if any("@" not in a or any(c in a for c in "\r\n,; ") for a in out):
             raise ValueError("every recipient must be one email address")
         return out
+
+    @model_validator(mode="after")
+    def _period(self) -> ReportParams:
+        if (self.period_from is None) != (self.period_to is None):
+            raise ValueError("a period needs its first and last day")
+        if self.period_from is not None and self.period_to is not None and self.period_to < self.period_from:
+            raise ValueError("the period ends before it starts")
+        return self
 
     @field_validator("formats")
     @classmethod
@@ -81,6 +93,7 @@ class ReportSpec:
     # and a step run on the pulled store before the build (an analysis the report reads instead of computing).
     ondemand_lead: Callable[[Settings], timedelta] | None = None
     ondemand_prepare: Callable[[AppContext, datetime], None] | None = None
+    reads_events: bool = False  # built from the collected events: a period before their floor reads the archive
     formats: tuple[ReportFormat, ...] = (ReportFormat.HTML, ReportFormat.XLSX)  # the formats this type makes
     # Whether these parameters read traffic, when the type alone does not say (a custom report of event sections)
     needs_traffic_for: Callable[[AppContext, ReportParams], bool] | None = None
@@ -163,7 +176,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
                                            max_lookback=flow_days, requires_app=True,
                                            accepts_filter=True, retention=flow_retention),
         ReportType.VEN_STATUS: ReportSpec(ReportType.VEN_STATUS, "operations", False, build_ven_status),
-        ReportType.AUDIT: ReportSpec(ReportType.AUDIT, "operations", False, build_audit),
+        ReportType.AUDIT: ReportSpec(ReportType.AUDIT, "operations", False, build_audit, reads_events=True),
         ReportType.RANSOMWARE: ReportSpec(ReportType.RANSOMWARE, "assessment", False, build_ransomware),
         # Reads the PCE's draft recompute, not the install's traffic: the same in every collection mode; a day per
         # recompute, so a month at most.

@@ -26650,6 +26650,18 @@
                 "title": "Copies",
                 "type": "integer"
               },
+              "earliest_day": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Earliest Day"
+              },
               "formats": {
                 "items": {
                   "$ref": "#/$defs/ReportFormat"
@@ -26659,6 +26671,11 @@
               },
               "group": {
                 "title": "Group",
+                "type": "string"
+              },
+              "latest_day": {
+                "format": "date",
+                "title": "Latest Day",
                 "type": "string"
               },
               "max_lookback": {
@@ -26721,6 +26738,8 @@
               "accepts_filter",
               "requires_app",
               "max_lookback",
+              "earliest_day",
+              "latest_day",
               "formats",
               "ui_group",
               "mode",
@@ -27250,6 +27269,32 @@
             "minimum": 1,
             "title": "Lookback Days",
             "type": "integer"
+          },
+          "period_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Period From"
+          },
+          "period_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Period To"
           },
           "recipients": {
             "default": [],

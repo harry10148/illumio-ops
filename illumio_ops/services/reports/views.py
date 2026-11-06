@@ -1,7 +1,7 @@
 """What the reports page reads: the catalog with what is available now, the report list and one report."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -11,8 +11,14 @@ from illumio_ops.domain.values import Language, ReportFormat, ReportStatus, Repo
 from illumio_ops.services import custom_reports
 from illumio_ops.services.analysis.status import MAX_LABEL_VALUES, LabelChoice
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.reports.generate import availability, enqueue
-from illumio_ops.services.reports.registry import ReportParams, specs
+from illumio_ops.services.reports.generate import (
+    availability,
+    earliest_start,
+    enqueue,
+    first_day,
+    reach,
+)
+from illumio_ops.services.reports.registry import ReportParams, ReportSpec, specs
 from illumio_ops.store import reports as store
 from illumio_ops.store.flowdb import labels
 
@@ -27,6 +33,10 @@ class CatalogEntry(BaseModel):
     accepts_filter: bool  # a label filter narrows the report
     requires_app: bool  # the filter must name an app
     max_lookback: int | None  # the most days back this type can read
+    # The days a named period may span, in the display zone: from the first day the data reaches (the archive's
+    # first day when it goes further back than the store) to yesterday. None: no first day.
+    earliest_day: date | None
+    latest_day: date
     formats: list[ReportFormat]  # the formats this type makes
     ui_group: Literal["assessment", "traffic", "policy", "operations"]  # the reports page's column (spec §4.7)
     mode: Literal["basic", "on_demand"]  # on_demand: reads traffic, pulled from the PCE where none is kept (§5)
@@ -88,10 +98,22 @@ def catalog(ctx: AppContext) -> Catalog:
     scheduled: dict[str, int] = {}
     for sch in settings.reports.schedules:
         scheduled[sch.report_type.value] = scheduled.get(sch.report_type.value, 0) + 1
+    now = datetime.now(UTC)
+    tz = settings.display.zone()
+    reached = reach(ctx, now)
+    latest = now.astimezone(tz).date() - timedelta(days=1)
+
+    def first(s: ReportSpec) -> date | None:
+        if s.reads_events:  # not refused: a period before the events kept shows its gaps; the picker starts there
+            floor = now - timedelta(days=settings.collection.retention.event_days)
+            return first_day(min(floor, reached["events"]) if "events" in reached else floor, tz)
+        return first_day(earliest_start(settings, s, now, reached), tz)
+
     return Catalog(entries=[CatalogEntry(report_type=t, group=s.group, available=avail.get(t) is None,
                                          reason_key=avail.get(t), accepts_filter=s.accepts_filter,
                                          requires_app=s.requires_app,
                                          max_lookback=s.max_lookback(settings) if s.max_lookback else None,
+                                         earliest_day=first(s), latest_day=latest,
                                          formats=list(s.formats), ui_group=UI_GROUPS.get(s.group, "traffic"),  # type: ignore[arg-type]
                                          mode="on_demand" if s.needs_traffic else "basic",
                                          schedules=scheduled.get(t.value, 0), copies=copies.get(t.value, 0))
@@ -112,7 +134,8 @@ def _item(ctx: AppContext, row: store.ReportRow) -> ReportItem:
                       pce_label=row.pce_label, period_start=row.period_start, period_end=row.period_end,
                       created_at=row.created_at, finished_at=row.finished_at, error_key=row.error_key,
                       error_detail=row.error_detail, files=row.files, email_status=row.email_status,
-                      email_detail=row.email_detail, lookback_days=row.params.get("lookback_days"),
+                      email_detail=row.email_detail,
+                      lookback_days=None if row.params.get("period_from") else row.params.get("lookback_days"),
                       lang=Language(lang) if lang else None, custom_name=custom.name if custom else None,
                       conclusion=row.conclusion)
 

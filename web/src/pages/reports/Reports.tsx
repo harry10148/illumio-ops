@@ -29,7 +29,11 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
   entry: CatalogEntry; catalog: Catalog; onDone: () => void; customId?: number;
 }) {
   const choices = lookbackChoices(entry.max_lookback);
+  // A named period: whole days from the first the data reaches (the archive's, when it goes further back) to yesterday.
+  const datesOffered = entry.earliest_day != null && (entry.max_lookback == null || entry.max_lookback > 1);
   const [days, setDays] = useState(choices.includes("7") ? "7" : (choices[choices.length - 1] ?? "1"));
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState(entry.latest_day);
   const [rows, setRows] = useState<FilterRow[]>(entry.requires_app ? [{ side: "dst", key: "app", value: "" }] : []);
   const [lang, setLang] = useState("");
   // The formats this type makes, all on by default (policy_resolver: JSON and CSV only).
@@ -43,7 +47,7 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
     setBusy(true);
     const env = await call("reports.generate", {
       report_type: entry.report_type,
-      lookback_days: Number(days),
+      ...(days === "custom" ? { period_from: from, period_to: to } : { lookback_days: Number(days) }),
       filter: entry.accepts_filter ? conditionOf(rows) : null,
       lang: lang === "" ? null : (lang as "en" | "zh_TW"),
       formats,
@@ -65,8 +69,23 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
           {t("gui_reports_lookback")}
           <select name="lookback_days" value={days} onChange={(e) => setDays(e.target.value)}>
             {choices.map((d) => <option key={d} value={d}>{t("gui_reports_days", { n: d })}</option>)}
+            {datesOffered && <option value="custom">{t("gui_reports_custom_period")}</option>}
           </select>
         </label>
+        {days === "custom" && (
+          <>
+            <label>
+              {t("gui_reports_period_from")}
+              <input type="date" name="period_from" value={from} min={entry.earliest_day ?? undefined}
+                     max={to || entry.latest_day} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label>
+              {t("gui_reports_period_to")}
+              <input type="date" name="period_to" value={to} min={from || entry.earliest_day || undefined}
+                     max={entry.latest_day} onChange={(e) => setTo(e.target.value)} />
+            </label>
+          </>
+        )}
         <label>
           {t("gui_reports_language")}
           <select name="lang" value={lang} onChange={(e) => setLang(e.target.value)}>
@@ -99,13 +118,19 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
           </label>
         )}
       </div>
+      {days === "custom" && (
+        <p className="hint" data-role="period-hint">
+          {t("gui_reports_period_hint", { first: entry.earliest_day ?? "", last: entry.latest_day })}
+        </p>
+      )}
       {entry.accepts_filter && (
         <ReportFilter choices={catalog.label_choices} rows={rows} onChange={setRows} requireApp={entry.requires_app} />
       )}
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       <div className="actions">
         <button type="button" className="btn-primary"
-          disabled={busy || formats.length === 0 || (entry.requires_app && !namesApp(rows))} onClick={() => void submit()}>
+          disabled={busy || formats.length === 0 || (entry.requires_app && !namesApp(rows))
+            || (days === "custom" && (from === "" || to === ""))} onClick={() => void submit()}>
           {t("gui_reports_generate")}
         </button>
       </div>

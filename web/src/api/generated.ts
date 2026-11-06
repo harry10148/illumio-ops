@@ -1833,8 +1833,10 @@ export interface CatalogEntry {
 accepts_filter: boolean
 available: boolean
 copies: number
+earliest_day: (string | null)
 formats: ReportFormat[]
 group: string
+latest_day: string
 max_lookback: (number | null)
 mode: ("basic" | "on_demand")
 reason_key: (string | null)
@@ -1873,6 +1875,8 @@ filter?: (FlowCondition | null)
 formats?: ReportFormat[]
 lang?: (Language | null)
 lookback_days?: number
+period_from?: (string | null)
+period_to?: (string | null)
 /**
  * @maxItems 50
  */

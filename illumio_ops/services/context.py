@@ -59,6 +59,10 @@ class AppContext:
         """Where kept traffic starts: `days` back from now, or nothing cut off in an on-demand store."""
         return datetime.min.replace(tzinfo=UTC) if self.ondemand else now - timedelta(days=days)
 
+    def event_floor(self, days: int, now: datetime) -> datetime:
+        """Where kept events start: as traffic_floor (a throwaway store holds what was loaded into it)."""
+        return datetime.min.replace(tzinfo=UTC) if self.ondemand else now - timedelta(days=days)
+
     def flows(self) -> FlowDb:
         assert self.flowdb is not None  # set in __post_init__
         return self.flowdb

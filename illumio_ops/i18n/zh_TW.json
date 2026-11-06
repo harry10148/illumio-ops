@@ -2817,5 +2817,16 @@
   "guide_det_quiet_host_wakes": "長期安靜的主機突然活躍。確認是否有人重新啟用它；久無動靜的主機常被當成藏身處。若確認是正常行為，用下方「標為已知」，之後同樣的情形不再告警。",
   "guide_det_data_staging": "多台內部主機把資料匯集到這台主機，常見於資料外洩前的集中。確認是否為備份或報表等已知工作；不是的話查這台主機接下來把資料送去哪裡。若確認是正常行為，用下方「標為已知」，之後同樣的情形不再告警。",
   "guide_det_off_hours": "這台主機在平常不活動的時段發起連線。確認是否為排程工作或值班人員的操作。若確認是正常行為，用下方「標為已知」，之後同樣的情形不再告警。",
-  "guide_title": "建議處置"
+  "guide_title": "建議處置",
+  "rpt_err_before_archive": "期間的起點早於能讀到的資料：本機保留與封存都沒有更早的流量。請把起點改到日期欄允許的最早日期之後。",
+  "rpt_err_period_not_over": "報表以整天計算：最後一天最晚只能是昨天。",
+  "rpt_quality_archive_flows": "{first} 到 {last}（{n} 天）的流量來自封存：本機已不保留這些日子。",
+  "rpt_quality_archive_events": "{first} 到 {last}（{n} 天）的事件來自封存：本機已不保留這些日子。",
+  "rpt_quality_archive_missing": "有 {n} 天本機與封存都沒有資料，報表不含這些日子：{days}。",
+  "rpt_quality_archive_unreadable": "封存裡有 {n} 筆紀錄讀不出來（檔案損毀或格式不符），未納入報表。",
+  "rpt_quality_archive_truncated": "從封存載入到 {n} 筆時停止：{start} 之後的封存資料不在報表裡。請縮短期間。",
+  "gui_reports_custom_period": "指定日期",
+  "gui_reports_period_from": "從",
+  "gui_reports_period_to": "到",
+  "gui_reports_period_hint": "以顯示時區的整天計算，含起訖兩天；可選 {first} 到 {last}。本機已不保留的日子從封存讀取，報表會註明。"
 }
