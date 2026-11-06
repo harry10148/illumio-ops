@@ -13724,6 +13724,1167 @@
         "type": "object"
       }
     },
+    "fleet.enforcement_apply": {
+      "method": "POST",
+      "path": "/api/fleet/enforcement/apply",
+      "request_schema": {
+        "$defs": {
+          "EnforcementHost": {
+            "properties": {
+              "from_mode": {
+                "title": "From Mode",
+                "type": "string"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "from_mode"
+            ],
+            "title": "EnforcementHost",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "hosts": {
+            "items": {
+              "$ref": "#/$defs/EnforcementHost"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Hosts",
+            "type": "array"
+          },
+          "target": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "hosts"
+        ],
+        "title": "EnforcementApplyRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "FleetResult": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "previous": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Previous"
+              },
+              "status": {
+                "enum": [
+                  "ok",
+                  "failed",
+                  "skipped",
+                  "unknown"
+                ],
+                "title": "Status",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "status",
+              "detail",
+              "previous"
+            ],
+            "title": "FleetResult",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "action": {
+            "enum": [
+              "enforcement",
+              "traffic_rate"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/$defs/FleetResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "required": [
+          "action",
+          "batch_id",
+          "target",
+          "results",
+          "until"
+        ],
+        "title": "FleetOutcome",
+        "type": "object"
+      }
+    },
+    "fleet.enforcement_preview": {
+      "method": "POST",
+      "path": "/api/fleet/enforcement/preview",
+      "request_schema": {
+        "$defs": {
+          "LabelPick": {
+            "properties": {
+              "key": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "value": {
+                "maxLength": 255,
+                "minLength": 1,
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ],
+            "title": "LabelPick",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Keys",
+            "type": "array"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/$defs/LabelPick"
+            },
+            "maxItems": 8,
+            "title": "Labels",
+            "type": "array"
+          },
+          "target": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "title": "EnforcementPreviewRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "FleetTarget": {
+            "properties": {
+              "current": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Current"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "online": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "online",
+                      "lost_24h",
+                      "lost_48h",
+                      "long_offline",
+                      "unknown"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Online"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unmanaged",
+                      "not_in_inventory",
+                      "same_mode",
+                      "not_forward",
+                      "mode_changed"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "ok",
+              "reason",
+              "current",
+              "online"
+            ],
+            "title": "FleetTarget",
+            "type": "object"
+          },
+          "HostBlocks": {
+            "properties": {
+              "inbound": {
+                "title": "Inbound",
+                "type": "integer"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "top_sources": {
+                "items": {
+                  "$ref": "#/$defs/RankedSource"
+                },
+                "title": "Top Sources",
+                "type": "array"
+              },
+              "would_block": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Would Block"
+              }
+            },
+            "required": [
+              "key",
+              "inbound",
+              "would_block",
+              "top_sources"
+            ],
+            "title": "HostBlocks",
+            "type": "object"
+          },
+          "PullInfo": {
+            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "properties": {
+              "capped": {
+                "title": "Capped",
+                "type": "boolean"
+              },
+              "end": {
+                "format": "date-time",
+                "title": "End",
+                "type": "string"
+              },
+              "read_at": {
+                "format": "date-time",
+                "title": "Read At",
+                "type": "string"
+              },
+              "rows": {
+                "title": "Rows",
+                "type": "integer"
+              },
+              "start": {
+                "format": "date-time",
+                "title": "Start",
+                "type": "string"
+              },
+              "truncated_windows": {
+                "title": "Truncated Windows",
+                "type": "integer"
+              },
+              "unread_from": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Unread From"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rows",
+              "capped",
+              "unread_from",
+              "truncated_windows",
+              "read_at"
+            ],
+            "title": "PullInfo",
+            "type": "object"
+          },
+          "RankedSource": {
+            "properties": {
+              "connections": {
+                "title": "Connections",
+                "type": "integer"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "connections"
+            ],
+            "title": "RankedSource",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "basis": {
+            "enum": [
+              "connections",
+              "none",
+              "deny_rules"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/$defs/HostBlocks"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "gaps": {
+            "title": "Gaps",
+            "type": "integer"
+          },
+          "pulled": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PullInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/$defs/FleetTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "window_end": {
+            "format": "date-time",
+            "title": "Window End",
+            "type": "string"
+          },
+          "window_start": {
+            "format": "date-time",
+            "title": "Window Start",
+            "type": "string"
+          },
+          "write_key": {
+            "title": "Write Key",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "target",
+          "write_key",
+          "basis",
+          "targets",
+          "blocks",
+          "window_start",
+          "window_end",
+          "pulled",
+          "gaps",
+          "truncated"
+        ],
+        "title": "EnforcementPreview",
+        "type": "object"
+      }
+    },
+    "fleet.history": {
+      "method": "GET",
+      "path": "/api/fleet/actions",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "FleetAction": {
+            "properties": {
+              "action": {
+                "title": "Action",
+                "type": "string"
+              },
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "batch_id": {
+                "title": "Batch Id",
+                "type": "string"
+              },
+              "by": {
+                "title": "By",
+                "type": "string"
+              },
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "hostname": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Hostname"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "previous_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Previous Mode"
+              },
+              "result": {
+                "title": "Result",
+                "type": "string"
+              },
+              "target_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Target Mode"
+              },
+              "workload_href": {
+                "title": "Workload Href",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "at",
+              "by",
+              "action",
+              "batch_id",
+              "workload_href",
+              "hostname",
+              "previous_mode",
+              "target_mode",
+              "result",
+              "detail"
+            ],
+            "title": "FleetAction",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/$defs/FleetAction"
+            },
+            "title": "Actions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "actions"
+        ],
+        "title": "FleetHistory",
+        "type": "object"
+      }
+    },
+    "fleet.hosts": {
+      "method": "GET",
+      "path": "/api/fleet/hosts",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "FleetHost": {
+            "properties": {
+              "app": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "App"
+              },
+              "env": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Env"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "last_heartbeat_at": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Heartbeat At"
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Mode"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "online": {
+                "enum": [
+                  "online",
+                  "lost_24h",
+                  "lost_48h",
+                  "long_offline",
+                  "unknown"
+                ],
+                "title": "Online",
+                "type": "string"
+              },
+              "os_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Os Id"
+              },
+              "policy_sync_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Policy Sync State"
+              },
+              "problems": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Problems",
+                "type": "array"
+              },
+              "ven_version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Ven Version"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "mode",
+              "ven_version",
+              "os_id",
+              "online",
+              "last_heartbeat_at",
+              "policy_sync_state",
+              "problems",
+              "env",
+              "app"
+            ],
+            "title": "FleetHost",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "hosts": {
+            "items": {
+              "$ref": "#/$defs/FleetHost"
+            },
+            "title": "Hosts",
+            "type": "array"
+          },
+          "limit_hit": {
+            "title": "Limit Hit",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "hosts",
+          "limit_hit"
+        ],
+        "title": "FleetHostList",
+        "type": "object"
+      }
+    },
+    "fleet.overview": {
+      "method": "GET",
+      "path": "/api/fleet/overview",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "Tally": {
+            "properties": {
+              "hosts": {
+                "title": "Hosts",
+                "type": "integer"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Value"
+              }
+            },
+            "required": [
+              "value",
+              "hosts"
+            ],
+            "title": "Tally",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "env_key": {
+            "title": "Env Key",
+            "type": "string"
+          },
+          "environments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Environments",
+            "type": "array"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "modes": {
+            "items": {
+              "$ref": "#/$defs/Tally"
+            },
+            "title": "Modes",
+            "type": "array"
+          },
+          "online": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Online",
+            "type": "object"
+          },
+          "sync_problems": {
+            "title": "Sync Problems",
+            "type": "integer"
+          },
+          "sync_states": {
+            "items": {
+              "$ref": "#/$defs/Tally"
+            },
+            "title": "Sync States",
+            "type": "array"
+          },
+          "systems": {
+            "items": {
+              "$ref": "#/$defs/Tally"
+            },
+            "title": "Systems",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/$defs/Tally"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "total",
+          "fetched_at",
+          "env_key",
+          "modes",
+          "versions",
+          "systems",
+          "online",
+          "sync_states",
+          "sync_problems",
+          "environments"
+        ],
+        "title": "FleetOverview",
+        "type": "object"
+      }
+    },
+    "fleet.rate_apply": {
+      "method": "POST",
+      "path": "/api/fleet/traffic-rate/apply",
+      "request_schema": {
+        "properties": {
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "keys"
+        ],
+        "title": "FleetKeys",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "FleetResult": {
+            "properties": {
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "previous": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Previous"
+              },
+              "status": {
+                "enum": [
+                  "ok",
+                  "failed",
+                  "skipped",
+                  "unknown"
+                ],
+                "title": "Status",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "status",
+              "detail",
+              "previous"
+            ],
+            "title": "FleetResult",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "action": {
+            "enum": [
+              "enforcement",
+              "traffic_rate"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/$defs/FleetResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "required": [
+          "action",
+          "batch_id",
+          "target",
+          "results",
+          "until"
+        ],
+        "title": "FleetOutcome",
+        "type": "object"
+      }
+    },
+    "fleet.rate_check": {
+      "method": "POST",
+      "path": "/api/fleet/traffic-rate/check",
+      "request_schema": {
+        "properties": {
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "keys"
+        ],
+        "title": "FleetKeys",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "FleetTarget": {
+            "properties": {
+              "current": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Current"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "online": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "online",
+                      "lost_24h",
+                      "lost_48h",
+                      "long_offline",
+                      "unknown"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Online"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "unmanaged",
+                      "not_in_inventory",
+                      "same_mode",
+                      "not_forward",
+                      "mode_changed"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Reason"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "ok",
+              "reason",
+              "current",
+              "online"
+            ],
+            "title": "FleetTarget",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/$defs/FleetTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "write_key": {
+            "title": "Write Key",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "write_key",
+          "minutes",
+          "targets"
+        ],
+        "title": "RateCheck",
+        "type": "object"
+      }
+    },
     "home.focus": {
       "method": "GET",
       "path": "/api/home/focus",

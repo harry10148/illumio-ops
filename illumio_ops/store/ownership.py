@@ -25,6 +25,7 @@ TABLE_OWNERS: dict[str, str] = {
     "alert_id_floor": "illumio_ops.store.alerts",
     "siem_cursor": "illumio_ops.store.siem",
     "siem_dlq": "illumio_ops.store.siem",
+    "fleet_actions": "illumio_ops.store.fleet_actions",
     # data/flows.sqlite
     "pce_binding": "illumio_ops.store.flowdb.binding",
     "ingest_state": "illumio_ops.store.flowdb.ingest_state",

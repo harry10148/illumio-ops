@@ -47,6 +47,13 @@ def replace_inventory(conn: sqlite3.Connection, rows: Sequence[WorkloadRow]) -> 
         conn.executemany(f"INSERT INTO workloads ({_COLUMNS}) VALUES ({_MARKS})", [astuple(r) for r in rows])
 
 
+def set_enforcement_mode(conn: sqlite3.Connection, href: str, mode: str) -> None:
+    """One workload's mode after the PCE accepted a change to it (services.fleet_write), until the next inventory read
+    replaces the whole list."""
+    with transaction(conn):
+        conn.execute("UPDATE workloads SET enforcement_mode = ? WHERE href = ?", (mode, href))
+
+
 def all_workloads(conn: sqlite3.Connection) -> list[WorkloadRow]:
     return [WorkloadRow(*r) for r in conn.execute(f"SELECT {_COLUMNS} FROM workloads ORDER BY href")]
 
