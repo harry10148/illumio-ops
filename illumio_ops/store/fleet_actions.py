@@ -28,3 +28,9 @@ def recent(conn: sqlite3.Connection, *, pce_url: str, org_id: str, limit: int) -
     params: list[Any] = [pce_url, org_id, limit]
     return conn.execute("SELECT * FROM fleet_actions WHERE pce_url = ? AND org_id = ? ORDER BY id DESC LIMIT ?",
                         params).fetchall()
+
+
+def move_pce(conn: sqlite3.Connection, *, old_url: str, new_url: str, org_id: str) -> int:
+    """The same PCE moved to a new address (System › PCE connection, decision D3): its record follows it."""
+    return int(conn.execute("UPDATE fleet_actions SET pce_url = ? WHERE pce_url = ? AND org_id = ?",
+                            (new_url, old_url, org_id)).rowcount)

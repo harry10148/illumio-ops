@@ -434,3 +434,59 @@ def test_a_put_back_discards_the_draft_rather_than_writing_the_old_value(ctx):
     reverts = [c for c in responses.calls if c.request.url == REVERT_URL]
     assert len(reverts) == 1 and json.loads(reverts[0].request.body) == _reverted()
     assert {"enabled": False} not in _puts()
+
+
+# ── edit and "check now" (5.x upsert and POST /api/rule_scheduler/check; parity 2026-11-06) ─────────────
+
+@responses.activate
+def test_update_changes_the_plan_and_rewrites_the_note(ctx):
+    sid = _add(ctx, href=RS)
+    _pce(href=RS, enabled=True)
+    evening = Weekly(days=("tue",), start="18:00", end="23:00", timezone="Asia/Taipei", action="disable_in_window")
+    view = rs.update(ctx, sid, evening, now=NOW)
+    assert view.plan == evening and view.preview_key == "rs_preview_weekly_disable"
+    assert _puts() == [{"description": "keep\n[📅 Recurring: Tue 18:00-23:00 (Asia/Taipei) Disable in window]"}]
+    with ctx.db() as conn:
+        assert rs.plan_of(store.get(conn, sid)["plan_json"]) == evening
+
+
+@responses.activate
+def test_update_refused_by_the_pce_keeps_the_old_plan(ctx):
+    sid = _add(ctx, href=RS)
+    _pce(href=RS, enabled=True, put=403)
+    evening = Weekly(days=("tue",), start="18:00", end="23:00", timezone="Asia/Taipei", action="disable_in_window")
+    with pytest.raises(rs.PceRefused):
+        rs.update(ctx, sid, evening, now=NOW)
+    with ctx.db() as conn:
+        assert rs.plan_of(store.get(conn, sid)["plan_json"]) == WINDOW
+
+
+@responses.activate
+def test_check_now_runs_one_schedule_as_the_tick_does(ctx):
+    sid = _add(ctx)
+    _add(ctx, href=OTHER)  # not asked: an unregistered PCE call would fail the test
+    _pce(enabled=False)
+    result = rs.check_now(ctx, sid, now=NOW)
+    assert result.outcome == "switched" and result.item is not None and result.item.live == "enabled"
+    assert _puts() == [{"enabled": True}] and _runs(ctx) == [("enable", "ok", None)]
+
+
+@responses.activate
+def test_check_now_records_a_pce_failure_like_the_tick(ctx):
+    sid = _add(ctx)
+    responses.add(responses.GET, API + pw.draft_href(RULE), status=500, body="boom")
+    result = rs.check_now(ctx, sid, now=NOW)
+    assert result.outcome == "failed" and _runs(ctx) == [("error", "failed", 500)]
+
+
+def test_check_now_needs_the_write_key_and_an_active_schedule(tmp_path):
+    c = configured_ctx(tmp_path, mode="full")
+    sid = _add(c)
+    with pytest.raises(rs.NoWriteKey):
+        rs.check_now(c, sid, now=NOW)
+    c.settings.update(c.settings.current().revision, lambda d: d["pce"].update(write_api_key="wk", write_api_secret="ws"))
+    with pytest.raises(LookupError):
+        rs.check_now(c, 999, now=NOW)
+    paused = _add(c, href=OTHER, paused=True)
+    with pytest.raises(rs.SchedulePaused):
+        rs.check_now(c, paused, now=NOW)

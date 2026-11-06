@@ -295,3 +295,11 @@ def delete_alerts_before(conn: sqlite3.Connection, cutoff: datetime) -> int:
 def row_params(row: sqlite3.Row) -> dict[str, Any]:
     params: dict[str, Any] = json.loads(row["params_json"])
     return params
+
+
+def move_pce(conn: sqlite3.Connection, *, old_url: str, new_url: str, org_id: str) -> int:
+    """The same PCE moved to a new address (System › PCE connection, decision D3): its rows follow it."""
+    n = conn.execute("UPDATE alerts SET pce_url = ? WHERE pce_url = ? AND org_id = ?",
+                     (new_url, old_url, org_id)).rowcount
+    conn.execute("UPDATE alert_eval_state SET pce_url = ? WHERE pce_url = ? AND org_id = ?", (new_url, old_url, org_id))
+    return int(n)

@@ -1,9 +1,10 @@
 // Rule scheduling (UI redesign spec §4.5, sample 05): enable or disable an active PCE rule or rule set by a weekly
 // window or an expiry; the engine checks every five minutes and provisions with the write key.
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type { DeleteResult, RuleSchedulesView, RunView, ScheduleView, TargetHit, Weekly, Expiry } from "../../api/generated";
+import type { CheckResult, DeleteResult, RuleSchedulesView, RunView, ScheduleView, TargetHit, Weekly, Expiry } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { DataTable, DetailPane, KpiStrip, ModeMark, PageHead, Panel, Tag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
@@ -95,21 +96,83 @@ function Week({ items }: { items: ScheduleView[] }) {
   );
 }
 
+/** datetime-local text ("YYYY-MM-DDTHH:MM") of an instant, in the browser's zone. */
+function localInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** The plan being written: a new schedule starts from office hours in the browser's zone; an edit from its plan (a
+ * weekly window keeps its zone, since its times are that zone's; an expiry is shown and saved in the browser's). */
+function usePlan(initial: Weekly | Expiry | null) {
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const weekly = initial && "days" in initial ? initial : null;
+  const [kind, setKind] = useState<"weekly" | "expiry">(initial && !weekly ? "expiry" : "weekly");
+  const [days, setDays] = useState<Day[]>(weekly ? [...weekly.days] as Day[] : ["mon", "tue", "wed", "thu", "fri"]);
+  const [start, setStart] = useState(weekly?.start ?? "09:00");
+  const [end, setEnd] = useState(weekly?.end ?? "18:00");
+  const [action, setAction] = useState<"enable_in_window" | "disable_in_window">(weekly?.action ?? "enable_in_window");
+  const [expireAt, setExpireAt] = useState(initial && "expire_at" in initial ? localInput(initial.expire_at) : "");
+  const zone = kind === "weekly" && weekly ? weekly.timezone : browserZone;
+  const plan: Weekly | Expiry = kind === "weekly"
+    ? { kind: "weekly", days: days as Weekly["days"], start, end, timezone: zone, action }
+    : { kind: "expiry", expire_at: expireAt ? new Date(expireAt).toISOString() : "", timezone: zone };
+  const preview = kind === "weekly"
+    ? previewText(action === "enable_in_window" ? "rs_preview_weekly_enable" : "rs_preview_weekly_disable",
+      { days: DAYS.filter((d) => days.includes(d)).join(","), start, end, next_day: start > end ? "1" : "0" })
+    : expireAt ? previewText("rs_preview_expiry", { at: expireAt.replace("T", " "), timezone: zone }) : "";
+  const valid = kind === "weekly" ? days.length > 0 && start !== end : expireAt !== "";
+  const fields = (
+    <>
+      <div className="chips-row" role="group">
+        <button type="button" className="chip-btn" aria-pressed={kind === "weekly"} onClick={() => setKind("weekly")}>{t("rs_type_weekly")}</button>
+        <button type="button" className="chip-btn" aria-pressed={kind === "expiry"} onClick={() => setKind("expiry")}>{t("rs_type_expiry")}</button>
+      </div>
+      {kind === "weekly" ? (
+        <>
+          <div className="chips-row" role="group" aria-label={t("rs_days")}>
+            {DAYS.map((d) => (
+              <label key={d} className="check">
+                <input type="checkbox" name={`rs_day_${d}`} checked={days.includes(d)}
+                       onChange={(e) => setDays(e.target.checked ? [...days, d] : days.filter((x) => x !== d))} />
+                {t(DAY_KEYS[d])}
+              </label>
+            ))}
+          </div>
+          <div className="row">
+            <label>{t("rs_start")}<input type="time" name="rs_start" value={start} onChange={(e) => setStart(e.target.value)} /></label>
+            <label>{t("rs_end")}<input type="time" name="rs_end" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
+            <span className="hint">{start > end ? t("rs_across_midnight", { zone }) : zone}</span>
+          </div>
+          <div className="row">
+            <label className="check"><input type="radio" name="rs_action" checked={action === "enable_in_window"}
+              onChange={() => setAction("enable_in_window")} />{t("rs_enable_in_window")}</label>
+            <label className="check"><input type="radio" name="rs_action" checked={action === "disable_in_window"}
+              onChange={() => setAction("disable_in_window")} />{t("rs_disable_in_window")}</label>
+          </div>
+        </>
+      ) : (
+        <label>{t("rs_expire_at", { zone })}
+          <input type="datetime-local" name="rs_expire_at" value={expireAt} onChange={(e) => setExpireAt(e.target.value)} />
+        </label>
+      )}
+      {preview && <p data-role="rs-preview">{t("rs_preview_label")}{preview}{t("rs_preview_note")}</p>}
+    </>
+  );
+  return { plan, valid, fields };
+}
+
 function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: () => void }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<TargetHit[] | null>(null);
   const [found, setFound] = useState<{ pce_url: string; org_id: string } | null>(null);
   const searchSeq = useRef(0);
   const [target, setTarget] = useState<TargetHit | null>(null);
-  const [kind, setKind] = useState<"weekly" | "expiry">("weekly");
-  const [days, setDays] = useState<Day[]>(["mon", "tue", "wed", "thu", "fri"]);
-  const [start, setStart] = useState("09:00");
-  const [end, setEnd] = useState("18:00");
-  const [action, setAction] = useState<"enable_in_window" | "disable_in_window">("enable_in_window");
-  const [expireAt, setExpireAt] = useState("");
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { plan, valid: planValid, fields } = usePlan(null);
 
   async function search(e: FormEvent) {
     e.preventDefault();
@@ -125,14 +188,7 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
     } else setError(env.error);
   }
 
-  const plan: Weekly | Expiry = kind === "weekly"
-    ? { kind: "weekly", days: days as Weekly["days"], start, end, timezone: zone, action }
-    : { kind: "expiry", expire_at: expireAt ? new Date(expireAt).toISOString() : "", timezone: zone };
-  const preview = kind === "weekly"
-    ? previewText(action === "enable_in_window" ? "rs_preview_weekly_enable" : "rs_preview_weekly_disable",
-      { days: DAYS.filter((d) => days.includes(d)).join(","), start, end, next_day: start > end ? "1" : "0" })
-    : expireAt ? previewText("rs_preview_expiry", { at: expireAt.replace("T", " "), timezone: zone }) : "";
-  const valid = target !== null && (kind === "weekly" ? days.length > 0 && start !== end : expireAt !== "");
+  const valid = target !== null && planValid;
 
   async function create() {
     if (!target) return;
@@ -181,39 +237,7 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
       ))}
       {target && (
         <>
-          <div className="chips-row" role="group">
-            <button type="button" className="chip-btn" aria-pressed={kind === "weekly"} onClick={() => setKind("weekly")}>{t("rs_type_weekly")}</button>
-            <button type="button" className="chip-btn" aria-pressed={kind === "expiry"} onClick={() => setKind("expiry")}>{t("rs_type_expiry")}</button>
-          </div>
-          {kind === "weekly" ? (
-            <>
-              <div className="chips-row" role="group" aria-label={t("rs_days")}>
-                {DAYS.map((d) => (
-                  <label key={d} className="check">
-                    <input type="checkbox" name={`rs_day_${d}`} checked={days.includes(d)}
-                           onChange={(e) => setDays(e.target.checked ? [...days, d] : days.filter((x) => x !== d))} />
-                    {t(DAY_KEYS[d])}
-                  </label>
-                ))}
-              </div>
-              <div className="row">
-                <label>{t("rs_start")}<input type="time" name="rs_start" value={start} onChange={(e) => setStart(e.target.value)} /></label>
-                <label>{t("rs_end")}<input type="time" name="rs_end" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
-                <span className="hint">{start > end ? t("rs_across_midnight", { zone }) : zone}</span>
-              </div>
-              <div className="row">
-                <label className="check"><input type="radio" name="rs_action" checked={action === "enable_in_window"}
-                  onChange={() => setAction("enable_in_window")} />{t("rs_enable_in_window")}</label>
-                <label className="check"><input type="radio" name="rs_action" checked={action === "disable_in_window"}
-                  onChange={() => setAction("disable_in_window")} />{t("rs_disable_in_window")}</label>
-              </div>
-            </>
-          ) : (
-            <label>{t("rs_expire_at", { zone })}
-              <input type="datetime-local" name="rs_expire_at" value={expireAt} onChange={(e) => setExpireAt(e.target.value)} />
-            </label>
-          )}
-          {preview && <p data-role="rs-preview">{t("rs_preview_label")}{preview}{t("rs_preview_note")}</p>}
+          {fields}
           <div className="actions">
             <button type="button" className="btn-primary" disabled={!valid || busy || !writeKey} onClick={() => void create()}>
               {t("rs_create")}
@@ -230,6 +254,42 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
   );
 }
 
+/** 5.x edited a schedule in place: the new plan's note is written to the PCE first (as a new schedule's is). */
+function EditSchedule({ schedule, writeKey, onDone }: { schedule: ScheduleView; writeKey: boolean; onDone: (saved: boolean) => void }) {
+  const { plan, valid, fields } = usePlan(schedule.plan);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    const env = await call("rule_schedules.update", { plan }, { schedule_id: String(schedule.id) });
+    setBusy(false);
+    if (env.ok) onDone(true);
+    else setError(env.error);
+  }
+
+  return (
+    <div className="stack" data-role="rs-edit">
+      <h2>{t("rs_edit_title")}</h2>
+      <p>{schedule.is_ruleset ? t("rs_whole_ruleset", { name: schedule.name }) : `${schedule.name} · ${schedule.ruleset_name}`}</p>
+      <p className="hint mono">{schedule.summary}</p>
+      {!writeKey && <p className="notice">{t("rs_no_write_key")}</p>}
+      {fields}
+      <div className="actions">
+        <button type="button" className="btn-primary" disabled={!valid || busy || !writeKey} onClick={() => void save()}>
+          {t("rs_edit_save")}
+        </button>
+        <button type="button" className="btn-quiet" onClick={() => onDone(false)}>{t("btn_cancel")}</button>
+      </div>
+      {error && <p className="form-error" data-role="rs-error">{t(error.message_key, error.params)}</p>}
+    </div>
+  );
+}
+
+const OUTCOME_KEYS: Record<string, string> = {
+  switched: "rs_check_switched", failed: "rs_check_failed", skipped: "rs_check_skipped", none: "rs_check_none",
+};
+
 export function RuleSchedules() {
   const lang = useLang();
   const [view, setView] = useState<RuleSchedulesView | null>(null);
@@ -237,6 +297,9 @@ export function RuleSchedules() {
   const [error, setError] = useState<ApiError | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [deleted, setDeleted] = useState<DeleteResult | null>(null);
+  const [editing, setEditing] = useState<ScheduleView | null>(null);
+  const [checked, setChecked] = useState<{ name: string; outcome: CheckResult["outcome"] } | null>(null);
+  const [checking, setChecking] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const [env, r] = await Promise.all([call("rule_schedules.list"), call("rule_schedules.runs")]);
@@ -255,6 +318,17 @@ export function RuleSchedules() {
     void load();
   }
 
+  async function checkNow(s: ScheduleView) {
+    setChecking(s.id);
+    const env = await call("rule_schedules.check", {}, { schedule_id: String(s.id) });
+    setChecking(null);
+    if (env.ok && env.data) {
+      setChecked({ name: s.name, outcome: env.data.outcome });
+      setError(null);
+    } else setError(env.error);
+    void load();
+  }
+
   async function remove(id: number) {
     const env = await call("rule_schedules.delete", undefined, { schedule_id: String(id) });
     setDeleting(null);
@@ -266,7 +340,10 @@ export function RuleSchedules() {
   const o = view?.overview;
   return (
     <section className="page" data-role="rule-schedules">
-      <PageHead title={t("nav_rule_schedules")} sub={t("rs_sub")}><ModeMark needs="basic" /></PageHead>
+      <PageHead title={t("nav_rule_schedules")} sub={t("rs_sub")}>
+        <Link to="/rule-schedules/rulesets" data-role="rs-browse-rulesets">{t("rs_browse_rulesets")}</Link>
+        <ModeMark needs="basic" />
+      </PageHead>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {o && !o.write_key && <p className="notice" data-role="rs-no-write-key">{t("rs_no_write_key")}</p>}
       <KpiStrip items={[
@@ -277,6 +354,11 @@ export function RuleSchedules() {
         { key: "next", label: t("rs_kpi_next"), value: o?.next_change ? shortTime(o.next_change) : null,
           reason: t("rs_kpi_next_none") },
       ]} />
+      {checked && (
+        <p className="notice" role="status" data-role="rs-checked">
+          {t(OUTCOME_KEYS[checked.outcome] ?? "rs_check_none", { name: checked.name })}
+        </p>
+      )}
       {deleted && (
         <p className="notice" data-role="rs-deleted">
           {deleted.note_cleared ? t(deleted.provisioned ? "rs_deleted_ok" : "rs_deleted_note_draft")
@@ -312,6 +394,11 @@ export function RuleSchedules() {
                   </div>) : <span className="hint">{t("rs_never_checked")}</span>) },
                 { key: "act", label: "", render: (s) => (
                   <div className="row nowrap">
+                    <button type="button" className="btn-quiet" data-role="rs-check" disabled={s.paused || checking !== null}
+                            title={s.paused ? t("rs_check_paused") : undefined} onClick={() => void checkNow(s)}>
+                      {checking === s.id ? t("rs_checking") : t("rs_check_now")}
+                    </button>
+                    <button type="button" className="btn-quiet" data-role="rs-edit-open" onClick={() => setEditing(s)}>{t("rs_edit")}</button>
                     <button type="button" className="btn-quiet" onClick={() => void pause(s)}>{s.paused ? t("rs_resume") : t("rs_pause")}</button>
                     {deleting === s.id
                       ? <button type="button" className="btn-danger" data-role="rs-delete-confirm" onClick={() => void remove(s.id)}>{t("rs_delete_confirm")}</button>
@@ -335,8 +422,11 @@ export function RuleSchedules() {
             />
           </Panel>
         </div>
-        <DetailPane label={t("rs_new_title")}>
-          <NewSchedule writeKey={o?.write_key ?? false} onCreated={() => void load()} />
+        <DetailPane label={editing ? t("rs_edit_title") : t("rs_new_title")}>
+          {editing
+            ? <EditSchedule key={editing.id} schedule={editing} writeKey={o?.write_key ?? false}
+                            onDone={() => { setEditing(null); void load(); }} />
+            : <NewSchedule writeKey={o?.write_key ?? false} onCreated={() => void load()} />}
         </DetailPane>
       </div>
     </section>

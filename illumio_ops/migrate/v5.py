@@ -8,6 +8,7 @@ report still lists every key. Nothing is skipped silently.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -111,6 +112,17 @@ def read_v5(v5_root: Path, reader: Callable[[Path], str] | None = None) -> dict[
     if not (isinstance(data, dict) and known & set(data) and "schema_version" not in data):
         raise ValueError("this is not a 5.x config.json")
     return data
+
+
+# 5.x files outside config.json that v6 does not carry; each one present is listed in the report (spec §7).
+# fleet_progressions.json: the VEN enforcement progression records 5.2.0 wrote (VEN fleet management is not in v6.0).
+NOT_CARRIED_FILES: dict[str, str] = {"config/fleet_progressions.json": "migrate_fleet_progressions_not_in_v6"}
+
+
+def not_carried_files(v5_root: Path) -> list[MigrationItem]:
+    """Present means present as anything, a link included: listed by name, never opened or followed."""
+    return [MigrationItem(rel, None, "unsupported", reason) for rel, reason in NOT_CARRIED_FILES.items()
+            if os.path.lexists(v5_root / rel)]
 
 
 @dataclass(frozen=True)

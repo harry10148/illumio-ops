@@ -4,6 +4,7 @@ rules, described by the PCE's own names (labels, IP lists, services), with wheth
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel
@@ -59,7 +60,7 @@ def _service(s: dict[str, Any], names: dict[str, str]) -> str:
     return f"{port}{'-' + str(to) if to else ''}/{word}" if word else str(port)
 
 
-def _summary(rule: dict[str, Any], names: dict[str, str], lang: Language) -> str:
+def rule_summary(rule: dict[str, Any], names: dict[str, str], lang: Language) -> str:
     """The rule in the PCE's own names; the words around them in the display language at search time (the summary is
     kept with the schedule as it was shown)."""
     src = ", ".join(_actor(a, names, lang) for a in rule.get("consumers") or []) or "?"
@@ -68,15 +69,27 @@ def _summary(rule: dict[str, Any], names: dict[str, str], lang: Language) -> str
     return f"{src} → {dst}: {svc or translate(lang, 'rs_service_all')}"
 
 
-def search(ctx: AppContext, q: str) -> TargetSearch:
-    text = q.strip()
-    if not text:
-        return TargetSearch(items=[], limited=False)
+@dataclass(frozen=True)
+class PolicyRead:
+    """The active rule sets read (name filter, or all), the names to describe their rules, which hrefs have a pending
+    draft (a pending rule holds its whole rule set), and which are scheduled on this PCE."""
+    active: list[dict[str, Any]]
+    names: dict[str, str]
+    pending: set[str]
+    scheduled: set[str]
+    pce_url: str
+    org_id: str
+
+
+def read_policy(ctx: AppContext, name: str | None) -> PolicyRead:
+    """name: the PCE's rule set name filter; None reads every rule set. Read with the main (read-only) key; the PCE's
+    failures propagate (PceNotConfigured, PceCollectionIncomplete, PceTransportError, PceBudgetExhausted)."""
     cfg = ctx.settings.current().pce
     deadline = time.monotonic() + DEADLINE_S
+    params = {"name": name} if name else {}
     with ctx.pce_client(cfg) as client:
-        active = get_all(client, "/sec_policy/active/rule_sets", params={"name": text}, deadline=deadline)
-        draft = get_all(client, "/sec_policy/draft/rule_sets", params={"name": text}, deadline=deadline)
+        active = get_all(client, "/sec_policy/active/rule_sets", params=params, deadline=deadline)
+        draft = get_all(client, "/sec_policy/draft/rule_sets", params=params, deadline=deadline)
         names = {x["href"]: f"{x.get('key')}={x.get('value')}" for x in get_all(client, "/labels", params={},
                                                                               deadline=deadline) if x.get("href")}
         for path in ("/sec_policy/active/ip_lists", "/sec_policy/active/services"):
@@ -90,22 +103,35 @@ def search(ctx: AppContext, q: str) -> TargetSearch:
                 if any(r.get("update_type") for kind in ("rules", "deny_rules") for r in x.get(kind) or [])}
     with ctx.db() as conn:
         scheduled = {r["href"] for r in store.list_for(conn, pce_url=cfg.url, org_id=cfg.org_id)}
+    return PolicyRead(active=active, names=names, pending=pending, scheduled=scheduled, pce_url=cfg.url,
+                      org_id=cfg.org_id)
+
+
+def rule_label(href: str, lang: Language) -> str:
+    number = href.rsplit("/", 1)[-1]
+    return translate(lang, "rs_deny_rule_name", {"id": number}) if "/deny_rules/" in href else f"#{number}"
+
+
+def search(ctx: AppContext, q: str) -> TargetSearch:
+    text = q.strip()
+    if not text:
+        return TargetSearch(items=[], limited=False)
+    read = read_policy(ctx, text)
     lang = ctx.settings.current().display.language
     items = []
-    for rs in active[:MAX_RULESETS]:
+    for rs in read.active[:MAX_RULESETS]:
         rs_name = str(rs.get("name") or "")
         rules = [*(rs.get("rules") or []), *(rs.get("deny_rules") or [])]  # deny rules too: 5.x scheduled them
         items.append(TargetHit(href=rs["href"], is_ruleset=True, name=rs_name, ruleset_name=rs_name,
                                summary=translate(lang, "rs_summary_rules", {"n": str(len(rules))}),
                                enabled=bool(rs.get("enabled")),
-                               draft_pending=rs["href"] in pending, scheduled=rs["href"] in scheduled))
+                               draft_pending=rs["href"] in read.pending, scheduled=rs["href"] in read.scheduled))
         for rule in rules:
             href = rule["href"]
-            number = href.rsplit("/", 1)[-1]
-            label = translate(lang, "rs_deny_rule_name", {"id": number}) if "/deny_rules/" in href else f"#{number}"
-            items.append(TargetHit(href=href, is_ruleset=False, name=label,
-                                   ruleset_name=rs_name, summary=_summary(rule, names, lang),
+            items.append(TargetHit(href=href, is_ruleset=False, name=rule_label(href, lang),
+                                   ruleset_name=rs_name, summary=rule_summary(rule, read.names, lang),
                                    enabled=bool(rule.get("enabled")),
-                                   draft_pending=href in pending or rs["href"] in pending,
-                                   scheduled=href in scheduled))
-    return TargetSearch(items=items, limited=len(active) > MAX_RULESETS, pce_url=cfg.url, org_id=cfg.org_id)
+                                   draft_pending=href in read.pending or rs["href"] in read.pending,
+                                   scheduled=href in read.scheduled))
+    return TargetSearch(items=items, limited=len(read.active) > MAX_RULESETS, pce_url=read.pce_url,
+                        org_id=read.org_id)

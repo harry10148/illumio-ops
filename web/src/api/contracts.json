@@ -10875,6 +10875,43 @@
         "type": "object"
       }
     },
+    "auth.username": {
+      "method": "POST",
+      "path": "/api/auth/username",
+      "request_schema": {
+        "properties": {
+          "current_password": {
+            "maxLength": 1024,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 1024,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "current_password"
+        ],
+        "title": "UsernameChangeRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csrf_token"
+        ],
+        "title": "CsrfToken",
+        "type": "object"
+      }
+    },
     "custom_reports.add_section": {
       "method": "POST",
       "path": "/api/custom-reports/sections",
@@ -29386,6 +29423,327 @@
         "type": "object"
       }
     },
+    "rule_schedules.check": {
+      "method": "POST",
+      "path": "/api/rule-schedules/<int:schedule_id>/check",
+      "request_schema": {
+        "properties": {},
+        "title": "Empty",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Expiry": {
+            "additionalProperties": false,
+            "properties": {
+              "expire_at": {
+                "format": "date-time",
+                "title": "Expire At",
+                "type": "string"
+              },
+              "kind": {
+                "const": "expiry",
+                "default": "expiry",
+                "title": "Kind",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "expire_at",
+              "timezone"
+            ],
+            "title": "Expiry",
+            "type": "object"
+          },
+          "RunView": {
+            "properties": {
+              "action": {
+                "title": "Action",
+                "type": "string"
+              },
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "result": {
+                "title": "Result",
+                "type": "string"
+              },
+              "schedule_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Schedule Id"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "at",
+              "schedule_id",
+              "name",
+              "action",
+              "result",
+              "status",
+              "detail"
+            ],
+            "title": "RunView",
+            "type": "object"
+          },
+          "ScheduleView": {
+            "properties": {
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "is_ruleset": {
+                "title": "Is Ruleset",
+                "type": "boolean"
+              },
+              "last_checked_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Checked At"
+              },
+              "last_run": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RunView"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "live": {
+                "enum": [
+                  "enabled",
+                  "disabled",
+                  "unknown"
+                ],
+                "title": "Live",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "next_change": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Next Change"
+              },
+              "paused": {
+                "title": "Paused",
+                "type": "boolean"
+              },
+              "pce_status": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "unknown"
+                ],
+                "title": "Pce Status",
+                "type": "string"
+              },
+              "plan": {
+                "discriminator": {
+                  "mapping": {
+                    "expiry": "#/$defs/Expiry",
+                    "weekly": "#/$defs/Weekly"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Weekly"
+                  },
+                  {
+                    "$ref": "#/$defs/Expiry"
+                  }
+                ],
+                "title": "Plan"
+              },
+              "preview_key": {
+                "title": "Preview Key",
+                "type": "string"
+              },
+              "preview_params": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Preview Params",
+                "type": "object"
+              },
+              "ruleset_name": {
+                "title": "Ruleset Name",
+                "type": "string"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "href",
+              "is_ruleset",
+              "name",
+              "ruleset_name",
+              "summary",
+              "plan",
+              "paused",
+              "pce_status",
+              "live",
+              "last_checked_at",
+              "last_run",
+              "next_change",
+              "preview_key",
+              "preview_params"
+            ],
+            "title": "ScheduleView",
+            "type": "object"
+          },
+          "Weekly": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "enable_in_window",
+                  "disable_in_window"
+                ],
+                "title": "Action",
+                "type": "string"
+              },
+              "days": {
+                "items": {
+                  "enum": [
+                    "mon",
+                    "tue",
+                    "wed",
+                    "thu",
+                    "fri",
+                    "sat",
+                    "sun"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Days",
+                "type": "array"
+              },
+              "end": {
+                "title": "End",
+                "type": "string"
+              },
+              "kind": {
+                "const": "weekly",
+                "default": "weekly",
+                "title": "Kind",
+                "type": "string"
+              },
+              "start": {
+                "title": "Start",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "start",
+              "end",
+              "timezone",
+              "action"
+            ],
+            "title": "Weekly",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ScheduleView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "switched",
+              "failed",
+              "skipped",
+              "none"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "item"
+        ],
+        "title": "CheckResult",
+        "type": "object"
+      }
+    },
     "rule_schedules.create": {
       "method": "POST",
       "path": "/api/rule-schedules",
@@ -30803,6 +31161,138 @@
         "type": "object"
       }
     },
+    "rule_schedules.rulesets": {
+      "method": "GET",
+      "path": "/api/rule-schedules/rulesets",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "RuleItem": {
+            "properties": {
+              "description": {
+                "title": "Description",
+                "type": "string"
+              },
+              "draft_pending": {
+                "title": "Draft Pending",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "allow",
+                  "deny",
+                  "override_deny"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "label": {
+                "title": "Label",
+                "type": "string"
+              },
+              "scheduled": {
+                "title": "Scheduled",
+                "type": "boolean"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "href",
+              "kind",
+              "label",
+              "enabled",
+              "summary",
+              "description",
+              "draft_pending",
+              "scheduled"
+            ],
+            "title": "RuleItem",
+            "type": "object"
+          },
+          "RulesetItem": {
+            "properties": {
+              "description": {
+                "title": "Description",
+                "type": "string"
+              },
+              "draft_pending": {
+                "title": "Draft Pending",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "rules": {
+                "items": {
+                  "$ref": "#/$defs/RuleItem"
+                },
+                "title": "Rules",
+                "type": "array"
+              },
+              "scheduled": {
+                "title": "Scheduled",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "href",
+              "name",
+              "enabled",
+              "description",
+              "draft_pending",
+              "scheduled",
+              "rules"
+            ],
+            "title": "RulesetItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RulesetItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limited": {
+            "title": "Limited",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limited"
+        ],
+        "title": "RulesetBrowse",
+        "type": "object"
+      }
+    },
     "rule_schedules.runs": {
       "method": "GET",
       "path": "/api/rule-schedules/runs",
@@ -30977,6 +31467,404 @@
         "type": "object"
       }
     },
+    "rule_schedules.update": {
+      "method": "PUT",
+      "path": "/api/rule-schedules/<int:schedule_id>",
+      "request_schema": {
+        "$defs": {
+          "Expiry": {
+            "additionalProperties": false,
+            "properties": {
+              "expire_at": {
+                "format": "date-time",
+                "title": "Expire At",
+                "type": "string"
+              },
+              "kind": {
+                "const": "expiry",
+                "default": "expiry",
+                "title": "Kind",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "expire_at",
+              "timezone"
+            ],
+            "title": "Expiry",
+            "type": "object"
+          },
+          "Weekly": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "enable_in_window",
+                  "disable_in_window"
+                ],
+                "title": "Action",
+                "type": "string"
+              },
+              "days": {
+                "items": {
+                  "enum": [
+                    "mon",
+                    "tue",
+                    "wed",
+                    "thu",
+                    "fri",
+                    "sat",
+                    "sun"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Days",
+                "type": "array"
+              },
+              "end": {
+                "title": "End",
+                "type": "string"
+              },
+              "kind": {
+                "const": "weekly",
+                "default": "weekly",
+                "title": "Kind",
+                "type": "string"
+              },
+              "start": {
+                "title": "Start",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "start",
+              "end",
+              "timezone",
+              "action"
+            ],
+            "title": "Weekly",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "plan": {
+            "discriminator": {
+              "mapping": {
+                "expiry": "#/$defs/Expiry",
+                "weekly": "#/$defs/Weekly"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Weekly"
+              },
+              {
+                "$ref": "#/$defs/Expiry"
+              }
+            ],
+            "title": "Plan"
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "title": "ScheduleEdit",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Expiry": {
+            "additionalProperties": false,
+            "properties": {
+              "expire_at": {
+                "format": "date-time",
+                "title": "Expire At",
+                "type": "string"
+              },
+              "kind": {
+                "const": "expiry",
+                "default": "expiry",
+                "title": "Kind",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "expire_at",
+              "timezone"
+            ],
+            "title": "Expiry",
+            "type": "object"
+          },
+          "RunView": {
+            "properties": {
+              "action": {
+                "title": "Action",
+                "type": "string"
+              },
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "result": {
+                "title": "Result",
+                "type": "string"
+              },
+              "schedule_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Schedule Id"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "at",
+              "schedule_id",
+              "name",
+              "action",
+              "result",
+              "status",
+              "detail"
+            ],
+            "title": "RunView",
+            "type": "object"
+          },
+          "Weekly": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "enable_in_window",
+                  "disable_in_window"
+                ],
+                "title": "Action",
+                "type": "string"
+              },
+              "days": {
+                "items": {
+                  "enum": [
+                    "mon",
+                    "tue",
+                    "wed",
+                    "thu",
+                    "fri",
+                    "sat",
+                    "sun"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Days",
+                "type": "array"
+              },
+              "end": {
+                "title": "End",
+                "type": "string"
+              },
+              "kind": {
+                "const": "weekly",
+                "default": "weekly",
+                "title": "Kind",
+                "type": "string"
+              },
+              "start": {
+                "title": "Start",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "start",
+              "end",
+              "timezone",
+              "action"
+            ],
+            "title": "Weekly",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "href": {
+            "title": "Href",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_ruleset": {
+            "title": "Is Ruleset",
+            "type": "boolean"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/RunView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "live": {
+            "enum": [
+              "enabled",
+              "disabled",
+              "unknown"
+            ],
+            "title": "Live",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_change": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Change"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "pce_status": {
+            "enum": [
+              "active",
+              "deleted",
+              "unknown"
+            ],
+            "title": "Pce Status",
+            "type": "string"
+          },
+          "plan": {
+            "discriminator": {
+              "mapping": {
+                "expiry": "#/$defs/Expiry",
+                "weekly": "#/$defs/Weekly"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Weekly"
+              },
+              {
+                "$ref": "#/$defs/Expiry"
+              }
+            ],
+            "title": "Plan"
+          },
+          "preview_key": {
+            "title": "Preview Key",
+            "type": "string"
+          },
+          "preview_params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Preview Params",
+            "type": "object"
+          },
+          "ruleset_name": {
+            "title": "Ruleset Name",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "href",
+          "is_ruleset",
+          "name",
+          "ruleset_name",
+          "summary",
+          "plan",
+          "paused",
+          "pce_status",
+          "live",
+          "last_checked_at",
+          "last_run",
+          "next_change",
+          "preview_key",
+          "preview_params"
+        ],
+        "title": "ScheduleView",
+        "type": "object"
+      }
+    },
     "shell.status": {
       "method": "GET",
       "path": "/api/shell/status",
@@ -31020,6 +31908,10 @@
             "title": "Unprocessed Alerts",
             "type": "integer"
           },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
           "write_key": {
             "title": "Write Key",
             "type": "boolean"
@@ -31030,7 +31922,8 @@
           "collection_mode",
           "collection",
           "unprocessed_alerts",
-          "write_key"
+          "write_key",
+          "version"
         ],
         "title": "ShellStatus",
         "type": "object"
@@ -33429,6 +34322,16 @@
             "title": "End",
             "type": "string"
           },
+          "sources": {
+            "default": "both",
+            "enum": [
+              "both",
+              "events",
+              "traffic"
+            ],
+            "title": "Sources",
+            "type": "string"
+          },
           "start": {
             "format": "date",
             "title": "Start",
@@ -33460,6 +34363,52 @@
           "end"
         ],
         "title": "BackfillAccepted",
+        "type": "object"
+      }
+    },
+    "system.collection.clear": {
+      "method": "POST",
+      "path": "/api/system/collection/clear",
+      "request_schema": {
+        "properties": {
+          "confirm": {
+            "maxLength": 100,
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "ClearRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "archive_moved_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Moved To"
+          },
+          "cleared": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cleared",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cleared",
+          "archive_moved_to"
+        ],
+        "title": "CollectedCleared",
         "type": "object"
       }
     },
@@ -33769,6 +34718,28 @@
           "settings"
         ],
         "title": "CollectionView",
+        "type": "object"
+      }
+    },
+    "system.collection.retention_run": {
+      "method": "POST",
+      "path": "/api/system/collection/retention/run",
+      "request_schema": {
+        "properties": {},
+        "title": "Empty",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "queued": {
+            "title": "Queued",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "queued"
+        ],
+        "title": "RetentionQueued",
         "type": "object"
       }
     },
@@ -36768,6 +37739,17 @@
           "deployment_type": {
             "$ref": "#/$defs/DeploymentType"
           },
+          "events_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events Timeout Seconds"
+          },
           "org_id": {
             "title": "Org Id",
             "type": "string"
@@ -36810,7 +37792,8 @@
           "console_url",
           "verify_tls",
           "write_api_key",
-          "write_api_secret"
+          "write_api_secret",
+          "events_timeout_seconds"
         ],
         "title": "PceConnection",
         "type": "object"
@@ -37031,8 +38014,36 @@
             ],
             "title": "Console Url"
           },
+          "data_choice": {
+            "anyOf": [
+              {
+                "enum": [
+                  "keep",
+                  "clear"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Data Choice"
+          },
           "deployment_type": {
             "$ref": "#/$defs/DeploymentType"
+          },
+          "events_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Events Timeout Seconds"
           },
           "org_id": {
             "maxLength": 32,
@@ -37147,6 +38158,22 @@
           "deployment_type": {
             "$ref": "#/$defs/DeploymentType"
           },
+          "events_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events Timeout Seconds"
+          },
+          "kept_data": {
+            "default": false,
+            "title": "Kept Data",
+            "type": "boolean"
+          },
           "org_id": {
             "title": "Org Id",
             "type": "string"
@@ -37200,6 +38227,7 @@
           "verify_tls",
           "write_api_key",
           "write_api_secret",
+          "events_timeout_seconds",
           "reset"
         ],
         "title": "PceConnectionSaved",

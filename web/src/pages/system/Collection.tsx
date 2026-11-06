@@ -7,6 +7,11 @@ import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { Modes } from "./Modes";
 
+type BackfillSources = "both" | "events" | "traffic";
+const CLEAR_WORD = "CLEAR";  // the server's word (system_collection.CLEAR_WORD), the same in every language
+const BACKFILL_SOURCE_KEYS: Record<BackfillSources, string> = {
+  both: "backfill_sources_both", events: "backfill_sources_events", traffic: "backfill_sources_traffic",
+};
 const SOURCE_KEYS: Record<string, string> = {
   traffic: "source_traffic",
   events: "source_events",
@@ -148,7 +153,14 @@ export function Collection() {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [range, setRange] = useState({ start: today(), end: today() });
+  const [range, setRange] = useState<{ start: string; end: string; sources: BackfillSources }>(
+    { start: today(), end: today(), sources: "both" });
+  const [retentionNote, setRetentionNote] = useState(false);
+  const [retentionError, setRetentionError] = useState<ApiError | null>(null);
+  const [clearWord, setClearWord] = useState("");
+  const [cleared, setCleared] = useState<{ moved: string | null } | null>(null);
+  const [clearError, setClearError] = useState<ApiError | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [backfillNote, setBackfillNote] = useState<string | null>(null);
   const [backfillError, setBackfillError] = useState<ApiError | null>(null);
 
@@ -194,14 +206,37 @@ export function Collection() {
 
   async function startBackfill(e: FormEvent) {
     e.preventDefault();
-    const env = await call("system.collection.backfill", { start: range.start, end: range.end });
+    const env = await call("system.collection.backfill", { start: range.start, end: range.end, sources: range.sources });
     if (env.ok && env.data) {
       setBackfillError(null);
-      setBackfillNote(t("backfill_started", { start: range.start, end: range.end }));
+      setBackfillNote(t("backfill_started", { start: range.start, end: range.end })
+        + " " + t("backfill_started_reads", { what: t(BACKFILL_SOURCE_KEYS[range.sources]) }));
       void refresh();
     } else {
       setBackfillNote(null);
       setBackfillError(env.error);
+    }
+  }
+
+  async function runRetention() {
+    const env = await call("system.collection.retention_run", {});
+    setRetentionNote(Boolean(env.ok && env.data?.queued));
+    setRetentionError(env.ok ? null : env.error);
+  }
+
+  async function clearCollected(e: FormEvent) {
+    e.preventDefault();
+    setClearing(true);
+    const env = await call("system.collection.clear", { confirm: clearWord });
+    setClearing(false);
+    setClearWord("");
+    if (env.ok && env.data) {
+      setCleared({ moved: env.data.archive_moved_to });
+      setClearError(null);
+      void refresh();
+    } else {
+      setCleared(null);
+      setClearError(env.error);
     }
   }
 
@@ -356,12 +391,52 @@ export function Collection() {
           {t("backfill_end")}
           <input type="date" name="end" value={range.end} onChange={(e) => setRange({ ...range, end: e.target.value })} />
         </label>
+        <label>
+          {t("backfill_sources")}
+          <select name="sources" value={range.sources}
+                  onChange={(e) => setRange({ ...range, sources: e.target.value as BackfillSources })}>
+            <option value="both">{t("backfill_sources_both")}</option>
+            <option value="events">{t("backfill_sources_events")}</option>
+            <option value="traffic">{t("backfill_sources_traffic")}</option>
+          </select>
+          <span className="hint">{t("backfill_sources_hint")}</span>
+        </label>
         {backfillError && <div className="form-error" role="alert">{t(backfillError.message_key, backfillError.params)}</div>}
         {backfillNote && <p className="form-ok" role="status">{backfillNote}</p>}
         <div className="actions">
           <button type="submit" className="btn-quiet">{t("btn_backfill")}</button>
         </div>
       </form>
+      <div className="card stack" data-role="collection-maintenance">
+        <h2>{t("collection_maintenance_title")}</h2>
+        <div>
+          <p className="muted">{t("retention_run_intro")}</p>
+          {retentionError && <div className="form-error" role="alert">{t(retentionError.message_key, retentionError.params)}</div>}
+          {retentionNote && <p className="form-ok" role="status">{t("retention_run_queued")}</p>}
+          <div className="actions">
+            <button type="button" className="btn-quiet" onClick={() => void runRetention()}>{t("btn_retention_run")}</button>
+          </div>
+        </div>
+        <form onSubmit={(e) => void clearCollected(e)} data-role="collection-clear">
+          <p className="muted">{t("collection_clear_intro")}</p>
+          <label className="block">
+            {t("collection_clear_type", { word: CLEAR_WORD })}
+            <input name="clear_confirm" autoComplete="off" value={clearWord} onChange={(e) => setClearWord(e.target.value)} />
+          </label>
+          {clearError && <div className="form-error" role="alert">{t(clearError.message_key, clearError.params)}</div>}
+          {cleared && (
+            <p className="form-ok" role="status">
+              {t("collection_cleared")}
+              {cleared.moved && <> {t("pce_reset_archive_moved", { folder: cleared.moved })}</>}
+            </p>
+          )}
+          <div className="actions">
+            <button type="submit" className="btn-danger" disabled={clearing || clearWord.trim() !== CLEAR_WORD}>
+              {t("btn_collection_clear")}
+            </button>
+          </div>
+        </form>
+      </div>
     </section>
   );
 }

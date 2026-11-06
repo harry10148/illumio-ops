@@ -312,7 +312,14 @@ PCE 主控台沒有中文介面（原廠中文文件的截圖欄位也是英文�
 - **大量資料**（events、flows、聚合、封存）與**應用狀態**分開管理，清除、回填、換 PCE 都不碰設定與
   告警紀錄。實體上是兩個 DB 還是同庫分表，由 builder 決定。
 - 每種產出（報表檔、封存、快照、log）都有保留期限與清理機制，並列入同一份清單核對。
-- 換 PCE（url／org_id 改變）時清除所有衍生資料，清單只有一份。
+- 換 PCE（url／org_id 改變）時清除所有衍生資料，清單只有一份。【修訂 2026-11-06，parity 決策 D3】只改網址（org 不變）
+  且已收集過資料時，PCE 連線頁要操作者選：「另一台 PCE」照上面清除；「同一台 PCE 換了網址」則**先驗證再保留**——用讀取用
+  key 從新網址讀回幾台已儲存 workload 的 href（含 `/orgs/<org>/`），PCE 以同一 href 回答才算同一台；驗證不過（不認得、
+  沒有可比對的 workload、連不上或拒絕 key）一律拒絕且不存任何變更，並說明原因。驗證通過後，在 flow store 寫入鎖內
+  存設定並把 binding 改綁新網址（不清資料），app.sqlite 中以 `pce_url`／`pce_target` 標示所屬 PCE 的列（告警、
+  告警評估水位、竄改／偵測註記、隔離紀錄、SIEM 游標、規則排程與執行紀錄、報表）一起改到新網址，只有健康檢查結果
+  重做。收集器補完切換（finish_pending_switch）在鎖內重查 binding，不會把剛改綁的資料清掉。5.x 的 same-pce 選項
+  只搬 binding；v6 多做了驗證與其他表的搬移。
 - **流量資料的形狀**【判斷 修訂】：5.x 的 raw flows 只存 `raw_json`，無法做多維彙整。v6 的 flow store 要把
   分析會用到的維度存成可索引欄位：來源／目的的 workload href、IP、hostname、各 label key 的值、enforcement
   mode；port、協定、發起端與服務端的 process／使用者（§6.5.7）；reported policy decision、方向；`timestamp_range` 的首見／最後見；
@@ -928,6 +935,8 @@ label 已存在時 workload_manager 也能套用）；RHC 需要 owner，所以�
 - **收集模式的對應**【使用者 修訂，2026-10-24】：5.x 的 `pce_cache.enabled` 為 false（5.0.0 預設）或沒有 `pce_cache`
   段的安裝，升級後為「輕量」模式（最接近 5.x 不存流量、產報表時才查的用法；2026-10-29 原「僅事件」併入輕量），需要時在資料收集頁
   切換；為 true 的為「完整」。
+- **流量過濾與取樣**【修訂 2026-11-06】：5.x 的 `pce_cache.traffic_filter`／`traffic_sampling` 升級時捨棄並列入報告——
+  橫向移動偵測要看到全部流量（§8 修訂說明）。
 - **SIEM 流量來源**【使用者 修訂】：5.x 目的地中設了流量（traffic）來源的，升級後該來源改為「新連線出現」並在報告中
   說明原因（§6.5 SIEM）；`traffic_pd` 過濾值照搬到新連線事件。
 - **切換時的連續性**【判斷】：v6 回填的歷史資料**只供報表與檢視**，不送 SIEM、不進告警評估。
@@ -953,9 +962,14 @@ label 已存在時 workload_manager 也能套用）；RHC 需要 owner，所以�
 
 | 處置 | 項目 |
 |---|---|
-| **回收** | `api_client` 的 HTTP 核心（重試、TLS、auth、速率限制）與**經真 PCE 驗證的行為及其測試**（X-Total-Count 為未過濾總數、500 上限＋async 回補、label 同 key 為 OR、ip_address 只接受純字串否則 406、裸日期 406、POST 429 只重試一次、Rule Search 6 份錄製 fixture）；`events/matcher`、`events/normalizer`、事件目錄；`pce_cache/traffic_filter`；`pce_target`；SIEM formatters／transports／DLQ／mask；報表 `analysis/*` 純模組（policy_resolver、policy_diff 四核心、posture／advisor、estate_inventory 等）、`df_filter`、`port_token`、`report_shell` 與 exporters；`rule_hit_count_enablement` 的三步啟用流程；i18n 字典（去掉 CLI 鍵）；安裝／預檢／移除腳本與 systemd hardening；Direction D 設計 token；`calculate_mbps` 三態計量 |
+| **回收** | `api_client` 的 HTTP 核心（重試、TLS、auth、速率限制）與**經真 PCE 驗證的行為及其測試**（X-Total-Count 為未過濾總數、500 上限＋async 回補、label 同 key 為 OR、ip_address 只接受純字串否則 406、裸日期 406、POST 429 只重試一次、Rule Search 6 份錄製 fixture）；`events/matcher`、`events/normalizer`、事件目錄；`pce_target`；SIEM formatters／transports／DLQ／mask；報表 `analysis/*` 純模組（policy_resolver、policy_diff 四核心、posture／advisor、estate_inventory 等）、`df_filter`、`port_token`、`report_shell` 與 exporters；`rule_hit_count_enablement` 的三步啟用流程；i18n 字典（去掉 CLI 鍵）；安裝／預檢／移除腳本與 systemd hardening；Direction D 設計 token；`calculate_mbps` 三態計量 |
 | **重寫** | 所有 GUI 路由與整個前端；`analyzer.py`／`reporter.py` 拆成收集→評估→通知；設定與狀態的所有權；報表產生入口（單一函式、單一參數結構）；cache／live／archive 取數（§6.3 FlowSource）；filter 執行（§6.3 filter 模型）；async job 生命週期（5.x 兩套、7 個輪詢迴圈）；SMTP（5.x 三份） |
 | **刪除** | `src/cli/`、`src/main.py` 的選單與 argparse、三支 `*_cli.py`、`settings/`、所有相容 wrapper、無讀者的路由與功能（`shadow` 比對器、`alert_dlq`、`rule_backups`、`_rs_background_scheduler` 等） |
+
+【修訂 2026-11-06，parity 決策 D1】`pce_cache/traffic_filter` 原列為回收，實作未回收：5.x 的流量過濾（`traffic_filter`）與
+取樣（`traffic_sampling`）設定在升級時捨棄，遷移報告逐鍵列為「捨棄」並說明原因（`migrate/v5.py` 的 `DROPPED_PREFIXES`）。
+理由：v6 的橫向移動與異常偵測要看到全部流量，過濾或取樣過的 flow store 正好會藏掉它要找的連線；容量改由收集模式
+（§6.4 輕量／告警／完整）與保留期控制。
 
 修訂版補充【判斷 修訂】：**回收** `report/analysis/mod15_lateral_movement.py`（可達性與 articulation points，含已修的
 BFS 爆炸問題）、`attack_posture.py`、rules_engine 的 B006／L010 判斷（改寫成偵測器）、5.x 竄改調查的擷取方法

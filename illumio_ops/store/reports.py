@@ -168,3 +168,9 @@ def done_counts(conn: sqlite3.Connection) -> dict[str, int]:
     """Finished reports kept, per type (the reports page's copies)."""
     return {r[0]: int(r[1]) for r in conn.execute(
         "SELECT report_type, COUNT(*) FROM reports WHERE status = 'done' GROUP BY report_type")}
+
+
+def move_pce(conn: sqlite3.Connection, *, old_target: str, new_target: str) -> int:
+    """The same PCE moved to a new address (System › PCE connection, decision D3): its reports stay its own, so the
+    next report still compares with them. Targets are services.reports.generate.pce_target values."""
+    return int(conn.execute("UPDATE reports SET pce_target = ? WHERE pce_target = ?", (new_target, old_target)).rowcount)

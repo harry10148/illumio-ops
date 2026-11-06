@@ -31,3 +31,9 @@ def recent(conn: sqlite3.Connection, *, pce_url: str, org_id: str, workload_href
         sql += " AND workload_href = ?"
         params.append(workload_href)
     return conn.execute(sql + " ORDER BY id DESC LIMIT ?", [*params, limit]).fetchall()
+
+
+def move_pce(conn: sqlite3.Connection, *, old_url: str, new_url: str, org_id: str) -> int:
+    """The same PCE moved to a new address (System › PCE connection, decision D3): its rows follow it."""
+    return int(conn.execute("UPDATE quarantine_actions SET pce_url = ? WHERE pce_url = ? AND org_id = ?",
+                            (new_url, old_url, org_id)).rowcount)

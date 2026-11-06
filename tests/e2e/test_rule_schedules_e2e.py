@@ -94,3 +94,71 @@ def test_a_new_search_clears_the_earlier_pick(context, live_app, monkeypatch):
     page.fill("input[name=rs_q]", "nothing")
     page.get_by_role("button", name="Search").click()
     expect(page.get_by_role("button", name="Create schedule")).to_have_count(0)
+
+
+def _scheduled(live_app):
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.rule_schedule import Weekly
+    from illumio_ops.store import rule_schedules as store
+    pce = live_app.ctx.settings.current().pce
+    plan = Weekly(days=("mon",), start="08:00", end="18:00", timezone="Asia/Taipei", action="enable_in_window")
+    with live_app.ctx.db() as conn:
+        sid = store.create(conn, pce_url=pce.url, org_id=pce.org_id, href=RS, is_ruleset=True, name="Backups",
+                           ruleset_name="Backups", summary="2 rules", plan_json=plan.model_dump_json(), paused=False,
+                           pce_status="active", by="a", at=datetime.now(UTC))
+        conn.commit()
+    return sid
+
+
+def test_edit_prefills_the_plan_and_check_now_says_what_happened(context, live_app, monkeypatch):
+    """5.x edited a schedule in place and checked on demand (parity 2026-11-06)."""
+    _write_key(live_app)
+    _scheduled(live_app)
+    sent = {}
+
+    def update(ctx, sid, plan, **kw):
+        sent["plan"] = plan
+        return rs.schedules(ctx)[1][0]
+    monkeypatch.setattr("illumio_ops.web.routes.rule_schedules.rs.update", update)
+    monkeypatch.setattr("illumio_ops.web.routes.rule_schedules.rs.check_now",
+                        lambda ctx, sid, **kw: rs.CheckResult(outcome="none", item=rs.schedules(ctx)[1][0]))
+    page = _open(context, live_app)
+    page.locator("[data-role=rs-edit-open]").click()
+    edit = page.locator("[data-role=rs-edit]")
+    expect(edit.locator("input[name=rs_start]")).to_have_value("08:00")
+    assert edit.locator("input[name=rs_day_mon]").is_checked() and not edit.locator("input[name=rs_day_tue]").is_checked()
+    edit.locator("input[name=rs_day_tue]").check()
+    edit.get_by_role("button", name="Save and provision the note").click()
+    expect(page.locator("[data-role=rs-new]")).to_have_count(1)  # back to the new-schedule pane
+    assert sent["plan"].days == ("mon", "tue") and sent["plan"].timezone == "Asia/Taipei"
+    page.locator("[data-role=rs-check]").click()
+    expect(page.locator("[data-role=rs-checked]")).to_contain_text("already as planned")
+
+
+def test_rule_sets_are_browsed_from_rule_schedules(context, live_app, monkeypatch):
+    """5.x #/policy/rulesets (parity 2026-11-06): read-only, deny rules included, reached from rule schedules."""
+    from illumio_ops.services import rulesets as rsb
+    view = rsb.RulesetBrowse(total=1, limited=False, items=[rsb.RulesetItem(
+        href=RS, name="Backups", enabled=True, description="nightly", draft_pending=False, scheduled=True, rules=[
+            rsb.RuleItem(href=RS + "/sec_rules/9", kind="allow", label="#9", enabled=True,
+                         summary="app=backup → NAS: 445/TCP", description="", draft_pending=False, scheduled=False),
+            rsb.RuleItem(href=RS + "/deny_rules/3", kind="override_deny", label="Deny rule 3", enabled=False,
+                         summary="All workloads → app=backup: 3389/TCP", description="no RDP", draft_pending=True,
+                         scheduled=False)])])
+    asked = []
+    monkeypatch.setattr("illumio_ops.web.routes.rule_schedules.rulesets.browse",
+                        lambda ctx, q: asked.append(q) or view)
+    page = _open(context, live_app)
+    page.locator("[data-role=rs-browse-rulesets]").click()
+    panel = page.locator("[data-role=rsb-ruleset]")
+    expect(panel).to_have_count(1)
+    expect(panel).to_contain_text("Backups")
+    expect(panel).to_contain_text("Override deny")
+    expect(panel).to_contain_text("3389/TCP")
+    expect(panel).to_contain_text("no RDP")
+    assert page.locator("[data-role=rulesets] button:has-text('Delete')").count() == 0  # read-only
+    page.fill("input[name=rsb_q]", "back")
+    page.get_by_role("button", name="Search").click()
+    expect(page.locator("[data-role=rsb-count]")).to_contain_text("Rule sets: 1")
+    assert asked[-1] == "back"

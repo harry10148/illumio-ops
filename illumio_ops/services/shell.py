@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+import illumio_ops
 from illumio_ops.domain.values import CollectionMode
 from illumio_ops.jobs.health import list_health
 from illumio_ops.services.context import AppContext
@@ -26,6 +27,7 @@ class ShellStatus(BaseModel):
     collection: Collection
     unprocessed_alerts: int
     write_key: bool
+    version: str  # the product version (5.x showed it in /api/status)
 
 
 def _collection(ctx: AppContext, mode: CollectionMode) -> Collection:
@@ -64,4 +66,5 @@ def status(ctx: AppContext, *, now: datetime | None = None) -> ShellStatus:
                                                   since=at - timedelta(days=UNPROCESSED_DAYS))
     return ShellStatus(mode="basic" if mode is CollectionMode.LIGHTWEIGHT else "advanced", collection_mode=mode,
                        collection=_collection(ctx, mode), unprocessed_alerts=unprocessed,
-                       write_key=bool(s.pce.write_api_key and s.pce.write_api_secret))
+                       write_key=bool(s.pce.write_api_key and s.pce.write_api_secret),
+                       version=illumio_ops.__version__)

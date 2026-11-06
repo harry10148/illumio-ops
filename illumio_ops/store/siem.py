@@ -294,3 +294,10 @@ def sends_since(conn: sqlite3.Connection, since: datetime) -> dict[str, Sends]:
 def delete_sends_before(conn: sqlite3.Connection, before: datetime) -> int:
     with conn:
         return conn.execute("DELETE FROM siem_stats WHERE bucket < ?", (_bucket(before),)).rowcount
+
+
+def move_pce(conn: sqlite3.Connection, *, old_url: str, new_url: str, org_id: str) -> int:
+    """The same PCE moved to a new address (System › PCE connection, decision D3): its rows follow it."""
+    # The flow store is kept, so the cursors into it stay valid.
+    return int(conn.execute("UPDATE siem_cursor SET pce_url = ? WHERE pce_url = ? AND org_id = ?",
+                            (new_url, old_url, org_id)).rowcount)

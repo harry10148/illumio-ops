@@ -88,3 +88,142 @@ def test_archive_retention_shorter_than_raw_is_a_field_error(client, ctx):
     data["settings"]["archive"] = {"enabled": True, "retention_days": 7}
     err = _send(client, "PUT", "/api/system/collection", data).get_json()["error"]
     assert err["field"] == "settings.archive" and err["code"] == "invalid_input"
+
+
+def _capture_backfill(monkeypatch):
+    import threading
+    seen: dict = {}
+    done = threading.Event()
+
+    def fake(ctx, *, start, end, sources=None, **kw):
+        seen.update(start=start, end=end, sources=sources)
+        done.set()
+    monkeypatch.setattr(backfill, "run_backfill", fake)
+    return seen, done
+
+
+def _days_ago(n):
+    from datetime import UTC, datetime, timedelta
+    return (datetime.now(UTC).date() - timedelta(days=n)).isoformat()
+
+
+def test_backfill_reads_only_what_was_asked(client, ctx, monkeypatch):
+    """5.x backfilled events or traffic per request (parity 2026-11-06); v6 decided by the mode alone."""
+    from illumio_ops.domain.values import IngestSource
+    login(client)
+    seen, done = _capture_backfill(monkeypatch)
+    r = _send(client, "POST", "/api/system/collection/backfill",
+              {"start": _days_ago(3), "end": _days_ago(2), "sources": "events"})
+    assert r.status_code == 200 and done.wait(5)
+    assert seen["sources"] == (IngestSource.EVENTS,)
+    done.clear()
+    r = _send(client, "POST", "/api/system/collection/backfill",
+              {"start": _days_ago(3), "end": _days_ago(2), "sources": "traffic"})
+    assert r.status_code == 200 and done.wait(5) and seen["sources"] == (IngestSource.TRAFFIC,)
+    done.clear()
+    r = _send(client, "POST", "/api/system/collection/backfill", {"start": _days_ago(3), "end": _days_ago(2)})
+    assert r.status_code == 200 and done.wait(5)
+    assert seen["sources"] == (IngestSource.TRAFFIC, IngestSource.EVENTS)  # both, in full mode
+
+
+def test_backfill_of_traffic_the_mode_does_not_collect_is_refused(client, ctx):
+    login(client)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
+    r = _send(client, "POST", "/api/system/collection/backfill",
+              {"start": _days_ago(3), "end": _days_ago(2), "sources": "traffic"})
+    assert r.status_code == 400 and r.get_json()["error"]["code"] == "backfill_source_not_collected"
+
+
+def test_events_backfill_goes_back_as_far_as_events_are_kept(client, ctx, monkeypatch):
+    login(client)
+    _seen, done = _capture_backfill(monkeypatch)
+    keep = ctx.settings.current().collection.retention
+    assert keep.event_days > keep.flow_days
+    old = _days_ago(keep.flow_days + 5)
+    r = _send(client, "POST", "/api/system/collection/backfill", {"start": old, "end": old, "sources": "both"})
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and err["code"] == "backfill_beyond_retention"
+    assert err["params"] == {"days": str(keep.flow_days), "earliest": _days_ago(keep.flow_days)}
+    r = _send(client, "POST", "/api/system/collection/backfill", {"start": old, "end": old, "sources": "events"})
+    assert r.status_code == 200 and done.wait(5)
+
+
+def test_retention_runs_now_through_its_job(client, ctx):
+    """5.x POST /retention/run; v6 moves the daily retention job to now, so job health records the run."""
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.jobs.scheduler import build_scheduler
+    login(client)
+    ctx.scheduler = build_scheduler(ctx)
+    r = _send(client, "POST", "/api/system/collection/retention/run", {})
+    assert r.status_code == 200 and r.get_json()["data"]["queued"] is True
+    nxt = ctx.scheduler.get_job("collect_retention").next_run_time
+    assert abs(nxt - datetime.now(UTC)) < timedelta(seconds=10)
+
+
+def test_retention_runs_beside_the_request_without_a_scheduler(client, ctx, monkeypatch):
+    import threading
+
+    from illumio_ops.web.routes import system_collection
+    login(client)
+    ran = threading.Event()
+    monkeypatch.setattr(system_collection, "run_retention", lambda c: ran.set() or {})
+    r = _send(client, "POST", "/api/system/collection/retention/run", {})
+    assert r.status_code == 200 and ran.wait(5)
+
+
+def _collected(ctx):
+    from datetime import UTC, datetime
+
+    from illumio_ops.store.flowdb import binding
+    with ctx.flows().connect() as conn:
+        binding.bind(conn, "https://pce.example.com:8443", "1", datetime.now(UTC))
+        conn.execute("INSERT INTO events (href, event_type, timestamp, raw_json, origin, ingested_at) "
+                     "VALUES ('/orgs/1/events/1', 'x', '2026-10-24T00:00:00Z', '{}', 'ingest', 'x')")
+        conn.commit()
+
+
+def _events(ctx):
+    with ctx.flows().connect() as conn:
+        return conn.execute("SELECT count(*) FROM events").fetchone()[0]
+
+
+def test_clearing_collected_data_needs_the_typed_word(client, ctx):
+    """5.x `cache flush --confirm` (parity 2026-11-06)."""
+    login(client)
+    _collected(ctx)
+    for word in ("", "clear it", "yes"):
+        r = _send(client, "POST", "/api/system/collection/clear", {"confirm": word})
+        assert r.status_code == 400 and r.get_json()["error"]["code"] == "confirm_mismatch"
+    assert _events(ctx) == 1
+
+
+def test_clearing_collected_data_keeps_settings_alerts_and_reports(client, ctx):
+    from datetime import UTC, datetime
+
+    from illumio_ops.services import shell
+    from tests.web.test_shell_status import _alert
+    login(client)
+    _collected(ctx)
+    _alert(ctx, at=datetime.now(UTC))
+    (ctx.paths.archive_dir / "events-2026-10-01.jsonl.gz").write_bytes(b"x")
+    before = ctx.settings.current().model_dump()
+    r = _send(client, "POST", "/api/system/collection/clear", {"confirm": "CLEAR"})
+    assert r.status_code == 200
+    data = r.get_json()["data"]
+    assert "flows" in data["cleared"] and data["archive_moved_to"].startswith("previous-")
+    assert _events(ctx) == 0
+    assert ctx.settings.current().model_dump() == before
+    assert shell.status(ctx).unprocessed_alerts == 1
+
+
+def test_clearing_while_a_reader_holds_the_store_says_so(client, ctx, monkeypatch):
+    from illumio_ops.store.flowdb import db as flowdb
+    monkeypatch.setattr(flowdb, "RESET_WAIT_SECONDS", 0.2)
+    login(client)
+    _collected(ctx)
+    reader = ctx.flows().connect()
+    r = _send(client, "POST", "/api/system/collection/clear", {"confirm": "CLEAR"})
+    reader.close()
+    assert r.status_code == 503 and r.get_json()["error"]["code"] == "store_busy"
+    assert _events(ctx) == 1

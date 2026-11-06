@@ -179,3 +179,42 @@ def test_inflight_old_session_is_not_upgraded_by_key_rotation(app):
     assert r.status_code == 401
     assert other.get("/api/auth/me", environ_overrides=LOCAL).status_code == 401
     assert admin.get("/api/auth/me", environ_overrides=LOCAL).status_code == 200
+
+
+# ── changing the admin username (5.x POST /api/security; parity 2026-11-06) ────────────────────────────
+
+def _rename(client, **body):
+    return post(client, "/api/auth/username", body)
+
+
+def test_username_change_needs_the_current_password(client, ctx):
+    login(client)
+    r = _rename(client, username="opsadmin", current_password="wrong")
+    assert r.status_code == 400 and r.get_json()["error"]["code"] == "old_password_incorrect"
+    for bad in ("", "   ", "x" * 257):
+        r = _rename(client, username=bad, current_password="illumio")
+        assert r.status_code == 400 and r.get_json()["error"]["code"] == "invalid_username"
+    assert ctx.settings.current().web.username == "illumio"
+
+
+def test_username_change_signs_everyone_else_out_like_a_password_change(app, ctx):
+    a, b = app.test_client(), app.test_client()
+    login(a)
+    login(b)
+    old_key = ctx.settings.current().web.secret_key
+    r = _rename(a, username="  opsadmin ", current_password="illumio")
+    assert r.status_code == 200 and r.get_json()["data"]["csrf_token"]
+    assert ctx.settings.current().web.username == "opsadmin" and ctx.settings.current().web.secret_key != old_key
+    me = a.get("/api/auth/me", environ_overrides=LOCAL)
+    assert me.status_code == 200 and me.get_json()["data"]["username"] == "opsadmin"  # the caller stays
+    assert b.get("/api/auth/me", environ_overrides=LOCAL).status_code == 401
+    c = app.test_client()
+    assert login(c).status_code == 401  # the old name no longer signs in
+    assert login(c, username="opsadmin").status_code == 200
+
+
+def test_username_change_token_is_usable(client):
+    login(client)
+    token = _rename(client, username="opsadmin", current_password="illumio").get_json()["data"]["csrf_token"]
+    r = client.post("/api/auth/logout", json={}, environ_overrides=LOCAL, headers={"X-CSRFToken": token})
+    assert r.status_code == 200

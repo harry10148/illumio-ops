@@ -203,13 +203,20 @@ class FlowDb:
             conn.close()
         return int(done)
 
-    def reset(self, *, also: Callable[[], None] | None = None) -> None:
+    def reset(self, *, also: Callable[[], None] | None = None,
+              still_wanted: Callable[[sqlite3.Connection], bool] | None = None) -> bool:
         """Drop every row by recreating the file (used when the PCE changes). `also` runs in the
         same hold of the write lock, so no writer of the old generation slips in between. The file is
         deleted only once no connection to it is open: a connection still open on the deleted file
         would, closing last on it, delete the new file's WAL and shared memory by name. Raises
-        FlowDbBusy, deleting nothing, if connections stay open for RESET_WAIT_SECONDS."""
+        FlowDbBusy, deleting nothing, if connections stay open for RESET_WAIT_SECONDS.
+        `still_wanted`, asked first under the lock: False leaves everything as it is (a reset decided
+        on a read made without the lock, overtaken by a rebind to the same PCE). Returns whether it reset."""
         with self.write_lock:
+            if still_wanted is not None:
+                with self.connect() as conn:
+                    if not still_wanted(conn):
+                        return False
             # First, so long lock-free reads notice it and stop. It stays moved if the reset gives up:
             # work begun for the old PCE is dropped either way, and the settings already name the new one,
             # so collectors refuse to write until the next run finishes the switch (finish_pending_switch).
@@ -228,3 +235,4 @@ class FlowDb:
                     self._resetting = False
                     self._gate.notify_all()
             self.connect().close()
+            return True

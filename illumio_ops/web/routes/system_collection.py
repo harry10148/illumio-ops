@@ -13,12 +13,15 @@ from illumio_ops.jobs.scheduler import apply_schedule, instrument
 from illumio_ops.services import data_status, logs
 from illumio_ops.services.collect import backfill
 from illumio_ops.services.collect.guard import BindingMismatch
-from illumio_ops.services.collect.mode import backfill_sources
+from illumio_ops.services.collect.mode import backfill_sources, in_mode
+from illumio_ops.services.collect.reset import clear_collected
+from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.status import CollectionStatus, collection_status
 from illumio_ops.services.data_status import DataStatus
-from illumio_ops.settings.schema import CollectionSettings
+from illumio_ops.settings.schema import CollectionSettings, Settings
+from illumio_ops.store.flowdb.db import FlowDbBusy
 from illumio_ops.web.auth import get_ctx
-from illumio_ops.web.contract import ApiFailure, api_route, operation
+from illumio_ops.web.contract import ApiFailure, Empty, api_route, operation
 
 
 class CollectionView(BaseModel):
@@ -31,14 +34,36 @@ class CollectionUpdate(BaseModel):
     settings: CollectionSettings
 
 
+BackfillSources = Literal["both", "events", "traffic"]
+
+
 class BackfillRequest(BaseModel):
     start: date
     end: date  # inclusive
+    # 5.x backfilled either source per request; "both" reads what the collection mode collects (events only in
+    # lightweight mode).
+    sources: BackfillSources = "both"
 
 
 class BackfillAccepted(BaseModel):
     start: datetime
     end: datetime
+
+
+class RetentionQueued(BaseModel):
+    queued: bool
+
+
+CLEAR_WORD = "CLEAR"  # typed to confirm (5.x `cache flush --confirm`); the same in every language
+
+
+class ClearRequest(BaseModel):
+    confirm: str = Field(max_length=100)
+
+
+class CollectedCleared(BaseModel):
+    cleared: list[str]
+    archive_moved_to: str | None  # folder under data/archive the archive files were moved to
 
 
 class LogQuery(BaseModel):
@@ -66,6 +91,9 @@ OP_DATA = operation("system.collection.data", "GET", "/api/system/collection/dat
 OP_STATUS = operation("system.collection.status", "GET", "/api/system/collection/status", None, CollectionStatus)
 OP_BACKFILL = operation("system.collection.backfill", "POST", "/api/system/collection/backfill", BackfillRequest,
                         BackfillAccepted)
+OP_RETENTION = operation("system.collection.retention_run", "POST", "/api/system/collection/retention/run", Empty,
+                         RetentionQueued)
+OP_CLEAR = operation("system.collection.clear", "POST", "/api/system/collection/clear", ClearRequest, CollectedCleared)
 OP_LOGS = operation("system.logs.query", "POST", "/api/system/logs/query", LogQuery, LogLines)
 
 bp = Blueprint("system_collection", __name__)
@@ -97,6 +125,17 @@ def status() -> CollectionStatus:
     return collection_status(get_ctx())
 
 
+def _backfill_reads(settings: Settings, wanted: BackfillSources) -> tuple[IngestSource, ...]:
+    if wanted == "both":
+        return backfill_sources(settings, manual=True)
+    if wanted == "traffic":
+        if not in_mode(settings, IngestSource.TRAFFIC):
+            raise ApiFailure(400, "backfill_source_not_collected", "err_backfill_traffic_not_collected",
+                             field="sources")
+        return (IngestSource.TRAFFIC,)
+    return (IngestSource.EVENTS,)
+
+
 @api_route(bp, OP_BACKFILL)
 def start_backfill(body: BackfillRequest) -> BackfillAccepted:
     ctx = get_ctx()
@@ -105,17 +144,22 @@ def start_backfill(body: BackfillRequest) -> BackfillAccepted:
     if body.start > body.end or body.end > today:
         raise ApiFailure(400, "backfill_range_invalid", "err_backfill_range_invalid", field="start")
     settings = ctx.settings.current()
+    reads = _backfill_reads(settings, body.sources)
     keep = settings.collection.retention
-    days = keep.flow_days if IngestSource.TRAFFIC in backfill_sources(settings, manual=True) else keep.event_days
-    if body.start < today - timedelta(days=days):
-        raise ApiFailure(400, "backfill_beyond_retention", "err_backfill_beyond_retention", field="start")
+    # Kept as the limit: a day older than retention keeps would be deleted by the next retention run (the refusal
+    # says so, with the earliest day that can be read).
+    days = keep.flow_days if IngestSource.TRAFFIC in reads else keep.event_days
+    earliest = today - timedelta(days=days)
+    if body.start < earliest:
+        raise ApiFailure(400, "backfill_beyond_retention", "err_backfill_beyond_retention", field="start",
+                         params={"days": str(days), "earliest": earliest.isoformat()})
     if backfill.BACKFILL_LOCK.locked():
         raise ApiFailure(409, "backfill_running", "err_backfill_running")
     start = datetime.combine(body.start, time.min, tzinfo=UTC)
     end = min(datetime.combine(body.end + timedelta(days=1), time.min, tzinfo=UTC), now)
 
     def job() -> None:
-        backfill.run_backfill(ctx, start=start, end=end)
+        backfill.run_backfill(ctx, start=start, end=end, sources=reads)
 
     if ctx.scheduler is not None:
         ctx.scheduler.add_job(instrument("collect_backfill_manual", job, ctx), "date", run_date=now,
@@ -123,6 +167,33 @@ def start_backfill(body: BackfillRequest) -> BackfillAccepted:
     else:  # not serving (tests, tools): run beside the request
         threading.Thread(target=job, daemon=True, name="backfill").start()
     return BackfillAccepted(start=start, end=end)
+
+
+RETENTION_JOB = "collect_retention"
+
+
+@api_route(bp, OP_RETENTION)
+def run_retention_now(body: Empty) -> RetentionQueued:
+    """5.x POST /retention/run: the daily retention job runs now (job health records it like any run); it waits for
+    a running backfill, as it always does."""
+    ctx = get_ctx()
+    if ctx.scheduler is not None and ctx.scheduler.get_job(RETENTION_JOB) is not None:
+        ctx.scheduler.modify_job(RETENTION_JOB, next_run_time=datetime.now(UTC))
+    else:  # not serving (tests, tools): run beside the request
+        threading.Thread(target=lambda: run_retention(ctx), daemon=True, name="retention").start()
+    return RetentionQueued(queued=True)
+
+
+@api_route(bp, OP_CLEAR)
+def clear_collected_data(body: ClearRequest) -> CollectedCleared:
+    if body.confirm.strip() != CLEAR_WORD:
+        raise ApiFailure(400, "confirm_mismatch", "err_clear_confirm_mismatch", field="confirm",
+                         params={"word": CLEAR_WORD})
+    try:
+        report = clear_collected(get_ctx())
+    except FlowDbBusy:
+        raise ApiFailure(503, "store_busy", "err_clear_store_busy") from None
+    return CollectedCleared(cleared=report.cleared, archive_moved_to=report.archive_moved_to)
 
 
 @api_route(bp, OP_LOGS)

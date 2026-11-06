@@ -76,6 +76,14 @@ class PasswordChangeRequest(BaseModel):
     confirm_password: str = Field(max_length=4096)
 
 
+class UsernameChangeRequest(BaseModel):
+    username: str = Field(max_length=1024)
+    current_password: str = Field(max_length=1024)
+
+
+USERNAME_MAX_LEN = 256  # as LoginRequest accepts
+
+
 class CsrfToken(BaseModel):
     csrf_token: str
 
@@ -96,6 +104,7 @@ OP_LOGIN = operation("auth.login", "POST", "/api/auth/login", LoginRequest, Logi
 OP_LOGOUT = operation("auth.logout", "POST", "/api/auth/logout", None, Empty)
 OP_ME = operation("auth.me", "GET", "/api/auth/me", None, Me)
 OP_PASSWORD = operation("auth.password", "POST", "/api/auth/password", PasswordChangeRequest, CsrfToken)
+OP_USERNAME = operation("auth.username", "POST", "/api/auth/username", UsernameChangeRequest, CsrfToken)
 
 
 def _me() -> Me:
@@ -164,20 +173,46 @@ def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:
             d["web"].update(password_hash=new_hash, secret_key=new_key, must_change_password=False)
 
         ctx.settings.update(cur.revision, mutate)  # raises before anything below on failure
-        # Every other session ends (a leaked cookie is a common reason to change the
-        # password): drop them server-side and rotate the signing key; this response
-        # re-signs the caller's session with the new key.
-        mine = session.get("sid", "")
-        active = _active()
-        with _SESSIONS_LOCK:
-            for sid in [s for s in active if s != mine]:
-                del active[sid]
-        current_app.secret_key = new_key
-        current_app.config["SECRET_KEY"] = new_key
+        _only_this_session(new_key)
         session["default_password"] = False
-        session.modified = True
-        g.pop("csrf_token", None)
         logger.info("admin password changed by {}; other sessions revoked", current_user.get_id())
         return CsrfToken(csrf_token=generate_csrf())
 
+    @api_route(bp, OP_USERNAME, decorators=[limiter.limit("5 per minute")])
+    def change_username(body: UsernameChangeRequest) -> CsrfToken:
+        """5.x changed the admin name in its security settings. Here it takes the current password, and every
+        other session ends as on a password change (they were signed in under the old name)."""
+        ctx = get_ctx()
+        cur = ctx.settings.current()
+        if not verify_password(body.current_password, cur.web.password_hash):
+            raise ApiFailure(400, "old_password_incorrect", "err_old_password_incorrect", field="current_password")
+        name = body.username.strip()
+        if not 1 <= len(name) <= USERNAME_MAX_LEN:
+            raise ApiFailure(400, "invalid_username", "err_invalid_username", field="username",
+                             params={"max": str(USERNAME_MAX_LEN)})
+        new_key = new_secret_key()
+
+        def mutate(d: dict[str, Any]) -> None:
+            d["web"].update(username=name, secret_key=new_key)
+
+        ctx.settings.update(cur.revision, mutate)  # raises before anything below on failure
+        _only_this_session(new_key)
+        login_user(AdminUser(name))  # the session names the user; the loader accepts only the current name
+        logger.info("admin username changed from {} to {}; other sessions revoked", cur.web.username, name)
+        return CsrfToken(csrf_token=generate_csrf())
+
     return bp
+
+
+def _only_this_session(new_key: str) -> None:
+    """Every other session ends (a leaked cookie is a common reason to change the password or the name): drop them
+    server-side and rotate the signing key; the response re-signs the caller's session with the new key."""
+    mine = session.get("sid", "")
+    active = _active()
+    with _SESSIONS_LOCK:
+        for sid in [s for s in active if s != mine]:
+            del active[sid]
+    current_app.secret_key = new_key
+    current_app.config["SECRET_KEY"] = new_key
+    session.modified = True
+    g.pop("csrf_token", None)
