@@ -80,6 +80,18 @@ function StatusTable({ status }: { status: SiemStatusView }) {
                 <td rowSpan={d.sources.length}>
                   <strong>{d.name}</strong>
                   <div className="hint">{t(TRANSPORT_KEYS[d.transport])} · {d.host}:{d.port}</div>
+                  {d.tls_unverified && <div><span className="badge" data-tone="warn" data-role="siem-tls-unverified">{t("siem_tls_unverified_badge")}</span></div>}
+                  <div className="hint" data-role="siem-rate-1h">
+                    {d.success_rate_1h === null ? t("siem_rate_1h_none")
+                      : t("siem_rate_1h", { rate: String(d.success_rate_1h), sent: d.last_hour.sent.toLocaleString(),
+                                            tried: (d.last_hour.sent + d.last_hour.failed).toLocaleString() })}
+                  </div>
+                  <div className="hint" data-role="siem-sends-24h">
+                    {t("siem_sends_24h", { sent: d.last_24h.sent.toLocaleString(), failed: d.last_24h.failed.toLocaleString() })}
+                  </div>
+                  <div className="hint" data-role="siem-sends-7d">
+                    {t("siem_sends_7d", { sent: d.last_7d.sent.toLocaleString(), failed: d.last_7d.failed.toLocaleString() })}
+                  </div>
                   <div className="hint">
                     <Link to={`/siem/dlq?destination=${d.id}`} data-role="siem-dlq-link">
                       {t("siem_dlq_count", { n: String(d.dlq), max: String(d.dlq_max) })}
@@ -91,6 +103,11 @@ function StatusTable({ status }: { status: SiemStatusView }) {
               <td><span className="badge" data-tone={STATE_TONES[s.state]}>{t(STATE_KEYS[s.state])}</span>
                 {s.state === "needs_alert_mode" && <div className="hint"><Link to="/system/collection">{t("siem_go_collection")}</Link></div>}
                 {s.state === "baseline_building" && <div className="hint">{t("siem_baseline_hint", { days: String(status.baseline_days) })}</div>}
+                {s.state === "dlq_full" && (
+                  <div className="hint" data-role="siem-dlq-held">
+                    {t("siem_dlq_full_hint")} <Link to={`/siem/dlq?destination=${d.id}`}>{t("siem_dlq_title")}</Link>
+                  </div>
+                )}
                 {s.source === "alerts" && status.lightweight && <div className="hint">{t("siem_alerts_lightweight")}</div>}
               </td>
               <td className="num">{s.pending === null ? "—" : s.pending.toLocaleString()}</td>
@@ -103,6 +120,7 @@ function StatusTable({ status }: { status: SiemStatusView }) {
           )))}
         </tbody>
       </table>
+      <p className="hint">{t("siem_sends_hint")}</p>
     </div>
   );
 }
@@ -177,6 +195,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
               <input name="siem_ca_bundle" value={caPath} placeholder="/etc/ssl/certs/siem-ca.pem" disabled={d.verify_tls === false}
                      onChange={(e) => set("verify_tls", e.target.value.trim() || true)} />
             </label>
+            {d.verify_tls === false && <p className="notice" data-role="siem-tls-warning">{t("siem_tls_unverified_warning")}</p>}
           </>
         )}
         {d.transport === "hec" && (
@@ -267,10 +286,10 @@ export function Siem() {
   const change = (next: SiemSettingsInput) => { setSiem(next); setSaved(false); };
   const setDest = (i: number, d: SiemDestinationInput) => change({ ...siem, destinations: siem.destinations.map((x, j) => (j === i ? d : x)) });
 
-  async function save(e: FormEvent) {
-    e.preventDefault();
+  async function save(e: FormEvent | null, confirmUnverified = false) {
+    e?.preventDefault();
     if (!view || !siem) return;
-    const env = await call("siem.settings.update", { revision: view.revision, siem });
+    const env = await call("siem.settings.update", { revision: view.revision, siem, confirm_tls_unverified: confirmUnverified });
     if (env.ok && env.data) { setView(env.data); setSiem(env.data.siem); setError(null); setSaved(true); loadStatus(); }
     else { setError(env.error); setSaved(false); }
   }
@@ -312,13 +331,26 @@ export function Siem() {
               <input name="siem_dlq_max" type="number" min={100} max={1000000} value={siem.dlq_max_per_dest}
                      onChange={(e) => change({ ...siem, dlq_max_per_dest: Number(e.target.value) })} />
             </label>
+            <label>{t("siem_dlq_retention_days")}
+              <input name="siem_dlq_retention_days" type="number" min={0} max={3650} value={siem.dlq_retention_days}
+                     onChange={(e) => change({ ...siem, dlq_retention_days: Number(e.target.value) })} />
+              <span className="hint">{t("siem_dlq_retention_hint")}</span>
+            </label>
             <label>{t("siem_backlog_warn")}
               <input name="siem_backlog_warn" type="number" min={1000} max={10000000} value={siem.backlog_warn_rows}
                      onChange={(e) => change({ ...siem, backlog_warn_rows: Number(e.target.value) })} />
             </label>
           </div>
         </details>
-        {error && <p className="form-error" data-field={error.field ?? ""}>{t(error.message_key, error.params)}</p>}
+        {error && (
+          <p className="form-error" data-field={error.field ?? ""}>
+            {t(error.message_key, error.params)}
+            {error.code === "tls_unverified" && (
+              <button type="button" className="btn-quiet inline-action" data-role="siem-save-anyway"
+                      onClick={() => void save(null, true)}>{t("siem_save_anyway")}</button>
+            )}
+          </p>
+        )}
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
         <div className="actions">
           <button type="submit" className="btn-primary">{t("btn_save")}</button>

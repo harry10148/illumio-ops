@@ -113,3 +113,10 @@ def test_a_kept_token_may_not_lose_tls_verification():
     saved = validate_settings(settings_with(dest(transport="hec", hec_token="tok-1"))).siem
     with pytest.raises(CredentialsRequired):
         merge_siem_destinations(saved, [dest(transport="hec", hec_token=MASK, verify_tls=False)], mask=MASK)
+
+
+def test_a_file_written_before_dlq_retention_gets_30_days():
+    from illumio_ops.settings.schema import SiemSettings
+    s = SiemSettings.model_validate({"enabled": False, "destinations": [], "dlq_max_per_dest": 10_000,
+                                     "tick_seconds": 30, "backlog_warn_rows": 50_000})
+    assert s.dlq_retention_days == 30

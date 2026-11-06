@@ -1,9 +1,10 @@
 """What the SIEM page shows for each destination and source (P7): how far behind it is, what it sent last, what
-failed, what the DLQ holds, what retention removed first — and, where a source cannot produce anything in the current
-collection mode, that it needs alert mode, never "0, normal" (spec §6.4 lightweight table)."""
+failed, what the DLQ holds, what retention removed first, what it sent and failed in the last hour, 24 hours and 7
+days — and, where a source cannot produce anything in the current collection mode, that it needs alert mode, never
+"0, normal" (spec §6.4 lightweight table)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from pydantic import BaseModel
@@ -12,12 +13,20 @@ from illumio_ops.domain.values import CollectionMode, SiemFormat, SiemTransport
 from illumio_ops.services.analysis.context import baseline_full
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.siem import sources
+from illumio_ops.settings.schema import SiemDestination
 from illumio_ops.store import siem as store
 
 SourceName = Literal["audit", "alerts", "detections", "new_connections"]
 SourceState = Literal["ok", "behind", "failing", "dlq_full", "waiting", "needs_alert_mode", "baseline_building",
                       "off"]
 NEEDS_TRAFFIC = ("detections", "new_connections")
+TLS_TRANSPORTS = (SiemTransport.TLS, SiemTransport.HEC)
+
+
+def tls_unverified(dest: SiemDestination) -> bool:
+    """A TLS or HEC destination whose certificate is not checked: encrypted, but to whoever answers (5.x refused this
+    under its production profile; v6 asks for a confirmation when it is turned off and keeps saying so)."""
+    return dest.transport in TLS_TRANSPORTS and dest.verify_tls is False
 
 
 class SiemSourceStatus(BaseModel):
@@ -32,6 +41,11 @@ class SiemSourceStatus(BaseModel):
     head_attempts: int           # how often the record it is stuck at has failed (0: not stuck)
 
 
+class SiemSends(BaseModel):
+    sent: int                    # lines the destination took
+    failed: int                  # send attempts that failed: once per run it was down, each line it refused
+
+
 class SiemDestinationStatus(BaseModel):
     id: str
     name: str
@@ -40,8 +54,14 @@ class SiemDestinationStatus(BaseModel):
     format: SiemFormat
     host: str
     port: int
+    tls_unverified: bool         # TLS or HEC without certificate verification (an explicit choice, shown as a warning)
     dlq: int
     dlq_max: int
+    # Counted in 10-minute buckets: each window reaches back up to 10 minutes further than its name.
+    last_hour: SiemSends
+    last_24h: SiemSends
+    last_7d: SiemSends
+    success_rate_1h: float | None  # percent of the last hour's attempts that went through; None: nothing tried
     sources: list[SiemSourceStatus]
 
 
@@ -73,14 +93,28 @@ def _state(source: str, cur: store.Cursor | None, pending: int | None, *, on: bo
     return "ok"
 
 
-def siem_status(ctx: AppContext) -> SiemStatusView:
+def _sends(window: dict[str, store.Sends], dest_id: str) -> SiemSends:
+    got = window.get(dest_id)
+    return SiemSends(sent=got.sent if got else 0, failed=got.failed if got else 0)
+
+
+def _rate(w: SiemSends) -> float | None:
+    tried = w.sent + w.failed
+    return round(w.sent * 100 / tried, 1) if tried else None
+
+
+def siem_status(ctx: AppContext, *, now: datetime | None = None) -> SiemStatusView:
     s = ctx.settings.current()
     light = s.collection.mode is CollectionMode.LIGHTWEIGHT
     full = not light and baseline_full(ctx)
     pce = s.pce
+    at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.db() as conn:
         cursors = store.cursors(conn)
         dlq = store.dlq_counts(conn)
+        hour = store.sends_since(conn, at - timedelta(hours=1))
+        day = store.sends_since(conn, at - timedelta(hours=24))
+        week = store.sends_since(conn, at - timedelta(days=7))
     out = []
     for d in s.siem.destinations:
         on = s.siem.enabled and d.enabled
@@ -98,8 +132,10 @@ def siem_status(ctx: AppContext) -> SiemStatusView:
                 last_sent_at=cur.last_sent_at if cur else None, last_error=cur.last_error if cur else None,
                 last_error_at=cur.last_error_at if cur else None, head_attempts=cur.head_attempts if cur else 0))
         out.append(SiemDestinationStatus(id=d.id, name=d.name, enabled=d.enabled, transport=d.transport,
-                                         format=d.format, host=d.host, port=d.port, dlq=dlq.get(d.id, 0),
-                                         dlq_max=s.siem.dlq_max_per_dest, sources=rows))
+                                         format=d.format, host=d.host, port=d.port, tls_unverified=tls_unverified(d),
+                                         dlq=dlq.get(d.id, 0), dlq_max=s.siem.dlq_max_per_dest,
+                                         last_hour=(h := _sends(hour, d.id)), last_24h=_sends(day, d.id),
+                                         last_7d=_sends(week, d.id), success_rate_1h=_rate(h), sources=rows))
     return SiemStatusView(enabled=s.siem.enabled, lightweight=light, baseline_full=full,
                           baseline_days=s.collection.retention.baseline_days,
                           backlog_warn_rows=s.siem.backlog_warn_rows, destinations=out)

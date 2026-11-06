@@ -627,6 +627,8 @@ class SiemSettings(StrictModel):
     dlq_max_per_dest: int = Field(ge=100, le=1_000_000)
     tick_seconds: int = Field(ge=10, le=600)
     backlog_warn_rows: int = Field(ge=1_000, le=10_000_000)
+    # DLQ lines older than this are deleted by the daily retention job; 0 keeps them until resent or purged (5.x: 30).
+    dlq_retention_days: int = Field(default=30, ge=0, le=3650)
 
     @field_validator("destinations")
     @classmethod

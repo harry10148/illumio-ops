@@ -42,6 +42,7 @@ from illumio_ops.services.reports.retention import run_report_retention
 from illumio_ops.services.reports.schedules import tick_schedules
 from illumio_ops.services.rule_schedules import tick as rule_schedule_tick
 from illumio_ops.services.siem.dispatch import run_siem
+from illumio_ops.services.siem.dlq import run_dlq_retention
 from illumio_ops.settings.schema import Settings
 from illumio_ops.web.tls import ensure_self_signed
 
@@ -183,7 +184,8 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
         run_archive(ctx)
 
     def retention() -> None:
-        run_retention(ctx)
+        # The SIEM DLQ (in the app database) goes too, whatever happened to the flow store's retention.
+        run_steps(lambda: run_retention(ctx), lambda: run_dlq_retention(ctx))
 
     def checkpoint() -> None:
         ctx.flows().checkpoint()

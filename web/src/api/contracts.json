@@ -30070,6 +30070,84 @@
         "type": "object"
       }
     },
+    "siem.dlq.get": {
+      "method": "GET",
+      "path": "/api/siem/dlq/<int:dead_id>",
+      "request_schema": null,
+      "response_schema": {
+        "description": "One DLQ line in full: the line exactly as it was formatted for the destination (the source row may be gone,\nand the line is what a resend sends).",
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "destination": {
+            "title": "Destination",
+            "type": "string"
+          },
+          "destination_id": {
+            "title": "Destination Id",
+            "type": "string"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "event_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Time"
+          },
+          "external_id": {
+            "title": "External Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "title": "Payload",
+            "type": "string"
+          },
+          "quarantined_at": {
+            "format": "date-time",
+            "title": "Quarantined At",
+            "type": "string"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "destination_id",
+          "destination",
+          "source",
+          "record_id",
+          "external_id",
+          "event_time",
+          "error",
+          "attempts",
+          "quarantined_at",
+          "payload"
+        ],
+        "title": "DlqDetail",
+        "type": "object"
+      }
+    },
     "siem.dlq.list": {
       "method": "GET",
       "path": "/api/siem/dlq",
@@ -30114,6 +30192,10 @@
                 "title": "Id",
                 "type": "integer"
               },
+              "length": {
+                "title": "Length",
+                "type": "integer"
+              },
               "preview": {
                 "title": "Preview",
                 "type": "string"
@@ -30138,7 +30220,8 @@
               "error",
               "attempts",
               "quarantined_at",
-              "preview"
+              "preview",
+              "length"
             ],
             "title": "DlqItem",
             "type": "object"
@@ -30179,7 +30262,7 @@
       "method": "POST",
       "path": "/api/siem/dlq/purge",
       "request_schema": {
-        "description": "ids: those lines; none: every line of destination_id (or of every destination).",
+        "description": "ids: those lines; none: every line of destination_id (or of every destination) — with older_than_days, those\nmoved to the DLQ more than that many days ago (purge only).",
         "properties": {
           "destination_id": {
             "anyOf": [
@@ -30209,6 +30292,20 @@
             ],
             "default": null,
             "title": "Ids"
+          },
+          "older_than_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Older Than Days"
           }
         },
         "title": "DlqAction",
@@ -30232,7 +30329,7 @@
       "method": "POST",
       "path": "/api/siem/dlq/resend",
       "request_schema": {
-        "description": "ids: those lines; none: every line of destination_id (or of every destination).",
+        "description": "ids: those lines; none: every line of destination_id (or of every destination) — with older_than_days, those\nmoved to the DLQ more than that many days ago (purge only).",
         "properties": {
           "destination_id": {
             "anyOf": [
@@ -30262,6 +30359,20 @@
             ],
             "default": null,
             "title": "Ids"
+          },
+          "older_than_days": {
+            "anyOf": [
+              {
+                "maximum": 3650,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Older Than Days"
           }
         },
         "title": "DlqAction",
@@ -30463,6 +30574,10 @@
                 "title": "Dlq Max Per Dest",
                 "type": "integer"
               },
+              "dlq_retention_days": {
+                "title": "Dlq Retention Days",
+                "type": "integer"
+              },
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
@@ -30477,7 +30592,8 @@
               "destinations",
               "dlq_max_per_dest",
               "tick_seconds",
-              "backlog_warn_rows"
+              "backlog_warn_rows",
+              "dlq_retention_days"
             ],
             "title": "SiemSettingsInput",
             "type": "object"
@@ -30669,6 +30785,10 @@
                 "title": "Dlq Max Per Dest",
                 "type": "integer"
               },
+              "dlq_retention_days": {
+                "title": "Dlq Retention Days",
+                "type": "integer"
+              },
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
@@ -30683,7 +30803,8 @@
               "destinations",
               "dlq_max_per_dest",
               "tick_seconds",
-              "backlog_warn_rows"
+              "backlog_warn_rows",
+              "dlq_retention_days"
             ],
             "title": "SiemSettingsInput",
             "type": "object"
@@ -30710,6 +30831,11 @@
           }
         },
         "properties": {
+          "confirm_tls_unverified": {
+            "default": false,
+            "title": "Confirm Tls Unverified",
+            "type": "boolean"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -30871,6 +30997,10 @@
                 "title": "Dlq Max Per Dest",
                 "type": "integer"
               },
+              "dlq_retention_days": {
+                "title": "Dlq Retention Days",
+                "type": "integer"
+              },
               "enabled": {
                 "title": "Enabled",
                 "type": "boolean"
@@ -30885,7 +31015,8 @@
               "destinations",
               "dlq_max_per_dest",
               "tick_seconds",
-              "backlog_warn_rows"
+              "backlog_warn_rows",
+              "dlq_retention_days"
             ],
             "title": "SiemSettingsInput",
             "type": "object"
@@ -30959,6 +31090,15 @@
                 "title": "Id",
                 "type": "string"
               },
+              "last_24h": {
+                "$ref": "#/$defs/SiemSends"
+              },
+              "last_7d": {
+                "$ref": "#/$defs/SiemSends"
+              },
+              "last_hour": {
+                "$ref": "#/$defs/SiemSends"
+              },
               "name": {
                 "title": "Name",
                 "type": "string"
@@ -30974,6 +31114,21 @@
                 "title": "Sources",
                 "type": "array"
               },
+              "success_rate_1h": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Success Rate 1H"
+              },
+              "tls_unverified": {
+                "title": "Tls Unverified",
+                "type": "boolean"
+              },
               "transport": {
                 "$ref": "#/$defs/SiemTransport"
               }
@@ -30986,8 +31141,13 @@
               "format",
               "host",
               "port",
+              "tls_unverified",
               "dlq",
               "dlq_max",
+              "last_hour",
+              "last_24h",
+              "last_7d",
+              "success_rate_1h",
               "sources"
             ],
             "title": "SiemDestinationStatus",
@@ -31005,6 +31165,24 @@
             ],
             "title": "SiemFormat",
             "type": "string"
+          },
+          "SiemSends": {
+            "properties": {
+              "failed": {
+                "title": "Failed",
+                "type": "integer"
+              },
+              "sent": {
+                "title": "Sent",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "sent",
+              "failed"
+            ],
+            "title": "SiemSends",
+            "type": "object"
           },
           "SiemSourceStatus": {
             "properties": {
