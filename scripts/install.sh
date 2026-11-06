@@ -191,10 +191,14 @@ if (( V6_UPGRADE )); then
     echo "==> Keeping $OLD_VERSION in $PREV"
     rm -rf "$PREV"  # one previous version is kept: the one this upgrade replaces
     mkdir -p "$PREV/data" && chmod 700 "$PREV" || die "could not make $PREV; $BACK"
+    # config/ and data/ belong to the service account: only regular files are copied, never a link planted there.
+    [[ -f "$PREFIX/config/settings.json" && ! -L "$PREFIX/config/settings.json" ]] \
+        || die "$PREFIX/config/settings.json is not a regular file; $BACK"
     cp -p "$PREFIX/config/settings.json" "$PREV/settings.json" || die "could not copy the settings to $PREV; $BACK"
     for f in "${COPIES[@]}"; do
         for g in "$DATA/$f" "$DATA/$f-wal" "$DATA/$f-shm"; do
-            if [[ -e "$g" ]]; then
+            [[ -L "$g" ]] && die "$g is a symbolic link; $BACK"
+            if [[ -f "$g" ]]; then
                 cp -p "$g" "$PREV/data/" || die "could not copy $g to $PREV; $BACK"
             fi
         done

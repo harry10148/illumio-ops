@@ -20,11 +20,11 @@ PREFIX="" SERVICE="" NO_SYSTEMD=0 OLD_VERSION="" NEW_VERSION="" COPIES=""
 # shellcheck source=/dev/null
 source "$PREV/previous.env"  # PREFIX SERVICE NO_SYSTEMD OLD_VERSION NEW_VERSION COPIES (install.sh, %q-quoted)
 [[ "$PREFIX" == "$HERE" ]] || die "previous.env names $PREFIX, but this script is in $HERE"
-for need in illumio_ops python settings.json; do
-    [[ -e "$PREV/$need" ]] || die "$PREV/$need is missing; nothing was changed"
+for need in illumio_ops python; do
+    [[ -d "$PREV/$need" && ! -L "$PREV/$need" ]] || die "$PREV/$need is missing; nothing was changed"
 done
-for f in $COPIES; do
-    [[ -f "$PREV/data/$f" ]] || die "$PREV/data/$f is missing; nothing was changed"
+for f in settings.json ${COPIES:+$(printf 'data/%s ' $COPIES)}; do
+    [[ -f "$PREV/$f" && ! -L "$PREV/$f" ]] || die "$PREV/$f is missing or not a regular file; nothing was changed"
 done
 
 WAS_ACTIVE=0
@@ -45,15 +45,19 @@ echo "==> Putting $OLD_VERSION back in place of ${NEW_VERSION:-the new version}"
 rm -rf "$PREFIX/illumio_ops" "$PREFIX/python"  # the new version's program: the bundle has it
 mv "$PREV/illumio_ops" "$PREFIX/illumio_ops"
 mv "$PREV/python" "$PREFIX/python"
-mv "$PREFIX/config/settings.json" "$PREFIX/config/settings.json.from-$NEW_VERSION-$STAMP"
-cp -p "$PREV/settings.json" "$PREFIX/config/settings.json"
+# config/ and data/ belong to the service account: every file goes in by rename (mv -T), which replaces a name
+# and never follows a link or lands inside a directory planted there.
+if [[ -e "$PREFIX/config/settings.json" || -L "$PREFIX/config/settings.json" ]]; then
+    mv -T "$PREFIX/config/settings.json" "$PREFIX/config/settings.json.from-$NEW_VERSION-$STAMP"
+fi
+mv -T "$PREV/settings.json" "$PREFIX/config/settings.json"  # previous/ is root's alone: nothing raced into it
 for f in $COPIES; do
     for suffix in "" -wal -shm; do
-        if [[ -e "$PREFIX/data/$f$suffix" ]]; then
-            mv "$PREFIX/data/$f$suffix" "$PREFIX/data/$f.from-$NEW_VERSION-$STAMP$suffix"
+        if [[ -e "$PREFIX/data/$f$suffix" || -L "$PREFIX/data/$f$suffix" ]]; then
+            mv -T "$PREFIX/data/$f$suffix" "$PREFIX/data/$f.from-$NEW_VERSION-$STAMP$suffix"
         fi
-        if [[ -e "$PREV/data/$f$suffix" ]]; then
-            mv "$PREV/data/$f$suffix" "$PREFIX/data/$f$suffix"
+        if [[ -f "$PREV/data/$f$suffix" && ! -L "$PREV/data/$f$suffix" ]]; then
+            mv -T "$PREV/data/$f$suffix" "$PREFIX/data/$f$suffix"
         fi
     done
 done
