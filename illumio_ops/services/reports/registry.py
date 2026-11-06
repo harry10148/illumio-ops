@@ -232,7 +232,9 @@ def app_filter_ok(cond: FlowCondition | None) -> bool:
     if cond is None:
         return False
     named = [s for s in (cond.src, cond.dst) if s is not None and any(lc.key == "app" for lc in s.labels)]
-    if len(named) != 1 or named[0].hrefs or named[0].ips:
+    # the side the report builds from is its labels: hosts, IP lists or label groups there would be dropped
+    if len(named) != 1 or named[0].has_hosts() or named[0].label_groups:
         return False
     other = cond.dst if named[0] is cond.src else cond.src
-    return all(e is None or e.is_empty() for e in (other, cond.src_exclude, cond.dst_exclude))
+    return all(e is None or e.is_empty()
+               for e in (other, cond.src_exclude, cond.dst_exclude, cond.either, cond.either_exclude))

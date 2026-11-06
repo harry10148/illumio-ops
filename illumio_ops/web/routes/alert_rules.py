@@ -3,6 +3,7 @@ write is validated as a whole and guarded by its revision), preview, and the bes
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from flask import Blueprint
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from illumio_ops.domain.alertpack import PACK_KEYS
 from illumio_ops.domain.alertrules import AlertRule
+from illumio_ops.domain.event_catalog import CATEGORY_KEYS, EVENT_DESC_KEYS, catalog
 from illumio_ops.services.alerts import rule_test
 from illumio_ops.services.alerts.rule_test import Candidates, RuleTestResult
 from illumio_ops.services.alerts.rules import (
@@ -17,8 +19,10 @@ from illumio_ops.services.alerts.rules import (
     RulePreview,
     apply_pack,
     preview_rule,
+    reset_rule_state,
     rule_list,
 )
+from illumio_ops.services.analysis.status import ConditionChoices, condition_choices
 from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
@@ -28,6 +32,17 @@ class RulesView(BaseModel):
     revision: int
     items: list[RuleListItem]
     pack_missing: int  # pack rules not in the list (deleted): "add what is missing" brings them back
+    retention_days: int  # alert records kept; 0 = forever
+
+
+class RetentionUpdate(BaseModel):
+    revision: int
+    retention_days: int = Field(ge=0, le=3650)
+
+
+class EvaluateRequested(BaseModel):
+    jobs: list[str]  # the scheduled jobs asked to run now
+    requested_at: datetime
 
 
 class RuleWrite(BaseModel):
@@ -49,6 +64,24 @@ class RuleTestRequest(BaseModel):
     id: int = Field(ge=1)
 
 
+class CatalogEventView(BaseModel):
+    event_type: str
+    description_key: str
+    vendor_documented: bool
+    status_filter: bool  # known to come with more than one status (domain/event_catalog.py)
+    severity_filter: bool
+
+
+class CatalogCategory(BaseModel):
+    id: str
+    label_key: str
+    events: list[CatalogEventView]
+
+
+class EventCatalog(BaseModel):
+    categories: list[CatalogCategory]
+
+
 class PackApply(BaseModel):
     revision: int
     mode: Literal["append_missing", "replace"]
@@ -61,6 +94,12 @@ OP_DELETE = operation("alert_rules.delete", "DELETE", "/api/alert-rules/<rule_id
 OP_PREVIEW = operation("alert_rules.preview", "POST", "/api/alert-rules/preview", RulePreviewRequest, RulePreview)
 OP_PACK = operation("alert_rules.pack", "POST", "/api/alert-rules/pack", PackApply, RulesView)
 OP_TEST = operation("alert_rules.test", "POST", "/api/alert-rules/test", RuleTestRequest, RuleTestResult)
+OP_CHOICES = operation("alert_rules.condition_choices", "GET", "/api/alert-rules/condition-choices", None,
+                       ConditionChoices)
+OP_RESET = operation("alert_rules.reset_state", "POST", "/api/alert-rules/<rule_id>/reset-state", None, RulesView)
+OP_RETENTION = operation("alert_rules.retention", "PUT", "/api/alert-rules/retention", RetentionUpdate, RulesView)
+OP_EVALUATE = operation("alert_rules.evaluate_now", "POST", "/api/alert-rules/evaluate-now", None, EvaluateRequested)
+OP_EVENT_CATALOG = operation("alert_rules.event_catalog", "GET", "/api/alert-rules/event-catalog", None, EventCatalog)
 OP_TEST_CANDIDATES = operation("alert_rules.test_candidates", "GET", "/api/alert-rules/test-candidates", None,
                                Candidates)
 
@@ -71,7 +110,8 @@ def _view() -> RulesView:
     ctx = get_ctx()
     s = ctx.settings.current()
     have = {r.pack_key for r in s.alerts.rules if r.pack_key}
-    return RulesView(revision=s.revision, items=rule_list(ctx), pack_missing=len(PACK_KEYS - have))
+    return RulesView(revision=s.revision, items=rule_list(ctx), pack_missing=len(PACK_KEYS - have),
+                     retention_days=s.alerts.retention_days)
 
 
 def _rules(d: dict[str, Any]) -> list[dict[str, Any]]:
@@ -149,3 +189,58 @@ def test_candidates() -> Candidates:
         return rule_test.candidates(get_ctx())
     except BindingMismatch:
         raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
+
+
+@api_route(bp, OP_CHOICES)
+def choices() -> ConditionChoices:
+    """What a flow condition editor offers: the alert rule editor and the reports filter."""
+    return condition_choices(get_ctx())
+
+
+@api_route(bp, OP_EVENT_CATALOG)
+def event_catalog() -> EventCatalog:
+    """The event types the rule editor offers, by category; a rule may still name one it does not list."""
+    by_category: dict[str, list[CatalogEventView]] = {c: [] for c in CATEGORY_KEYS}
+    for e in catalog():
+        by_category[e.category].append(CatalogEventView(
+            event_type=e.event_type, description_key=EVENT_DESC_KEYS[e.event_type],
+            vendor_documented=e.vendor_documented, status_filter=e.status_filter, severity_filter=e.severity_filter))
+    return EventCatalog(categories=[CatalogCategory(id=c, label_key=CATEGORY_KEYS[c], events=events)
+                                    for c, events in by_category.items() if events])
+
+
+@api_route(bp, OP_RESET)
+def reset_state(rule_id: str) -> RulesView:
+    """Cooldown and throttle start over; what the rule has already seen stays seen (no history is alerted)."""
+    ctx = get_ctx()
+    if not any(r.id == rule_id for r in ctx.settings.current().alerts.rules):
+        raise ApiFailure(404, "not_found", "err_not_found")
+    reset_rule_state(ctx, rule_id)
+    return _view()
+
+
+@api_route(bp, OP_RETENTION)
+def set_retention(body: RetentionUpdate) -> RulesView:
+    get_ctx().settings.update(body.revision, lambda d: d["alerts"].__setitem__("retention_days", body.retention_days))
+    return _view()
+
+
+# The scheduled jobs that end in an alert evaluation (jobs/scheduler.py): events, traffic with the lateral and anomaly
+# detectors, the system checks, and the PCE probe (its health check).
+EVALUATING_JOBS = ("collect_events", "collect_traffic", "alerts_system", "pce_probe")
+# APScheduler skips a run picked up later than its grace time (1 s by default) as missed: a run asked for now must not
+# be dropped because the executor was busy for a moment. It stays on the job, where a late run also beats a skipped one.
+EVALUATE_GRACE_SECONDS = 60
+
+
+@api_route(bp, OP_EVALUATE)
+def evaluate_now() -> EvaluateRequested:
+    """Asks the scheduler's own jobs to run now (5.x "run now"): no second scheduler, no evaluation outside the jobs
+    and their locks. A job already running finishes that pass instead."""
+    ctx = get_ctx()
+    if ctx.scheduler is None:
+        raise ApiFailure(503, "jobs_not_running", "err_jobs_not_running")
+    now = datetime.now(UTC)
+    for job_id in EVALUATING_JOBS:
+        ctx.scheduler.modify_job(job_id, next_run_time=now, misfire_grace_time=EVALUATE_GRACE_SECONDS)
+    return EvaluateRequested(jobs=list(EVALUATING_JOBS), requested_at=now)

@@ -56,7 +56,9 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
 
     # ── label hygiene ───────────────────────────────────────────────────────
     keys = (APP, env_key, *HYGIENE_KEYS[1:])
-    managed = [h for h in lc.hosts.values() if flowsections.host_in_scope(h, inp.params.filter)]
+    scope_groups = flowsections.label_groups_of(inp.ctx, inp.params.filter)
+    managed = [h for h in lc.hosts.values()
+               if flowsections.host_in_scope(h, inp.params.filter, label_groups=scope_groups)]
     missing = sorted(((h.hostname or h.key, [k for k in keys if not h.labels.get(k)]) for h in managed),
                      key=lambda r: (-len(r[1]), r[0]))
     missing = [(name, ks) for name, ks in missing if ks]

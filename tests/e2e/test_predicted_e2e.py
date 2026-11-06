@@ -22,7 +22,8 @@ def _flow():
         dst_href="/orgs/1/workloads/b", src_hostname="web-01", dst_hostname="db-01", src_managed=True,
         dst_managed=True, src_mode="selective", dst_mode="visibility_only", src_labels={}, dst_labels={}, port=3389,
         proto=6, initiator_process=None, initiator_user=None, service_process=None, service_user=None,
-        windows_service=None, policy_decision="potentially_blocked", first_detected=now, last_detected=now,
+        windows_service=None, transmission=None, policy_decision="potentially_blocked", first_detected=now,
+        last_detected=now,
         num_connections=4, bytes_in=None, bytes_out=None, state=None, origin="pce")
 
 

@@ -24,8 +24,10 @@ from illumio_ops.domain.filter import (
     FlowCondition,
     PortProto,
     ip_list_hrefs,
+    label_group_hrefs,
     matches,
     port_matches,
+    service_hrefs,
     sql_functions,
     to_pce_payload,
     to_sql,
@@ -60,7 +62,7 @@ from illumio_ops.services.coverage import (
     store_coverage,
 )
 from illumio_ops.settings.schema import PceSettings
-from illumio_ops.store.flowdb import ingest_state, ip_lists
+from illumio_ops.store.flowdb import ingest_state, ip_lists, policy_objects
 from illumio_ops.store.flowdb.db import StaleGeneration, db_time
 from illumio_ops.store.flowdb.flows import INCREMENT_PRIMARY_JOIN
 
@@ -122,6 +124,7 @@ class FlowRow(BaseModel):
     service_process: str | None
     service_user: str | None
     windows_service: str | None
+    transmission: str | None  # unicast / broadcast / multicast, as the PCE sent it
     policy_decision: str
     first_detected: datetime
     last_detected: datetime
@@ -173,8 +176,8 @@ class UserPair(BaseModel):
 
 _COLUMNS = ("record_key, conn_key, direction, src_ip, dst_ip, src_key, dst_key, src_href, dst_href, src_hostname, "
             "dst_hostname, src_managed, dst_managed, src_mode, dst_mode, src_label_set, dst_label_set, port, proto, "
-            "initiator_process, initiator_user, service_process, service_user, windows_service, policy_decision, "
-            "first_detected, last_detected, num_connections, bytes_in, bytes_out, state, origin")
+            "initiator_process, initiator_user, service_process, service_user, windows_service, transmission, "
+            "policy_decision, first_detected, last_detected, num_connections, bytes_in, bytes_out, state, origin")
 _ORDER_SQL = {"last_detected_desc": "f.last_detected DESC, f.id DESC",
               "connections_desc": "f.num_connections DESC, f.last_detected DESC, f.id DESC"}
 
@@ -219,7 +222,8 @@ def _row_from_pce(primary: FlowRecord, partner: FlowRecord | None) -> FlowRow:
         dst_labels=dict(primary.dst_labels), port=primary.port, proto=primary.proto,
         initiator_process=out.own_process if out else None, initiator_user=out.own_user if out else None,
         service_process=inn.own_process if inn else None, service_user=inn.own_user if inn else None,
-        windows_service=primary.windows_service, policy_decision=primary.policy_decision,
+        windows_service=primary.windows_service, transmission=primary.transmission,
+        policy_decision=primary.policy_decision,
         first_detected=primary.first_detected, last_detected=primary.last_detected,
         num_connections=primary.num_connections, bytes_in=max(known_in) if known_in else None,
         bytes_out=max(known_out) if known_out else None, state=primary.state, origin="pce",
@@ -295,6 +299,8 @@ def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> tuple[
     changed = {(r.src_ip, r.dst_ip, r.port, r.proto) for k, r in merged.items() if stored.get(k) != r}
     _, residual = to_pce_payload(spec, max_results=FILL_MAX_RESULTS, query_name="illumio-ops query", label_hrefs={})
     nets = ip_lists.networks(conn, ip_list_hrefs(residual))
+    groups = policy_objects.label_groups(conn, label_group_hrefs(residual))
+    ports = policy_objects.service_ports(conn, service_hrefs(residual))
     out: list[FlowRow] = []
     superseded: set[str] = set()
     for primary, partner in group_pairs(list(merged.values())):
@@ -303,7 +309,7 @@ def _live_rows(conn: Any, spec: FilterSpec, fetched: list[FlowRecord]) -> tuple[
         keys = {record_key(primary)} | ({record_key(partner)} if partner is not None else set())
         superseded |= keys & stored.keys()
         row = _row_from_pce(primary, partner)
-        if matches(residual, row.model_dump(), ip_lists=nets):
+        if matches(residual, row.model_dump(), ip_lists=nets, label_groups=groups, services=ports):
             out.append(row)
     return out, superseded
 

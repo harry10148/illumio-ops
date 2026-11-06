@@ -191,6 +191,53 @@ export type ProbeName = ("noop" | "health" | "node_available")
 
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "IpListChoice".
+ */
+export interface IpListChoice {
+href: string
+name: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelChoice".
+ */
+export interface LabelChoice {
+key: string
+truncated: boolean
+values: string[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelGroupChoice".
+ */
+export interface LabelGroupChoice {
+href: string
+key: string
+name: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ServiceChoice".
+ */
+export interface ServiceChoice {
+href: string
+name: string
+}
+/**
+ * What a flow condition editor offers (alert rules, the reports filter): the inventory's labels and the PCE
+ * objects the last inventory read.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ConditionChoices".
+ */
+export interface ConditionChoices {
+ip_lists: IpListChoice[]
+label_groups: LabelGroupChoice[]
+labels: LabelChoice[]
+services: ServiceChoice[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "BandwidthRule".
  */
 export interface BandwidthRule {
@@ -218,8 +265,14 @@ export interface FlowCondition {
 decisions?: PolicyDecision[]
 dst?: (EndpointFilter | null)
 dst_exclude?: (EndpointFilter | null)
+either?: (EndpointFilter | null)
+either_exclude?: (EndpointFilter | null)
 exclude_ports?: PortProto[]
+exclude_processes?: string[]
+exclude_services?: string[]
 exclude_system_accounts?: boolean
+exclude_transmissions?: ("unicast" | "broadcast" | "multicast")[]
+exclude_windows_services?: string[]
 initiator_process?: (string | null)
 initiator_processes?: string[]
 initiator_user?: (string | null)
@@ -229,9 +282,12 @@ service_process?: (string | null)
 service_processes?: string[]
 service_user?: (string | null)
 service_users?: string[]
+services?: string[]
 src?: (EndpointFilter | null)
 src_exclude?: (EndpointFilter | null)
 text?: (string | null)
+transmissions?: ("unicast" | "broadcast" | "multicast")[]
+windows_services?: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -241,6 +297,7 @@ export interface EndpointFilter {
 hrefs?: string[]
 ip_lists?: string[]
 ips?: string[]
+label_groups?: string[]
 labels?: LabelCond[]
 match?: ("any" | "all")
 public?: boolean
@@ -386,11 +443,23 @@ revision: number
 rule: (EventRule | TrafficRule | BandwidthRule | VolumeRule | SystemRule | LateralRule)
 }
 /**
+ * A rule holding alerts back now: the latest moment one of its subjects is let through again.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RuleHold".
+ */
+export interface RuleHold {
+reason: ("cooldown" | "throttle")
+subjects: number
+until: string
+}
+/**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RuleListItem".
  */
 export interface RuleListItem {
 display_name: string
+held: (RuleHold | null)
 rule: (EventRule | TrafficRule | BandwidthRule | VolumeRule | SystemRule | LateralRule)
 summary: (RuleSummary | null)
 }
@@ -413,6 +482,7 @@ suppressed_throttle: number
 export interface RulesView {
 items: RuleListItem[]
 pack_missing: number
+retention_days: number
 revision: number
 }
 /**
@@ -421,6 +491,41 @@ revision: number
  */
 export interface RuleDelete {
 revision: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EvaluateRequested".
+ */
+export interface EvaluateRequested {
+jobs: string[]
+requested_at: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CatalogCategory".
+ */
+export interface CatalogCategory {
+events: CatalogEventView[]
+id: string
+label_key: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CatalogEventView".
+ */
+export interface CatalogEventView {
+description_key: string
+event_type: string
+severity_filter: boolean
+status_filter: boolean
+vendor_documented: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "EventCatalog".
+ */
+export interface EventCatalog {
+categories: CatalogCategory[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -449,6 +554,14 @@ samples: {
 }[]
 status: ("ok" | "not_applicable")
 would_fire: number
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "RetentionUpdate".
+ */
+export interface RetentionUpdate {
+retention_days: number
+revision: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -863,8 +976,14 @@ export interface FlowCondition1 {
 decisions?: PolicyDecision[]
 dst?: (EndpointFilter | null)
 dst_exclude?: (EndpointFilter | null)
+either?: (EndpointFilter | null)
+either_exclude?: (EndpointFilter | null)
 exclude_ports?: PortProto[]
+exclude_processes?: string[]
+exclude_services?: string[]
 exclude_system_accounts?: boolean
+exclude_transmissions?: ("unicast" | "broadcast" | "multicast")[]
+exclude_windows_services?: string[]
 initiator_process?: (string | null)
 initiator_processes?: string[]
 initiator_user?: (string | null)
@@ -874,9 +993,12 @@ service_process?: (string | null)
 service_processes?: string[]
 service_user?: (string | null)
 service_users?: string[]
+services?: string[]
 src?: (EndpointFilter | null)
 src_exclude?: (EndpointFilter | null)
 text?: (string | null)
+transmissions?: ("unicast" | "broadcast" | "multicast")[]
+windows_services?: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1755,6 +1877,7 @@ src_labels: {
 src_managed: boolean
 src_mode: (string | null)
 state: (string | null)
+transmission: (string | null)
 windows_service: (string | null)
 }
 /**
@@ -2087,15 +2210,6 @@ report_type: ReportType
 requires_app: boolean
 schedules: number
 ui_group: ("assessment" | "traffic" | "policy" | "operations")
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "LabelChoice".
- */
-export interface LabelChoice {
-key: string
-truncated: boolean
-values: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -2673,6 +2787,29 @@ ok: boolean
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelTestAll".
+ */
+export interface ChannelTestAll {
+channels?: (ChannelsInput | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelTestOutcome".
+ */
+export interface ChannelTestOutcome {
+channel: ChannelKind
+error: (string | null)
+ok: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ChannelTestAllResult".
+ */
+export interface ChannelTestAllResult {
+results: ChannelTestOutcome[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ChannelsUpdate".
  */
 export interface ChannelsUpdate {
@@ -2949,14 +3086,6 @@ port: number
  */
 processes: [string, ...(string)[]]
 proto: (number | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "IpListChoice".
- */
-export interface IpListChoice {
-href: string
-name: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -3424,14 +3553,19 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
+  "alert_rules.condition_choices": undefined;
   "alert_rules.create": RuleWrite;
   "alert_rules.delete": RuleDelete;
+  "alert_rules.evaluate_now": undefined;
+  "alert_rules.event_catalog": undefined;
   "alert_rules.list": undefined;
   "alert_rules.pack": PackApply;
   "alert_rules.preview": RulePreviewRequest;
+  "alert_rules.reset_state": undefined;
+  "alert_rules.retention": RetentionUpdate;
   "alert_rules.test": RuleTestRequest;
   "alert_rules.test_candidates": undefined;
   "alert_rules.update": RuleWrite;
@@ -3508,6 +3642,7 @@ export interface Requests {
   "siem.status": undefined;
   "system.channels.get": undefined;
   "system.channels.test": ChannelTest;
+  "system.channels.test_all": ChannelTestAll;
   "system.channels.update": ChannelsUpdate;
   "system.collection.backfill": BackfillRequest;
   "system.collection.clear": ClearRequest;
@@ -3545,11 +3680,16 @@ export interface Requests {
 }
 
 export interface Responses {
+  "alert_rules.condition_choices": ConditionChoices;
   "alert_rules.create": RulesView;
   "alert_rules.delete": RulesView;
+  "alert_rules.evaluate_now": EvaluateRequested;
+  "alert_rules.event_catalog": EventCatalog;
   "alert_rules.list": RulesView;
   "alert_rules.pack": RulesView;
   "alert_rules.preview": RulePreview;
+  "alert_rules.reset_state": RulesView;
+  "alert_rules.retention": RulesView;
   "alert_rules.test": RuleTestResult;
   "alert_rules.test_candidates": Candidates;
   "alert_rules.update": RulesView;
@@ -3626,6 +3766,7 @@ export interface Responses {
   "siem.status": SiemStatusView;
   "system.channels.get": ChannelsView;
   "system.channels.test": ChannelTestResult;
+  "system.channels.test_all": ChannelTestAllResult;
   "system.channels.update": ChannelsView;
   "system.collection.backfill": BackfillAccepted;
   "system.collection.clear": CollectedCleared;
@@ -3663,11 +3804,16 @@ export interface Responses {
 }
 
 export const OPERATIONS = {
+  "alert_rules.condition_choices": { method: "GET", path: "/api/alert-rules/condition-choices" },
   "alert_rules.create": { method: "POST", path: "/api/alert-rules" },
   "alert_rules.delete": { method: "DELETE", path: "/api/alert-rules/<rule_id>" },
+  "alert_rules.evaluate_now": { method: "POST", path: "/api/alert-rules/evaluate-now" },
+  "alert_rules.event_catalog": { method: "GET", path: "/api/alert-rules/event-catalog" },
   "alert_rules.list": { method: "GET", path: "/api/alert-rules" },
   "alert_rules.pack": { method: "POST", path: "/api/alert-rules/pack" },
   "alert_rules.preview": { method: "POST", path: "/api/alert-rules/preview" },
+  "alert_rules.reset_state": { method: "POST", path: "/api/alert-rules/<rule_id>/reset-state" },
+  "alert_rules.retention": { method: "PUT", path: "/api/alert-rules/retention" },
   "alert_rules.test": { method: "POST", path: "/api/alert-rules/test" },
   "alert_rules.test_candidates": { method: "GET", path: "/api/alert-rules/test-candidates" },
   "alert_rules.update": { method: "PUT", path: "/api/alert-rules/<rule_id>" },
@@ -3744,6 +3890,7 @@ export const OPERATIONS = {
   "siem.status": { method: "GET", path: "/api/siem/status" },
   "system.channels.get": { method: "GET", path: "/api/system/channels" },
   "system.channels.test": { method: "POST", path: "/api/system/channels/test" },
+  "system.channels.test_all": { method: "POST", path: "/api/system/channels/test-all" },
   "system.channels.update": { method: "PUT", path: "/api/system/channels" },
   "system.collection.backfill": { method: "POST", path: "/api/system/collection/backfill" },
   "system.collection.clear": { method: "POST", path: "/api/system/collection/clear" },

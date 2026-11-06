@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type { RuleListItem, RulesView } from "../../api/generated";
+import type { EvaluateRequested, RuleListItem, RulesView } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
@@ -15,13 +15,35 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<RulesView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [confirm, setConfirm] = useState<Mode | null>(null);
+  const [resetting, setResetting] = useState<string | null>(null);
+  const [evaluated, setEvaluated] = useState<EvaluateRequested | null>(null);
+  const [keep, setKeep] = useState("");
+  const [keepSaved, setKeepSaved] = useState(false);
 
   useEffect(() => {
     void call("alert_rules.list").then((env) => {
-      if (env.ok && env.data) setView(env.data);
+      if (env.ok && env.data) { setView(env.data); setKeep(String(env.data.retention_days)); }
       else setError(env.error);
     });
   }, []);
+
+  async function reset(id: string) {
+    const env = await call("alert_rules.reset_state", undefined, { rule_id: id });
+    setResetting(null);
+    if (env.ok && env.data) { setView(env.data); setError(null); } else setError(env.error);
+  }
+
+  async function evaluateNow() {
+    const env = await call("alert_rules.evaluate_now");
+    if (env.ok && env.data) { setEvaluated(env.data); setError(null); } else { setEvaluated(null); setError(env.error); }
+  }
+
+  async function saveKeep() {
+    if (!view) return;
+    const env = await call("alert_rules.retention", { revision: view.revision, retention_days: Number(keep) });
+    if (env.ok && env.data) { setView(env.data); setError(null); setKeepSaved(true); }
+    else { setError(env.error); setKeepSaved(false); }
+  }
 
   async function toggle(item: RuleListItem, field: "enabled" | "notify") {
     if (!view) return;
@@ -63,6 +85,19 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
               </div>
             )}
           </div>
+          <div className="card stack" data-role="evaluate">
+            <div className="row">
+              <button type="button" className="btn-quiet" data-role="evaluate-now" onClick={() => void evaluateNow()}>
+                {t("rules_evaluate_now")}
+              </button>
+              <span className="hint">{t("rules_evaluate_hint")}</span>
+            </div>
+            {evaluated && (
+              <p className="notice" role="status" data-role="evaluate-requested">
+                {t("rules_evaluate_requested", { time: formatTime(evaluated.requested_at, lang) })}
+              </p>
+            )}
+          </div>
           <div className="table-wrap">
             <table className="table" data-role="rule-list">
               <thead>
@@ -93,6 +128,23 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
                       <td>
                         {s?.last_fired_at ? formatTime(s.last_fired_at, lang) : t("rules_never")}
                         {held > 0 && <span className="hint"> · {t("rules_held", { n: String(held) })}</span>}
+                        {item.held && (
+                          <div className="hint" data-role="held">
+                            {t(item.held.reason === "throttle" ? "rules_hold_throttle" : "rules_hold_cooldown",
+                               { n: String(item.held.subjects), time: formatTime(item.held.until, lang) })}{" "}
+                            {resetting === item.rule.id ? (
+                              <>
+                                <span>{t("rules_reset_confirm")}</span>{" "}
+                                <button type="button" className="btn-quiet" data-role="reset-confirm"
+                                        onClick={() => void reset(item.rule.id)}>{t("btn_confirm")}</button>
+                                <button type="button" className="btn-quiet" onClick={() => setResetting(null)}>{t("btn_cancel")}</button>
+                              </>
+                            ) : (
+                              <button type="button" className="btn-quiet" data-role="reset"
+                                      onClick={() => setResetting(item.rule.id)}>{t("rules_reset")}</button>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="wb-num mono" data-role="fired-7d">{s?.fired_7d ?? 0}</td>
                       <td className="wb-num mono" data-role="known-7d">{s?.known_7d ?? 0}</td>
@@ -102,6 +154,18 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="card row" data-role="retention">
+            <label>
+              {t("rules_retention")}
+              <input name="alert_retention_days" type="number" min={0} max={3650} className="narrow" value={keep}
+                     onChange={(e) => { setKeep(e.target.value); setKeepSaved(false); }} />
+            </label>
+            <span className="hint">{/^\d+$/.test(keep) && Number(keep) === 0 ? t("rules_retention_forever") : t("rules_retention_hint")}</span>
+            <button type="button" className="btn-quiet" disabled={!/^\d+$/.test(keep)} onClick={() => void saveKeep()}>
+              {t("btn_save")}
+            </button>
+            {keepSaved && <span className="form-ok" role="status">{t("saved_ok")}</span>}
           </div>
         </>
       )}

@@ -3,9 +3,10 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  DetectorKind, EventRule, FlowCondition, IpListChoice, LabelChoice, RulePreview, RuleWrite, Severity, SystemCheck, ThresholdType,
+  ConditionChoices, DetectorKind, EventCatalog, EventRule, FlowCondition, RulePreview, RuleWrite, Severity, SystemCheck,
+  ThresholdType,
 } from "../../api/generated";
-import { ConditionEditor, Side } from "../../components/ConditionEditor";
+import { ConditionEditor, NO_CHOICES, Side } from "../../components/ConditionEditor";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
@@ -76,8 +77,7 @@ export function RuleEditor() {
   const navigate = useNavigate();
   const [revision, setRevision] = useState<number | null>(null);
   const [rule, setRule] = useState<Rule | null>(id === "new" ? blank("event") : null);
-  const [choices, setChoices] = useState<LabelChoice[]>([]);
-  const [ipLists, setIpLists] = useState<IpListChoice[]>([]);
+  const [choices, setChoices] = useState<ConditionChoices>(NO_CHOICES);
   const [error, setError] = useState<ApiError | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [preview, setPreview] = useState<RulePreview | null>(null);
@@ -94,8 +94,8 @@ export function RuleEditor() {
         else setError({ code: "not_found", message_key: "err_not_found", params: {}, field: null });
       }
     });
-    void call("system.lateral.get").then((env) => {
-      if (env.ok && env.data) { setChoices(env.data.label_choices); setIpLists(env.data.ip_list_choices); }
+    void call("alert_rules.condition_choices").then((env) => {
+      if (env.ok && env.data) setChoices(env.data);
     });
   }, [id]);
 
@@ -170,7 +170,7 @@ export function RuleEditor() {
             </p>
             {fieldError("window_minutes")}
             <p className="hint">{t(rule.type === "traffic" ? "rule_traffic_hint" : "rule_bytes_hint")}</p>
-            <ConditionEditor value={rule.condition} choices={choices} ipLists={ipLists} onChange={(condition) => set({ condition })}
+            <ConditionEditor value={rule.condition} choices={choices} onChange={(condition) => set({ condition })}
                              onInvalid={setLocalError} />
             {localError && <p className="form-error" data-field={localError}>{t("rule_ports_invalid")}</p>}
             {fieldError("condition")}
@@ -218,7 +218,7 @@ export function RuleEditor() {
                      onChange={(e) => set({ critical_assets_only: e.target.checked })} />
               {t("rule_critical_only")}
             </label>
-            <Side name="exclude" value={rule.exclude} choices={choices} ipLists={ipLists} onChange={(exclude) => set({ exclude })} />
+            <Side name="exclude" value={rule.exclude} choices={choices} onChange={(exclude) => set({ exclude })} />
           </>
         )}
 
@@ -302,9 +302,64 @@ function parseFields(text: string): Record<string, string> {
   return out;
 }
 
+// A pattern (regular expression) rather than event type names: as domain/alertrules._looks_like_regex.
+const isPattern = (p: string) => /^\^|\$$|[*+?[\](){}$\\]/.test(p);
+
+/** The event catalog: a picker that adds to the typed list (which still takes types it does not list, or patterns),
+ * and what each chosen type is. */
+function EventPicker({ types, onAdd }: { types: string[]; onAdd: (type: string) => void }) {
+  const [catalog, setCatalog] = useState<EventCatalog | null>(null);
+  const [pick, setPick] = useState("");
+  useEffect(() => {
+    void call("alert_rules.event_catalog").then((env) => { if (env.ok && env.data) setCatalog(env.data); });
+  }, []);
+  if (!catalog) return null;
+  const known = new Map(catalog.categories.flatMap((c) => c.events.map((e) => [e.event_type, e] as const)));
+  const names = types.filter((p) => p && !isPattern(p)).flatMap((p) => p.split("|"));
+  const chosen = names.filter((n) => known.has(n));
+  return (
+    <div className="stack" data-role="event-picker">
+      <div className="row">
+        <select name="event_pick" aria-label={t("rule_event_pick")} value={pick} onChange={(e) => setPick(e.target.value)}>
+          <option value="">{t("rule_event_pick")}</option>
+          {catalog.categories.map((c) => (
+            <optgroup key={c.id} label={t(c.label_key)}>
+              {c.events.map((e) => <option key={e.event_type} value={e.event_type}>{`${e.event_type} — ${t(e.description_key)}`}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <button type="button" className="btn-quiet" disabled={!pick} onClick={() => { onAdd(pick); setPick(""); }}>
+          {t("rule_event_add")}
+        </button>
+      </div>
+      <p className="hint">{t("rule_event_catalog_hint")}</p>
+      {names.length > 0 && (
+        <ul className="stack" data-role="event-descriptions">
+          {names.map((n) => {
+            const e = known.get(n);
+            return (
+              <li key={n} data-event-type={n}>
+                <span className="mono">{n}</span>{" — "}
+                {e ? t(e.description_key) : <span className="hint">{t("rule_event_not_in_catalog")}</span>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {chosen.length > 0 && chosen.length === names.length && !chosen.some((n) => known.get(n)?.status_filter) && (
+        <p className="hint" data-role="status-unmarked">{t("rule_event_status_unmarked")}</p>
+      )}
+    </div>
+  );
+}
+
 function EventFields({ rule, set, fieldError }: {
   rule: EventRule; set: (patch: Partial<EventRule>) => void; fieldError: (name: string) => ReactElement | null;
 }) {
+  const add = (type: string) => {
+    const kept = rule.event_types.map((p) => p.trim()).filter((p) => p !== "");
+    if (!kept.includes(type)) set({ event_types: kept.concat([type]) as [string, ...string[]] });
+  };
   return (
     <>
       <label>
@@ -314,6 +369,7 @@ function EventFields({ rule, set, fieldError }: {
         <span className="hint">{t("rule_event_types_hint")}</span>
         {fieldError("event_types")}
       </label>
+      <EventPicker types={rule.event_types} onAdd={add} />
       <div className="form-grid">
         <label>
           {t("rule_event_status")}

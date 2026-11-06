@@ -41,7 +41,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.eventsource import events_in_window
 from illumio_ops.services.flowsource import increment_times, increment_totals
 from illumio_ops.store import alerts as store
-from illumio_ops.store.flowdb import analysis, ip_lists
+from illumio_ops.store.flowdb import analysis, ip_lists, policy_objects
 from illumio_ops.store.flowdb.flows import INCREMENT_KEEP
 
 PREVIEW_SAMPLES = 10
@@ -104,8 +104,9 @@ def _preview_lateral(ctx: AppContext, rule: LateralRule, start: datetime) -> lis
         rows = list(reversed(analysis.detections_since(conn, start, limit=5000)))
         names, labels = inventory(conn)
         nets = ip_lists.networks(conn, rule.exclude.ip_lists if rule.exclude else ())
+        groups = policy_objects.label_groups(conn, rule.exclude.label_groups if rule.exclude else ())
     facts = [detection_fact(r, start=("", 0), names=names, labels=labels, previous=None) for r in rows]
-    return [(t.last_seen, t) for t in evaluate_lateral_rule(rule, facts, ip_lists=nets)]
+    return [(t.last_seen, t) for t in evaluate_lateral_rule(rule, facts, ip_lists=nets, label_groups=groups)]
 
 
 def preview_rule(ctx: AppContext, rule: AlertRule, *, hours: int, now: datetime | None = None) -> RulePreview:
@@ -142,10 +143,27 @@ def apply_pack(current: Sequence[AlertRule], *, mode: Literal["append_missing", 
     return (*kept, *(r for rid, r in pack.items() if rid not in have))
 
 
+class RuleHold(BaseModel):
+    """A rule holding alerts back now: the latest moment one of its subjects is let through again."""
+    reason: Literal["cooldown", "throttle"]  # of that latest subject
+    until: datetime
+    subjects: int  # subjects held back now
+
+
 class RuleListItem(BaseModel):
     rule: AlertRule
     display_name: str
     summary: store.RuleSummary | None
+    held: RuleHold | None
+
+
+def _hold(rule: AlertRule, states: Sequence[RuleState], now: datetime) -> RuleHold | None:
+    gates = [g for g in (gate(rule, s, now) for s in states) if not g.allowed and g.next_allowed_at is not None]
+    if not gates:
+        return None
+    last = max(gates, key=lambda g: g.next_allowed_at or now)
+    return RuleHold(reason="throttle" if last.reason == "throttle" else "cooldown", until=last.next_allowed_at or now,
+                    subjects=len(gates))
 
 
 def rule_list(ctx: AppContext, *, now: datetime | None = None) -> list[RuleListItem]:
@@ -154,6 +172,13 @@ def rule_list(ctx: AppContext, *, now: datetime | None = None) -> list[RuleListI
     lang: Language = s.display.language
     with ctx.db() as conn:
         summaries = store.rule_summaries(conn, pce_url=s.pce.url, org_id=s.pce.org_id, now=at)
+        states = store.rule_states(conn)
     return [RuleListItem(rule=r, display_name=r.name or translate(lang, r.pack_key or ""),
-                         summary=summaries.get(r.id)) for r in s.alerts.rules]
+                         summary=summaries.get(r.id), held=_hold(r, states.get(r.id, ()), at)) for r in s.alerts.rules]
+
+
+def reset_rule_state(ctx: AppContext, rule_id: str) -> None:
+    """The rule's cooldown and throttle start over (5.x reset-watermark, without its event watermark)."""
+    with ctx.db() as conn:
+        store.reset_rule_state(conn, rule_id)
 

@@ -10,7 +10,9 @@ from illumio_ops.domain.filter import (
     EndpointFilter,
     FilterSpec,
     FlowCondition,
+    LabelGroups,
     endpoint_matches,
+    label_group_hrefs,
 )
 from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.report import Cell, Column, TableBlock
@@ -23,10 +25,12 @@ from illumio_ops.domain.values import (
     SegmentView,
 )
 from illumio_ops.services.analysis.segments import run_segment
+from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import AggRow, FieldCoverage
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports.common import host_name, port_text, tr
 from illumio_ops.services.reports.registry import BuildInput
+from illumio_ops.store.flowdb import policy_objects
 
 DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
                  "blocked": "decision_blocked", "unknown": "decision_unknown"}
@@ -105,29 +109,76 @@ def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric:
 
 def _side_text(side: EndpointFilter, lang: Language, prefix_key: str) -> list[str]:
     out = []
+    name = tr(lang, prefix_key)
     for lc in side.labels:
-        out.append(tr(lang, "rpt_filter_label", side=tr(lang, prefix_key), key=lc.key,
+        out.append(tr(lang, "rpt_filter_label", side=name, key=lc.key,
                       values=tr(lang, "rpt_filter_or").join(lc.values)))
+    if side.label_groups:
+        out.append(tr(lang, "rpt_filter_label_groups", side=name, n=len(side.label_groups)))
     if side.hrefs or side.ips:
-        out.append(tr(lang, "rpt_filter_hosts", side=tr(lang, prefix_key), n=len(side.hrefs) + len(side.ips)))
+        out.append(tr(lang, "rpt_filter_hosts", side=name, n=len(side.hrefs) + len(side.ips)))
+    if side.ip_lists:
+        out.append(tr(lang, "rpt_filter_ip_lists", side=name, n=len(side.ip_lists)))
+    if side.public:
+        out.append(tr(lang, "rpt_filter_field", name=name, value=tr(lang, "cond_public")))
     return out
 
 
+_SIDE_TEXT_KEYS = {"src": "rpt_filter_source", "dst": "rpt_filter_destination", "either": "wb_cond_either",
+                   "src_exclude": "wb_cond_src_not", "dst_exclude": "wb_cond_dst_not",
+                   "either_exclude": "wb_cond_either_not"}
+_VALUE_TEXT_KEYS = {"initiator_process": "wb_cond_initiator_process", "initiator_user": "wb_cond_initiator_user",
+                    "service_process": "wb_cond_service_process", "service_user": "wb_cond_service_user",
+                    "initiator_processes": "wb_cond_initiator_process", "initiator_users": "wb_cond_initiator_user",
+                    "service_processes": "wb_cond_service_process", "service_users": "wb_cond_service_user",
+                    "windows_services": "wb_cond_windows_service",
+                    "exclude_windows_services": "wb_cond_windows_service_not",
+                    "exclude_processes": "wb_cond_process_not", "text": "wb_cond_text"}
+_TX_TEXT_KEYS = {"unicast": "cond_tx_unicast", "broadcast": "cond_tx_broadcast", "multicast": "cond_tx_multicast"}
+
+
 def filter_text(cond: FlowCondition | None, lang: Language) -> str | None:
-    """The report's filter in words for the cover and the data-quality line; None without a filter."""
+    """The report's filter in words for the cover and the data-quality line; None without a filter. Every condition
+    the filter holds is named (PCE objects by count: the cover has no PCE to name them from)."""
     if cond is None:
         return None
     parts: list[str] = []
-    if cond.src is not None:
-        parts += _side_text(cond.src, lang, "rpt_filter_source")
-    if cond.dst is not None:
-        parts += _side_text(cond.dst, lang, "rpt_filter_destination")
+    for field, key in _SIDE_TEXT_KEYS.items():
+        side = getattr(cond, field)
+        if side is not None:
+            parts += _side_text(side, lang, key)
     if cond.ports:
         parts.append(tr(lang, "rpt_filter_ports", ports=", ".join(port_text(p.port, p.proto or 6) for p in cond.ports)))
+    for services, key in ((cond.services, "wb_cond_service"), (cond.exclude_services, "wb_cond_service_not")):
+        if services:
+            parts.append(tr(lang, "rpt_filter_services", name=tr(lang, key), n=len(services)))
+    if cond.exclude_ports:
+        parts.append(tr(lang, "rpt_filter_field", name=tr(lang, "wb_cond_port_not"),
+                        value=", ".join(port_text(p.port, p.proto or 6) for p in cond.exclude_ports)))
     if cond.decisions:
         parts.append(tr(lang, "rpt_filter_decisions",
                         decisions=", ".join(tr(lang, DECISION_KEYS[d.value]) for d in cond.decisions)))
+    for field, key in _VALUE_TEXT_KEYS.items():
+        value = getattr(cond, field)
+        if value:
+            parts.append(tr(lang, "rpt_filter_field", name=tr(lang, key),
+                            value=value if isinstance(value, str) else ", ".join(value)))
+    for txs, key in ((cond.transmissions, "wb_cond_transmission"), (cond.exclude_transmissions,
+                                                                      "wb_cond_transmission_not")):
+        if txs:
+            parts.append(tr(lang, "rpt_filter_field", name=tr(lang, key),
+                            value=", ".join(tr(lang, _TX_TEXT_KEYS[x]) for x in txs)))
+    if cond.exclude_system_accounts:
+        parts.append(tr(lang, "wb_cond_no_system"))
     return "; ".join(parts) or None
+
+
+def label_groups_of(ctx: AppContext, cond: FlowCondition | None) -> LabelGroups:
+    """The members of the label groups a filter names (host_in_scope reads them)."""
+    if cond is None or not label_group_hrefs(cond):
+        return {}
+    with ctx.flows().connect() as conn:
+        return policy_objects.label_groups(conn, label_group_hrefs(cond))
 
 
 def coverage_lines(inp: BuildInput, fc: FieldCoverage | None) -> tuple[str, ...]:
@@ -141,19 +192,22 @@ def coverage_lines(inp: BuildInput, fc: FieldCoverage | None) -> tuple[str, ...]
                bytes=pct(fc.bytes)),)
 
 
-def host_in_scope(host: HostInfo, cond: FlowCondition | None) -> bool:
-    """A managed host a filtered report is about: one an include side of the filter matches (labels, href or
-    address, as the flows are matched) and that side's exclusion does not; every host without include
-    conditions, minus the excluded ones. Inventory hosts carry no address here, so an address-only side
-    matches none of them."""
+def host_in_scope(host: HostInfo, cond: FlowCondition | None, *, label_groups: LabelGroups) -> bool:
+    """A managed host a filtered report is about: one an include side of the filter matches (labels, label groups,
+    href or address, as the flows are matched) and that side's exclusion does not; every host without include
+    conditions, minus the excluded ones. Either end counts as a side of its own. Inventory hosts carry no address
+    here, so an address-only side matches none of them. label_groups: label_groups_of(the filter)."""
     if not host.managed:
         return False
     if cond is None:
         return True
 
     def hits(ep: EndpointFilter | None) -> bool:
-        return ep is not None and not ep.is_empty() and endpoint_matches(ep, href=host.href, ip="", labels=host.labels)
-    sides = [(cond.src, cond.src_exclude), (cond.dst, cond.dst_exclude)]
+        return ep is not None and not ep.is_empty() and endpoint_matches(ep, href=host.href, ip="", labels=host.labels,
+                                                                          label_groups=label_groups)
+    if hits(cond.either_exclude):
+        return False
+    sides = [(cond.src, cond.src_exclude), (cond.dst, cond.dst_exclude), (cond.either, None)]
     includes = [(inc, exc) for inc, exc in sides if inc is not None and not inc.is_empty()]
     if not includes:
         return not any(hits(exc) for _, exc in sides)

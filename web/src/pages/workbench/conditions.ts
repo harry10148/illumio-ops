@@ -1,5 +1,6 @@
 // What a dimension value adds to the conditions, and the conditions as removable chips (spec §6.5.3).
 import type { AggRow, EndpointFilter, EventRequest, FlowCondition1, FlowRequest, SegmentDimension } from "../../api/generated";
+import { t } from "../../i18n";
 
 export type Req = FlowRequest | EventRequest;
 
@@ -34,9 +35,12 @@ const SETS: Partial<Record<SegmentDimension, FlowSet>> = {
 /** A value picked on one end narrows it: labels AND hosts (match "all"); values of the same kind OR. An end that
  * already holds both labels and hosts as a union (an alert's evidence) keeps its meaning. */
 function endpoint(f: EndpointFilter | null | undefined, key: string, labelKey?: string): EndpointFilter {
-  const union = f?.match !== "all" && !!f?.labels?.length && !!(f?.hrefs?.length || f?.ips?.length);
-  const e: EndpointFilter = { hrefs: [...(f?.hrefs ?? [])], ips: [...(f?.ips ?? [])], labels: [...(f?.labels ?? [])],
-    match: union ? "any" : "all" };
+  // what the side holds besides hosts and labels (label groups, IP lists, public) is kept, and counts as its own part
+  const labelled = !!(f?.labels?.length || f?.label_groups?.length);
+  const hosted = !!(f?.hrefs?.length || f?.ips?.length || f?.ip_lists?.length || f?.public);
+  const union = f?.match !== "all" && labelled && hosted;
+  const e: EndpointFilter = { ...(f ?? {}), hrefs: [...(f?.hrefs ?? [])], ips: [...(f?.ips ?? [])],
+    labels: [...(f?.labels ?? [])], match: union ? "any" : "all" };
   if (labelKey) {
     const found = (e.labels ?? []).find((l) => l.key === labelKey);
     if (!found) e.labels = [...(e.labels ?? []), { key: labelKey, values: [key] }];
@@ -92,6 +96,8 @@ export interface Chip {
   remove: (req: Req) => Req;
 }
 
+const TX_KEYS: Record<string, string> = { unicast: "cond_tx_unicast", broadcast: "cond_tx_broadcast", multicast: "cond_tx_multicast" };
+
 function shown(names: Record<string, string>, v: string): string {
   return names[v] ?? (v.startsWith("ip:") ? v.slice(3) : v.split("/").slice(-2).join("/"));
 }
@@ -112,26 +118,36 @@ export function chips(req: Req, names: Record<string, string>): Chip[] {
     return out;
   }
   const c = req.condition ?? {};
-  const side = (k: "src" | "dst" | "src_exclude" | "dst_exclude", labelKey: string) => {
+  type SideKey = "src" | "dst" | "src_exclude" | "dst_exclude" | "either" | "either_exclude";
+  const side = (k: SideKey, labelKey: string) => {
     const e = c[k];
     if (!e) return;
     const without = (r: Req, patch: Partial<EndpointFilter>): Req => {
       const cond = { ...((r as FlowRequest).condition ?? {}) };
       const next = { ...(cond[k] ?? {}), ...patch };
-      cond[k] = (next.hrefs?.length || next.ips?.length || next.labels?.length) ? next : null;
+      cond[k] = (next.hrefs?.length || next.ips?.length || next.labels?.length || next.label_groups?.length
+        || next.ip_lists?.length || next.public) ? next : null;
       return { ...r, condition: cond } as Req;
     };
+    const ep = (r: Req) => (r as FlowRequest).condition?.[k];
     for (const h of e.hrefs ?? []) out.push({ id: `${k}:h:${h}`, labelKey, value: shown(names, h),
       remove: (r) => without(r, { hrefs: ((r as FlowRequest).condition?.[k]?.hrefs ?? []).filter((x) => x !== h) }) });
     for (const ip of e.ips ?? []) out.push({ id: `${k}:i:${ip}`, labelKey, value: ip,
       remove: (r) => without(r, { ips: ((r as FlowRequest).condition?.[k]?.ips ?? []).filter((x) => x !== ip) }) });
     for (const l of e.labels ?? []) out.push({ id: `${k}:l:${l.key}`, labelKey, value: `${l.key}=${l.values.join(", ")}`,
       remove: (r) => without(r, { labels: ((r as FlowRequest).condition?.[k]?.labels ?? []).filter((x) => x.key !== l.key) }) });
+    for (const g of e.label_groups ?? []) out.push({ id: `${k}:g:${g}`, labelKey, value: shown(names, g),
+      remove: (r) => without(r, { label_groups: (ep(r)?.label_groups ?? []).filter((x) => x !== g) }) });
+    for (const l of e.ip_lists ?? []) out.push({ id: `${k}:p:${l}`, labelKey, value: shown(names, l),
+      remove: (r) => without(r, { ip_lists: (ep(r)?.ip_lists ?? []).filter((x) => x !== l) }) });
+    if (e.public) out.push({ id: `${k}:public`, labelKey, value: t("cond_public"), remove: (r) => without(r, { public: false }) });
   };
   side("src", "wb_cond_src");
   side("dst", "wb_cond_dst");
   side("src_exclude", "wb_cond_src_not");
   side("dst_exclude", "wb_cond_dst_not");
+  side("either", "wb_cond_either");
+  side("either_exclude", "wb_cond_either_not");
   const cond = (r: Req) => ({ ...((r as FlowRequest).condition ?? {}) });
   for (const p of c.ports ?? []) out.push({ id: `port:${p.port}/${p.proto}`, labelKey: "wb_cond_port",
     value: `${p.port === -1 ? "—" : (p.port ?? "*")}${p.to_port ? `-${p.to_port}` : ""}/${p.proto ?? "*"}`,
@@ -155,6 +171,17 @@ export function chips(req: Req, names: Record<string, string>): Chip[] {
     const v = c[field];
     if (typeof v === "string" && v) out.push({ id: field, labelKey, value: v,
       remove: (r) => ({ ...r, condition: { ...cond(r), [field]: null } }) as Req });
+  }
+  type FlowList = "services" | "exclude_services" | "windows_services" | "exclude_windows_services" | "transmissions"
+    | "exclude_transmissions" | "exclude_processes";
+  const lists: [FlowList, string][] = [["services", "wb_cond_service"], ["exclude_services", "wb_cond_service_not"],
+    ["windows_services", "wb_cond_windows_service"], ["exclude_windows_services", "wb_cond_windows_service_not"],
+    ["transmissions", "wb_cond_transmission"], ["exclude_transmissions", "wb_cond_transmission_not"],
+    ["exclude_processes", "wb_cond_process_not"]];
+  for (const [field, labelKey] of lists) {
+    for (const v of (c[field] ?? []) as string[]) out.push({ id: `${field}:${v}`, labelKey,
+      value: field.endsWith("transmissions") ? t(TX_KEYS[v] ?? v) : shown(names, v),
+      remove: (r) => ({ ...r, condition: { ...cond(r), [field]: ((cond(r)[field] ?? []) as string[]).filter((x) => x !== v) } }) as Req });
   }
   if (c.exclude_system_accounts) out.push({ id: "nosys", labelKey: "wb_cond_no_system", value: "",
     remove: (r) => ({ ...r, condition: { ...cond(r), exclude_system_accounts: false } }) as Req });

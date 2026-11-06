@@ -88,3 +88,29 @@ def test_channels_test_mask_uses_stored_secret(client, monkeypatch):
     data["channels"]["smtp"]["host"] = "attacker.example"
     r = post(client, "/api/system/channels/test", {"channel": "smtp", "channels": data["channels"]})
     assert r.status_code == 400 and r.get_json()["error"]["code"] == "credentials_required"
+
+
+def test_test_all_sends_to_every_enabled_channel(client, monkeypatch):
+    """5.x parity 2026-11-06: one button tests every enabled channel, with the values on the page."""
+    login(client)
+    data = configured(client)
+    data["channels"]["teams"]["enabled"] = False
+    sent = []
+
+    def fake(kind, cfg, rendered, **kw):
+        sent.append(kind.value)
+        return SendResult(kind.value != "telegram", "bad chat" if kind.value == "telegram" else None)
+    monkeypatch.setattr(dispatch, "send", fake)
+    r = post(client, "/api/system/channels/test-all", {"channels": data["channels"]})
+    results = {x["channel"]: (x["ok"], x["error"]) for x in r.get_json()["data"]["results"]}
+    assert sorted(sent) == ["line", "smtp", "telegram", "webhook"]
+    assert results == {"smtp": (True, None), "line": (True, None), "telegram": (False, "bad chat"),
+                       "webhook": (True, None)}
+
+
+def test_test_all_with_no_channel_enabled_says_so(client, monkeypatch):
+    login(client)
+    v = view(client)
+    monkeypatch.setattr(dispatch, "send", lambda *a, **kw: (_ for _ in ()).throw(AssertionError("sent")))
+    r = post(client, "/api/system/channels/test-all", {"channels": v["channels"]})
+    assert r.status_code == 200 and r.get_json()["data"]["results"] == []

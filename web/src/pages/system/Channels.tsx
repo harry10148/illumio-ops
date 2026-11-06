@@ -36,6 +36,7 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [results, setResults] = useState<Partial<Record<Kind, Result>>>({});
+  const [allNone, setAllNone] = useState(false);
 
   const load = (v: ChannelsView) => { setView(v); setChannels(v.channels); };
   useEffect(() => {
@@ -71,6 +72,17 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
     if (!channels) return;
     const env = await call("system.channels.test", { channel: kind, channels });
     setResults({ ...results, [kind]: env.ok && env.data ? env.data : (env.error as ApiError) });
+  }
+
+  /** Every enabled channel, with the values on the page; each answer lands beside its channel. */
+  async function testAll() {
+    if (!channels) return;
+    setAllNone(false);
+    const env = await call("system.channels.test_all", { channels });
+    if (!env.ok || !env.data) { setError(env.error); return; }
+    setError(null);
+    setAllNone(env.data.results.length === 0);
+    setResults(Object.fromEntries(env.data.results.map((r) => [r.channel, { ok: r.ok, error: r.error }])));
   }
 
   return (
@@ -134,7 +146,11 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
         })}
         {error && <p className="form-error" data-field={error.field ?? ""}>{t(error.message_key, error.params)}</p>}
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
+        {allNone && <p className="hint" role="status" data-role="test-all-none">{t("channels_test_all_none")}</p>}
         <div className="actions">
+          <button type="button" className="btn-quiet" data-role="test-all" onClick={() => void testAll()}>
+            {t("channels_test_all")}
+          </button>
           <button type="submit" className="btn-primary">{t("btn_save")}</button>
         </div>
       </form>

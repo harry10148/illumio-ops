@@ -15,6 +15,7 @@ from typing import Any
 
 from loguru import logger
 
+from illumio_ops.domain.policy_objects import label_group_values, service_port_entries
 from illumio_ops.domain.policy_resolver import ip_list_networks
 from illumio_ops.domain.values import (
     CapabilityState,
@@ -35,6 +36,7 @@ from illumio_ops.store.flowdb import (
     capabilities,
     ingest_state,
     ip_lists,
+    policy_objects,
     ransomware,
     workloads,
 )
@@ -126,6 +128,41 @@ def _ip_lists(client: PceClient, fdb: FlowDb, gen: int, at: datetime) -> None:
              for r in rows if isinstance(r, Mapping) and r.get("href")]
     with fdb.writing(gen) as conn, transaction(conn):
         ip_lists.replace_all(conn, lists, at=at)
+
+
+def _policy_objects(client: PceClient, fdb: FlowDb, gen: int, at: datetime) -> None:
+    """The active services and label groups flow conditions name (5.x parity 2026-11-06), read like the IP lists:
+    a failed read never fails the inventory; it keeps the names and drops the ports / members, so a condition naming
+    one matches nothing until the next read."""
+    try:
+        services = fetch_objects(client, "active", "services", deadline=_deadline())
+    except (*PCE_FAILURES, PceCollectionIncomplete, ValueError) as exc:
+        logger.warning("services could not be read; until the next read a condition naming one matches nothing: {}",
+                       exc)
+        with fdb.writing(gen) as conn, transaction(conn):
+            policy_objects.forget_service_ports(conn)
+    else:
+        rows = [policy_objects.ServiceRow(str(r["href"]), str(r.get("name") or ""), service_port_entries(r))
+                for r in services if isinstance(r, Mapping) and r.get("href")]
+        with fdb.writing(gen) as conn, transaction(conn):
+            policy_objects.replace_services(conn, rows, at=at)
+    try:
+        groups = [g for g in fetch_objects(client, "active", "label_groups", deadline=_deadline())
+                  if isinstance(g, Mapping) and g.get("href") and g.get("key")]
+        labels = {str(r["href"]): (str(r.get("key")), str(r.get("value")))
+                  for r in get_all(client, "/labels", params={}, deadline=_deadline())
+                  if isinstance(r, Mapping) and r.get("href")} if groups else {}
+    except (*PCE_FAILURES, PceCollectionIncomplete, ValueError) as exc:
+        logger.warning("label groups could not be read; until the next read a condition naming one matches nothing: {}",
+                       exc)
+        with fdb.writing(gen) as conn, transaction(conn):
+            policy_objects.forget_label_group_members(conn)
+        return
+    by_href = {str(g["href"]): g for g in groups}
+    group_rows = [policy_objects.LabelGroupRow(h, str(g.get("name") or ""), str(g["key"]),
+                                               label_group_values(g, by_href, labels)) for h, g in by_href.items()]
+    with fdb.writing(gen) as conn, transaction(conn):
+        policy_objects.replace_label_groups(conn, group_rows, at=at)
 
 
 def _org_summary(client: PceClient, fdb: FlowDb, gen: int, day: str, at: datetime) -> str | None:
@@ -229,6 +266,7 @@ def _inventory(ctx: AppContext, client: PceClient, pce: PceSettings, fdb: FlowDb
                     capabilities.record(conn, name, state, None, at)
                 ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=len(rows))
         _ip_lists(client, fdb, gen, at)
+        _policy_objects(client, fdb, gen, at)
         # The ransomware stage reports on its own source and never fails the inventory before it.
         try:
             summary_error = _org_summary(client, fdb, gen, day, at)

@@ -213,3 +213,67 @@ def test_an_ip_list_failure_matches_nothing_until_the_next_read(tmp_path):
     with ctx.flows().connect() as conn:
         assert [n for _, n in ip_lists.names(conn)] == ["Scanners"] and ip_lists.networks(conn) == {}
         assert ingest_state.get(conn, IngestSource.INVENTORY).last_error is None
+
+
+SVC = f"{API}/orgs/1/sec_policy/active/services"
+LGS = f"{API}/orgs/1/sec_policy/active/label_groups"
+LABELS = f"{API}/orgs/1/labels"
+
+
+def _policy_objects():
+    responses.add(responses.GET, SVC, json=[
+        {"href": "/orgs/1/sec_policy/active/services/1", "name": "All Services", "service_ports": [{"proto": -1}]},
+        {"href": "/orgs/1/sec_policy/active/services/2", "name": "Web",
+         "service_ports": [{"port": 443, "proto": 6}, {"port": 8000, "to_port": 8100, "proto": 6}, {"proto": 1}]},
+        {"href": "/orgs/1/sec_policy/active/services/3", "name": "Update",
+         "windows_services": [{"service_name": "wuauserv"}, {"port": 135, "proto": 6, "service_name": "RpcSs"}]}])
+    responses.add(responses.GET, LABELS, json=[
+        {"href": "/orgs/1/labels/1", "key": "env", "value": "Prod"},
+        {"href": "/orgs/1/labels/2", "key": "env", "value": "Staging"},
+        {"href": "/orgs/1/labels/3", "key": "env", "value": "DR"}])
+    responses.add(responses.GET, LGS, json=[
+        {"href": "/orgs/1/sec_policy/active/label_groups/a", "name": "Live", "key": "env",
+         "labels": [{"href": "/orgs/1/labels/1"}], "sub_groups": [{"href": "/orgs/1/sec_policy/active/label_groups/b"}]},
+        {"href": "/orgs/1/sec_policy/active/label_groups/b", "name": "Standby", "key": "env",
+         "labels": [{"href": "/orgs/1/labels/3"}], "sub_groups": [{"href": "/orgs/1/sec_policy/active/label_groups/a"}]}])
+
+
+@responses.activate
+def test_inventory_keeps_the_pce_services_and_label_groups(tmp_path):
+    # 5.x parity 2026-11-06: flow conditions name PCE services (their ports) and label groups (their labels)
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
+    responses.add(responses.GET, SUMMARY, status=404)
+    _policy_objects()
+    run_inventory_cycle(ctx, now=NOW)
+    from illumio_ops.store.flowdb import policy_objects as po
+    with ctx.flows().connect() as conn:
+        assert [n for _, n in po.service_names(conn)] == ["All Services", "Update", "Web"]
+        ports = po.service_ports(conn, [h for h, _ in po.service_names(conn)])
+        assert ports["/orgs/1/sec_policy/active/services/1"] == ((None, None, None),)
+        assert sorted(ports["/orgs/1/sec_policy/active/services/2"], key=str) == sorted(
+            [(443, None, 6), (8000, 8100, 6), (None, None, 1)], key=str)
+        assert ports["/orgs/1/sec_policy/active/services/3"] == ((135, None, 6),)  # a name alone has no port
+        assert po.label_group_names(conn) == [("/orgs/1/sec_policy/active/label_groups/a", "Live", "env"),
+                                              ("/orgs/1/sec_policy/active/label_groups/b", "Standby", "env")]
+        groups = po.label_groups(conn, ["/orgs/1/sec_policy/active/label_groups/a"])
+    # sub-groups expanded (a cycle between two groups stops)
+    assert groups == {"/orgs/1/sec_policy/active/label_groups/a": ("env", frozenset({"Prod", "DR"}))}
+
+
+@responses.activate
+def test_a_policy_object_failure_matches_nothing_until_the_next_read(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
+    responses.add(responses.GET, SUMMARY, status=404)
+    _policy_objects()
+    run_inventory_cycle(ctx, now=NOW)
+    responses.replace(responses.GET, SVC, status=500)
+    responses.replace(responses.GET, LGS, status=500)
+    run_inventory_cycle(ctx, now=NOW + timedelta(hours=1))
+    from illumio_ops.store.flowdb import policy_objects as po
+    with ctx.flows().connect() as conn:
+        assert len(po.service_names(conn)) == 3 and po.service_ports(conn, [h for h, _ in po.service_names(conn)]) == {}
+        assert po.label_groups(conn, ["/orgs/1/sec_policy/active/label_groups/a"]) == {
+            "/orgs/1/sec_policy/active/label_groups/a": ("env", frozenset())}
+        assert ingest_state.get(conn, IngestSource.INVENTORY).last_error is None
