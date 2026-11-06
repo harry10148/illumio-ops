@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.4.1] - 2026-11-06
+
+Found by the lab PCE write test of 6.4.0 (enforcement progression and traffic update rate, verified against the PCE's
+own audit events).
+
+### Fixed
+
+- VEN fleet, VEN status report and enforcement preview: a VEN is online or lost as of the inventory read that copied
+  its heartbeat. Aged against the clock, every host read close to an hour ago showed as lost (on .106: 19 hosts with
+  heartbeats minutes old at the PCE, all listed as lost within 24 hours).
+- Traffic update rate: the page no longer promises once a minute; the lab PCE 26.2.20 recorded every 30 seconds for
+  600 seconds.
+- The 5.x upgrade report no longer says v6 cannot progress VENs.
+- `uninstall.sh --help` said a later install does not reuse the kept settings and data; it does.
+
 ## [6.4.0] - 2026-11-06
 
 What 5.x had and 6.3.0 still lacked (parity audit 2026-11-06), and the features the v6 design had deferred.

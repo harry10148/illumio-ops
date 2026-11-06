@@ -5,8 +5,8 @@
 #
 # Stops and removes the service and the program. config/, data/ and reports/ are kept (owned by root, mode 0700:
 # the service account is deleted and its user id may be given to another program later); a later install.sh in the
-# same directory is a fresh installation and does not reuse them. --purge removes the whole directory, settings and
-# data included. Asks before removing anything unless --yes.
+# same directory installs the program again with them (unless they were written by a newer version). --purge removes
+# the whole directory, settings and data included. Asks before removing anything unless --yes.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
