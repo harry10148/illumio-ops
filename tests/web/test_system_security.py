@@ -80,3 +80,21 @@ def test_default_password_flag(client):
                                             "confirm_password": "a-new-password-1"})
     assert r.status_code == 200
     assert client.get("/api/auth/me", environ_overrides=LOCAL).get_json()["data"]["default_password_in_use"] is False
+
+
+def test_time_zone_is_set_in_the_gui(client):
+    """5.x set the time zone in its settings page; v6 only read it from the file (parity audit 2026-11-06, A4).
+    Report schedules, report periods and alert times all follow it."""
+    login(client)
+    view = client.get("/api/system/display", environ_overrides=LOCAL).get_json()["data"]
+    assert view["timezone"] == "local" and view["server_zone"]  # what "local" is on this server
+    r = _put(client, "/api/system/display", {"revision": view["revision"], "language": "en", "timezone": "Asia/Taipei"})
+    assert r.status_code == 200 and r.get_json()["data"]["timezone"] == "Asia/Taipei"
+    assert client.get("/api/system/display", environ_overrides=LOCAL).get_json()["data"]["timezone"] == "Asia/Taipei"
+
+
+def test_unknown_time_zone_is_rejected(client):
+    login(client)
+    rev = client.get("/api/system/display", environ_overrides=LOCAL).get_json()["data"]["revision"]
+    r = _put(client, "/api/system/display", {"revision": rev, "language": "en", "timezone": "Mars/Olympus"})
+    assert r.status_code == 400 and r.get_json()["error"]["field"] == "timezone"

@@ -6,9 +6,15 @@ import { t } from "../../i18n";
 import { notifyMeChanged } from "../../shell/Shell";
 import { registerNav } from "../../shell/nav";
 
+// Suggestions only: any value the server accepts can be typed (an IANA name, UTC+N).
+const ZONES = ["local", "UTC", "Asia/Taipei", "Asia/Tokyo", "Asia/Seoul", "Asia/Shanghai", "Asia/Hong_Kong",
+  "Asia/Singapore", "Asia/Kolkata", "Europe/London", "Europe/Berlin", "America/New_York", "America/Chicago",
+  "America/Los_Angeles", "Australia/Sydney"];
+
 export function Display() {
   const [view, setView] = useState<DisplayView | null>(null);
   const [language, setLanguage] = useState<DisplayView["language"]>("en");
+  const [timezone, setTimezone] = useState("");
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -17,6 +23,7 @@ export function Display() {
       if (env.ok && env.data) {
         setView(env.data);
         setLanguage(env.data.language);
+        setTimezone(env.data.timezone);
       } else setError(env.error);
     });
   }, []);
@@ -25,7 +32,7 @@ export function Display() {
     e.preventDefault();
     if (!view) return;
     setBusy(true);
-    const env = await call("system.display.update", { revision: view.revision, language });
+    const env = await call("system.display.update", { revision: view.revision, language, timezone: timezone.trim() });
     setBusy(false);
     if (env.ok && env.data) {
       setView(env.data);
@@ -47,6 +54,15 @@ export function Display() {
               <option value="zh_TW">繁體中文</option>
             </select>
             <span className="hint">{t("display_language_hint")}</span>
+          </label>
+          <label>
+            {t("display_timezone")}
+            <input name="timezone" value={timezone} list="timezones" autoComplete="off" spellCheck={false}
+                   aria-invalid={error?.field === "timezone"} onChange={(e) => setTimezone(e.target.value)} />
+            <datalist id="timezones">
+              {ZONES.map((z) => <option key={z} value={z} />)}
+            </datalist>
+            <span className="hint">{t("display_timezone_hint", { zone: view.server_zone })}</span>
           </label>
           <div className="actions">
             <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>

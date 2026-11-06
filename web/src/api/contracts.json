@@ -32979,11 +32979,21 @@
           "revision": {
             "title": "Revision",
             "type": "integer"
+          },
+          "server_zone": {
+            "title": "Server Zone",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
           }
         },
         "required": [
           "revision",
-          "language"
+          "language",
+          "timezone",
+          "server_zone"
         ],
         "title": "DisplayView",
         "type": "object"
@@ -33010,6 +33020,19 @@
           "revision": {
             "title": "Revision",
             "type": "integer"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Timezone"
           }
         },
         "required": [
@@ -33037,11 +33060,21 @@
           "revision": {
             "title": "Revision",
             "type": "integer"
+          },
+          "server_zone": {
+            "title": "Server Zone",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
           }
         },
         "required": [
           "revision",
-          "language"
+          "language",
+          "timezone",
+          "server_zone"
         ],
         "title": "DisplayView",
         "type": "object"

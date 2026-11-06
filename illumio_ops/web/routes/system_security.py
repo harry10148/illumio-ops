@@ -1,12 +1,14 @@
-"""System › Security (allowed addresses) and System › Display (language)."""
+"""System › Security (allowed addresses) and System › Display (language and time zone)."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from flask import Blueprint, request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from illumio_ops.domain.values import Language
+from illumio_ops.settings.schema import DisplaySettings
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
 from illumio_ops.web.ipallow import InvalidIpEntries, is_allowed, validate_allowed_ips
@@ -28,11 +30,14 @@ class SecurityUpdate(BaseModel):
 class DisplayView(BaseModel):
     revision: int
     language: Language
+    timezone: str
+    server_zone: str  # what "local" is: the server clock's zone and offset now
 
 
 class DisplayUpdate(BaseModel):
     revision: int
     language: Language
+    timezone: str | None = Field(default=None, max_length=64)  # None: unchanged
 
 
 OP_SECURITY_GET = operation("system.security.get", "GET", "/api/system/security", None, SecurityView)
@@ -74,9 +79,16 @@ def update_security(body: SecurityUpdate) -> SecurityView:
     return _security()
 
 
+def _server_zone() -> str:
+    now = datetime.now().astimezone()
+    offset = now.strftime("%z")
+    return f"{now.tzname()} (UTC{offset[:3]}:{offset[3:]})"
+
+
 def _display() -> DisplayView:
     s = get_ctx().settings.current()
-    return DisplayView(revision=s.revision, language=s.display.language)
+    return DisplayView(revision=s.revision, language=s.display.language, timezone=s.display.timezone,
+                       server_zone=_server_zone())
 
 
 @api_route(bp, OP_DISPLAY_GET)
@@ -87,9 +99,18 @@ def get_display() -> DisplayView:
 @api_route(bp, OP_DISPLAY_UPDATE)
 def update_display(body: DisplayUpdate) -> DisplayView:
     language = body.language.value
+    timezone = body.timezone
+    if timezone is not None:
+        try:
+            DisplaySettings(language=body.language, timezone=timezone)
+        except ValidationError:
+            raise ApiFailure(400, "invalid_timezone", "err_invalid_timezone", field="timezone",
+                             params={"value": timezone}) from None
 
     def mutate(d: dict[str, Any]) -> None:
         d["display"]["language"] = language
+        if timezone is not None:
+            d["display"]["timezone"] = timezone
 
     get_ctx().settings.update(body.revision, mutate)
     return _display()

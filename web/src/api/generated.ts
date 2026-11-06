@@ -2502,6 +2502,8 @@ settings: CollectionSettings
 export interface DisplayView {
 language: Language
 revision: number
+server_zone: string
+timezone: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -2510,6 +2512,7 @@ revision: number
 export interface DisplayUpdate {
 language: Language
 revision: number
+timezone?: (string | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
