@@ -104,6 +104,9 @@ export function Shell({ me, onSignedOut }: Props) {
               <span className="mono">{me.username}</span>
               <button type="button" className="btn-link" onClick={signOut}>{t("user_menu_logout")}</button>
             </div>
+            {status && (
+              <div className="nav-version mono" data-role="product-version">{t("shell_version", { version: status.version })}</div>
+            )}
           </div>
         </nav>
         <main className="content">

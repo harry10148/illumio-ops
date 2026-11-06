@@ -2828,5 +2828,6 @@
   "gui_reports_custom_period": "指定日期",
   "gui_reports_period_from": "從",
   "gui_reports_period_to": "到",
-  "gui_reports_period_hint": "以顯示時區的整天計算，含起訖兩天；可選 {first} 到 {last}。本機已不保留的日子從封存讀取，報表會註明。"
+  "gui_reports_period_hint": "以顯示時區的整天計算，含起訖兩天；可選 {first} 到 {last}。本機已不保留的日子從封存讀取，報表會註明。",
+  "shell_version": "版本 {version}"
 }

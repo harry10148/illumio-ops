@@ -90,7 +90,7 @@ def test_route_requires_login_and_answers(client):
     assert client.get("/api/shell/status", environ_overrides=LOCAL).status_code == 401
     login(client)
     data = client.get("/api/shell/status", environ_overrides=LOCAL).get_json()["data"]
-    assert set(data) == {"mode", "collection_mode", "collection", "unprocessed_alerts", "write_key"}
+    assert set(data) == {"mode", "collection_mode", "collection", "unprocessed_alerts", "write_key", "version"}
 
 
 def test_rule_summary_counts_known(ctx):
@@ -122,3 +122,13 @@ def test_collection_failure_recorded_by_the_collector_not_the_job(ctx):
             ingest_state.mark_failed(conn, src, NOW, "PceTransportError: dns")
         conn.commit()
     assert shell.status(ctx, now=NOW).collection == "failing"
+
+
+def test_status_names_the_product_version(ctx, client):
+    """5.x showed its version (/api/status.version); the frame shows v6's (parity 2026-11-06)."""
+    import illumio_ops
+
+    assert shell.status(ctx, now=NOW).version == illumio_ops.__version__
+    login(client)
+    body = client.get("/api/shell/status", environ_overrides=LOCAL).get_json()
+    assert body["data"]["version"] == illumio_ops.__version__

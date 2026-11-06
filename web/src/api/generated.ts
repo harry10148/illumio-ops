@@ -2075,6 +2075,7 @@ collection: ("ok" | "degraded" | "failing" | "not_started")
 collection_mode: CollectionMode
 mode: ("basic" | "advanced")
 unprocessed_alerts: number
+version: string
 write_key: boolean
 }
 /**

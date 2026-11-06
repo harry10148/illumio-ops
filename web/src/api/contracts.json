@@ -29859,6 +29859,10 @@
             "title": "Unprocessed Alerts",
             "type": "integer"
           },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
           "write_key": {
             "title": "Write Key",
             "type": "boolean"
@@ -29869,7 +29873,8 @@
           "collection_mode",
           "collection",
           "unprocessed_alerts",
-          "write_key"
+          "write_key",
+          "version"
         ],
         "title": "ShellStatus",
         "type": "object"

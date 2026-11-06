@@ -63,6 +63,7 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .nav-user { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4);
             margin-top: var(--space-5); padding: var(--space-4) var(--space-5) 0; border-top: 1px solid var(--line);
             color: var(--text-3); font-size: var(--fs-mini); }
+.nav-version { padding: var(--space-2) var(--space-5) 0; color: var(--text-3); font-size: var(--fs-micro); }
 .btn-link { border: 0; background: none; padding: 0; color: var(--accent-text); font: inherit; cursor: pointer;
             text-decoration: underline; text-underline-offset: 3px; }
 .content { overflow: auto; padding: var(--space-7) var(--space-8); min-width: 0; }
