@@ -8,6 +8,7 @@ import { registerNav } from "../../shell/nav";
 import { Modes } from "./Modes";
 
 type BackfillSources = "both" | "events" | "traffic";
+const CLEAR_WORD = "CLEAR";  // the server's word (system_collection.CLEAR_WORD), the same in every language
 const BACKFILL_SOURCE_KEYS: Record<BackfillSources, string> = {
   both: "backfill_sources_both", events: "backfill_sources_events", traffic: "backfill_sources_traffic",
 };
@@ -156,6 +157,10 @@ export function Collection() {
     { start: today(), end: today(), sources: "both" });
   const [retentionNote, setRetentionNote] = useState(false);
   const [retentionError, setRetentionError] = useState<ApiError | null>(null);
+  const [clearWord, setClearWord] = useState("");
+  const [cleared, setCleared] = useState<{ moved: string | null } | null>(null);
+  const [clearError, setClearError] = useState<ApiError | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [backfillNote, setBackfillNote] = useState<string | null>(null);
   const [backfillError, setBackfillError] = useState<ApiError | null>(null);
 
@@ -217,6 +222,22 @@ export function Collection() {
     const env = await call("system.collection.retention_run", {});
     setRetentionNote(Boolean(env.ok && env.data?.queued));
     setRetentionError(env.ok ? null : env.error);
+  }
+
+  async function clearCollected(e: FormEvent) {
+    e.preventDefault();
+    setClearing(true);
+    const env = await call("system.collection.clear", { confirm: clearWord });
+    setClearing(false);
+    setClearWord("");
+    if (env.ok && env.data) {
+      setCleared({ moved: env.data.archive_moved_to });
+      setClearError(null);
+      void refresh();
+    } else {
+      setCleared(null);
+      setClearError(env.error);
+    }
   }
 
   /** A mode brings its suggested retention with it; the operator can still change the numbers. */
@@ -396,6 +417,25 @@ export function Collection() {
             <button type="button" className="btn-quiet" onClick={() => void runRetention()}>{t("btn_retention_run")}</button>
           </div>
         </div>
+        <form onSubmit={(e) => void clearCollected(e)} data-role="collection-clear">
+          <p className="muted">{t("collection_clear_intro")}</p>
+          <label className="block">
+            {t("collection_clear_type", { word: CLEAR_WORD })}
+            <input name="clear_confirm" autoComplete="off" value={clearWord} onChange={(e) => setClearWord(e.target.value)} />
+          </label>
+          {clearError && <div className="form-error" role="alert">{t(clearError.message_key, clearError.params)}</div>}
+          {cleared && (
+            <p className="form-ok" role="status">
+              {t("collection_cleared")}
+              {cleared.moved && <> {t("pce_reset_archive_moved", { folder: cleared.moved })}</>}
+            </p>
+          )}
+          <div className="actions">
+            <button type="submit" className="btn-danger" disabled={clearing || clearWord.trim() !== CLEAR_WORD}>
+              {t("btn_collection_clear")}
+            </button>
+          </div>
+        </form>
       </div>
     </section>
   );

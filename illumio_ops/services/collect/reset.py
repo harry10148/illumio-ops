@@ -126,6 +126,13 @@ def reset_for_new_pce(ctx: AppContext, *, now: datetime | None = None) -> ResetR
     return report
 
 
+def clear_collected(ctx: AppContext, *, now: datetime | None = None) -> ResetReport:
+    """5.x `cache flush --confirm`, from Modes and data sources: the same clearing as a PCE switch, for the same PCE —
+    the collected traffic, events and analysis go, archive files are moved aside, settings, alert records and reports
+    stay; collection and a first backfill start again. Raises FlowDbBusy (nothing deleted) as the switch does."""
+    return reset_for_new_pce(ctx, now=now)
+
+
 def _reset(ctx: AppContext, *, now: datetime | None, only_if_bound_elsewhere: bool) -> ResetReport | None:
     """only_if_bound_elsewhere: checked again under the write lock; None (nothing done) when the store is no longer
     bound to another PCE than the settings name."""

@@ -14,10 +14,12 @@ from illumio_ops.services import data_status, logs
 from illumio_ops.services.collect import backfill
 from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.collect.mode import backfill_sources, in_mode
+from illumio_ops.services.collect.reset import clear_collected
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.status import CollectionStatus, collection_status
 from illumio_ops.services.data_status import DataStatus
 from illumio_ops.settings.schema import CollectionSettings, Settings
+from illumio_ops.store.flowdb.db import FlowDbBusy
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, Empty, api_route, operation
 
@@ -52,6 +54,18 @@ class RetentionQueued(BaseModel):
     queued: bool
 
 
+CLEAR_WORD = "CLEAR"  # typed to confirm (5.x `cache flush --confirm`); the same in every language
+
+
+class ClearRequest(BaseModel):
+    confirm: str = Field(max_length=100)
+
+
+class CollectedCleared(BaseModel):
+    cleared: list[str]
+    archive_moved_to: str | None  # folder under data/archive the archive files were moved to
+
+
 class LogQuery(BaseModel):
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] | None = None
     module: str | None = Field(default=None, max_length=200)
@@ -79,6 +93,7 @@ OP_BACKFILL = operation("system.collection.backfill", "POST", "/api/system/colle
                         BackfillAccepted)
 OP_RETENTION = operation("system.collection.retention_run", "POST", "/api/system/collection/retention/run", Empty,
                          RetentionQueued)
+OP_CLEAR = operation("system.collection.clear", "POST", "/api/system/collection/clear", ClearRequest, CollectedCleared)
 OP_LOGS = operation("system.logs.query", "POST", "/api/system/logs/query", LogQuery, LogLines)
 
 bp = Blueprint("system_collection", __name__)
@@ -167,6 +182,18 @@ def run_retention_now(body: Empty) -> RetentionQueued:
     else:  # not serving (tests, tools): run beside the request
         threading.Thread(target=lambda: run_retention(ctx), daemon=True, name="retention").start()
     return RetentionQueued(queued=True)
+
+
+@api_route(bp, OP_CLEAR)
+def clear_collected_data(body: ClearRequest) -> CollectedCleared:
+    if body.confirm.strip() != CLEAR_WORD:
+        raise ApiFailure(400, "confirm_mismatch", "err_clear_confirm_mismatch", field="confirm",
+                         params={"word": CLEAR_WORD})
+    try:
+        report = clear_collected(get_ctx())
+    except FlowDbBusy:
+        raise ApiFailure(503, "store_busy", "err_clear_store_busy") from None
+    return CollectedCleared(cleared=report.cleared, archive_moved_to=report.archive_moved_to)
 
 
 @api_route(bp, OP_LOGS)

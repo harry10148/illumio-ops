@@ -170,3 +170,60 @@ def test_retention_runs_beside_the_request_without_a_scheduler(client, ctx, monk
     monkeypatch.setattr(system_collection, "run_retention", lambda c: ran.set() or {})
     r = _send(client, "POST", "/api/system/collection/retention/run", {})
     assert r.status_code == 200 and ran.wait(5)
+
+
+def _collected(ctx):
+    from datetime import UTC, datetime
+
+    from illumio_ops.store.flowdb import binding
+    with ctx.flows().connect() as conn:
+        binding.bind(conn, "https://pce.example.com:8443", "1", datetime.now(UTC))
+        conn.execute("INSERT INTO events (href, event_type, timestamp, raw_json, origin, ingested_at) "
+                     "VALUES ('/orgs/1/events/1', 'x', '2026-10-24T00:00:00Z', '{}', 'ingest', 'x')")
+        conn.commit()
+
+
+def _events(ctx):
+    with ctx.flows().connect() as conn:
+        return conn.execute("SELECT count(*) FROM events").fetchone()[0]
+
+
+def test_clearing_collected_data_needs_the_typed_word(client, ctx):
+    """5.x `cache flush --confirm` (parity 2026-11-06)."""
+    login(client)
+    _collected(ctx)
+    for word in ("", "clear it", "yes"):
+        r = _send(client, "POST", "/api/system/collection/clear", {"confirm": word})
+        assert r.status_code == 400 and r.get_json()["error"]["code"] == "confirm_mismatch"
+    assert _events(ctx) == 1
+
+
+def test_clearing_collected_data_keeps_settings_alerts_and_reports(client, ctx):
+    from datetime import UTC, datetime
+
+    from illumio_ops.services import shell
+    from tests.web.test_shell_status import _alert
+    login(client)
+    _collected(ctx)
+    _alert(ctx, at=datetime.now(UTC))
+    (ctx.paths.archive_dir / "events-2026-10-01.jsonl.gz").write_bytes(b"x")
+    before = ctx.settings.current().model_dump()
+    r = _send(client, "POST", "/api/system/collection/clear", {"confirm": "CLEAR"})
+    assert r.status_code == 200
+    data = r.get_json()["data"]
+    assert "flows" in data["cleared"] and data["archive_moved_to"].startswith("previous-")
+    assert _events(ctx) == 0
+    assert ctx.settings.current().model_dump() == before
+    assert shell.status(ctx).unprocessed_alerts == 1
+
+
+def test_clearing_while_a_reader_holds_the_store_says_so(client, ctx, monkeypatch):
+    from illumio_ops.store.flowdb import db as flowdb
+    monkeypatch.setattr(flowdb, "RESET_WAIT_SECONDS", 0.2)
+    login(client)
+    _collected(ctx)
+    reader = ctx.flows().connect()
+    r = _send(client, "POST", "/api/system/collection/clear", {"confirm": "CLEAR"})
+    reader.close()
+    assert r.status_code == 503 and r.get_json()["error"]["code"] == "store_busy"
+    assert _events(ctx) == 1

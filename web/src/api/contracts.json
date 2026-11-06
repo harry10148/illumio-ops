@@ -33027,6 +33027,52 @@
         "type": "object"
       }
     },
+    "system.collection.clear": {
+      "method": "POST",
+      "path": "/api/system/collection/clear",
+      "request_schema": {
+        "properties": {
+          "confirm": {
+            "maxLength": 100,
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "ClearRequest",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "archive_moved_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Moved To"
+          },
+          "cleared": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cleared",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cleared",
+          "archive_moved_to"
+        ],
+        "title": "CollectedCleared",
+        "type": "object"
+      }
+    },
     "system.collection.data": {
       "method": "GET",
       "path": "/api/system/collection/data",

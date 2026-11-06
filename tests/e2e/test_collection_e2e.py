@@ -103,3 +103,21 @@ def test_mode_switch_fills_suggested_retention(context, live_app):
     page.reload()
     expect(page.locator("[data-source=traffic]")).to_contain_text("Not collected in this mode")
     expect(page.locator("select[name=mode]")).to_have_value("lightweight")
+
+
+def test_maintenance_runs_retention_and_clears_with_the_typed_word(context, live_app):
+    """5.x retention/run and `cache flush --confirm` (parity 2026-11-06)."""
+    from tests.web.test_system_collection import _collected, _events
+    _collected(live_app.ctx)
+    page = context.new_page()
+    _open_collection(page, live_app.url)
+    box = page.locator("[data-role=collection-maintenance]")
+    box.get_by_role("button", name="Run retention clean-up now").click()
+    expect(box).to_contain_text("Retention clean-up started")
+    clear = box.locator("[data-role=collection-clear]")
+    button = clear.get_by_role("button", name="Clear the collected data")
+    expect(button).to_be_disabled()
+    clear.locator("input[name=clear_confirm]").fill("CLEAR")
+    button.click()
+    expect(clear.locator(".form-ok")).to_contain_text("The collected data was cleared")
+    assert _events(live_app.ctx) == 0

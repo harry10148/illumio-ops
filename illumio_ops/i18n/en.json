@@ -2887,5 +2887,11 @@
   "err_invalid_username": "The username must be 1 to {max} characters (spaces at either end are removed).",
   "security_username_hint": "Changing the username takes the current password. Like a password change, everyone else who is signed in is signed out; this browser stays signed in under the new name.",
   "security_username_save": "Change username",
-  "security_username_changed": "Username changed. Everyone else who was signed in has been signed out."
+  "security_username_changed": "Username changed. Everyone else who was signed in has been signed out.",
+  "collection_clear_intro": "Clearing removes everything collected from the PCE: traffic, events, workloads, the baseline and the analysis results. Settings, alert records, rule schedules and generated reports stay; archive files are moved aside, not deleted. Collection and a first backfill then start again.",
+  "collection_clear_type": "To confirm, type {word}",
+  "btn_collection_clear": "Clear the collected data",
+  "collection_cleared": "The collected data was cleared; collection and a first backfill start again.",
+  "err_clear_confirm_mismatch": "Type {word} to confirm; nothing was cleared.",
+  "err_clear_store_busy": "The data could not be cleared now: a long read was still using it. Nothing was deleted; try again in a minute."
 }
