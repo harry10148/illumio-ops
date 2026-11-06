@@ -229,7 +229,7 @@ def test_evaluate_now_asks_the_existing_jobs_to_run(client, ctx):
     assert post(client, "/api/alert-rules/evaluate-now", None).status_code == 503  # nothing scheduled: said so
     ctx.scheduler = build_scheduler(ctx)
     try:
-        before = datetime.now(UTC)
+        before, scheduled = datetime.now(UTC), {j.id for j in ctx.scheduler.get_jobs()}
         r = post(client, "/api/alert-rules/evaluate-now", None)
         assert r.status_code == 200
         jobs = r.get_json()["data"]["jobs"]
@@ -237,6 +237,6 @@ def test_evaluate_now_asks_the_existing_jobs_to_run(client, ctx):
         for job_id in jobs:
             assert ctx.scheduler.get_job(job_id).next_run_time <= datetime.now(UTC)
             assert ctx.scheduler.get_job(job_id).next_run_time >= before.replace(microsecond=0)
-        assert len(ctx.scheduler.get_jobs()) == len(set(j.id for j in ctx.scheduler.get_jobs()))  # no new job
+        assert {j.id for j in ctx.scheduler.get_jobs()} == scheduled  # the same jobs, none added
     finally:
         ctx.scheduler = None
