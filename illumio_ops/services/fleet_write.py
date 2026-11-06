@@ -9,7 +9,8 @@ Each host is read again right before its write, only `enforcement_mode` is sent 
 host, unlike bulk_update whose answer the REST guide does not describe), and every attempt is recorded.
 
 Traffic update rate (5.x 「加速流量回報」): the PCE console's "Increase Traffic Update Rate" — the VEN reports traffic
-once a minute for RATE_MINUTES, then goes back to every 10 minutes by itself (Visualization guide 26.1). The REST
+more often for RATE_MINUTES, then goes back to every 10 minutes by itself (Visualization guide 26.1 says once a minute;
+the lab PCE 26.2.20 recorded every 30 seconds for 600 seconds, 2026-11-06: the page names no rate). The REST
 guide lists only its audit event (workloads.set_flow_reporting_frequency); the call is the one 5.x made."""
 from __future__ import annotations
 
@@ -372,7 +373,7 @@ def rate_check(ctx: AppContext, keys: Sequence[str], *, now: datetime | None = N
 
 
 def increase_rate(ctx: AppContext, keys: Sequence[str], *, by: str, now: datetime | None = None) -> FleetOutcome:
-    """Ask the PCE to have each host's VEN report traffic once a minute for RATE_MINUTES (one request for the batch:
+    """Ask the PCE to have each host's VEN report traffic more often for RATE_MINUTES (one request for the batch:
     MAX_BATCH is the call's own limit of 50). Raises NoWriteKey, ValueError."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     cfg = ctx.settings.current().pce
