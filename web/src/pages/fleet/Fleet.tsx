@@ -68,7 +68,7 @@ function TallyTable({ title, rows, wordOf, role }: {
       <DataTable<Tally>
         rows={rows} rowKey={(r) => r.value ?? "\u0000"} empty={t("fleet_none_hosts")}
         columns={[
-          { key: "v", label: title, render: (r) => wordOf(r.value) },
+          { key: "v", label: "", render: (r) => wordOf(r.value) },
           { key: "n", label: t("fleet_col_hosts"), kind: "num", render: (r) => r.hosts.toLocaleString() },
         ]}
       />

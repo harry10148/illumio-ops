@@ -2883,7 +2883,7 @@
   "fleet_enf_title": "Change enforcement mode",
   "fleet_enf_intro": "Moves the chosen hosts forward to the target mode with the write key, after this preview and your confirmation. Forward only: Idle → Visibility Only → Selective → Full; moving back is done in the PCE. Hosts not chosen are never changed.",
   "fleet_enf_target": "Target mode",
-  "fleet_enf_by_hosts": "The {n} chosen hosts",
+  "fleet_enf_by_hosts": "Chosen hosts ({n})",
   "fleet_enf_by_labels": "Hosts with these Labels",
   "fleet_enf_labels_hint": "The managed hosts carrying every Label below (at most {max}).",
   "fleet_enf_label_key": "Label key",
