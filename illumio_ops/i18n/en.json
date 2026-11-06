@@ -2850,15 +2850,15 @@
   "rpt_inv_conflicts_none": "Every managed endpoint in the period's flows carried one label combination.",
   "rpt_inv_conflicts_note": "An endpoint above carried different labels on different flows in the period: it was relabelled during the period, or the two ends of a connection reported different labels. Rules written against labels treat each combination differently; check the host's current labels in the PCE. At most 5 combinations are listed per endpoint.",
   "rpt_aud_sec_failed_change": "Failed sign-ins followed by a high-risk change",
-  "rpt_aud_failed_change_intro": "A high-risk change ({changes}) by a user who, in the {minutes} minutes before it, failed to sign in or had a request denied ({failures}) under the same name. One row per change.",
+  "rpt_aud_failed_change_intro": "A high-risk change ({changes}) by a user, preceded within {minutes} minutes by a failed sign-in or denied request ({failures}) under the same user name or from the same source address. A real PCE records a failed sign-in without a user name, so the address is usually what matches; an address shared by several people (a jump host, NAT) matches them all. One row per change.",
   "rpt_aud_tbl_failed_change": "High-risk changes after failed sign-ins",
   "rpt_aud_col_change": "Change",
   "rpt_aud_col_failures_before": "Failures before",
   "rpt_aud_col_last_failure": "Last failure",
   "rpt_aud_col_gap": "Minutes after",
-  "rpt_aud_none_failed_change": "No high-risk change came within {minutes} minutes after a failed sign-in by the same user.",
+  "rpt_aud_none_failed_change": "No high-risk change came within {minutes} minutes after a failed sign-in by the same user name or from the same source address.",
   "rpt_aud_failed_change_title": "{n} high-risk changes right after failed sign-ins",
-  "rpt_aud_failed_change_why": "Users: {users}. Each made a high-risk change within {minutes} minutes after a failed sign-in or denied request under the same name; a guessed or stolen password looks like this.",
+  "rpt_aud_failed_change_why": "Users: {users}. Each made a high-risk change within {minutes} minutes after a failed sign-in or denied request under the same name or from the same address; a guessed or stolen password looks like this.",
   "rpt_aud_failed_change_action": "Confirm with each user that they made the change; if not, revert it, reset the credential and review the account's other actions.",
   "rpt_new_sec_disappeared": "Connections that stopped",
   "rpt_new_disappeared_intro": "Connections (source, destination, port and protocol) seen in the previous period of the same length and not seen since this period began. Connections on dynamic ports ({port} and up) or without a port are left out, as for new connections. The previous period here is the one the other metrics compare with.",
@@ -2886,5 +2886,8 @@
   "gui_reports_open": "Open",
   "gui_reports_open_hint": "Open the HTML report in a new tab",
   "cust_open_section": "Open in Investigate",
-  "cust_open_section_hint": "Opens the section's conditions, view and grouping in Investigate over the last day, the page's default period; a section keeps no period of its own."
+  "cust_open_section_hint": "Opens the section's conditions, view and grouping in Investigate over the last day, the page's default period; a section keeps no period of its own.",
+  "rpt_aud_col_matched_on": "Matched on",
+  "rpt_aud_matched_user": "User name",
+  "rpt_aud_matched_address": "Source address"
 }

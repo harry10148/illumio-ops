@@ -55,6 +55,7 @@ _KPI_KEYS = {"total": "rpt_aud_kpi_total", "high_risk": "rpt_aud_kpi_high_risk",
              "authz_denied": "rpt_aud_kpi_authz_denied", "policy_provisions": "rpt_aud_kpi_provisions",
              "draft_changes": "rpt_aud_kpi_draft_changes", "agent_security": "rpt_aud_kpi_agent_security",
              "actors": "rpt_aud_kpi_actors", "source_ips": "rpt_aud_kpi_source_ips"}
+_MATCHED_KEYS = {"user": "rpt_aud_matched_user", "address": "rpt_aud_matched_address"}
 _ACTION_KEYS = {Severity.CRITICAL: "rpt_aud_action_critical", Severity.HIGH: "rpt_aud_action_high",
                 Severity.MEDIUM: "rpt_aud_action_medium", Severity.LOW: "rpt_aud_action_low"}
 
@@ -226,11 +227,13 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         title=t("rpt_aud_tbl_failed_change"),
         columns=(Column(key="at", label=t("rpt_aud_col_time"), kind="time"), Column(key="user", label=t("rpt_col_user")),
                  Column(key="change", label=t("rpt_aud_col_change")),
+                 Column(key="address", label=t("rpt_aud_col_source_ip")),
+                 Column(key="matched", label=t("rpt_aud_col_matched_on")),
                  Column(key="failures", label=t("rpt_aud_col_failures_before"), kind="number"),
                  Column(key="last", label=t("rpt_aud_col_last_failure"), kind="time"),
                  Column(key="gap", label=t("rpt_aud_col_gap"), kind="number")),
-        rows=tuple((c.at.isoformat(), c.user, c.change, c.failures, c.last_failure.isoformat(), c.gap_minutes)
-                   for c in chained),
+        rows=tuple((c.at.isoformat(), c.user, c.change, c.address or "—", t(_MATCHED_KEYS[c.matched]), c.failures,
+                    c.last_failure.isoformat(), c.gap_minutes) for c in chained),
         total_rows=chained_total, empty_text=t("rpt_aud_none_failed_change", minutes=FAILED_THEN_CHANGE_MINUTES) if counts.total else none,
         limit_note=t("rpt_aud_newest_n", n=DETAIL_ROWS) if chained_total > len(chained) else None)
     if chained:

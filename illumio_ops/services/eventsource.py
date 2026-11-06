@@ -231,7 +231,8 @@ def audit_counts(ctx: AppContext, *, start: datetime, end: datetime, top: int = 
     window = ["e.timestamp >= ?", "e.timestamp < ?"]
     params = [db_time(start), db_time(end)]
     kinds = f"e.created_by_kind IN ({','.join('?' * len(USER_KINDS))}) AND TRIM(COALESCE(e.created_by_name, '')) != ''"
-    ip = "json_extract(e.raw_json, '$.action.src_ip')"
+    ip = ("COALESCE(json_extract(e.raw_json, '$.action.src_ip'), "
+          "json_extract(e.raw_json, '$.notifications[0].info.src_ip'))")  # a failed sign-in: notifications (lab)
 
     def read(conn: Any) -> Any:
         where = " AND ".join(window)
@@ -264,39 +265,53 @@ def audit_counts(ctx: AppContext, *, start: datetime, end: datetime, top: int = 
 
 
 class FailedThenChange(BaseModel):
-    """A high-risk change by a user who failed to sign in (or was denied) within the minutes before it."""
+    """A high-risk change by a user who failed to sign in (or was denied) within the minutes before it, matched on the
+    user name or on the source address."""
     at: datetime
     user: str
     change: str
-    failures: int  # the user's failures in the window before the change
+    address: str | None  # the change's source address
+    matched: Literal["user", "address"]  # "user" when any failure carried the same user name
+    failures: int  # the matching failures in the window before the change
     last_failure: datetime
     gap_minutes: float  # from the last failure to the change
+
+
+# A failed sign-in names no user on a real PCE (created_by system) and carries its address under notifications;
+# a change carries it under action (lab 2026-11-06).
+_FAIL_ADDR = ("COALESCE(json_extract(f.raw_json, '$.action.src_ip'), "
+              "json_extract(f.raw_json, '$.notifications[0].info.src_ip'))")
+_CHANGE_ADDR = "json_extract(c.raw_json, '$.action.src_ip')"
 
 
 def failed_then_change(ctx: AppContext, *, start: datetime, end: datetime, window_minutes: int, failure_types:
                        Sequence[str], change_types: Sequence[str], limit: int,
                        now: datetime | None = None) -> tuple[list[FailedThenChange], int]:
-    """Changes of `change_types` in [start, end) by a user or service account whose `failure_types` events, under the
-    same name, fall in the `window_minutes` before the change (which may reach before `start`). Newest first, at most
-    `limit`, with how many there are."""
+    """Changes of `change_types` in [start, end) by a user or service account preceded, within `window_minutes`
+    (which may reach before `start`), by `failure_types` events under the same user name or from the same source
+    address (5.x audit_mod04 matched on either). Newest first, at most `limit`, with how many there are."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     seg = EventSegment(filter=EventFilter(start=start, end=end), view=SegmentView.DETAIL, limit=1)
     kinds = ",".join("?" * len(USER_KINDS))
     fails, changes = ",".join("?" * len(failure_types)), ",".join("?" * len(change_types))
-    sql = (f"SELECT c.timestamp, c.created_by_name, c.event_type, COUNT(f.id), MAX(f.timestamp) FROM events c "
-           f"JOIN events f ON f.created_by_name = c.created_by_name AND f.event_type IN ({fails}) "
+    same_user = (f"(f.created_by_kind IN ({kinds}) AND TRIM(COALESCE(f.created_by_name, '')) != '' "
+                 "AND f.created_by_name = c.created_by_name)")
+    sql = (f"SELECT c.timestamp, c.created_by_name, c.event_type, {_CHANGE_ADDR}, MAX({same_user}), COUNT(f.id), "
+           f"MAX(f.timestamp) FROM events c JOIN events f ON f.event_type IN ({fails}) "
            "AND f.timestamp < c.timestamp AND f.timestamp >= ? "
            "AND (julianday(c.timestamp) - julianday(f.timestamp)) * 1440 <= ? "
+           f"AND ({same_user} OR {_FAIL_ADDR} = {_CHANGE_ADDR}) "
            f"WHERE c.event_type IN ({changes}) AND c.timestamp >= ? AND c.timestamp < ? "
            f"AND c.created_by_kind IN ({kinds}) AND TRIM(COALESCE(c.created_by_name, '')) != '' "
            "GROUP BY c.id ORDER BY c.timestamp DESC, c.id DESC")
-    params = [*failure_types, db_time(start - timedelta(minutes=window_minutes)), window_minutes, *change_types,
-              db_time(start), db_time(end), *USER_KINDS]
+    params = [*USER_KINDS, *failure_types, db_time(start - timedelta(minutes=window_minutes)), window_minutes,
+              *USER_KINDS, *change_types, db_time(start), db_time(end), *USER_KINDS]
     found, _ = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, params).fetchall())
     rows = []
-    for ts, user, change, n, last in found[:limit]:
+    for ts, user, change, addr, by_user, n, last in found[:limit]:
         when, prior = datetime.fromisoformat(ts), datetime.fromisoformat(last)
-        rows.append(FailedThenChange(at=when, user=user, change=change, failures=n, last_failure=prior,
+        rows.append(FailedThenChange(at=when, user=user, change=change, address=addr,
+                                     matched="user" if by_user else "address", failures=n, last_failure=prior,
                                      gap_minutes=round((when - prior).total_seconds() / 60, 1)))
     return rows, len(found)
 

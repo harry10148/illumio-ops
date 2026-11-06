@@ -175,3 +175,27 @@ def test_failed_then_change_none_says_so(ctx):
     _write(ctx, [event("sec_policy.create", D, user="alice")])
     table = _tables(_build(ctx), "failed_then_change")[0]
     assert table.rows == () and table.empty_text
+
+
+def test_failed_then_change_matched_on_address_as_the_pce_sends_it(ctx):
+    """A real PCE (lab 2026-11-06) sends a failed sign-in as created_by system, no username, its address under
+    notifications[].info.src_ip; the change carries action.src_ip. 5.x matched on the address too."""
+    fail = {"created_by": {"system": {}}, "notifications": [
+        {"notification_type": "request.authentication_failed", "info": {"src_ip": "192.0.2.7", "api_method": "GET"}}]}
+    _write(ctx, [event("request.authentication_failed", D, system=True, status="failure", extra=fail),
+                 event("sec_policy.create", D + timedelta(minutes=4), user="alice", ip="192.0.2.7"),
+                 event("sec_policy.create", D + timedelta(minutes=5), user="bob", ip="192.0.2.99")])
+    table = _tables(_build(ctx), "failed_then_change")[0]
+    rows = [dict(zip([c.key for c in table.columns], r, strict=True)) for r in table.rows]
+    assert [(r["user"], r["address"], r["matched"]) for r in rows] == [("alice", "192.0.2.7", "Source address")]
+
+
+def test_brute_force_reads_the_address_where_the_pce_puts_it(ctx):
+    """Lab 2026-11-06: a failed sign-in carries its address under notifications[].info.src_ip, not action."""
+    fails = [event("request.authentication_failed", D + timedelta(minutes=i), system=True, status="failure",
+                   extra={"notifications": [{"notification_type": "request.authentication_failed",
+                                             "info": {"src_ip": "198.51.100.4"}}]}) for i in range(5)]
+    _write(ctx, fails)
+    doc = _build(ctx)
+    assert [r[0] for r in _tables(doc, "brute_force")[0].rows] == ["198.51.100.4"]
+    assert _kpi(doc)["source_ips"] == 1
