@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  ConditionChoices, DetectorKind, EventRule, FlowCondition, RulePreview, RuleWrite, Severity, SystemCheck, ThresholdType,
+  ConditionChoices, DetectorKind, EventCatalog, EventRule, FlowCondition, RulePreview, RuleWrite, Severity, SystemCheck,
+  ThresholdType,
 } from "../../api/generated";
 import { ConditionEditor, NO_CHOICES, Side } from "../../components/ConditionEditor";
 import { t } from "../../i18n";
@@ -301,9 +302,64 @@ function parseFields(text: string): Record<string, string> {
   return out;
 }
 
+// A pattern (regular expression) rather than event type names: as domain/alertrules._looks_like_regex.
+const isPattern = (p: string) => /^\^|\$$|[*+?[\](){}$\\]/.test(p);
+
+/** The event catalog: a picker that adds to the typed list (which still takes types it does not list, or patterns),
+ * and what each chosen type is. */
+function EventPicker({ types, onAdd }: { types: string[]; onAdd: (type: string) => void }) {
+  const [catalog, setCatalog] = useState<EventCatalog | null>(null);
+  const [pick, setPick] = useState("");
+  useEffect(() => {
+    void call("alert_rules.event_catalog").then((env) => { if (env.ok && env.data) setCatalog(env.data); });
+  }, []);
+  if (!catalog) return null;
+  const known = new Map(catalog.categories.flatMap((c) => c.events.map((e) => [e.event_type, e] as const)));
+  const names = types.filter((p) => p && !isPattern(p)).flatMap((p) => p.split("|"));
+  const chosen = names.filter((n) => known.has(n));
+  return (
+    <div className="stack" data-role="event-picker">
+      <div className="row">
+        <select name="event_pick" aria-label={t("rule_event_pick")} value={pick} onChange={(e) => setPick(e.target.value)}>
+          <option value="">{t("rule_event_pick")}</option>
+          {catalog.categories.map((c) => (
+            <optgroup key={c.id} label={t(c.label_key)}>
+              {c.events.map((e) => <option key={e.event_type} value={e.event_type}>{`${e.event_type} — ${t(e.description_key)}`}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <button type="button" className="btn-quiet" disabled={!pick} onClick={() => { onAdd(pick); setPick(""); }}>
+          {t("rule_event_add")}
+        </button>
+      </div>
+      <p className="hint">{t("rule_event_catalog_hint")}</p>
+      {names.length > 0 && (
+        <ul className="stack" data-role="event-descriptions">
+          {names.map((n) => {
+            const e = known.get(n);
+            return (
+              <li key={n} data-event-type={n}>
+                <span className="mono">{n}</span>{" — "}
+                {e ? t(e.description_key) : <span className="hint">{t("rule_event_not_in_catalog")}</span>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {chosen.length > 0 && chosen.length === names.length && !chosen.some((n) => known.get(n)?.status_filter) && (
+        <p className="hint" data-role="status-unmarked">{t("rule_event_status_unmarked")}</p>
+      )}
+    </div>
+  );
+}
+
 function EventFields({ rule, set, fieldError }: {
   rule: EventRule; set: (patch: Partial<EventRule>) => void; fieldError: (name: string) => ReactElement | null;
 }) {
+  const add = (type: string) => {
+    const kept = rule.event_types.map((p) => p.trim()).filter((p) => p !== "");
+    if (!kept.includes(type)) set({ event_types: kept.concat([type]) as [string, ...string[]] });
+  };
   return (
     <>
       <label>
@@ -313,6 +369,7 @@ function EventFields({ rule, set, fieldError }: {
         <span className="hint">{t("rule_event_types_hint")}</span>
         {fieldError("event_types")}
       </label>
+      <EventPicker types={rule.event_types} onAdd={add} />
       <div className="form-grid">
         <label>
           {t("rule_event_status")}

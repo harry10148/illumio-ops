@@ -440,3 +440,28 @@ def test_rule_traffic_parity_conditions_round_trip(context, live_app):
     expect(page.locator("[data-side=src] [data-label-group]")).to_contain_text("Live (env)")
     expect(page.locator("[data-role=service] [data-service]")).to_contain_text("Web")
     expect(page.locator("input[name=windows_services]")).to_have_value("wuauserv, Spooler")
+
+
+def test_rule_event_types_from_the_catalog(context, live_app):
+    """5.x parity 2026-11-06: event types are picked from the catalog with their descriptions; a type the catalog does
+    not list can still be typed, and is said to be unlisted."""
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules/new")
+    form = page.locator("[data-role=rule-editor]")
+    form.locator("input[name=name]").fill("Tamper or sign-in")
+    picker = form.locator("[data-role=event-picker]")
+    picker.locator("select[name=event_pick]").select_option("agent.tampering")
+    picker.get_by_role("button", name="Add event type").click()
+    expect(form.locator("input[name=event_types]")).to_have_value("agent.tampering")
+    expect(picker.locator("[data-event-type='agent.tampering']")).to_contain_text("firewall")
+    expect(picker.locator("[data-role=status-unmarked]")).to_be_visible()
+    picker.locator("select[name=event_pick]").select_option("user.sign_in")
+    picker.get_by_role("button", name="Add event type").click()
+    expect(picker.locator("[data-role=status-unmarked]")).to_have_count(0)
+    form.locator("input[name=event_types]").fill("agent.tampering, user.sign_in, vendor.brand_new")
+    expect(picker.locator("[data-event-type='vendor.brand_new']")).to_contain_text("not in the event catalog")
+    form.get_by_role("button", name="Save").click()
+    page.wait_for_selector("[data-role=rule-list]")
+    mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Tamper or sign-in")
+    assert mine.event_types == ("agent.tampering", "user.sign_in", "vendor.brand_new")

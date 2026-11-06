@@ -3763,6 +3763,88 @@
         "type": "object"
       }
     },
+    "alert_rules.event_catalog": {
+      "method": "GET",
+      "path": "/api/alert-rules/event-catalog",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "CatalogCategory": {
+            "properties": {
+              "events": {
+                "items": {
+                  "$ref": "#/$defs/CatalogEventView"
+                },
+                "title": "Events",
+                "type": "array"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "label_key": {
+                "title": "Label Key",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "label_key",
+              "events"
+            ],
+            "title": "CatalogCategory",
+            "type": "object"
+          },
+          "CatalogEventView": {
+            "properties": {
+              "description_key": {
+                "title": "Description Key",
+                "type": "string"
+              },
+              "event_type": {
+                "title": "Event Type",
+                "type": "string"
+              },
+              "severity_filter": {
+                "title": "Severity Filter",
+                "type": "boolean"
+              },
+              "status_filter": {
+                "title": "Status Filter",
+                "type": "boolean"
+              },
+              "vendor_documented": {
+                "title": "Vendor Documented",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "event_type",
+              "description_key",
+              "vendor_documented",
+              "status_filter",
+              "severity_filter"
+            ],
+            "title": "CatalogEventView",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/$defs/CatalogCategory"
+            },
+            "title": "Categories",
+            "type": "array"
+          }
+        },
+        "required": [
+          "categories"
+        ],
+        "title": "EventCatalog",
+        "type": "object"
+      }
+    },
     "alert_rules.list": {
       "method": "GET",
       "path": "/api/alert-rules",

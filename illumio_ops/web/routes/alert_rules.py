@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from illumio_ops.domain.alertpack import PACK_KEYS
 from illumio_ops.domain.alertrules import AlertRule
+from illumio_ops.domain.event_catalog import CATEGORY_KEYS, EVENT_DESC_KEYS, catalog
 from illumio_ops.services.alerts import rule_test
 from illumio_ops.services.alerts.rule_test import Candidates, RuleTestResult
 from illumio_ops.services.alerts.rules import (
@@ -50,6 +51,24 @@ class RuleTestRequest(BaseModel):
     id: int = Field(ge=1)
 
 
+class CatalogEventView(BaseModel):
+    event_type: str
+    description_key: str
+    vendor_documented: bool
+    status_filter: bool  # known to come with more than one status (domain/event_catalog.py)
+    severity_filter: bool
+
+
+class CatalogCategory(BaseModel):
+    id: str
+    label_key: str
+    events: list[CatalogEventView]
+
+
+class EventCatalog(BaseModel):
+    categories: list[CatalogCategory]
+
+
 class PackApply(BaseModel):
     revision: int
     mode: Literal["append_missing", "replace"]
@@ -64,6 +83,7 @@ OP_PACK = operation("alert_rules.pack", "POST", "/api/alert-rules/pack", PackApp
 OP_TEST = operation("alert_rules.test", "POST", "/api/alert-rules/test", RuleTestRequest, RuleTestResult)
 OP_CHOICES = operation("alert_rules.condition_choices", "GET", "/api/alert-rules/condition-choices", None,
                        ConditionChoices)
+OP_EVENT_CATALOG = operation("alert_rules.event_catalog", "GET", "/api/alert-rules/event-catalog", None, EventCatalog)
 OP_TEST_CANDIDATES = operation("alert_rules.test_candidates", "GET", "/api/alert-rules/test-candidates", None,
                                Candidates)
 
@@ -158,3 +178,15 @@ def test_candidates() -> Candidates:
 def choices() -> ConditionChoices:
     """What a flow condition editor offers: the alert rule editor and the reports filter."""
     return condition_choices(get_ctx())
+
+
+@api_route(bp, OP_EVENT_CATALOG)
+def event_catalog() -> EventCatalog:
+    """The event types the rule editor offers, by category; a rule may still name one it does not list."""
+    by_category: dict[str, list[CatalogEventView]] = {c: [] for c in CATEGORY_KEYS}
+    for e in catalog():
+        by_category[e.category].append(CatalogEventView(
+            event_type=e.event_type, description_key=EVENT_DESC_KEYS[e.event_type],
+            vendor_documented=e.vendor_documented, status_filter=e.status_filter, severity_filter=e.severity_filter))
+    return EventCatalog(categories=[CatalogCategory(id=c, label_key=CATEGORY_KEYS[c], events=events)
+                                    for c, events in by_category.items() if events])

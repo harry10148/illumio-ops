@@ -143,3 +143,15 @@ def test_rule_with_the_new_conditions_round_trips(client):
     for k, v in cond.items():
         got = saved["condition"][k]
         assert (got if not isinstance(v, dict) else {kk: got[kk] for kk in v}) == v, k
+
+
+def test_event_catalog_lists_categories_with_their_events(client):
+    login(client)
+    data = client.get("/api/alert-rules/event-catalog", environ_overrides=LOCAL).get_json()["data"]
+    cats = {c["id"]: c for c in data["categories"]}
+    assert data["categories"][0]["id"] == "general" and cats["agent_security"]["label_key"] == "evcat_agent_security"
+    tamper = next(e for e in cats["agent_security"]["events"] if e["event_type"] == "agent.tampering")
+    assert tamper == {"event_type": "agent.tampering", "description_key": "evdesc_agent_tampering",
+                      "vendor_documented": True, "status_filter": False, "severity_filter": False}
+    sign_in = next(e for c in data["categories"] for e in c["events"] if e["event_type"] == "user.sign_in")
+    assert sign_in["status_filter"] and sign_in["severity_filter"]
