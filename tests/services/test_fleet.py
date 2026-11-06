@@ -16,11 +16,11 @@ def _stamp(delta: timedelta) -> str:
 
 
 def wl(href, hostname, mode, *, version="23.2.0", os_id="ubuntu", online=1, beat=timedelta(minutes=5),
-       sync="applied", label_set=None, managed=1, applied=True):
+       sync="applied", label_set=None, managed=1, applied=True, fetched_at="2026-11-06T08:55:00.000Z"):
     return workloads.WorkloadRow(
         href=href, hostname=hostname, name=None, managed=managed, enforcement_mode=mode, visibility_level=None,
         os_id=os_id, ven_version=version, ven_href=None, label_set=label_set, online=online, risk_exposure=None,
-        risk_percent=None, risk_updated_at=None, fetched_at="2026-11-06T08:55:00.000Z", agent_status="active",
+        risk_percent=None, risk_updated_at=None, fetched_at=fetched_at, agent_status="active",
         last_heartbeat_at=None if beat is None else _stamp(beat), policy_sync_state=sync,
         policy_applied_at=_stamp(timedelta(hours=1)) if applied else None)
 
@@ -88,3 +88,18 @@ def test_empty_inventory_is_zero_not_missing(tmp_path):
     ctx = configured_ctx(tmp_path)
     o = fleet.overview(ctx, now=NOW)
     assert o.total == 0 and o.fetched_at is None and o.modes == []
+
+
+def test_a_host_online_at_the_last_inventory_read_stays_online_until_the_next(tmp_path):
+    """.106, 2026-11-06: the inventory is read once an hour and copies each heartbeat (sent every few minutes); aged
+    against the clock, every host read 58 minutes ago with a heartbeat 5 minutes older than the read showed as lost.
+    Online is what the PCE said at the read; how old that read is, the page says beside it (fetched_at)."""
+    ctx = configured_ctx(tmp_path)
+    read = (NOW - timedelta(minutes=58)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    seed(ctx, lambda prod, dev: [
+        wl("/orgs/1/workloads/a", "web-01", "selective", beat=timedelta(minutes=63), fetched_at=read),
+        wl("/orgs/1/workloads/d", "db-02", "idle", online=0, beat=timedelta(hours=3), fetched_at=read)])
+    o = fleet.overview(ctx, now=NOW)
+    assert o.online == {"online": 1, "lost_24h": 1, "lost_48h": 0, "long_offline": 0, "unknown": 0}
+    assert {h.name: h.online for h in fleet.host_list(ctx, FleetFilter(), now=NOW).hosts} == {
+        "web-01": "online", "db-02": "lost_24h"}

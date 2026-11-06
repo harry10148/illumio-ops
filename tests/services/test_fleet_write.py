@@ -26,7 +26,7 @@ def _wl(href, hostname, mode, label_set=None):
     return workloads.WorkloadRow(
         href=href, hostname=hostname, name=None, managed=1, enforcement_mode=mode, visibility_level=None, os_id=None,
         ven_version=None, ven_href=None, label_set=label_set, online=1, risk_exposure=None, risk_percent=None,
-        risk_updated_at=None, fetched_at="x", last_heartbeat_at=(NOW - timedelta(minutes=3)).strftime(
+        risk_updated_at=None, fetched_at=NOW.strftime("%Y-%m-%dT%H:%M:%S.000Z"), last_heartbeat_at=(NOW - timedelta(minutes=3)).strftime(
             "%Y-%m-%dT%H:%M:%S.000Z"))
 
 

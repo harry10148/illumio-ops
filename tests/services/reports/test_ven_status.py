@@ -23,7 +23,7 @@ def host(name, *, online=1, hb=timedelta(minutes=5), sync="applied", fw=1, recei
                 "mode": mode, "version": version, "os_id": os_id, "status": status, "app": app, "env": env}
 
 
-def _inventory(ctx, hosts):
+def _inventory(ctx, hosts, read_at=NOW):
     with ctx.flows().connect() as conn:
         rows = []
         for h in hosts:
@@ -33,8 +33,8 @@ def _inventory(ctx, hosts):
                 href=f"/orgs/1/workloads/{h['name']}", hostname=h["name"], name=None, managed=1,
                 enforcement_mode=h["mode"], visibility_level=None, os_id=h["os_id"], ven_version=h["version"],
                 ven_href=None, label_set=labels.label_set_id(conn, (("app", h["app"]), ("env", h["env"]))),
-                online=h["online"], risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at=db_time(NOW),
-                agent_status=h["status"], last_heartbeat_at=None if h["hb"] is None else db_time(NOW - h["hb"]),
+                online=h["online"], risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at=db_time(read_at),
+                agent_status=h["status"], last_heartbeat_at=None if h["hb"] is None else db_time(read_at - h["hb"]),
                 policy_sync_state=h["sync"], policy_received_at=None if h["status"] is None else db_time(received),
                 policy_applied_at=None if h["status"] is None else db_time(applied), managed_since=None,
                 fw_config_current=h["fw"], agent_health_json=json.dumps(h["health"]) if h["health"] else None))
@@ -73,6 +73,14 @@ def test_online_offline_buckets(ctx):
     assert (k["online"], k["lost_24h"], k["lost_48h"], k["long_offline"]) == (1, 2, 1, 1)
     rows = {r[0]: r[1] for r in _table(_build(ctx), "offline").rows}
     assert set(rows) == {"late", "d1", "d2", "old"}
+
+
+def test_online_is_judged_at_the_inventory_read_not_aged_until_the_report(ctx):
+    """The inventory is read once an hour: a heartbeat 5 minutes before a read 58 minutes ago is online, as the PCE
+    said then (aged against the report's clock, a whole fleet showed as lost each hour before the next read)."""
+    _inventory(ctx, [host("on"), host("d1", online=0, hb=timedelta(hours=5))], read_at=NOW - timedelta(minutes=58))
+    k = _kpi(_build(ctx))
+    assert (k["online"], k["lost_24h"]) == (1, 1)
 
 
 def test_unknown_status_not_offline(ctx):

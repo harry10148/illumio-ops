@@ -59,7 +59,11 @@ def bucket(w: WorkloadRow, now: datetime) -> str:
     beat = _when(w.last_heartbeat_at)
     if beat is None:
         return "unknown"
-    age = now - beat
+    # As of the inventory read that copied the heartbeat (once an hour by default; the VEN beats every few minutes):
+    # aged against the clock instead, a whole fleet read 58 minutes ago showed as lost. The read's own age is shown
+    # beside the counts (fleet overview fetched_at, the report's inventory time).
+    read = _when(w.fetched_at)
+    age = (min(now, read) if read is not None else now) - beat
     if w.online == 1 and age <= ONLINE_WITHIN:
         return "online"
     return "lost_24h" if age <= DAY else "lost_48h" if age <= 2 * DAY else "long_offline"

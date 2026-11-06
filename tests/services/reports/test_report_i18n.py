@@ -149,8 +149,9 @@ def _p5b2_sample(c):
     hb = NOW - timedelta(hours=5)
     with c.flows().connect() as conn:
         conn.execute("UPDATE workloads SET agent_status = 'active', last_heartbeat_at = ?, policy_sync_state = "
-                     "'syncing', fw_config_current = 0, policy_received_at = ?, policy_applied_at = ?",
-                     (db_time(NOW - timedelta(minutes=5)), db_time(NOW - timedelta(minutes=10)), db_time(hb)))
+                     "'syncing', fw_config_current = 0, policy_received_at = ?, policy_applied_at = ?, fetched_at = ?",
+                     (db_time(NOW - timedelta(minutes=5)), db_time(NOW - timedelta(minutes=10)), db_time(hb),
+                      db_time(NOW)))
         conn.execute("UPDATE workloads SET online = 0, last_heartbeat_at = ? WHERE href = '/orgs/1/workloads/b'",
                      (db_time(hb),))
         analysis.write_result(conn, "tamper", params={}, at=NOW, result={"unmatched": 0, "hosts": [
