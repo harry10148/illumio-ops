@@ -1,6 +1,6 @@
 # illumio-ops
 
-![Version](https://img.shields.io/badge/Version-v6.2.1-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v6.2.2-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.12-yellow?style=flat-square&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)
 

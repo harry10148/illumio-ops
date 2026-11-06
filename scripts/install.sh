@@ -77,7 +77,10 @@ if [[ -z "$UPGRADE_FROM" && -e "$PREFIX/illumio-ops.py" ]]; then
     UPGRADE_FROM="$PREFIX"  # the prefix holds 5.x: this is an upgrade
 fi
 V6_UPGRADE=0
-if [[ -z "$UPGRADE_FROM" && ( -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ) ]]; then
+KEPT=0
+if [[ -z "$UPGRADE_FROM" && -f "$PREFIX/config/settings.json" && ! -e "$PREFIX/illumio_ops" ]]; then
+    KEPT=1  # the settings and data uninstall.sh kept: a fresh install of the program that uses them
+elif [[ -z "$UPGRADE_FROM" && ( -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ) ]]; then
     [[ -f "$PREFIX/illumio_ops/__init__.py" && -f "$PREFIX/config/settings.json" ]] \
         || die "$PREFIX holds only part of a v6 installation (illumio_ops/ and config/settings.json go together): not a complete installation; nothing was changed"
     V6_UPGRADE=1  # the prefix holds v6: this bundle's version replaces it
@@ -87,13 +90,13 @@ if [[ -n "$UPGRADE_FROM" ]]; then
     UPGRADE_FROM="${UPGRADE_FROM%/}"
     [[ -f "$UPGRADE_FROM/illumio-ops.py" && -f "$UPGRADE_FROM/config/config.json" ]] \
         || die "$UPGRADE_FROM is not an illumio-ops 5.x installation (no illumio-ops.py and config/config.json)"
-elif (( ! V6_UPGRADE && (REPORT_ONLY || ACCEPT) )); then
+elif (( ! V6_UPGRADE && ! KEPT && (REPORT_ONLY || ACCEPT) )); then
     die "--report-only and --accept-report are for an upgrade (--upgrade-from, or a prefix that holds v6)"
 fi
 if [[ -n "$UPGRADE_FROM" && "$PREFIX" != "$UPGRADE_FROM" && ( -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ) ]]; then
     die "$PREFIX already holds an illumio-ops v6 installation; nothing was changed"
 fi
-for need in python wheels illumio_ops requirements.lock illumio-ops.service.in rollback.sh restore-previous.sh; do
+for need in python wheels illumio_ops requirements.lock illumio-ops.service.in rollback.sh restore-previous.sh uninstall.sh; do
     [[ -e "$BUNDLE_DIR/$need" ]] || die "bundle is incomplete: $need is missing next to install.sh"
 done
 
@@ -121,12 +124,19 @@ install_program() {
         chown -R root:root "$PREFIX/python" "$PREFIX/illumio_ops"
     fi
     chmod -R go-w "$PREFIX/python" "$PREFIX/illumio_ops"
+    cp "$BUNDLE_DIR/uninstall.sh" "$PREFIX/uninstall.sh" && chmod 755 "$PREFIX/uninstall.sh"
     cd "$PREFIX"  # a directory we own: never let python -m pick modules up from the caller's cwd
     echo "==> Installing locked dependencies (hash-checked, offline)"
     "$PREFIX/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location --root-user-action=ignore \
         --require-hashes --find-links "$BUNDLE_DIR/wheels" -r "$BUNDLE_DIR/requirements.lock"
 }
 
+if (( KEPT )); then
+    # The kept settings and databases must be ones this version starts with (not written by a newer one).
+    bundle_program -m illumio_ops.migrate.v6 --root "$PREFIX" \
+        || die "the settings and data kept in $PREFIX cannot be used by this bundle (above); nothing was changed"
+    (( REPORT_ONLY )) && exit 0
+fi
 if (( V6_UPGRADE )); then
     PLAN="$(mktemp)"
     set +e
@@ -336,6 +346,9 @@ if [[ -n "$UPGRADE_FROM" ]]; then
     echo "==> Writing the v6 settings and continuing where 5.x stopped"
     "${PY[@]}" -m illumio_ops.migrate --from "$V5_NOW" --write --root "$PREFIX" --lang "$REPORT_LANG" "${MOVED[@]}" \
         || die "the upgrade did not complete; $PREFIX/rollback.sh brings 5.x back"
+    RUN=()
+elif (( KEPT )); then
+    echo "==> Using the settings and data kept in $PREFIX"
     RUN=()
 else
     RUN=("${PY[@]}" -m illumio_ops.rescue init --root "$PREFIX" --port "$PORT")

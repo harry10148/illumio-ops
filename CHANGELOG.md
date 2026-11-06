@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.2.2] - 2026-11-06
+
+### Added
+- System › Display sets the time zone (report schedules, report periods and alert times follow it); it could only be
+  changed in the settings file. The page shows what `local` is on the server.
+- Rescue commands `clear-allowed-ips` (an address list that shuts the operator out) and `reset-tls` (back to the
+  self-signed certificate when a provided one stops the service); the installation guide lists every rescue command.
+- `preflight.sh` in the bundle: says what `install.sh` would do in the prefix (fresh, upgrade of 5.x, upgrade of v6,
+  older bundle refused) and checks the host and the bundle. `uninstall.sh`, copied into the installation: removes the
+  service and the program, keeps config/, data/ and reports/ (`--purge` removes them too); `install.sh` in the same
+  directory reinstalls with the kept settings and data. Both were in 5.x and in the v6 design, and missing.
+
 ## [6.2.1] - 2026-11-06
 
 ### Fixed

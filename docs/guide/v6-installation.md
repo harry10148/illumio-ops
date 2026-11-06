@@ -5,6 +5,8 @@ verified_against:
   - scripts/install.sh
   - scripts/rollback.sh
   - scripts/restore-previous.sh
+  - scripts/preflight.sh
+  - scripts/uninstall.sh
   - illumio_ops/migrate/v6.py
   - illumio_ops/rescue.py
   - illumio_ops/migrate/v5_write.py
@@ -34,10 +36,13 @@ illumio-ops v6 以離線安裝包安裝，可以離線執行。安裝包內含 C
 ```
 tar xzf illumio-ops-<版本>-offline-linux-x86_64.tar.gz
 cd illumio-ops-<版本>
+./preflight.sh                        # 先檢查主機與安裝包（只讀，不改任何東西）
 sudo ./install.sh                     # 預設 /opt/illumio-ops、服務 illumio-ops、port 5001
 sudo systemctl enable --now illumio-ops
 ```
 
+- `preflight.sh` 會說明 `install.sh` 在這個目錄會做什麼（全新安裝、從 5.x 升級、升級已安裝的 v6），並檢查架構、glibc、
+  systemd、磁碟空間、安裝包是否完整與 port。有 FAIL 時先處理再安裝；`--prefix`、`--port` 與 `install.sh` 相同。
 - 安裝程式只安裝，不會啟動服務。
 - 啟動後開 `https://<主機>:5001/`，以預設帳號登入並立刻改密碼，接著到「系統 › PCE 連線」填入 PCE。
 - 可用的選項：
@@ -160,4 +165,17 @@ sudo systemctl start illumio-ops
 | `clear-allowed-ips` | 允許 IP 清單把自己擋在外面。清單清空（任何位址都能登入），並印出原本的清單，登入後到「系統 › 安全」重設。 |
 | `reset-tls` | 匯入的憑證不見了、與私鑰不合或加密套件設錯，服務起不來。改回自簽憑證（下次啟動時產生），不刪除原本的憑證檔；之後到「系統 › TLS」重新匯入。 |
 | `check-settings` | 服務起不來時，檢查設定檔並指出哪一欄有問題。 |
+
+## 7. 解除安裝
+
+```
+sudo /opt/illumio-ops/uninstall.sh          # 移除服務與程式，保留 config/、data/、reports/
+sudo /opt/illumio-ops/uninstall.sh --purge  # 連設定、資料與報表整個目錄一起刪除
+```
+
+- 動手前會先說明要刪什麼，輸入 yes 才執行；非互動時加 `--yes`。
+- 保留下來的 `config/`、`data/`、`reports/` 改由 root 擁有、權限 0700：服務帳號 `illumio-ops` 會一併刪除（同一台主機上
+  還有其他 illumio-ops 服務時保留），它的 user id 之後可能分給別的程式。
+- 之後在同一個目錄再執行 `install.sh`，會沿用保留的設定與資料重新安裝（登入帳密、PCE 連線、規則都還在）；
+  保留的設定或資料庫若比安裝包新，會拒絕安裝。
 

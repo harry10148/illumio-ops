@@ -1,4 +1,5 @@
-"""An installed v6 taken over by this program's version (install.sh, when the prefix already holds v6).
+"""An installed v6 taken over by this program's version (install.sh, when the prefix already holds v6, or only the
+settings and data uninstall.sh kept).
 
 `python -m illumio_ops.migrate.v6 --root <prefix> [--env FILE]` reads the installation and changes nothing. It refuses
 an older program over a newer installation (the older one would refuse the newer settings or databases at its start,
@@ -33,7 +34,7 @@ class Refused(Exception):
 
 @dataclass(frozen=True)
 class Plan:
-    installed: str
+    installed: str     # "" when only the settings and data are there (uninstall.sh kept them)
     bundle: str
     app_pending: int   # migrations this program applies to data/app.sqlite at its first start
     flow_pending: int  # the same for data/flows.sqlite
@@ -75,8 +76,8 @@ def _pending(db: Path, package: str) -> int:
 
 def plan(root: Path) -> Plan:
     paths = InstallPaths(root)
-    installed = installed_version(root)
-    if _parse(__version__) < _parse(installed):
+    installed = installed_version(root) if (root / "illumio_ops").exists() else ""
+    if installed and _parse(__version__) < _parse(installed):
         raise Refused(f"{root} runs {installed}, newer than this bundle ({__version__}); an older version is not "
                       "installed over a newer one")
     try:
@@ -106,8 +107,9 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"{exc}; nothing was changed\n")
         return EX_DATAERR
     same = " (the same version: its files are installed again)" if p.installed == p.bundle else ""
-    lines = [f"Upgrade {args.root} from {p.installed} to {p.bundle}{same}.",
-             "Kept as they are: settings, data, reports, logs and certificates."]
+    lines = ([f"Upgrade {args.root} from {p.installed} to {p.bundle}{same}."] if p.installed else
+             [f"Install {p.bundle} into {args.root} again, with the settings and data an uninstall kept there."])
+    lines.append("Kept as they are: settings, data, reports, logs and certificates.")
     lines += [f"data/{name}: {n} schema change(s) at the first start; a copy is kept first so the previous version "
               "can come back." for name, n in (("app.sqlite", p.app_pending), ("flows.sqlite", p.flow_pending)) if n]
     sys.stdout.write("".join(f"{line}\n" for line in lines))

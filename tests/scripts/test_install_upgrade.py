@@ -18,7 +18,7 @@ FIXTURES = REPO / "tests" / "migrate" / "fixtures"
 @pytest.fixture(scope="module")
 def bundle(tmp_path_factory):
     b = tmp_path_factory.mktemp("bundle")
-    for f in ("install.sh", "rollback.sh", "restore-previous.sh", "illumio-ops.service.in"):
+    for f in ("install.sh", "rollback.sh", "restore-previous.sh", "uninstall.sh", "preflight.sh", "illumio-ops.service.in"):
         shutil.copy(REPO / "scripts" / f, b / f)
     (b / "requirements.lock").write_text("")
     (b / "wheels").mkdir()

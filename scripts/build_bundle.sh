@@ -74,8 +74,9 @@ echo "==> Wheels (all manylinux tags: some packages only publish older ones, e.g
     -r "$LOCK"
 
 rsync -a --exclude '__pycache__' --exclude '*.pyc' illumio_ops/ "$STAGE/illumio_ops/"
-cp "$LOCK" scripts/install.sh scripts/rollback.sh scripts/restore-previous.sh scripts/illumio-ops.service.in "$STAGE/"
-chmod +x "$STAGE/install.sh" "$STAGE/rollback.sh" "$STAGE/restore-previous.sh"
+cp "$LOCK" scripts/install.sh scripts/rollback.sh scripts/restore-previous.sh scripts/uninstall.sh scripts/preflight.sh \
+    scripts/illumio-ops.service.in "$STAGE/"
+chmod +x "$STAGE/install.sh" "$STAGE/rollback.sh" "$STAGE/restore-previous.sh" "$STAGE/uninstall.sh" "$STAGE/preflight.sh"
 
 echo "==> Slimming the bundled Python"
 py="$STAGE/python"

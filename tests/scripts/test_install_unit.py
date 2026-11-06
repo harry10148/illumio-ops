@@ -63,7 +63,8 @@ def test_existing_5x_installation_is_refused(tmp_path):
     assert sorted(p.name for p in tmp_path.iterdir()) == ["illumio-ops.py"]
 
 
-def test_existing_v6_installation_is_refused(tmp_path):
+def test_part_of_a_v6_installation_is_refused(tmp_path):
+    (tmp_path / "illumio_ops").mkdir()  # the program without its __init__ beside the settings: not an installation
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "settings.json").write_text("{}")
     r = subprocess.run(["bash", str(INSTALL), "--no-systemd", "--prefix", str(tmp_path)], capture_output=True,

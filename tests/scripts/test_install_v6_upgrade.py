@@ -22,7 +22,7 @@ FLOW_LATEST = len(_migrations(FLOW_MIGRATIONS))
 @pytest.fixture(scope="module")
 def bundle(tmp_path_factory):
     b = tmp_path_factory.mktemp("bundle")
-    for f in ("install.sh", "rollback.sh", "restore-previous.sh", "illumio-ops.service.in"):
+    for f in ("install.sh", "rollback.sh", "restore-previous.sh", "uninstall.sh", "preflight.sh", "illumio-ops.service.in"):
         shutil.copy(REPO / "scripts" / f, b / f)
     (b / "requirements.lock").write_text("")
     (b / "wheels").mkdir()
@@ -133,8 +133,55 @@ def test_report_only_and_no_terminal_change_nothing(bundle, v6):
     assert _tree(v6) == before
 
 
-def test_settings_without_the_program_are_not_an_installation(bundle, tmp_path):
-    (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "settings.json").write_text("{}")
+def test_the_program_without_settings_is_not_an_installation(bundle, tmp_path):
+    (tmp_path / "illumio_ops").mkdir()
     r = _install(bundle, "--prefix", tmp_path, "--accept-report")
     assert r.returncode != 0 and "not a complete" in r.stderr
+
+
+def _uninstall(prefix, *args):
+    return _run("bash", prefix / "uninstall.sh", "--no-systemd", *args)
+
+
+def test_uninstall_keeps_settings_and_data_and_a_reinstall_uses_them(bundle, v6):
+    """Parity audit 2026-11-06 A5: 5.x shipped uninstall.sh (spec §6.2 keeps it); v6 had none."""
+    settings = (v6 / "config" / "settings.json").read_bytes()
+    r = _uninstall(v6)
+    assert r.returncode != 0 and "--yes" in r.stderr  # asks first; no terminal here
+    r = _uninstall(v6, "--yes")
+    assert r.returncode == 0, r.stderr
+    assert sorted(p.name for p in v6.iterdir()) == ["config", "data", "reports"]
+    r = _install(bundle, "--prefix", v6)
+    assert r.returncode == 0, r.stderr
+    assert "kept" in r.stdout and _version(v6) == __version__
+    assert (v6 / "config" / "settings.json").read_bytes() == settings  # not a new default sign-in
+    assert (v6 / "reports" / "kept.html").exists() and (v6 / "uninstall.sh").exists()
+
+
+def test_uninstall_purge_removes_everything(v6):
+    assert _uninstall(v6, "--purge", "--yes").returncode == 0
+    assert not v6.exists()
+
+
+def test_uninstall_refuses_a_directory_that_is_not_v6(bundle, tmp_path):
+    (tmp_path / "keep.txt").write_text("x")
+    r = _run("bash", bundle / "uninstall.sh", "--no-systemd", "--yes", "--prefix", tmp_path)
+    assert r.returncode != 0 and (tmp_path / "keep.txt").exists()
+
+
+def test_a_reinstall_refuses_settings_from_a_newer_version(bundle, v6):
+    _uninstall(v6, "--yes")
+    _db(v6 / "data" / "flows.sqlite", FLOW_LATEST + 1)
+    r = _install(bundle, "--prefix", v6)
+    assert r.returncode != 0 and "newer than this program" in r.stderr
+    assert not (v6 / "illumio_ops").exists()
+
+
+def test_preflight_says_what_install_would_do(bundle, v6, tmp_path):
+    r = _run("bash", bundle / "preflight.sh", "--prefix", tmp_path / "free")
+    assert "fresh installation" in r.stdout
+    r = _run("bash", bundle / "preflight.sh", "--prefix", v6)
+    assert f"holds v6 6.0.0: install.sh upgrades it to {__version__}" in r.stdout
+    _set_version(v6, "99.0.0")
+    r = _run("bash", bundle / "preflight.sh", "--prefix", v6)
+    assert r.returncode == 1 and "FAIL" in r.stdout and "newer than this bundle" in r.stdout
