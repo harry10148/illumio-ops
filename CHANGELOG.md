@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.2.1] - 2026-11-06
+
+### Fixed
+- An installed v6 can be upgraded with the offline bundle: `install.sh` over a prefix that holds v6 now replaces the
+  program in place (settings, data, reports, logs and certificates stay) instead of refusing. It shows the plan first
+  (`--report-only`, `--accept-report` as for 5.x), refuses an older bundle over a newer installation and settings or
+  databases the new version would not start with, stops the service for the swap and starts it again if it was
+  running. The replaced version, its settings and a copy of each database the new version migrates at its first start
+  are kept in `previous/`; `restore-previous.sh` puts them back. Until now every v6 release could only be installed
+  fresh.
+
 ## [6.2.0] - 2026-11-06
 
 ### Changed

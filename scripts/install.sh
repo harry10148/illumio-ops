@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# illumio-ops v6 installer: a fresh install, or an upgrade of a 5.x installation (spec §7).
+# illumio-ops v6 installer: a fresh install, an upgrade of a 5.x installation (spec §7), or of an installed v6.
 #
 #   ./install.sh [--prefix DIR] [--service-name NAME] [--port N] [--no-systemd] [--print-unit]
 #                [--upgrade-from DIR] [--report-only] [--accept-report] [--lang en|zh_TW] [--old-service NAME]
@@ -14,8 +14,14 @@
 #                    The migration report is shown first; the upgrade stops and disables the 5.x
 #                    service, keeps its unit and wrapper, moves the 5.x directory aside only when v6
 #                    takes the same directory, and leaves PREFIX/rollback.sh to go back.
-#   --report-only    show the migration report and change nothing
+#   --report-only    show the migration report (or, over v6, the upgrade plan) and change nothing
 #   --accept-report  upgrade without asking (non-interactive)
+#
+# When the prefix already holds v6, this bundle's version replaces the installed one in place: settings, data,
+# reports, logs and certificates stay. An older bundle is refused over a newer installation, and so are settings or
+# databases this version would not start with. The service is stopped for the swap and started again if it was
+# running. The replaced version is kept in PREFIX/previous (with a copy of each database this version migrates at
+# its first start) and PREFIX/restore-previous.sh puts it back.
 #   --old-service    the 5.x unit (default: the one whose WorkingDirectory is the 5.x directory)
 set -euo pipefail
 
@@ -46,7 +52,7 @@ while [[ $# -gt 0 ]]; do
         --accept-report) ACCEPT=1; shift ;;
         --lang) REPORT_LANG="${2:?}"; shift 2 ;;
         --old-service) OLD_SERVICE="${2:?}"; shift 2 ;;
-        -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
         *) die "unknown option: $1" ;;
     esac
 done
@@ -70,30 +76,162 @@ fi
 if [[ -z "$UPGRADE_FROM" && -e "$PREFIX/illumio-ops.py" ]]; then
     UPGRADE_FROM="$PREFIX"  # the prefix holds 5.x: this is an upgrade
 fi
+V6_UPGRADE=0
+if [[ -z "$UPGRADE_FROM" && ( -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ) ]]; then
+    [[ -f "$PREFIX/illumio_ops/__init__.py" && -f "$PREFIX/config/settings.json" ]] \
+        || die "$PREFIX holds only part of a v6 installation (illumio_ops/ and config/settings.json go together): not a complete installation; nothing was changed"
+    V6_UPGRADE=1  # the prefix holds v6: this bundle's version replaces it
+fi
 if [[ -n "$UPGRADE_FROM" ]]; then
     [[ "$UPGRADE_FROM" == /* ]] || die "--upgrade-from must be an absolute path"
     UPGRADE_FROM="${UPGRADE_FROM%/}"
     [[ -f "$UPGRADE_FROM/illumio-ops.py" && -f "$UPGRADE_FROM/config/config.json" ]] \
         || die "$UPGRADE_FROM is not an illumio-ops 5.x installation (no illumio-ops.py and config/config.json)"
-elif (( REPORT_ONLY || ACCEPT )); then
-    die "--report-only and --accept-report are for an upgrade (--upgrade-from)"
+elif (( ! V6_UPGRADE && (REPORT_ONLY || ACCEPT) )); then
+    die "--report-only and --accept-report are for an upgrade (--upgrade-from, or a prefix that holds v6)"
 fi
-if [[ "$PREFIX" != "$UPGRADE_FROM" && ( -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ) ]]; then
+if [[ -n "$UPGRADE_FROM" && "$PREFIX" != "$UPGRADE_FROM" && ( -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ) ]]; then
     die "$PREFIX already holds an illumio-ops v6 installation; nothing was changed"
 fi
-for need in python wheels illumio_ops requirements.lock illumio-ops.service.in rollback.sh; do
+for need in python wheels illumio_ops requirements.lock illumio-ops.service.in rollback.sh restore-previous.sh; do
     [[ -e "$BUNDLE_DIR/$need" ]] || die "bundle is incomplete: $need is missing next to install.sh"
 done
 
-if [[ -n "$UPGRADE_FROM" ]]; then
-    # The report first, from the bundle (dependencies into a scratch directory), before anything changes.
-    SITE="$(mktemp -d)"
-    trap 'rm -rf "$SITE"' EXIT
-    "$BUNDLE_DIR/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location --root-user-action=ignore \
-        --require-hashes --find-links "$BUNDLE_DIR/wheels" --target "$SITE" -r "$BUNDLE_DIR/requirements.lock"
+SITE=""
+# The bundle's program, its dependencies in a scratch directory: it reads the installation before anything changes.
+bundle_program() {
+    if [[ -z "$SITE" ]]; then
+        SITE="$(mktemp -d)"
+        trap 'rm -rf "$SITE"' EXIT
+        "$BUNDLE_DIR/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location --root-user-action=ignore \
+            --require-hashes --find-links "$BUNDLE_DIR/wheels" --target "$SITE" -r "$BUNDLE_DIR/requirements.lock"
+    fi
+    (cd "$SITE" && env "PYTHONPATH=$BUNDLE_DIR:$SITE" PYTHONNOUSERSITE=1 "$BUNDLE_DIR/python/bin/python3" -P "$@")
+}
+
+# Copy without the archive's owner; as root, the code and the interpreter must be root's
+# (the service account only writes config/data/logs/reports).
+install_program() {
+    mkdir -p "$PREFIX"
+    cp -R --preserve=mode,timestamps "$BUNDLE_DIR/python" "$PREFIX/python"
+    cp -R --preserve=mode,timestamps "$BUNDLE_DIR/illumio_ops" "$PREFIX/illumio_ops"
+    if (( ! NO_SYSTEMD )); then
+        chown root:root "$PREFIX"
+        chmod 755 "$PREFIX"
+        chown -R root:root "$PREFIX/python" "$PREFIX/illumio_ops"
+    fi
+    chmod -R go-w "$PREFIX/python" "$PREFIX/illumio_ops"
+    cd "$PREFIX"  # a directory we own: never let python -m pick modules up from the caller's cwd
+    echo "==> Installing locked dependencies (hash-checked, offline)"
+    "$PREFIX/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location --root-user-action=ignore \
+        --require-hashes --find-links "$BUNDLE_DIR/wheels" -r "$BUNDLE_DIR/requirements.lock"
+}
+
+if (( V6_UPGRADE )); then
+    PLAN="$(mktemp)"
     set +e
-    (cd "$SITE" && env "PYTHONPATH=$BUNDLE_DIR:$SITE" PYTHONNOUSERSITE=1 "$BUNDLE_DIR/python/bin/python3" -P \
-        -m illumio_ops.migrate --from "$UPGRADE_FROM" --report-only --lang "$REPORT_LANG")
+    bundle_program -m illumio_ops.migrate.v6 --root "$PREFIX" --env "$PLAN"
+    rc=$?
+    set -e
+    if (( rc != 0 )); then
+        rm -f "$PLAN"
+        die "$PREFIX cannot be upgraded with this bundle (above)"
+    fi
+    OLD_VERSION="" NEW_VERSION="" APP_PENDING=0 FLOW_PENDING=0
+    # shellcheck source=/dev/null
+    source "$PLAN"  # OLD_VERSION NEW_VERSION APP_PENDING FLOW_PENDING, %q-quoted by the program
+    rm -f "$PLAN"
+    (( REPORT_ONLY )) && exit 0
+    if (( ! ACCEPT )); then
+        [[ -t 0 ]] || die "not a terminal: pass --accept-report to upgrade with this plan; nothing was changed"
+        read -r -p "Upgrade $PREFIX from $OLD_VERSION to $NEW_VERSION? Type yes: " answer
+        [[ "$answer" == yes ]] || die "cancelled; nothing was changed"
+    fi
+
+    DATA="$PREFIX/data"
+    PREV="$PREFIX/previous"
+    COPIES=()  # the databases this version migrates at its first start: the previous version could not open them
+    (( APP_PENDING > 0 )) && [[ -f "$DATA/app.sqlite" ]] && COPIES+=(app.sqlite)
+    (( FLOW_PENDING > 0 )) && [[ -f "$DATA/flows.sqlite" ]] && COPIES+=(flows.sqlite)
+    if (( ${#COPIES[@]} )); then
+        need=0
+        for f in "${COPIES[@]}"; do
+            need=$(( need + $(du -cb "$DATA/$f"* | tail -1 | cut -f1) ))
+        done
+        avail=$(df --output=avail -B1 "$DATA" | tail -1 | tr -d ' ')
+        (( avail > need + need / 10 )) || die "the copies of ${COPIES[*]} need $(( need / 1048576 )) MB in $DATA and $(( avail / 1048576 )) MB are free; nothing was changed"
+    fi
+    WAS_ACTIVE=0
+    if (( ! NO_SYSTEMD )); then
+        [[ $(id -u) -eq 0 ]] || die "run as root (or use --no-systemd for a user-level installation)"
+        command -v systemctl >/dev/null || die "systemctl not found (use --no-systemd)"
+        UNIT="/etc/systemd/system/${SERVICE}.service"
+        if ! grep -qF -- "-m illumio_ops serve --root $PREFIX" "$UNIT" 2>/dev/null; then
+            UNIT=""
+            for u in /etc/systemd/system/*.service; do
+                if [[ -f "$u" ]] && grep -qF -- "-m illumio_ops serve --root $PREFIX" "$u"; then
+                    UNIT="$u"
+                    break
+                fi
+            done
+            [[ -n "$UNIT" ]] || die "no systemd unit in /etc/systemd/system runs $PREFIX: pass --service-name NAME; nothing was changed"
+            SERVICE="$(basename "$UNIT" .service)"
+        fi
+        if systemctl is-active --quiet "$SERVICE"; then
+            WAS_ACTIVE=1
+        fi
+        echo "==> Stopping $SERVICE"
+        systemctl stop "$SERVICE" || die "could not stop $SERVICE; nothing else was changed"
+        if systemctl is-active --quiet "$SERVICE"; then
+            die "$SERVICE is still running; nothing else was changed"
+        fi
+    fi
+    BACK="$OLD_VERSION is stopped and unchanged in $PREFIX"
+    (( WAS_ACTIVE )) && BACK="$BACK; to start it again: systemctl start $SERVICE"
+    echo "==> Keeping $OLD_VERSION in $PREV"
+    rm -rf "$PREV"  # one previous version is kept: the one this upgrade replaces
+    mkdir -p "$PREV/data" && chmod 700 "$PREV" || die "could not make $PREV; $BACK"
+    cp -p "$PREFIX/config/settings.json" "$PREV/settings.json" || die "could not copy the settings to $PREV; $BACK"
+    for f in "${COPIES[@]}"; do
+        for g in "$DATA/$f" "$DATA/$f-wal" "$DATA/$f-shm"; do
+            if [[ -e "$g" ]]; then
+                cp -p "$g" "$PREV/data/" || die "could not copy $g to $PREV; $BACK"
+            fi
+        done
+    done
+    printf 'PREFIX=%q\nSERVICE=%q\nNO_SYSTEMD=%q\nOLD_VERSION=%q\nNEW_VERSION=%q\nCOPIES=%q\n' \
+        "$PREFIX" "$SERVICE" "$NO_SYSTEMD" "$OLD_VERSION" "$NEW_VERSION" "${COPIES[*]}" > "$PREV/previous.env"
+    cp "$BUNDLE_DIR/restore-previous.sh" "$PREFIX/restore-previous.sh" && chmod 755 "$PREFIX/restore-previous.sh" \
+        || die "could not write $PREFIX/restore-previous.sh; $BACK"
+    mv "$PREFIX/illumio_ops" "$PREV/illumio_ops" && mv "$PREFIX/python" "$PREV/python" \
+        || die "could not move $OLD_VERSION into $PREV; $PREFIX/restore-previous.sh puts it back"
+    echo "==> If anything below fails: $PREFIX/restore-previous.sh brings $OLD_VERSION back"
+
+    echo "==> Installing illumio-ops $NEW_VERSION into $PREFIX"
+    install_program
+    if (( NO_SYSTEMD )); then
+        echo "==> Upgraded to $NEW_VERSION (no systemd)."
+        exit 0
+    fi
+    render_unit > "$UNIT"  # the unit of this version (its directives may have changed)
+    chmod 644 "$UNIT"
+    systemctl daemon-reload
+    if (( ! WAS_ACTIVE )); then
+        echo "==> Upgraded to $NEW_VERSION. The service was not running and is NOT started: systemctl start $SERVICE"
+        exit 0
+    fi
+    echo "==> Starting $SERVICE"
+    systemctl start "$SERVICE" || die "$SERVICE did not start; journalctl -u $SERVICE says why, and $PREFIX/restore-previous.sh brings $OLD_VERSION back"
+    sleep 5
+    systemctl is-active --quiet "$SERVICE" \
+        || die "$SERVICE stopped after starting; journalctl -u $SERVICE says why, and $PREFIX/restore-previous.sh brings $OLD_VERSION back"
+    echo "==> Upgraded to $NEW_VERSION and running. $OLD_VERSION is kept in $PREV until the next upgrade."
+    exit 0
+fi
+if [[ -n "$UPGRADE_FROM" ]]; then
+    # The report first, from the bundle, before anything changes.
+    set +e
+    bundle_program -m illumio_ops.migrate --from "$UPGRADE_FROM" --report-only --lang "$REPORT_LANG"
     rc=$?
     set -e
     (( rc == 0 )) || die "the 5.x settings cannot be upgraded as they are (above); nothing was changed"
@@ -178,22 +316,7 @@ if [[ -n "$UPGRADE_FROM" ]]; then
 fi
 
 echo "==> Installing illumio-ops v6 into $PREFIX"
-mkdir -p "$PREFIX"
-# Copy without the archive's owner; as root, the code and the interpreter must be root's
-# (the service account only writes config/data/logs/reports).
-cp -R --preserve=mode,timestamps "$BUNDLE_DIR/python" "$PREFIX/python"
-cp -R --preserve=mode,timestamps "$BUNDLE_DIR/illumio_ops" "$PREFIX/illumio_ops"
-if (( ! NO_SYSTEMD )); then
-    chown root:root "$PREFIX"
-    chmod 755 "$PREFIX"
-    chown -R root:root "$PREFIX/python" "$PREFIX/illumio_ops"
-fi
-chmod -R go-w "$PREFIX/python" "$PREFIX/illumio_ops"
-cd "$PREFIX"  # a directory we own: never let python -m pick modules up from the caller's cwd
-
-echo "==> Installing locked dependencies (hash-checked, offline)"
-"$PREFIX/python/bin/python3" -I -m pip install --quiet --no-index --no-warn-script-location --root-user-action=ignore \
-    --require-hashes --find-links "$BUNDLE_DIR/wheels" -r "$BUNDLE_DIR/requirements.lock"
+install_program
 
 for d in config data logs reports; do
     mkdir -p "$PREFIX/$d"

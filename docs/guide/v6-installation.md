@@ -1,14 +1,16 @@
 ---
-title: v6 安裝、從 5.x 升級與回退
-last_verified: 2026-11-01
+title: v6 安裝、升級與回退
+last_verified: 2026-11-06
 verified_against:
   - scripts/install.sh
   - scripts/rollback.sh
+  - scripts/restore-previous.sh
+  - illumio_ops/migrate/v6.py
   - illumio_ops/migrate/v5_write.py
   - illumio_ops/migrate/v5_handover.py
 ---
 
-# v6 安裝、從 5.x 升級與回退
+# v6 安裝、升級與回退
 
 illumio-ops v6 以離線安裝包安裝，可以離線執行。安裝包內含 CPython 3.12 和所有相依套件，安裝在 Linux x86_64（RHEL、Rocky 系）上，以 systemd 服務執行。v6 只有網頁介面，沒有命令列工具。
 
@@ -103,3 +105,39 @@ sudo /opt/illumio-ops/rollback.sh
   - 啟動 5.x。
 - 5.x 會從它自己停下的地方繼續，所以 v6 運作期間送過的 SIEM 事件與告警，可能會再送一次。
 - 回退後要再升級，重新執行 `install.sh` 即可。被保留的 v6 目錄不影響新的升級。
+
+## 5. 升級已安裝的 v6
+
+解開新版安裝包後，在同一個前綴再執行一次 `install.sh`：
+
+```
+sudo ./install.sh                  # 先顯示升級計畫，輸入 yes 才動手
+sudo ./install.sh --report-only    # 只看計畫，什麼都不改
+sudo ./install.sh --accept-report  # 不詢問（非互動）
+```
+
+```
+讀取既有安裝（不改任何東西）
+  ├─ 已安裝的版本比安裝包新 ──────────> 拒絕（不會把舊版裝到新版上）
+  ├─ 設定檔或資料庫比安裝包新、或新版無法啟動 ─> 拒絕，並指出原因
+  └─ 可以升級：顯示「從 X 升到 Y」與首次啟動會改結構的資料庫
+停止服務 ─> 舊版程式、設定檔，以及新版首次啟動會遷移的資料庫，複製到 <前綴>/previous
+        ─> 安裝新版程式與相依套件、更新 systemd unit
+        ─> 原本在執行就重新啟動，並確認服務起得來
+```
+
+- 設定、資料、報表、日誌與憑證都留在原處，不會重新初始化。
+- 需要複製資料庫時，會先確認磁碟空間足夠，不夠就不動手。
+- 相同版本也可以重新安裝（修復被改壞的程式檔）。
+- 服務的 unit 名稱會自動找出（執行這個前綴的那個 unit）；找不到時用 `--service-name` 指定。
+
+### 回到升級前的版本
+
+```
+sudo /opt/illumio-ops/restore-previous.sh
+```
+
+- 停止服務，把 `previous/` 裡的舊版程式、設定檔與資料庫副本放回，原本在執行就重新啟動。
+- 新版改過的設定檔與資料庫不刪除，改名為 `*.from-<新版版本>-<時間>` 留在 `config/`、`data/`。
+- 升級後在介面改的設定、以及寫進被還原資料庫的資料，會回到升級前的狀態；其他資料照舊。
+- 只保留前一版：再升級一次，`previous/` 就換成那次被取代的版本。回到 5.x 仍用第 4 節的 `rollback.sh`。

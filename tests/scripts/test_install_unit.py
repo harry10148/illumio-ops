@@ -68,4 +68,4 @@ def test_existing_v6_installation_is_refused(tmp_path):
     (tmp_path / "config" / "settings.json").write_text("{}")
     r = subprocess.run(["bash", str(INSTALL), "--no-systemd", "--prefix", str(tmp_path)], capture_output=True,
                        text=True, timeout=30, check=False)
-    assert r.returncode != 0 and "already" in r.stderr
+    assert r.returncode != 0 and "not a complete" in r.stderr
