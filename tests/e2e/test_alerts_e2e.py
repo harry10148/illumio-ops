@@ -465,3 +465,40 @@ def test_rule_event_types_from_the_catalog(context, live_app):
     page.wait_for_selector("[data-role=rule-list]")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Tamper or sign-in")
     assert mine.event_types == ("agent.tampering", "user.sign_in", "vendor.brand_new")
+
+
+def test_rules_page_holds_resets_evaluates_and_keeps(context, live_app):
+    """5.x parity 2026-11-06: a rule in cooldown says until when and can be reset; evaluate now asks the jobs to run;
+    alert records can be kept forever."""
+    from datetime import timedelta
+
+    from illumio_ops.domain.alerting import RuleState
+    from illumio_ops.domain.alertpack import pack_rule_id
+    from illumio_ops.jobs.scheduler import build_scheduler
+    rid = pack_rule_id("rule_agent_tampering")
+    with live_app.ctx.db() as conn:
+        store.save_rule_state(conn, rid, "host-a", RuleState(datetime.now(UTC) - timedelta(minutes=5), ()),
+                              suppressed="cooldown")
+        conn.commit()
+    live_app.ctx.scheduler = build_scheduler(live_app.ctx)
+    try:
+        page = context.new_page()
+        sign_in(page, live_app.url)
+        page.goto(f"{live_app.url}/alert-rules")
+        held = page.locator(f"tr[data-rule-id='{rid}'] [data-role=held]")
+        expect(held).to_contain_text("In cooldown until")
+        expect(held).to_contain_text("(1 held back)")
+        held.locator("[data-role=reset]").click()
+        held.locator("[data-role=reset-confirm]").click()
+        expect(page.locator(f"tr[data-rule-id='{rid}'] [data-role=held]")).to_have_count(0)
+        page.locator("[data-role=evaluate-now]").click()
+        expect(page.locator("[data-role=evaluate-requested]")).to_contain_text("Requested at")
+        assert live_app.ctx.scheduler.get_job("collect_events").next_run_time <= datetime.now(UTC)
+        keep = page.locator("[data-role=retention]")
+        keep.locator("input[name=alert_retention_days]").fill("0")
+        expect(keep).to_contain_text("kept forever")
+        keep.get_by_role("button", name="Save").click()
+        expect(keep.get_by_role("status")).to_be_visible()
+        assert live_app.ctx.settings.current().alerts.retention_days == 0
+    finally:
+        live_app.ctx.scheduler = None

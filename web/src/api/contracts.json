@@ -2050,11 +2050,50 @@
             "title": "PortProto",
             "type": "object"
           },
+          "RuleHold": {
+            "description": "A rule holding alerts back now: the latest moment one of its subjects is let through again.",
+            "properties": {
+              "reason": {
+                "enum": [
+                  "cooldown",
+                  "throttle"
+                ],
+                "title": "Reason",
+                "type": "string"
+              },
+              "subjects": {
+                "title": "Subjects",
+                "type": "integer"
+              },
+              "until": {
+                "format": "date-time",
+                "title": "Until",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "until",
+              "subjects"
+            ],
+            "title": "RuleHold",
+            "type": "object"
+          },
           "RuleListItem": {
             "properties": {
               "display_name": {
                 "title": "Display Name",
                 "type": "string"
+              },
+              "held": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleHold"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "rule": {
                 "discriminator": {
@@ -2104,7 +2143,8 @@
             "required": [
               "rule",
               "display_name",
-              "summary"
+              "summary",
+              "held"
             ],
             "title": "RuleListItem",
             "type": "object"
@@ -2499,6 +2539,10 @@
             "title": "Pack Missing",
             "type": "integer"
           },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -2507,7 +2551,8 @@
         "required": [
           "revision",
           "items",
-          "pack_missing"
+          "pack_missing",
+          "retention_days"
         ],
         "title": "RulesView",
         "type": "object"
@@ -3300,11 +3345,50 @@
             "title": "PortProto",
             "type": "object"
           },
+          "RuleHold": {
+            "description": "A rule holding alerts back now: the latest moment one of its subjects is let through again.",
+            "properties": {
+              "reason": {
+                "enum": [
+                  "cooldown",
+                  "throttle"
+                ],
+                "title": "Reason",
+                "type": "string"
+              },
+              "subjects": {
+                "title": "Subjects",
+                "type": "integer"
+              },
+              "until": {
+                "format": "date-time",
+                "title": "Until",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "until",
+              "subjects"
+            ],
+            "title": "RuleHold",
+            "type": "object"
+          },
           "RuleListItem": {
             "properties": {
               "display_name": {
                 "title": "Display Name",
                 "type": "string"
+              },
+              "held": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleHold"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "rule": {
                 "discriminator": {
@@ -3354,7 +3438,8 @@
             "required": [
               "rule",
               "display_name",
-              "summary"
+              "summary",
+              "held"
             ],
             "title": "RuleListItem",
             "type": "object"
@@ -3749,6 +3834,10 @@
             "title": "Pack Missing",
             "type": "integer"
           },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -3757,9 +3846,37 @@
         "required": [
           "revision",
           "items",
-          "pack_missing"
+          "pack_missing",
+          "retention_days"
         ],
         "title": "RulesView",
+        "type": "object"
+      }
+    },
+    "alert_rules.evaluate_now": {
+      "method": "POST",
+      "path": "/api/alert-rules/evaluate-now",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobs",
+          "requested_at"
+        ],
+        "title": "EvaluateRequested",
         "type": "object"
       }
     },
@@ -4620,11 +4737,50 @@
             "title": "PortProto",
             "type": "object"
           },
+          "RuleHold": {
+            "description": "A rule holding alerts back now: the latest moment one of its subjects is let through again.",
+            "properties": {
+              "reason": {
+                "enum": [
+                  "cooldown",
+                  "throttle"
+                ],
+                "title": "Reason",
+                "type": "string"
+              },
+              "subjects": {
+                "title": "Subjects",
+                "type": "integer"
+              },
+              "until": {
+                "format": "date-time",
+                "title": "Until",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "until",
+              "subjects"
+            ],
+            "title": "RuleHold",
+            "type": "object"
+          },
           "RuleListItem": {
             "properties": {
               "display_name": {
                 "title": "Display Name",
                 "type": "string"
+              },
+              "held": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleHold"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "rule": {
                 "discriminator": {
@@ -4674,7 +4830,8 @@
             "required": [
               "rule",
               "display_name",
-              "summary"
+              "summary",
+              "held"
             ],
             "title": "RuleListItem",
             "type": "object"
@@ -5069,6 +5226,10 @@
             "title": "Pack Missing",
             "type": "integer"
           },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -5077,7 +5238,8 @@
         "required": [
           "revision",
           "items",
-          "pack_missing"
+          "pack_missing",
+          "retention_days"
         ],
         "title": "RulesView",
         "type": "object"
@@ -5879,11 +6041,50 @@
             "title": "PortProto",
             "type": "object"
           },
+          "RuleHold": {
+            "description": "A rule holding alerts back now: the latest moment one of its subjects is let through again.",
+            "properties": {
+              "reason": {
+                "enum": [
+                  "cooldown",
+                  "throttle"
+                ],
+                "title": "Reason",
+                "type": "string"
+              },
+              "subjects": {
+                "title": "Subjects",
+                "type": "integer"
+              },
+              "until": {
+                "format": "date-time",
+                "title": "Until",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "until",
+              "subjects"
+            ],
+            "title": "RuleHold",
+            "type": "object"
+          },
           "RuleListItem": {
             "properties": {
               "display_name": {
                 "title": "Display Name",
                 "type": "string"
+              },
+              "held": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleHold"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "rule": {
                 "discriminator": {
@@ -5933,7 +6134,8 @@
             "required": [
               "rule",
               "display_name",
-              "summary"
+              "summary",
+              "held"
             ],
             "title": "RuleListItem",
             "type": "object"
@@ -6328,6 +6530,10 @@
             "title": "Pack Missing",
             "type": "integer"
           },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -6336,7 +6542,8 @@
         "required": [
           "revision",
           "items",
-          "pack_missing"
+          "pack_missing",
+          "retention_days"
         ],
         "title": "RulesView",
         "type": "object"
@@ -7531,6 +7738,2591 @@
           "coverage_note"
         ],
         "title": "RulePreview",
+        "type": "object"
+      }
+    },
+    "alert_rules.reset_state": {
+      "method": "POST",
+      "path": "/api/alert-rules/<rule_id>/reset-state",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "BandwidthRule": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "threshold_mbps": {
+                "exclusiveMinimum": 0,
+                "title": "Threshold Mbps",
+                "type": "number"
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "bandwidth",
+                "title": "Type",
+                "type": "string"
+              },
+              "window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Window Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "condition",
+              "window_minutes",
+              "type",
+              "threshold_mbps"
+            ],
+            "title": "BandwidthRule",
+            "type": "object"
+          },
+          "DetectorKind": {
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
+            "enum": [
+              "fanout",
+              "new_admin_connection",
+              "pivot_chain",
+              "blocked_surge",
+              "non_admin_group",
+              "cross_env",
+              "account_fanout",
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
+            ],
+            "title": "DetectorKind",
+            "type": "string"
+          },
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "label_groups": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Label Groups",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "EventRule": {
+            "additionalProperties": false,
+            "properties": {
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "event_severity": {
+                "title": "Event Severity",
+                "type": "string"
+              },
+              "event_types": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Event Types",
+                "type": "array"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "match_fields": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Match Fields",
+                "type": "object"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "title": "Status",
+                "type": "string"
+              },
+              "threshold": {
+                "$ref": "#/$defs/ThresholdType"
+              },
+              "threshold_count": {
+                "minimum": 1,
+                "title": "Threshold Count",
+                "type": "integer"
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "event",
+                "title": "Type",
+                "type": "string"
+              },
+              "window_minutes": {
+                "maximum": 1440,
+                "minimum": 1,
+                "title": "Window Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "type",
+              "event_types",
+              "status",
+              "event_severity",
+              "match_fields",
+              "threshold",
+              "threshold_count",
+              "window_minutes"
+            ],
+            "title": "EventRule",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "either": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "either_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_processes": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Exclude Processes",
+                "type": "array"
+              },
+              "exclude_services": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Exclude Services",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "exclude_transmissions": {
+                "default": [],
+                "items": {
+                  "enum": [
+                    "unicast",
+                    "broadcast",
+                    "multicast"
+                  ],
+                  "type": "string"
+                },
+                "title": "Exclude Transmissions",
+                "type": "array"
+              },
+              "exclude_windows_services": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Exclude Windows Services",
+                "type": "array"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
+              },
+              "services": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Services",
+                "type": "array"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              },
+              "transmissions": {
+                "default": [],
+                "items": {
+                  "enum": [
+                    "unicast",
+                    "broadcast",
+                    "multicast"
+                  ],
+                  "type": "string"
+                },
+                "title": "Transmissions",
+                "type": "array"
+              },
+              "windows_services": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Windows Services",
+                "type": "array"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
+          "LateralRule": {
+            "additionalProperties": false,
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
+            "properties": {
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "critical_assets_only": {
+                "title": "Critical Assets Only",
+                "type": "boolean"
+              },
+              "detectors": {
+                "items": {
+                  "$ref": "#/$defs/DetectorKind"
+                },
+                "minItems": 1,
+                "title": "Detectors",
+                "type": "array"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "min_severity": {
+                "$ref": "#/$defs/Severity"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "lateral",
+                "title": "Type",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "type",
+              "detectors",
+              "min_severity",
+              "critical_assets_only",
+              "exclude"
+            ],
+            "title": "LateralRule",
+            "type": "object"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": -1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
+          },
+          "RuleHold": {
+            "description": "A rule holding alerts back now: the latest moment one of its subjects is let through again.",
+            "properties": {
+              "reason": {
+                "enum": [
+                  "cooldown",
+                  "throttle"
+                ],
+                "title": "Reason",
+                "type": "string"
+              },
+              "subjects": {
+                "title": "Subjects",
+                "type": "integer"
+              },
+              "until": {
+                "format": "date-time",
+                "title": "Until",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "until",
+              "subjects"
+            ],
+            "title": "RuleHold",
+            "type": "object"
+          },
+          "RuleListItem": {
+            "properties": {
+              "display_name": {
+                "title": "Display Name",
+                "type": "string"
+              },
+              "held": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleHold"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rule": {
+                "discriminator": {
+                  "mapping": {
+                    "bandwidth": "#/$defs/BandwidthRule",
+                    "event": "#/$defs/EventRule",
+                    "lateral": "#/$defs/LateralRule",
+                    "system": "#/$defs/SystemRule",
+                    "traffic": "#/$defs/TrafficRule",
+                    "volume": "#/$defs/VolumeRule"
+                  },
+                  "propertyName": "type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/EventRule"
+                  },
+                  {
+                    "$ref": "#/$defs/TrafficRule"
+                  },
+                  {
+                    "$ref": "#/$defs/BandwidthRule"
+                  },
+                  {
+                    "$ref": "#/$defs/VolumeRule"
+                  },
+                  {
+                    "$ref": "#/$defs/SystemRule"
+                  },
+                  {
+                    "$ref": "#/$defs/LateralRule"
+                  }
+                ],
+                "title": "Rule"
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleSummary"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "rule",
+              "display_name",
+              "summary",
+              "held"
+            ],
+            "title": "RuleListItem",
+            "type": "object"
+          },
+          "RuleSummary": {
+            "properties": {
+              "fired_7d": {
+                "title": "Fired 7D",
+                "type": "integer"
+              },
+              "known_7d": {
+                "default": 0,
+                "title": "Known 7D",
+                "type": "integer"
+              },
+              "last_fired_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Fired At"
+              },
+              "last_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Status"
+              },
+              "suppressed_cooldown": {
+                "title": "Suppressed Cooldown",
+                "type": "integer"
+              },
+              "suppressed_throttle": {
+                "title": "Suppressed Throttle",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "last_fired_at",
+              "fired_7d",
+              "suppressed_cooldown",
+              "suppressed_throttle",
+              "last_status"
+            ],
+            "title": "RuleSummary",
+            "type": "object"
+          },
+          "Severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "SystemCheck": {
+            "description": "What a system rule watches: the PCE itself, and this product's own collection (5.x's watchdog and\ndata-loss meta-alerts).",
+            "enum": [
+              "pce_health",
+              "collection_failing",
+              "data_loss",
+              "job_failing",
+              "disk_low",
+              "siem_backlog"
+            ],
+            "title": "SystemCheck",
+            "type": "string"
+          },
+          "SystemRule": {
+            "additionalProperties": false,
+            "properties": {
+              "check": {
+                "$ref": "#/$defs/SystemCheck"
+              },
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "system",
+                "title": "Type",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "type",
+              "check"
+            ],
+            "title": "SystemRule",
+            "type": "object"
+          },
+          "ThresholdType": {
+            "description": "An event rule fires on the matches of one evaluation (immediate) or on a count within its window.",
+            "enum": [
+              "immediate",
+              "count"
+            ],
+            "title": "ThresholdType",
+            "type": "string"
+          },
+          "Throttle": {
+            "additionalProperties": false,
+            "properties": {
+              "count": {
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Count",
+                "type": "integer"
+              },
+              "period_minutes": {
+                "maximum": 10080,
+                "minimum": 1,
+                "title": "Period Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "count",
+              "period_minutes"
+            ],
+            "title": "Throttle",
+            "type": "object"
+          },
+          "TrafficRule": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "threshold_connections": {
+                "minimum": 1,
+                "title": "Threshold Connections",
+                "type": "integer"
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "traffic",
+                "title": "Type",
+                "type": "string"
+              },
+              "window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Window Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "condition",
+              "window_minutes",
+              "type",
+              "threshold_connections"
+            ],
+            "title": "TrafficRule",
+            "type": "object"
+          },
+          "VolumeRule": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "threshold_mb": {
+                "exclusiveMinimum": 0,
+                "title": "Threshold Mb",
+                "type": "number"
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "volume",
+                "title": "Type",
+                "type": "string"
+              },
+              "window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Window Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "condition",
+              "window_minutes",
+              "type",
+              "threshold_mb"
+            ],
+            "title": "VolumeRule",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RuleListItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "pack_missing": {
+            "title": "Pack Missing",
+            "type": "integer"
+          },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "items",
+          "pack_missing",
+          "retention_days"
+        ],
+        "title": "RulesView",
+        "type": "object"
+      }
+    },
+    "alert_rules.retention": {
+      "method": "PUT",
+      "path": "/api/alert-rules/retention",
+      "request_schema": {
+        "properties": {
+          "retention_days": {
+            "maximum": 3650,
+            "minimum": 0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "retention_days"
+        ],
+        "title": "RetentionUpdate",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "BandwidthRule": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "threshold_mbps": {
+                "exclusiveMinimum": 0,
+                "title": "Threshold Mbps",
+                "type": "number"
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "bandwidth",
+                "title": "Type",
+                "type": "string"
+              },
+              "window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Window Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "condition",
+              "window_minutes",
+              "type",
+              "threshold_mbps"
+            ],
+            "title": "BandwidthRule",
+            "type": "object"
+          },
+          "DetectorKind": {
+            "description": "The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.",
+            "enum": [
+              "fanout",
+              "new_admin_connection",
+              "pivot_chain",
+              "blocked_surge",
+              "non_admin_group",
+              "cross_env",
+              "account_fanout",
+              "unexpected_initiator",
+              "peer_deviation",
+              "volume_surge",
+              "account_new_source",
+              "suspicious_tool",
+              "new_process",
+              "auth_to_non_dc",
+              "new_dc_client",
+              "directory_surge",
+              "direction_reversal",
+              "new_pair_port",
+              "quiet_host_wakes",
+              "data_staging",
+              "off_hours"
+            ],
+            "title": "DetectorKind",
+            "type": "string"
+          },
+          "EndpointFilter": {
+            "additionalProperties": false,
+            "properties": {
+              "hrefs": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Hrefs",
+                "type": "array"
+              },
+              "ip_lists": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Ip Lists",
+                "type": "array"
+              },
+              "ips": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Ips",
+                "type": "array"
+              },
+              "label_groups": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Label Groups",
+                "type": "array"
+              },
+              "labels": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/LabelCond"
+                },
+                "title": "Labels",
+                "type": "array"
+              },
+              "match": {
+                "default": "any",
+                "enum": [
+                  "any",
+                  "all"
+                ],
+                "title": "Match",
+                "type": "string"
+              },
+              "public": {
+                "default": false,
+                "title": "Public",
+                "type": "boolean"
+              }
+            },
+            "title": "EndpointFilter",
+            "type": "object"
+          },
+          "EventRule": {
+            "additionalProperties": false,
+            "properties": {
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "event_severity": {
+                "title": "Event Severity",
+                "type": "string"
+              },
+              "event_types": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Event Types",
+                "type": "array"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "match_fields": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Match Fields",
+                "type": "object"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "title": "Status",
+                "type": "string"
+              },
+              "threshold": {
+                "$ref": "#/$defs/ThresholdType"
+              },
+              "threshold_count": {
+                "minimum": 1,
+                "title": "Threshold Count",
+                "type": "integer"
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "event",
+                "title": "Type",
+                "type": "string"
+              },
+              "window_minutes": {
+                "maximum": 1440,
+                "minimum": 1,
+                "title": "Window Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "type",
+              "event_types",
+              "status",
+              "event_severity",
+              "match_fields",
+              "threshold",
+              "threshold_count",
+              "window_minutes"
+            ],
+            "title": "EventRule",
+            "type": "object"
+          },
+          "FlowCondition": {
+            "additionalProperties": false,
+            "description": "A flow filter without its time window: what an alert rule (and later a saved report section) stores.\nwithin() gives the FilterSpec for a window; every field, default and check is FilterSpec's.",
+            "properties": {
+              "decisions": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PolicyDecision"
+                },
+                "title": "Decisions",
+                "type": "array"
+              },
+              "dst": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "dst_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "either": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "either_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "exclude_ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Exclude Ports",
+                "type": "array"
+              },
+              "exclude_processes": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Exclude Processes",
+                "type": "array"
+              },
+              "exclude_services": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Exclude Services",
+                "type": "array"
+              },
+              "exclude_system_accounts": {
+                "default": false,
+                "title": "Exclude System Accounts",
+                "type": "boolean"
+              },
+              "exclude_transmissions": {
+                "default": [],
+                "items": {
+                  "enum": [
+                    "unicast",
+                    "broadcast",
+                    "multicast"
+                  ],
+                  "type": "string"
+                },
+                "title": "Exclude Transmissions",
+                "type": "array"
+              },
+              "exclude_windows_services": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Exclude Windows Services",
+                "type": "array"
+              },
+              "initiator_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator Process"
+              },
+              "initiator_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Processes",
+                "type": "array"
+              },
+              "initiator_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Initiator User"
+              },
+              "initiator_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Initiator Users",
+                "type": "array"
+              },
+              "ports": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PortProto"
+                },
+                "title": "Ports",
+                "type": "array"
+              },
+              "service_process": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service Process"
+              },
+              "service_processes": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Processes",
+                "type": "array"
+              },
+              "service_user": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Service User"
+              },
+              "service_users": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Service Users",
+                "type": "array"
+              },
+              "services": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Services",
+                "type": "array"
+              },
+              "src": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "src_exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              },
+              "transmissions": {
+                "default": [],
+                "items": {
+                  "enum": [
+                    "unicast",
+                    "broadcast",
+                    "multicast"
+                  ],
+                  "type": "string"
+                },
+                "title": "Transmissions",
+                "type": "array"
+              },
+              "windows_services": {
+                "default": [],
+                "items": {
+                  "maxLength": 255,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": "Windows Services",
+                "type": "array"
+              }
+            },
+            "title": "FlowCondition",
+            "type": "object"
+          },
+          "LabelCond": {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "minLength": 1,
+                "title": "Key",
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Values",
+                "type": "array"
+              }
+            },
+            "required": [
+              "key",
+              "values"
+            ],
+            "title": "LabelCond",
+            "type": "object"
+          },
+          "LateralRule": {
+            "additionalProperties": false,
+            "description": "severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection\nwhose source matches, or whose every target does, does not alert (it stays on the lateral page).",
+            "properties": {
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "critical_assets_only": {
+                "title": "Critical Assets Only",
+                "type": "boolean"
+              },
+              "detectors": {
+                "items": {
+                  "$ref": "#/$defs/DetectorKind"
+                },
+                "minItems": 1,
+                "title": "Detectors",
+                "type": "array"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "exclude": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EndpointFilter"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "min_severity": {
+                "$ref": "#/$defs/Severity"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "lateral",
+                "title": "Type",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "type",
+              "detectors",
+              "min_severity",
+              "critical_assets_only",
+              "exclude"
+            ],
+            "title": "LateralRule",
+            "type": "object"
+          },
+          "PolicyDecision": {
+            "enum": [
+              "allowed",
+              "potentially_blocked",
+              "blocked",
+              "unknown"
+            ],
+            "title": "PolicyDecision",
+            "type": "string"
+          },
+          "PortProto": {
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": -1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Port"
+              },
+              "proto": {
+                "anyOf": [
+                  {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Proto"
+              },
+              "to_port": {
+                "anyOf": [
+                  {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "To Port"
+              }
+            },
+            "title": "PortProto",
+            "type": "object"
+          },
+          "RuleHold": {
+            "description": "A rule holding alerts back now: the latest moment one of its subjects is let through again.",
+            "properties": {
+              "reason": {
+                "enum": [
+                  "cooldown",
+                  "throttle"
+                ],
+                "title": "Reason",
+                "type": "string"
+              },
+              "subjects": {
+                "title": "Subjects",
+                "type": "integer"
+              },
+              "until": {
+                "format": "date-time",
+                "title": "Until",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "until",
+              "subjects"
+            ],
+            "title": "RuleHold",
+            "type": "object"
+          },
+          "RuleListItem": {
+            "properties": {
+              "display_name": {
+                "title": "Display Name",
+                "type": "string"
+              },
+              "held": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleHold"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rule": {
+                "discriminator": {
+                  "mapping": {
+                    "bandwidth": "#/$defs/BandwidthRule",
+                    "event": "#/$defs/EventRule",
+                    "lateral": "#/$defs/LateralRule",
+                    "system": "#/$defs/SystemRule",
+                    "traffic": "#/$defs/TrafficRule",
+                    "volume": "#/$defs/VolumeRule"
+                  },
+                  "propertyName": "type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/EventRule"
+                  },
+                  {
+                    "$ref": "#/$defs/TrafficRule"
+                  },
+                  {
+                    "$ref": "#/$defs/BandwidthRule"
+                  },
+                  {
+                    "$ref": "#/$defs/VolumeRule"
+                  },
+                  {
+                    "$ref": "#/$defs/SystemRule"
+                  },
+                  {
+                    "$ref": "#/$defs/LateralRule"
+                  }
+                ],
+                "title": "Rule"
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleSummary"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "rule",
+              "display_name",
+              "summary",
+              "held"
+            ],
+            "title": "RuleListItem",
+            "type": "object"
+          },
+          "RuleSummary": {
+            "properties": {
+              "fired_7d": {
+                "title": "Fired 7D",
+                "type": "integer"
+              },
+              "known_7d": {
+                "default": 0,
+                "title": "Known 7D",
+                "type": "integer"
+              },
+              "last_fired_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Fired At"
+              },
+              "last_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Status"
+              },
+              "suppressed_cooldown": {
+                "title": "Suppressed Cooldown",
+                "type": "integer"
+              },
+              "suppressed_throttle": {
+                "title": "Suppressed Throttle",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "last_fired_at",
+              "fired_7d",
+              "suppressed_cooldown",
+              "suppressed_throttle",
+              "last_status"
+            ],
+            "title": "RuleSummary",
+            "type": "object"
+          },
+          "Severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "SystemCheck": {
+            "description": "What a system rule watches: the PCE itself, and this product's own collection (5.x's watchdog and\ndata-loss meta-alerts).",
+            "enum": [
+              "pce_health",
+              "collection_failing",
+              "data_loss",
+              "job_failing",
+              "disk_low",
+              "siem_backlog"
+            ],
+            "title": "SystemCheck",
+            "type": "string"
+          },
+          "SystemRule": {
+            "additionalProperties": false,
+            "properties": {
+              "check": {
+                "$ref": "#/$defs/SystemCheck"
+              },
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "system",
+                "title": "Type",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "type",
+              "check"
+            ],
+            "title": "SystemRule",
+            "type": "object"
+          },
+          "ThresholdType": {
+            "description": "An event rule fires on the matches of one evaluation (immediate) or on a count within its window.",
+            "enum": [
+              "immediate",
+              "count"
+            ],
+            "title": "ThresholdType",
+            "type": "string"
+          },
+          "Throttle": {
+            "additionalProperties": false,
+            "properties": {
+              "count": {
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Count",
+                "type": "integer"
+              },
+              "period_minutes": {
+                "maximum": 10080,
+                "minimum": 1,
+                "title": "Period Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "count",
+              "period_minutes"
+            ],
+            "title": "Throttle",
+            "type": "object"
+          },
+          "TrafficRule": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "threshold_connections": {
+                "minimum": 1,
+                "title": "Threshold Connections",
+                "type": "integer"
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "traffic",
+                "title": "Type",
+                "type": "string"
+              },
+              "window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Window Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "condition",
+              "window_minutes",
+              "type",
+              "threshold_connections"
+            ],
+            "title": "TrafficRule",
+            "type": "object"
+          },
+          "VolumeRule": {
+            "additionalProperties": false,
+            "properties": {
+              "condition": {
+                "$ref": "#/$defs/FlowCondition"
+              },
+              "cooldown_minutes": {
+                "maximum": 10080,
+                "minimum": 0,
+                "title": "Cooldown Minutes",
+                "type": "integer"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "id": {
+                "title": "Id",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 120,
+                "title": "Name",
+                "type": "string"
+              },
+              "notify": {
+                "title": "Notify",
+                "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
+              },
+              "severity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Severity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "threshold_mb": {
+                "exclusiveMinimum": 0,
+                "title": "Threshold Mb",
+                "type": "number"
+              },
+              "throttle": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Throttle"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "volume",
+                "title": "Type",
+                "type": "string"
+              },
+              "window_minutes": {
+                "maximum": 1440,
+                "minimum": 10,
+                "title": "Window Minutes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "pack_key",
+              "enabled",
+              "notify",
+              "severity",
+              "cooldown_minutes",
+              "throttle",
+              "condition",
+              "window_minutes",
+              "type",
+              "threshold_mb"
+            ],
+            "title": "VolumeRule",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RuleListItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "pack_missing": {
+            "title": "Pack Missing",
+            "type": "integer"
+          },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "items",
+          "pack_missing",
+          "retention_days"
+        ],
+        "title": "RulesView",
         "type": "object"
       }
     },
@@ -9622,11 +12414,50 @@
             "title": "PortProto",
             "type": "object"
           },
+          "RuleHold": {
+            "description": "A rule holding alerts back now: the latest moment one of its subjects is let through again.",
+            "properties": {
+              "reason": {
+                "enum": [
+                  "cooldown",
+                  "throttle"
+                ],
+                "title": "Reason",
+                "type": "string"
+              },
+              "subjects": {
+                "title": "Subjects",
+                "type": "integer"
+              },
+              "until": {
+                "format": "date-time",
+                "title": "Until",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "until",
+              "subjects"
+            ],
+            "title": "RuleHold",
+            "type": "object"
+          },
           "RuleListItem": {
             "properties": {
               "display_name": {
                 "title": "Display Name",
                 "type": "string"
+              },
+              "held": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RuleHold"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "rule": {
                 "discriminator": {
@@ -9676,7 +12507,8 @@
             "required": [
               "rule",
               "display_name",
-              "summary"
+              "summary",
+              "held"
             ],
             "title": "RuleListItem",
             "type": "object"
@@ -10071,6 +12903,10 @@
             "title": "Pack Missing",
             "type": "integer"
           },
+          "retention_days": {
+            "title": "Retention Days",
+            "type": "integer"
+          },
           "revision": {
             "title": "Revision",
             "type": "integer"
@@ -10079,7 +12915,8 @@
         "required": [
           "revision",
           "items",
-          "pack_missing"
+          "pack_missing",
+          "retention_days"
         ],
         "title": "RulesView",
         "type": "object"
@@ -34057,6 +36894,253 @@
           "error"
         ],
         "title": "ChannelTestResult",
+        "type": "object"
+      }
+    },
+    "system.channels.test_all": {
+      "method": "POST",
+      "path": "/api/system/channels/test-all",
+      "request_schema": {
+        "$defs": {
+          "ChannelsInput": {
+            "properties": {
+              "line": {
+                "$ref": "#/$defs/LineInput"
+              },
+              "smtp": {
+                "$ref": "#/$defs/SmtpInput"
+              },
+              "teams": {
+                "$ref": "#/$defs/TeamsInput"
+              },
+              "telegram": {
+                "$ref": "#/$defs/TelegramInput"
+              },
+              "webhook": {
+                "$ref": "#/$defs/WebhookInput"
+              }
+            },
+            "required": [
+              "smtp",
+              "line",
+              "telegram",
+              "teams",
+              "webhook"
+            ],
+            "title": "ChannelsInput",
+            "type": "object"
+          },
+          "LineInput": {
+            "properties": {
+              "access_token": {
+                "title": "Access Token",
+                "type": "string"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "target_id": {
+                "title": "Target Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "enabled",
+              "access_token",
+              "target_id"
+            ],
+            "title": "LineInput",
+            "type": "object"
+          },
+          "SmtpInput": {
+            "properties": {
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "password": {
+                "title": "Password",
+                "type": "string"
+              },
+              "port": {
+                "title": "Port",
+                "type": "integer"
+              },
+              "recipients": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Recipients",
+                "type": "array"
+              },
+              "security": {
+                "enum": [
+                  "none",
+                  "starttls",
+                  "tls"
+                ],
+                "title": "Security",
+                "type": "string"
+              },
+              "sender": {
+                "title": "Sender",
+                "type": "string"
+              },
+              "username": {
+                "title": "Username",
+                "type": "string"
+              }
+            },
+            "required": [
+              "enabled",
+              "host",
+              "port",
+              "security",
+              "username",
+              "password",
+              "sender",
+              "recipients"
+            ],
+            "title": "SmtpInput",
+            "type": "object"
+          },
+          "TeamsInput": {
+            "properties": {
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "webhook_url": {
+                "title": "Webhook Url",
+                "type": "string"
+              }
+            },
+            "required": [
+              "enabled",
+              "webhook_url"
+            ],
+            "title": "TeamsInput",
+            "type": "object"
+          },
+          "TelegramInput": {
+            "properties": {
+              "bot_token": {
+                "title": "Bot Token",
+                "type": "string"
+              },
+              "chat_id": {
+                "title": "Chat Id",
+                "type": "string"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "enabled",
+              "bot_token",
+              "chat_id"
+            ],
+            "title": "TelegramInput",
+            "type": "object"
+          },
+          "WebhookInput": {
+            "properties": {
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "url": {
+                "title": "Url",
+                "type": "string"
+              }
+            },
+            "required": [
+              "enabled",
+              "url"
+            ],
+            "title": "WebhookInput",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "channels": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ChannelsInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "ChannelTestAll",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "ChannelKind": {
+            "enum": [
+              "smtp",
+              "line",
+              "telegram",
+              "teams",
+              "webhook"
+            ],
+            "title": "ChannelKind",
+            "type": "string"
+          },
+          "ChannelTestOutcome": {
+            "properties": {
+              "channel": {
+                "$ref": "#/$defs/ChannelKind"
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Error"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok",
+              "error",
+              "channel"
+            ],
+            "title": "ChannelTestOutcome",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/$defs/ChannelTestOutcome"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "ChannelTestAllResult",
         "type": "object"
       }
     },

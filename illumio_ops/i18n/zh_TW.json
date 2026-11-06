@@ -3169,5 +3169,18 @@
   "rule_event_add": "加入事件類型",
   "rule_event_catalog_hint": "目錄依類別列出此版本已知的事件類型；目錄沒有的類型或比對樣式仍可在上方自行輸入。",
   "rule_event_not_in_catalog": "不在事件目錄中：較新的 PCE 可能會送出，請確認拼字",
-  "rule_event_status_unmarked": "目錄沒有把這些事件類型標示為會有不同狀態（成功或失敗）。"
+  "rule_event_status_unmarked": "目錄沒有把這些事件類型標示為會有不同狀態（成功或失敗）。",
+  "err_jobs_not_running": "背景工作沒有在執行，無法立即執行。",
+  "rules_hold_cooldown": "冷卻中，最晚至 {time}（{n} 個對象暫停告警）",
+  "rules_hold_throttle": "頻率限制中，最晚至 {time}（{n} 個對象暫停告警）",
+  "rules_reset": "重設冷卻",
+  "rules_reset_confirm": "要讓此規則立即可再告警嗎？冷卻與頻率限制重新計算；已告警過的內容不會再次告警。",
+  "rules_evaluate_now": "立即評估",
+  "rules_evaluate_hint": "立即執行事件與流量收集、偵測與告警規則，不等下一輪。",
+  "rules_evaluate_requested": "已於 {time} 送出。工作會在一分鐘內開始；正在執行的工作則以當輪結果為準。完成後重新整理頁面即可看到結果。",
+  "rules_retention": "告警紀錄保留天數",
+  "rules_retention_hint": "超過天數的告警紀錄每天刪除一次；0 表示永久保留。",
+  "rules_retention_forever": "0：告警紀錄永久保留。",
+  "channels_test_all": "測試所有已啟用的通道",
+  "channels_test_all_none": "此頁沒有已啟用的通道。"
 }

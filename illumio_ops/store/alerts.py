@@ -175,6 +175,25 @@ def save_rule_state(conn: sqlite3.Connection, rule_id: str, subject_key: str, st
         (rule_id, subject_key, last, recent, int(suppressed == "cooldown"), int(suppressed == "throttle")))
 
 
+def rule_states(conn: sqlite3.Connection) -> dict[str, list[RuleState]]:
+    """Every rule's cooldown / throttle state, one per subject it alerted on."""
+    out: dict[str, list[RuleState]] = {}
+    for r in conn.execute("SELECT rule_id, last_fired_at, recent_json FROM alert_rule_state"):
+        out.setdefault(r["rule_id"], []).append(RuleState(
+            datetime.fromisoformat(r["last_fired_at"]) if r["last_fired_at"] else None,
+            tuple(datetime.fromisoformat(t) for t in json.loads(r["recent_json"]))))
+    return out
+
+
+def reset_rule_state(conn: sqlite3.Connection, rule_id: str) -> None:
+    """Forget when the rule last let an alert through (its cooldown and throttle start over). What it has seen stays:
+    seen_severity keeps a detection already alerted on from alerting again, and the evaluation watermarks keep
+    history from being alerted (spec §6.5.2); the suppressed counts are history too."""
+    with conn:
+        conn.execute("UPDATE alert_rule_state SET last_fired_at = NULL, recent_json = '[]' WHERE rule_id = ?",
+                     (rule_id,))
+
+
 def seen_severity(conn: sqlite3.Connection, rule_id: str, subject_key: str) -> str | None:
     row = conn.execute("SELECT seen_severity FROM alert_rule_state WHERE rule_id = ? AND subject_key = ?",
                        (rule_id, subject_key)).fetchone()

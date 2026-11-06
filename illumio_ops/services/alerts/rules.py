@@ -143,10 +143,27 @@ def apply_pack(current: Sequence[AlertRule], *, mode: Literal["append_missing", 
     return (*kept, *(r for rid, r in pack.items() if rid not in have))
 
 
+class RuleHold(BaseModel):
+    """A rule holding alerts back now: the latest moment one of its subjects is let through again."""
+    reason: Literal["cooldown", "throttle"]  # of that latest subject
+    until: datetime
+    subjects: int  # subjects held back now
+
+
 class RuleListItem(BaseModel):
     rule: AlertRule
     display_name: str
     summary: store.RuleSummary | None
+    held: RuleHold | None
+
+
+def _hold(rule: AlertRule, states: Sequence[RuleState], now: datetime) -> RuleHold | None:
+    gates = [g for g in (gate(rule, s, now) for s in states) if not g.allowed and g.next_allowed_at is not None]
+    if not gates:
+        return None
+    last = max(gates, key=lambda g: g.next_allowed_at or now)
+    return RuleHold(reason="throttle" if last.reason == "throttle" else "cooldown", until=last.next_allowed_at or now,
+                    subjects=len(gates))
 
 
 def rule_list(ctx: AppContext, *, now: datetime | None = None) -> list[RuleListItem]:
@@ -155,6 +172,13 @@ def rule_list(ctx: AppContext, *, now: datetime | None = None) -> list[RuleListI
     lang: Language = s.display.language
     with ctx.db() as conn:
         summaries = store.rule_summaries(conn, pce_url=s.pce.url, org_id=s.pce.org_id, now=at)
+        states = store.rule_states(conn)
     return [RuleListItem(rule=r, display_name=r.name or translate(lang, r.pack_key or ""),
-                         summary=summaries.get(r.id)) for r in s.alerts.rules]
+                         summary=summaries.get(r.id), held=_hold(r, states.get(r.id, ()), at)) for r in s.alerts.rules]
+
+
+def reset_rule_state(ctx: AppContext, rule_id: str) -> None:
+    """The rule's cooldown and throttle start over (5.x reset-watermark, without its event watermark)."""
+    with ctx.db() as conn:
+        store.reset_rule_state(conn, rule_id)
 

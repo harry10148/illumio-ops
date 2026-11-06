@@ -3169,5 +3169,18 @@
   "rule_event_add": "Add event type",
   "rule_event_catalog_hint": "The catalog lists the event types this version knows, by category; a type it does not list, or a pattern, can still be typed above.",
   "rule_event_not_in_catalog": "not in the event catalog: a newer PCE may send it; check the spelling",
-  "rule_event_status_unmarked": "The catalog marks none of these event types as coming with more than one status (success or failure)."
+  "rule_event_status_unmarked": "The catalog marks none of these event types as coming with more than one status (success or failure).",
+  "err_jobs_not_running": "The background jobs are not running, so nothing can be run now.",
+  "rules_hold_cooldown": "In cooldown until {time} at the latest ({n} held back)",
+  "rules_hold_throttle": "Rate-limited until {time} at the latest ({n} held back)",
+  "rules_reset": "Reset cooldown",
+  "rules_reset_confirm": "Let this rule alert again right away? Its cooldown and rate limit start over; what it has already alerted on is not alerted again.",
+  "rules_evaluate_now": "Evaluate now",
+  "rules_evaluate_hint": "Runs event and traffic collection, the detections and the alert rules now instead of at their next turn.",
+  "rules_evaluate_requested": "Requested at {time}. The jobs start within a minute; one already running finishes its pass instead. Reload the page to see the result once they are done.",
+  "rules_retention": "Keep alert records (days)",
+  "rules_retention_hint": "Older alert records are deleted once a day; 0 keeps them forever.",
+  "rules_retention_forever": "0: alert records are kept forever.",
+  "channels_test_all": "Test every enabled channel",
+  "channels_test_all_none": "No channel is enabled on this page."
 }

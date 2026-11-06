@@ -90,9 +90,23 @@ class ChannelTestResult(BaseModel):
     error: str | None
 
 
+class ChannelTestAll(BaseModel):
+    channels: ChannelsInput | None = None
+
+
+class ChannelTestOutcome(ChannelTestResult):
+    channel: ChannelKind
+
+
+class ChannelTestAllResult(BaseModel):
+    results: list[ChannelTestOutcome]  # one per enabled channel; empty when none is enabled
+
+
 OP_GET = operation("system.channels.get", "GET", "/api/system/channels", None, ChannelsView)
 OP_UPDATE = operation("system.channels.update", "PUT", "/api/system/channels", ChannelsUpdate, ChannelsView)
 OP_TEST = operation("system.channels.test", "POST", "/api/system/channels/test", ChannelTest, ChannelTestResult)
+OP_TEST_ALL = operation("system.channels.test_all", "POST", "/api/system/channels/test-all", ChannelTestAll,
+                        ChannelTestAllResult)
 
 bp = Blueprint("system_channels", __name__)
 
@@ -131,16 +145,32 @@ def update_channels(body: ChannelsUpdate) -> ChannelsView:
     return _view()
 
 
+def _page_channels(channels: ChannelsInput | None) -> AlertChannels | None:
+    """The page's values, secrets merged back and validated; None: the saved settings."""
+    if channels is None:
+        return None
+    try:
+        return AlertChannels.model_validate(_merged(channels))
+    except ValidationError as exc:
+        errs = exc.errors(include_input=False)
+        raise ApiFailure(400, "invalid_input", "err_invalid_input",
+                         field=".".join(str(p) for p in errs[0]["loc"]) if errs else None) from None
+
+
 @api_route(bp, OP_TEST)
 def test_channel(body: ChannelTest) -> ChannelTestResult:
-    ctx = get_ctx()
-    cfg = None
-    if body.channels is not None:
-        try:
-            cfg = AlertChannels.model_validate(_merged(body.channels))
-        except ValidationError as exc:
-            errs = exc.errors(include_input=False)
-            raise ApiFailure(400, "invalid_input", "err_invalid_input",
-                             field=".".join(str(p) for p in errs[0]["loc"]) if errs else None) from None
-    r = send_test(ctx, body.channel, cfg=cfg)
+    r = send_test(get_ctx(), body.channel, cfg=_page_channels(body.channels))
     return ChannelTestResult(ok=r.ok, error=r.error)
+
+
+@api_route(bp, OP_TEST_ALL)
+def test_all_channels(body: ChannelTestAll) -> ChannelTestAllResult:
+    """A test message to every enabled channel, one after another (5.x tested them all at once)."""
+    ctx = get_ctx()
+    cfg = _page_channels(body.channels) or ctx.settings.current().alerts.channels
+    out = []
+    for kind in ChannelKind:
+        if getattr(cfg, kind.value).enabled:
+            r = send_test(ctx, kind, cfg=cfg)
+            out.append(ChannelTestOutcome(channel=kind, ok=r.ok, error=r.error))
+    return ChannelTestAllResult(results=out)

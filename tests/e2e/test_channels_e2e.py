@@ -53,3 +53,20 @@ def test_channels_mask_and_test_webhook(context, live_app, receiver):
     value = page.locator("[data-channel=webhook] input[name=webhook_url]").input_value()
     assert value == "********" and "SECRET-PATH" not in page.content()
     assert live_app.ctx.settings.current().alerts.channels.webhook.url == "https://hook.example/in/SECRET-PATH"
+
+
+def test_test_every_enabled_channel(context, live_app, receiver):
+    """5.x parity 2026-11-06: one button tests every enabled channel; none enabled is said so."""
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alert-rules?tab=channels")
+    page.locator("[data-role=test-all]").click()
+    expect(page.locator("[data-role=test-all-none]")).to_have_text("No channel is enabled on this page.")
+    card = page.locator("[data-channel=webhook]")
+    card.locator("input[name=webhook_url]").fill(receiver)
+    card.locator("input[name=webhook_enabled]").check()
+    page.locator("[data-role=test-all]").click()
+    expect(card.locator("[data-role=test-result]")).to_have_text("Sent. Check that it arrived.")
+    expect(page.locator("[data-channel=line] [data-role=test-result]")).to_have_count(0)
+    expect(page.locator("[data-role=test-all-none]")).to_have_count(0)
+    assert len(_Receiver.got) == 1

@@ -155,3 +155,88 @@ def test_event_catalog_lists_categories_with_their_events(client):
                       "vendor_documented": True, "status_filter": False, "severity_filter": False}
     sign_in = next(e for c in data["categories"] for e in c["events"] if e["event_type"] == "user.sign_in")
     assert sign_in["status_filter"] and sign_in["severity_filter"]
+
+
+# ── 5.x parity 2026-11-06: cooldown shown and reset, retention 0 = forever, evaluate now ──
+
+def _held_state(ctx, rule_id, *, minutes_ago=5):
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.domain.alerting import RuleState
+    from illumio_ops.store import alerts as store
+    fired = datetime.now(UTC) - timedelta(minutes=minutes_ago)
+    with ctx.db() as conn:
+        store.save_rule_state(conn, rule_id, "host-a", RuleState(fired, ()), suppressed="cooldown")
+        store.set_seen_severity(conn, rule_id, "host-a", "high")
+        conn.commit()
+    return fired
+
+
+def test_rules_list_says_how_long_a_rule_is_held(client, ctx):
+    from datetime import timedelta
+    rid = pack_rule_id("rule_agent_tampering")  # cooldown 30 minutes
+    fired = _held_state(ctx, rid)
+    login(client)
+    item = next(i for i in rules(client)["items"] if i["rule"]["id"] == rid)
+    assert item["held"]["reason"] == "cooldown" and item["held"]["subjects"] == 1
+    assert item["held"]["until"].startswith((fired + timedelta(minutes=30)).isoformat()[:16])
+    other = next(i for i in rules(client)["items"] if i["rule"]["id"] == pack_rule_id("rule_agent_suspend"))
+    assert other["held"] is None
+
+
+def test_reset_clears_cooldown_and_throttle_but_not_what_was_seen(client, ctx):
+    from illumio_ops.store import alerts as store
+    rid = pack_rule_id("rule_agent_tampering")
+    _held_state(ctx, rid)
+    login(client)
+    r = post(client, f"/api/alert-rules/{rid}/reset-state", None)
+    item = next(i for i in r.get_json()["data"]["items"] if i["rule"]["id"] == rid)
+    assert item["held"] is None
+    with ctx.db() as conn:
+        assert store.rule_state(conn, rid, "host-a").last_fired_at is None
+        assert store.seen_severity(conn, rid, "host-a") == "high"  # a detection seen before still does not re-alert
+    assert post(client, f"/api/alert-rules/{'e' * 32}/reset-state", None).status_code == 404
+
+
+def test_alert_retention_zero_keeps_alerts_forever(client, ctx):
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.services.alerts.retention import run_alert_retention
+    login(client)
+    data = rules(client)
+    r = put(client, "/api/alert-rules/retention", {"revision": data["revision"], "retention_days": 0})
+    assert r.status_code == 200 and r.get_json()["data"]["retention_days"] == 0
+    assert ctx.settings.current().alerts.retention_days == 0
+    with ctx.db() as conn:
+        conn.execute("INSERT INTO alerts (id, pce_url, org_id, rule_id, rule_type, rule_name, pack_key, severity, "
+                     "subject_key, fired_at, first_seen, last_seen, late, notify, message_key, params_json, facts_json, "
+                     "confidence_json) VALUES (1, 'u', '1', 'r', 'event', 'n', NULL, 'low', 's', ?, ?, ?, 0, 1, 'm', "
+                     "'{}', '{}', '{}')",
+                     ((datetime.now(UTC) - timedelta(days=4000)).isoformat(),) * 3)
+        conn.commit()
+    assert run_alert_retention(ctx) == 0
+    with ctx.db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0] == 1
+    bad = put(client, "/api/alert-rules/retention", {"revision": rules(client)["revision"], "retention_days": -1})
+    assert bad.status_code == 400
+
+
+def test_evaluate_now_asks_the_existing_jobs_to_run(client, ctx):
+    from datetime import UTC, datetime
+
+    from illumio_ops.jobs.scheduler import build_scheduler
+    login(client)
+    assert post(client, "/api/alert-rules/evaluate-now", None).status_code == 503  # nothing scheduled: said so
+    ctx.scheduler = build_scheduler(ctx)
+    try:
+        before = datetime.now(UTC)
+        r = post(client, "/api/alert-rules/evaluate-now", None)
+        assert r.status_code == 200
+        jobs = r.get_json()["data"]["jobs"]
+        assert jobs == ["collect_events", "collect_traffic", "alerts_system", "pce_probe"]
+        for job_id in jobs:
+            assert ctx.scheduler.get_job(job_id).next_run_time <= datetime.now(UTC)
+            assert ctx.scheduler.get_job(job_id).next_run_time >= before.replace(microsecond=0)
+        assert len(ctx.scheduler.get_jobs()) == len(set(j.id for j in ctx.scheduler.get_jobs()))  # no new job
+    finally:
+        ctx.scheduler = None

@@ -467,7 +467,7 @@ class AlertSettings(StrictModel):
     # and a file at the old limit must still load after it — raise this with every rule an upgrade adds.
     # 300 operator rules plus the pack (v13 raised it with the second anomaly batch, so a full file still loads)
     rules: tuple[AlertRule, ...] = Field(max_length=400)
-    retention_days: int = Field(ge=1, le=3650)
+    retention_days: int = Field(ge=0, le=3650)  # 0 = keep alert records forever
 
     @field_validator("rules")
     @classmethod
