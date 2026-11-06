@@ -101,7 +101,7 @@ def test_app_summary_needs_an_app(context, live_app):
     form = entry.locator("[data-role=generate-form]")
     go = form.get_by_role("button", name="Generate", exact=True)
     expect(go).to_be_disabled()  # no app chosen yet
-    form.locator("select[name=filter_value]").select_option("Finance")
+    form.locator("select[name=filter_app]").select_option("Finance")
     go.click()
     row = page.locator("[data-role=report-list] tbody tr").first
     expect(row).to_have_attribute("data-status", "queued")
@@ -121,13 +121,22 @@ def test_schedule_with_filter(context, live_app):
     editor = page.locator("[data-role=schedule-editor]")
     editor.locator("input[name=name]").fill("Finance traffic")
     editor.locator("select[name=report_type]").select_option("traffic")
-    editor.get_by_role("button", name="Add a condition").click()
-    editor.locator("select[name=filter_value]").select_option("Finance")
+    dst = editor.locator("[data-side=dst]")
+    dst.locator("select[name=dst_label_key]").select_option("app")
+    dst.locator("select[name=dst_label_value]").select_option("Finance")
+    dst.get_by_role("button", name="Add label").click()
+    editor.locator("input[name=ports]").fill("443")
+    editor.locator("input[name=ports]").blur()
+    editor.get_by_text("Exclusions").click()
+    editor.locator("input[name=src_exclude_ips]").fill("10.9.0.0/16")
+    editor.locator("input[name=src_exclude_ips]").blur()
     editor.get_by_role("button", name="Save").click()
     row = page.locator("[data-role=schedule-list] tbody tr").first
-    expect(row.locator("[data-role=schedule-filter]")).to_have_text("app = Finance")
+    expect(row.locator("[data-role=schedule-filter]")).to_have_text(
+        "Destination: app=Finance; Source is not: 10.9.0.0/16; Port: 443/6")
     saved = live_app.ctx.settings.current().reports.schedules[0]
     assert saved.filter is not None and saved.filter.dst.labels[0].values == ("Finance",)
+    assert [p.port for p in saved.filter.ports] == [443] and saved.filter.src_exclude.ips == ("10.9.0.0/16",)
 
 
 def test_editing_a_schedule_keeps_filter_fields_the_picker_does_not_show(context, live_app):

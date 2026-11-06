@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type { Catalog, CustomReport, ReportScheduleFields, SchedulesView, ScheduleItem } from "../../api/generated";
+import type { Catalog, CustomReport, FlowCondition, ReportScheduleFields, SchedulesView, ScheduleItem } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { STATUS_KEYS, STATUS_TONES, TYPE_KEYS, lookbackChoices, word } from "./common";
-import { type FilterRow, ReportFilter, conditionOf, namesApp, rowsOf } from "./ReportFilter";
+import { FilterSummary, ReportFilter } from "./ReportFilter";
 
 const WEEKDAY_KEYS = ["weekday_mon", "weekday_tue", "weekday_wed", "weekday_thu", "weekday_fri", "weekday_sat",
   "weekday_sun"];
@@ -46,7 +46,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       catalog.entries.find((c) => c.report_type === initial.report_type)?.max_lookback),
   }));
   const [recipients, setRecipients] = useState(initial.recipients.join(", "));
-  const [rows, setRows] = useState<FilterRow[]>(rowsOf(initial.filter));
+  const [filter, setFilter] = useState<FlowCondition | null>(initial.filter ?? null);
   const entry = catalog.entries.find((c) => c.report_type === s.report_type);
   const [customs, setCustoms] = useState<CustomReport[] | null>(null);
   useEffect(() => {
@@ -79,7 +79,6 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
                   // keep the chosen formats the new type also makes; none left: all it makes
                   formats: (s.formats.filter((f) => next?.formats.includes(f)).length
                     ? s.formats.filter((f) => next?.formats.includes(f)) : next?.formats ?? s.formats) as ReportScheduleFields["formats"] });
-            if (next?.requires_app && !namesApp(rows)) setRows([...rows, { side: "dst", key: "app", value: "" }]);
           }}>
           {catalog.entries.map((c) => (
             <option key={c.report_type} value={c.report_type} disabled={!c.available && c.report_type !== initial.report_type}>
@@ -158,7 +157,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
         </label>
       )}
       {entry?.accepts_filter && (
-        <ReportFilter choices={catalog.label_choices} rows={rows} onChange={setRows} requireApp={entry.requires_app} />
+        <ReportFilter value={filter} onChange={setFilter} requireApp={entry.requires_app} />
       )}
       <label>
         {t("gui_reports_keep")}
@@ -170,7 +169,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       {error && <p className="form-error span-all">{t(error.message_key, error.params)}{error.field ? ` (${error.field})` : ""}</p>}
       <div className="actions span-all">
         <button type="button" className="btn-primary"
-          onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? conditionOf(rows, initial.filter) : null,
+          onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? filter : null,
                                   recipients: recipients.split(/[\s,;]+/).filter((r) => r !== "") })}>{t("btn_save")}</button>
         <button type="button" className="btn-quiet" onClick={onCancel}>{t("btn_cancel")}</button>
       </div>
@@ -259,11 +258,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
                     <td>{s.name}</td>
                     <td>
                       {word(TYPE_KEYS, s.report_type)}<div className="hint">{t("gui_reports_days", { n: String(s.lookback_days) })}</div>
-                      {rowsOf(s.filter).length > 0 && (
-                        <div className="hint" data-role="schedule-filter">
-                          {rowsOf(s.filter).map((r) => `${r.key} = ${r.value}`).join(", ")}
-                        </div>
-                      )}
+                      <FilterSummary value={s.filter} />
                     </td>
                     <td>{when(s)}{s.email && <div className="hint">{t("gui_reports_email")}</div>}</td>
                     <td>{item.next_run ? formatTime(item.next_run, lang) : t("gui_reports_disabled")}</td>

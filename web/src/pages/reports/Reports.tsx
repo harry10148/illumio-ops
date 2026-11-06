@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type { Catalog, CatalogEntry, ReportItem, ReportPage } from "../../api/generated";
+import type { Catalog, CatalogEntry, FlowCondition, ReportItem, ReportPage } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { ModeMark, PageHead, Tag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
@@ -17,7 +17,7 @@ import {
   periodText,
   word,
 } from "./common";
-import { type FilterRow, ReportFilter, conditionOf, namesApp } from "./ReportFilter";
+import { ReportFilter, namesApp } from "./ReportFilter";
 import { CustomReports } from "./CustomReports";
 import { Schedules } from "./Schedules";
 import { ReportSettings } from "../system/ReportSettings";
@@ -34,7 +34,7 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
   const [days, setDays] = useState(choices.includes("7") ? "7" : (choices[choices.length - 1] ?? "1"));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(entry.latest_day);
-  const [rows, setRows] = useState<FilterRow[]>(entry.requires_app ? [{ side: "dst", key: "app", value: "" }] : []);
+  const [filter, setFilter] = useState<FlowCondition | null>(null);
   const [lang, setLang] = useState("");
   // The formats this type makes, all on by default (policy_resolver: JSON and CSV only).
   const [formats, setFormats] = useState<CatalogEntry["formats"]>(entry.formats);
@@ -48,7 +48,7 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
     const env = await call("reports.generate", {
       report_type: entry.report_type,
       ...(days === "custom" ? { period_from: from, period_to: to } : { lookback_days: Number(days) }),
-      filter: entry.accepts_filter ? conditionOf(rows) : null,
+      filter: entry.accepts_filter ? filter : null,
       lang: lang === "" ? null : (lang as "en" | "zh_TW"),
       formats,
       email,
@@ -124,12 +124,12 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
         </p>
       )}
       {entry.accepts_filter && (
-        <ReportFilter choices={catalog.label_choices} rows={rows} onChange={setRows} requireApp={entry.requires_app} />
+        <ReportFilter value={filter} onChange={setFilter} requireApp={entry.requires_app} />
       )}
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       <div className="actions">
         <button type="button" className="btn-primary"
-          disabled={busy || formats.length === 0 || (entry.requires_app && !namesApp(rows))
+          disabled={busy || formats.length === 0 || (entry.requires_app && !namesApp(filter))
             || (days === "custom" && (from === "" || to === ""))} onClick={() => void submit()}>
           {t("gui_reports_generate")}
         </button>

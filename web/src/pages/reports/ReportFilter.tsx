@@ -1,85 +1,94 @@
-// The label filter of a flow report: conditions "source/destination <label key> = <value>", picked from the
-// inventory's labels. Conditions on one side must all hold; values of one key on one side are alternatives.
-import type { EndpointFilter, FlowCondition, LabelChoice, LabelCond } from "../../api/generated";
+// The filter of a flow report: the whole flow condition the alert rules use (labels, label groups, addresses, IP lists,
+// either end, ports and services, decisions, processes, users, Windows services, transmission, exclusions), picked
+// from what the inventory last read. One application's report also offers its app directly.
+import { useEffect, useState } from "react";
+
+import { call } from "../../api/client";
+import type { ConditionChoices, EndpointFilter, FlowCondition, FlowRequest } from "../../api/generated";
+import { ConditionEditor, NO_CHOICES } from "../../components/ConditionEditor";
 import { t } from "../../i18n";
+import { chips } from "../workbench/conditions";
 
-type Side = "src" | "dst";
-export interface FilterRow { side: Side; key: string; value: string }
+let cached: Promise<ConditionChoices> | null = null;
 
-const SIDE_KEYS: Record<Side, string> = { src: "gui_reports_filter_source", dst: "gui_reports_filter_destination" };
-
-export function rowsOf(cond: FlowCondition | null | undefined): FilterRow[] {
-  const out: FilterRow[] = [];
-  for (const side of ["dst", "src"] as Side[]) {
-    for (const lc of cond?.[side]?.labels ?? []) for (const value of lc.values) out.push({ side, key: lc.key, value });
-  }
-  return out;
+/** The condition choices, read once per page load (the editor and the schedule list share them). */
+function useChoices(): ConditionChoices {
+  const [choices, setChoices] = useState<ConditionChoices>(NO_CHOICES);
+  useEffect(() => {
+    cached ??= call("alert_rules.condition_choices").then((env) => {
+      if (env.ok && env.data) return env.data;
+      cached = null;  // a failed read is tried again by the next page, never kept as "nothing to choose"
+      return NO_CHOICES;
+    });
+    let live = true;
+    void cached.then((c) => { if (live) setChoices(c); });
+    return () => { live = false; };
+  }, []);
+  return choices;
 }
 
-/** The picker's rows as a filter. `base` is the filter being edited: what the picker does not show (ports,
- * decisions, exclusions, individual hosts, users) is kept, and only its label conditions are replaced. */
-export function conditionOf(rows: FilterRow[], base?: FlowCondition | null): FlowCondition | null {
-  const done = rows.filter((r) => r.key !== "" && r.value !== "");
-  const side = (s: Side): EndpointFilter | null => {
-    const byKey = new Map<string, string[]>();
-    for (const r of done.filter((x) => x.side === s)) byKey.set(r.key, [...new Set([...(byKey.get(r.key) ?? []), r.value])]);
-    const kept = base?.[s];
-    const labels = [...byKey].map(([key, values]) => ({ key, values: values as LabelCond["values"] }));
-    if (labels.length === 0 && !kept?.hrefs?.length && !kept?.ips?.length) return null;
-    return { ...(kept ?? {}), labels };
-  };
-  const out: FlowCondition = { ...(base ?? {}), src: side("src"), dst: side("dst") };
-  const rest = Object.entries(out).some(([k, v]) =>
-    k !== "src" && k !== "dst" && v !== null && v !== undefined && v !== false && !(Array.isArray(v) && v.length === 0));
-  return out.src || out.dst || rest ? out : null;
+const APP = "app";
+
+/** Whether the filter names an application (an app label on either side): what one application's report needs. */
+export function namesApp(cond: FlowCondition | null | undefined): boolean {
+  return [cond?.src, cond?.dst].some((e) => (e?.labels ?? []).some((l) => l.key === APP && l.values.length > 0));
 }
 
-export function namesApp(rows: FilterRow[]): boolean {
-  return rows.some((r) => r.key === "app" && r.value !== "");
+function empty(cond: FlowCondition): boolean {
+  return !Object.values(cond).some((v) => v !== null && v !== undefined && v !== false && !(Array.isArray(v) && v.length === 0));
 }
 
-export function ReportFilter({ choices, rows, onChange, requireApp }: {
-  choices: LabelChoice[]; rows: FilterRow[]; onChange: (rows: FilterRow[]) => void; requireApp: boolean;
+/** The filter as words, one per condition (the workbench's chips): what the schedule list shows. */
+export function FilterSummary({ value }: { value: FlowCondition | null | undefined }) {
+  const choices = useChoices();
+  if (!value) return null;
+  const names = Object.fromEntries([...choices.ip_lists, ...choices.label_groups, ...choices.services].map((o) => [o.href, o.name]));
+  const words = chips({ mode: "flows", condition: value } as FlowRequest, names);
+  if (words.length === 0) return null;
+  return (
+    <div className="hint" data-role="schedule-filter">
+      {words.map((c) => (c.value ? `${t(c.labelKey)}: ${c.value}` : t(c.labelKey))).join("; ")}
+    </div>
+  );
+}
+
+export function ReportFilter({ value, onChange, requireApp }: {
+  value: FlowCondition | null; onChange: (next: FlowCondition | null) => void; requireApp: boolean;
 }) {
-  const set = (i: number, patch: Partial<FilterRow>) =>
-    onChange(rows.map((r, j) => (j === i ? { ...r, ...patch, ...(patch.key !== undefined ? { value: "" } : {}) } : r)));
-  const first = requireApp && choices.some((c) => c.key === "app") ? "app" : (choices[0]?.key ?? "");
+  const choices = useChoices();
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const cond = value ?? {};
+  const set = (next: FlowCondition) => onChange(empty(next) ? null : next);
+  const apps = choices.labels.find((c) => c.key === APP);
+  const app = (cond.dst?.labels ?? []).find((l) => l.key === APP)?.values[0] ?? "";
+  const pickApp = (v: string) => {
+    const dst: EndpointFilter = { ...(cond.dst ?? {}) };
+    const others = (dst.labels ?? []).filter((l) => l.key !== APP);
+    dst.labels = v ? [{ key: APP, values: [v] }, ...others] : others;
+    set({ ...cond, dst: dst.labels.length || dst.label_groups?.length || dst.ips?.length || dst.hrefs?.length
+      || dst.ip_lists?.length || dst.public ? dst : null });
+  };
   return (
     <div className="stack span-all" data-role="report-filter">
       <strong>{t("gui_reports_filter")}</strong>
       <span className="hint">{requireApp ? t("gui_reports_filter_app_required") : t("gui_reports_filter_hint")}</span>
-      {choices.length === 0 && <span className="hint">{t("gui_reports_filter_no_labels")}</span>}
-      {rows.map((r, i) => {
-        const values = choices.find((c) => c.key === r.key);
-        return (
-          <div className="row" key={i} data-role="filter-row">
-            <select name="filter_side" aria-label={t("gui_reports_filter_side")} value={r.side}
-              onChange={(e) => set(i, { side: e.target.value as Side })}>
-              {(Object.keys(SIDE_KEYS) as Side[]).map((s) => <option key={s} value={s}>{t(SIDE_KEYS[s])}</option>)}
-            </select>
-            <select name="filter_key" aria-label={t("gui_reports_filter_key")} value={r.key}
-              onChange={(e) => set(i, { key: e.target.value })}>
-              {choices.map((c) => <option key={c.key} value={c.key}>{c.key}</option>)}
-            </select>
-            <select name="filter_value" aria-label={t("gui_reports_filter_value")} value={r.value}
-              onChange={(e) => set(i, { value: e.target.value })}>
-              <option value="">{t("gui_reports_filter_pick")}</option>
-              {(values?.values ?? []).map((v) => <option key={v} value={v}>{v}</option>)}
-            </select>
-            <button type="button" className="btn-quiet" onClick={() => onChange(rows.filter((_, j) => j !== i))}>
-              {t("gui_reports_filter_remove")}
-            </button>
-            {values?.truncated && <span className="hint">{t("gui_reports_filter_truncated")}</span>}
-          </div>
-        );
-      })}
-      {choices.length > 0 && (
-        <div>
-          <button type="button" className="btn-quiet" onClick={() => onChange([...rows, { side: "dst", key: first, value: "" }])}>
-            {t("gui_reports_filter_add")}
-          </button>
-        </div>
+      {requireApp && (
+        <label>
+          {t("gui_reports_filter_app")}
+          <select name="filter_app" value={app} onChange={(e) => pickApp(e.target.value)}>
+            <option value="">{t("gui_reports_filter_pick")}</option>
+            {(apps?.values ?? []).map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+          {!apps && <span className="hint">{t("gui_reports_filter_no_labels")}</span>}
+          {apps?.truncated && <span className="hint">{t("gui_reports_filter_truncated")}</span>}
+        </label>
       )}
+      <details open={!requireApp || !empty({ ...cond, dst: null })}>
+        <summary>{t(requireApp ? "gui_reports_filter_more" : "gui_reports_filter_conditions")}</summary>
+        {/* remounted when the app is picked above, so its address and port fields show what the filter holds */}
+        <ConditionEditor key={app} value={cond} choices={choices} onChange={set} onInvalid={setInvalid} />
+      </details>
+      {invalid && <p className="form-error" data-field={invalid}>{t("rule_ports_invalid")}</p>}
     </div>
   );
 }
