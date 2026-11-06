@@ -237,3 +237,11 @@ def test_the_dlq_retention_is_a_setting_the_page_keeps(client, ctx):
     assert ctx.settings.current().siem.dlq_retention_days == 7
     s["dlq_retention_days"] = -1
     assert put(client, s).status_code == 400
+
+
+def test_an_empty_destination_in_the_export_means_every_destination(client, ctx):
+    login(client)
+    configured(client)
+    _fill(ctx, [("e", 0, "a")])
+    out = client.get("/siem/dlq/export?destination_id=&error=", environ_overrides=LOCAL)
+    assert out.status_code == 200 and len(out.get_data(as_text=True).splitlines()) == 1

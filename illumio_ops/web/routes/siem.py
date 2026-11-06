@@ -282,7 +282,7 @@ def export() -> Response | tuple[Response, int]:
     if ctx.settings.current().web.must_change_password:
         return api_error(423, "password_change_required", "err_password_change_required")
     try:
-        q = DlqQuery.model_validate({k: v for k, v in request.args.items() if k in ("destination_id", "error")})
+        q = DlqQuery.model_validate({k: v for k, v in request.args.items() if k in ("destination_id", "error") and v})
     except ValidationError:
         return api_error(400, "invalid_input", "err_invalid_input")
     resp = Response(stream_with_context(dlq.export_lines(ctx, destination_id=q.destination_id, error=q.error or None)),
