@@ -568,6 +568,48 @@ def label_mix(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str, 
                     unmanaged_into_apps_total=len(into))
 
 
+class LabelConflict(BaseModel):
+    """A managed endpoint the period's flows show with more than one label combination."""
+    key: str
+    sets: list[dict[str, str]]  # every combination, {} for "no labels", ordered by their text
+    connections: int
+
+
+class LabelConflicts(BaseModel):
+    rows: list[LabelConflict]  # most combinations first, at most `top`
+    total: int  # endpoints with more than one combination
+
+
+def label_conflicts(ctx: AppContext, spec: FilterSpec, *, top: int) -> LabelConflicts:
+    """Managed endpoints (either side of a flow) whose flows in the period carried more than one label combination
+    — relabelled during the period, or reported differently by the two ends. A flow without labels counts as one
+    combination ("no labels")."""
+    fdb, gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
+        ends = (f"SELECT f.src_key AS k, COALESCE(f.src_label_set, 0) AS ls, f.num_connections AS n FROM flows f "
+                f"WHERE {where} AND f.src_managed = 1 UNION ALL "
+                f"SELECT f.dst_key, COALESCE(f.dst_label_set, 0), f.num_connections FROM flows f "
+                f"WHERE {where} AND f.dst_managed = 1")
+        found = conn.execute(f"SELECT k, COUNT(DISTINCT ls) AS sets, GROUP_CONCAT(DISTINCT ls), SUM(n) FROM ({ends}) "
+                             "GROUP BY k HAVING sets > 1 ORDER BY sets DESC, k", [*params, *params]).fetchall()
+        kept = found[:top]
+        ids = {int(i) for r in kept for i in str(r[2]).split(",")}
+        members = _labels(conn, ids - {0})
+    if fdb.generation != gen:
+        raise StaleGeneration
+
+    def text(labels: dict[str, str]) -> str:
+        return ", ".join(f"{k}={v}" for k, v in sorted(labels.items()))
+    rows = [LabelConflict(key=r[0], connections=r[3] or 0,
+                          sets=sorted((members.get(int(i), {}) for i in str(r[2]).split(",")), key=text))
+            for r in kept]
+    return LabelConflicts(rows=rows, total=len(found))
+
+
 class ReadinessRow(BaseModel):
     """Connections into one app (environment)'s managed hosts (the readiness report)."""
     app: str | None

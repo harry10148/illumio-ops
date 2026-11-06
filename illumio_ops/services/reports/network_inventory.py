@@ -17,7 +17,8 @@ from illumio_ops.domain.segment import FlowSegment, GroupBy
 from illumio_ops.domain.values import SegmentDimension, SegmentMetric, SegmentView
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.analysis.segments import run_segment
-from illumio_ops.services.flowsource import label_mix
+from illumio_ops.services.flowsource import label_conflicts, label_mix
+from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports import findings, flowsections
 from illumio_ops.services.reports.common import port_text, tr
 from illumio_ops.services.reports.generate import (
@@ -33,6 +34,7 @@ PAIR_LIMIT = 1000  # app x service and app x source-app pairs read for the per-a
 KEY_FINDINGS = 5
 APP = "app"
 HYGIENE_KEYS = (APP, "loc", "role")  # with the configured environment key
+SETS_SHOWN = 5  # label combinations listed per endpoint; more are counted
 
 
 def _service(key: object) -> str:
@@ -123,6 +125,25 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
         total_rows=mix.unmanaged_into_apps_total, empty_text=t("rpt_inv_unmanaged_none"),
         limit_note=t("rpt_limit_top_n", n=TOP) if mix.unmanaged_into_apps_total > TOP else None)
 
+    # ── label conflicts ─────────────────────────────────────────────────────
+    found = label_conflicts(inp.ctx, spec, top=TOP)
+
+    def sets_text(sets: list[dict[str, str]]) -> str:
+        shown = [", ".join(f"{k}={v}" for k, v in sorted(s.items())) or t("rpt_inv_no_labels") for s in sets[:SETS_SHOWN]]
+        more = [t("rpt_inv_more_sets", n=len(sets) - SETS_SHOWN)] if len(sets) > SETS_SHOWN else []
+        return " | ".join(shown + more)
+    shown_as = display_names(inp.ctx, [c.key for c in found.rows], lang=lang)
+    conflicts = TableBlock(
+        title=t("rpt_inv_tbl_conflicts"),
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                 Column(key="n", label=t("rpt_inv_col_combinations"), kind="number"),
+                 Column(key="sets", label=t("rpt_inv_col_label_sets")),
+                 Column(key="connections", label=t("rpt_col_connections"), kind="number")),
+        rows=tuple((shown_as.get(c.key, c.key), len(c.sets), sets_text(c.sets), c.connections)
+                   for c in found.rows),
+        total_rows=found.total, empty_text=t("rpt_inv_conflicts_none") if totals else no_flows,
+        limit_note=t("rpt_limit_top_n", n=TOP) if found.total > TOP else None)
+
     outcomes = findings.run_rules(inp.ctx, spec, inp.ctx.settings.current().reports.rule_thresholds, lang,
                                   now=inp.now, scoped=inp.params.filter is not None) if totals else []
     kpis = (
@@ -146,7 +167,8 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
         sections=(
             Section(id="hygiene", title=t("rpt_inv_sec_hygiene"), intro=t("rpt_inv_hygiene_intro", keys=", ".join(keys)),
                     blocks=(hygiene, TextBlock(paragraphs=(t("rpt_inv_unlabeled_flows",
-                                                             n=f"{mix.unlabeled_app_flows:,}"),)))),
+                                                             n=f"{mix.unlabeled_app_flows:,}"),)),
+                            conflicts, TextBlock(paragraphs=(t("rpt_inv_conflicts_note"),)))),
             Section(id="dependencies", title=t("rpt_inv_sec_dependencies"), blocks=(pairs, env_text)),
             Section(id="services", title=t("rpt_inv_sec_services"), intro=t("rpt_inv_services_intro"),
                     blocks=(provided,)),

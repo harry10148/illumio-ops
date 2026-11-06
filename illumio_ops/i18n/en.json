@@ -2841,5 +2841,12 @@
   "rpt_ven_compat_warn": "Warning",
   "rpt_ven_compat_fail": "Fail",
   "rpt_ven_compat_unknown": "Unknown",
-  "rpt_ven_quality_compat": "Compatibility comes from the VEN health entries about compatibility in the inventory (an error: fail; a warning: warning; otherwise pass); {n} hosts report none and are unknown."
+  "rpt_ven_quality_compat": "Compatibility comes from the VEN health entries about compatibility in the inventory (an error: fail; a warning: warning; otherwise pass); {n} hosts report none and are unknown.",
+  "rpt_inv_tbl_conflicts": "Endpoints seen with more than one label combination",
+  "rpt_inv_col_combinations": "Combinations",
+  "rpt_inv_col_label_sets": "Label combinations",
+  "rpt_inv_no_labels": "(no labels)",
+  "rpt_inv_more_sets": "{n} more not listed",
+  "rpt_inv_conflicts_none": "Every managed endpoint in the period's flows carried one label combination.",
+  "rpt_inv_conflicts_note": "An endpoint above carried different labels on different flows in the period: it was relabelled during the period, or the two ends of a connection reported different labels. Rules written against labels treat each combination differently; check the host's current labels in the PCE. At most 5 combinations are listed per endpoint."
 }

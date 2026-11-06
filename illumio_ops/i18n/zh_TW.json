@@ -2841,5 +2841,12 @@
   "rpt_ven_compat_warn": "警告",
   "rpt_ven_compat_fail": "不通過",
   "rpt_ven_compat_unknown": "未知",
-  "rpt_ven_quality_compat": "相容性取自清冊中 VEN 健康裡與相容性有關的項目（有錯誤＝不通過；有警告＝警告；其餘＝通過）；{n} 台主機沒有回報，列為未知。"
+  "rpt_ven_quality_compat": "相容性取自清冊中 VEN 健康裡與相容性有關的項目（有錯誤＝不通過；有警告＝警告；其餘＝通過）；{n} 台主機沒有回報，列為未知。",
+  "rpt_inv_tbl_conflicts": "出現多組 Label 組合的端點",
+  "rpt_inv_col_combinations": "組合數",
+  "rpt_inv_col_label_sets": "Label 組合",
+  "rpt_inv_no_labels": "（無 Label）",
+  "rpt_inv_more_sets": "另有 {n} 組未列出",
+  "rpt_inv_conflicts_none": "期間流量中每個受管端點都只帶一組 Label 組合。",
+  "rpt_inv_conflicts_note": "上表的端點在期間內不同的流量帶著不同的 Label：可能是期間內改過 Label，或連線兩端回報的 Label 不同。依 Label 撰寫的規則會把每組組合視為不同對象；請到 PCE 確認該主機目前的 Label。每個端點最多列出 5 組組合。"
 }

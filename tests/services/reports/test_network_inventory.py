@@ -95,3 +95,22 @@ def test_findings_section(ctx):
 def test_zh_tw_builds(ctx):
     _write(ctx, [flow(port=443)])
     assert _build(ctx, Language.ZH_TW).title
+
+
+def test_label_conflicts_same_endpoint_two_combinations(ctx):
+    """5.x mod_labels: a managed endpoint the flows show with more than one label combination (relabelled in the
+    period, or reported inconsistently) is listed with every combination; a consistent one is not."""
+    _write(ctx, [flow(src="a", port=443, src_app="Web"), flow(src="a", port=443, src_app="Old"),
+                 flow(src="a", port=22, src_app="Web"), flow(src="b", port=443, src_app="Web")])
+    doc = _build(ctx)
+    table = _tables(doc, "hygiene")[1]
+    assert [r[0] for r in table.rows] == ["a"] and table.total_rows == 1
+    row = dict(zip([c.key for c in table.columns], table.rows[0], strict=True))
+    assert row["n"] == 2 and row["sets"] == "app=Old, env=Dev | app=Web, env=Dev"
+    assert row["connections"] == 3
+
+
+def test_label_conflicts_none_says_so(ctx):
+    _write(ctx, [flow(src="a", port=443), flow(src="a", port=22)])
+    table = _tables(_build(ctx), "hygiene")[1]
+    assert table.rows == () and "one label combination" in table.empty_text
