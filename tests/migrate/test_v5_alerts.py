@@ -118,7 +118,22 @@ def test_unsupported_filterbar_key_disables_rule():
     section, items = migrate_alerts({}, [r], None)
     assert section["rules"][0]["enabled"] is False
     lost = {i.source.split(" · ")[-1] for i in items if i.reason_key == "migrate_rule_filter_unsupported"}
-    assert lost == {"src_iplists", "any_label"}
+    assert lost == {"src_iplists"}  # a name v6 cannot resolve before collection; any_label is carried now
+
+
+def test_conditions_v6_gained_are_carried():
+    """Parity 2026-11-06: either end, Windows service, transmission and an excluded process came to v6's conditions,
+    so the 5.x keys for them migrate instead of disabling the rule."""
+    r = {"type": "traffic", "name": "x", "pd": 2, "any_label": "env=Prod", "ex_any_ip": ["10.9.0.0/16"],
+         "windows_service_name": ["LanmanServer"], "ex_transmission": "broadcast", "ex_process_name": ["svchost.exe"]}
+    section, items = migrate_alerts({}, [r], None)
+    rule = section["rules"][0]
+    c = rule["condition"]
+    assert c["either"]["labels"] == [{"key": "env", "values": ["Prod"]}]
+    assert c["either_exclude"]["ips"] == ["10.9.0.0/16"]
+    assert c["windows_services"] == ["LanmanServer"] and c["exclude_transmissions"] == ["broadcast"]
+    assert c["exclude_processes"] == ["svchost.exe"]
+    assert rule["enabled"] is True and not any(i.reason_key == "migrate_rule_filter_unsupported" for i in items)
 
 
 @pytest.mark.parametrize("field,value", [("src_ip_in", "CorporateServers"), ("src_labels", ["no-equals-sign"])])

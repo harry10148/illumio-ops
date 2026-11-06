@@ -33844,32 +33844,6 @@
             "title": "CatalogEntry",
             "type": "object"
           },
-          "LabelChoice": {
-            "properties": {
-              "key": {
-                "title": "Key",
-                "type": "string"
-              },
-              "truncated": {
-                "title": "Truncated",
-                "type": "boolean"
-              },
-              "values": {
-                "items": {
-                  "type": "string"
-                },
-                "title": "Values",
-                "type": "array"
-              }
-            },
-            "required": [
-              "key",
-              "values",
-              "truncated"
-            ],
-            "title": "LabelChoice",
-            "type": "object"
-          },
           "ReportFormat": {
             "enum": [
               "html",
@@ -33916,13 +33890,6 @@
             "title": "Gui External Url Set",
             "type": "boolean"
           },
-          "label_choices": {
-            "items": {
-              "$ref": "#/$defs/LabelChoice"
-            },
-            "title": "Label Choices",
-            "type": "array"
-          },
           "smtp_enabled": {
             "title": "Smtp Enabled",
             "type": "boolean"
@@ -33930,7 +33897,6 @@
         },
         "required": [
           "entries",
-          "label_choices",
           "smtp_enabled",
           "gui_external_url_set"
         ],

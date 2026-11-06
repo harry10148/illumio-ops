@@ -26,11 +26,9 @@ _UNIT = {"s": 1 / 60, "m": 1, "h": 60, "d": 1440}
 MAX_THROTTLE_MINUTES = 10080
 MIN_FLOW_WINDOW = 10
 # FilterBar keys and legacy scalar keys v6 conditions can hold (the rest are listed per rule as unsupported).
-_UNSUPPORTED_FILTER_KEYS = ("src_iplists", "dst_iplists", "ex_src_iplists", "ex_dst_iplists", "any_label", "any_ip",
-                            "any_iplist", "any_workload", "ex_any_label", "ex_any_ip", "ex_any_iplist",
-                            "ex_any_workload", "services", "ex_services", "windows_service_name",
-                            "ex_windows_service_name", "transmission", "ex_transmission", "ex_process_name",
-                            "src_label_group", "dst_label_group", "ex_src_label_group", "ex_dst_label_group",
+# Names v6 holds as PCE object hrefs, unknown until the inventory reads the PCE: carried off, said so.
+_UNSUPPORTED_FILTER_KEYS = ("src_iplists", "dst_iplists", "ex_src_iplists", "ex_dst_iplists", "any_iplist",
+                            "ex_any_iplist", "services", "ex_services", "src_label_group", "dst_label_group", "ex_src_label_group", "ex_dst_label_group",
                             "src_label_groups", "dst_label_groups", "ex_src_label_groups", "ex_dst_label_groups")
 _RULE_META = frozenset({"id", "type", "name", "name_key", "desc", "desc_key", "rec", "rec_key", "enabled", "filter_key"})
 
@@ -279,7 +277,9 @@ def _condition(rule: dict[str, Any], lost: _Lost) -> dict[str, Any]:
     for name, keys in (("src", (("src_label", "src_labels"), ("src_ip_in",), ("src_workloads",))),
                        ("dst", (("dst_label", "dst_labels"), ("dst_ip_in",), ("dst_workloads",))),
                        ("src_exclude", (("ex_src_label", "ex_src_labels"), ("ex_src_ip",), ("ex_src_workloads",))),
-                       ("dst_exclude", (("ex_dst_label", "ex_dst_labels"), ("ex_dst_ip",), ("ex_dst_workloads",)))):
+                       ("dst_exclude", (("ex_dst_label", "ex_dst_labels"), ("ex_dst_ip",), ("ex_dst_workloads",))),
+                       ("either", (("any_label",), ("any_ip",), ("any_workload",))),
+                       ("either_exclude", (("ex_any_label",), ("ex_any_ip",), ("ex_any_workload",)))):
         side = _side(rule, lost, labels=keys[0], ips=keys[1], hrefs=keys[2])
         if side:
             cond[name] = side
@@ -313,16 +313,33 @@ def _condition(rule: dict[str, Any], lost: _Lost) -> dict[str, Any]:
         lost.add("process_name", "migrate_rule_process_initiator")  # rewritten, said so
         if len(names) > 1:
             lost.add("process_name", "migrate_rule_first_process_only")
+    for key, field in (("windows_service_name", "windows_services"), ("ex_windows_service_name",
+                                                                       "exclude_windows_services"),
+                       ("ex_process_name", "exclude_processes")):
+        names = [str(v).strip() for v in _as_list(rule.get(key)) if str(v).strip()]
+        if names:
+            cond[field] = names
+    for key, field in (("transmission", "transmissions"), ("ex_transmission", "exclude_transmissions")):
+        values = [str(v).strip().lower() for v in _as_list(rule.get(key)) if str(v).strip()]
+        if any(v not in _TRANSMISSIONS for v in values):
+            lost.add(key, "migrate_rule_bad_value")
+        if kept := [v for v in values if v in _TRANSMISSIONS]:
+            cond[field] = kept
     for k in _UNSUPPORTED_FILTER_KEYS:
         if _as_list(rule.get(k)):
             lost.add(k, "migrate_rule_filter_unsupported")
     return cond
 
 
+_TRANSMISSIONS = ("unicast", "broadcast", "multicast")
+
+
 _FLOW_KEYS = frozenset({"pd", "port", "proto", "ex_port", "ports", "ex_ports", "src_label", "dst_label", "ex_src_label",
                         "ex_dst_label", "src_labels", "dst_labels", "ex_src_labels", "ex_dst_labels", "src_ip_in",
                         "dst_ip_in", "ex_src_ip", "ex_dst_ip", "src_workloads", "dst_workloads", "ex_src_workloads",
-                        "ex_dst_workloads", "process_name", *_UNSUPPORTED_FILTER_KEYS})
+                        "ex_dst_workloads", "process_name", "any_label", "any_ip", "any_workload", "ex_any_label",
+                        "ex_any_ip", "ex_any_workload", "windows_service_name", "ex_windows_service_name",
+                        "transmission", "ex_transmission", "ex_process_name", *_UNSUPPORTED_FILTER_KEYS})
 _COMMON_KEYS = frozenset({"threshold_type", "threshold_count", "threshold", "threshold_window", "cooldown_minutes",
                           "throttle", "alert_throttle"})
 _EVENT_KEYS = frozenset({"filter_value", "filter_status", "filter_severity", "match_fields", "filter_match_fields"})

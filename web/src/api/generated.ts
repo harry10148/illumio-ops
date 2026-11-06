@@ -2218,7 +2218,6 @@ ui_group: ("assessment" | "traffic" | "policy" | "operations")
 export interface Catalog {
 entries: CatalogEntry[]
 gui_external_url_set: boolean
-label_choices: LabelChoice[]
 smtp_enabled: boolean
 }
 /**

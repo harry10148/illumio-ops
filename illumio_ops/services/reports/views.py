@@ -9,7 +9,6 @@ from pydantic import BaseModel
 
 from illumio_ops.domain.values import Language, ReportFormat, ReportStatus, ReportType
 from illumio_ops.services import custom_reports
-from illumio_ops.services.analysis.status import MAX_LABEL_VALUES, LabelChoice
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports.generate import (
     availability,
@@ -20,7 +19,6 @@ from illumio_ops.services.reports.generate import (
 )
 from illumio_ops.services.reports.registry import ReportParams, ReportSpec, specs
 from illumio_ops.store import reports as store
-from illumio_ops.store.flowdb import labels
 
 PAGE_SIZE = 50
 
@@ -46,7 +44,6 @@ class CatalogEntry(BaseModel):
 
 class Catalog(BaseModel):
     entries: list[CatalogEntry]
-    label_choices: list[LabelChoice]  # the inventory's labels, for the filter picker
     smtp_enabled: bool
     gui_external_url_set: bool
 
@@ -88,11 +85,6 @@ UI_GROUPS = {"lateral": "assessment", "assessment": "assessment", "analysis": "t
 def catalog(ctx: AppContext) -> Catalog:
     avail = availability(ctx)
     settings = ctx.settings.current()
-    with ctx.flows().connect() as conn:
-        known = labels.known_labels(conn)
-    by_key: dict[str, list[str]] = {}
-    for k, v in sorted(known):
-        by_key.setdefault(k, []).append(v)
     with ctx.db() as conn:
         copies = store.done_counts(conn)
     scheduled: dict[str, int] = {}
@@ -118,8 +110,6 @@ def catalog(ctx: AppContext) -> Catalog:
                                          mode="on_demand" if s.needs_traffic else "basic",
                                          schedules=scheduled.get(t.value, 0), copies=copies.get(t.value, 0))
                             for t, s in specs().items()],
-                   label_choices=[LabelChoice(key=k, values=vs[:MAX_LABEL_VALUES], truncated=len(vs) > MAX_LABEL_VALUES)
-                                  for k, vs in sorted(by_key.items())],
                    smtp_enabled=settings.alerts.channels.smtp.enabled,
                    gui_external_url_set=bool(settings.reports.gui_external_url))
 
