@@ -6,6 +6,7 @@ verified_against:
   - scripts/rollback.sh
   - scripts/restore-previous.sh
   - illumio_ops/migrate/v6.py
+  - illumio_ops/rescue.py
   - illumio_ops/migrate/v5_write.py
   - illumio_ops/migrate/v5_handover.py
 ---
@@ -141,3 +142,22 @@ sudo /opt/illumio-ops/restore-previous.sh
 - 新版改過的設定檔與資料庫不刪除，改名為 `*.from-<新版版本>-<時間>` 留在 `config/`、`data/`。
 - 升級後在介面改的設定、以及寫進被還原資料庫的資料，會回到升級前的狀態；其他資料照舊。
 - 只保留前一版：再升級一次，`previous/` 就換成那次被取代的版本。回到 5.x 仍用第 4 節的 `rollback.sh`。
+
+## 6. 進不了網頁介面時（救援指令）
+
+先停止服務，再以服務帳號執行（指令會拒絕在服務執行中或以其他帳號改設定）：
+
+```
+sudo systemctl stop illumio-ops
+sudo runuser -u illumio-ops -- env PYTHONPATH=/opt/illumio-ops \
+    /opt/illumio-ops/python/bin/python3 -P -m illumio_ops.rescue <指令> --root /opt/illumio-ops
+sudo systemctl start illumio-ops
+```
+
+| 指令 | 用在 |
+|---|---|
+| `reset-password` | 忘記管理者密碼。改完後所有已登入的人都會被登出。 |
+| `clear-allowed-ips` | 允許 IP 清單把自己擋在外面。清單清空（任何位址都能登入），並印出原本的清單，登入後到「系統 › 安全」重設。 |
+| `reset-tls` | 匯入的憑證不見了、與私鑰不合或加密套件設錯，服務起不來。改回自簽憑證（下次啟動時產生），不刪除原本的憑證檔；之後到「系統 › TLS」重新匯入。 |
+| `check-settings` | 服務起不來時，檢查設定檔並指出哪一欄有問題。 |
+

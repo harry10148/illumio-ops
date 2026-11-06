@@ -3,6 +3,8 @@
     python -m illumio_ops.rescue init [--port N] [--root PATH]   create the first settings file
     python -m illumio_ops.rescue reset-password [--root PATH]   set a new admin password
     python -m illumio_ops.rescue check-settings [--root PATH]   validate the settings file
+    python -m illumio_ops.rescue clear-allowed-ips [--root PATH]   accept sign-ins from any address again
+    python -m illumio_ops.rescue reset-tls [--root PATH]   go back to the self-signed certificate
 
 This is the one module allowed to print.
 """
@@ -92,6 +94,43 @@ def _reset_password(paths: InstallPaths) -> int:
     return 0
 
 
+def _clear_allowed_ips(paths: InstallPaths) -> int:
+    store = SettingsStore(paths.settings_file)
+    failed = _load(store)
+    if failed is not None:
+        return failed
+    before = list(store.current().web.allowed_ips)
+    if not before:
+        print("No address restriction is set: sign-ins are accepted from any address. Nothing was changed.")
+        return 0
+    store.update(store.current().revision, lambda d: d["web"].update(allowed_ips=[]))
+    print("Sign-ins are accepted from any address again. The list was:")
+    for entry in before:
+        print(f"  {entry}")
+    print("Set it again in System › Security once you are signed in.")
+    return 0
+
+
+def _reset_tls(paths: InstallPaths) -> int:
+    store = SettingsStore(paths.settings_file)
+    failed = _load(store)
+    if failed is not None:
+        return failed
+    tls = store.current().web.tls
+    was = (f"a provided certificate ({tls.cert_file}, {tls.key_file})" if tls.mode == "provided"
+           else "the self-signed certificate")
+
+    def mutate(d: dict[str, Any]) -> None:
+        d["web"]["tls"].update(enabled=True, mode="self_signed", cert_file="", key_file="", ciphers=None,
+                               min_version="TLSv1.2")
+
+    store.update(store.current().revision, mutate)
+    print(f"TLS was using {was}" + (", ciphers " + tls.ciphers if tls.ciphers else "") + f", {tls.min_version} or newer.")
+    print("It now uses the self-signed certificate (made at the next start when missing), TLS 1.2 or newer and the "
+          "default ciphers. The provided files were not touched. Import a certificate again in System › TLS.")
+    return 0
+
+
 def _check(paths: InstallPaths) -> int:
     store = SettingsStore(paths.settings_file)
     failed = _load(store)
@@ -104,7 +143,7 @@ def _check(paths: InstallPaths) -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m illumio_ops.rescue")
     sub = ap.add_subparsers(dest="command", required=True)
-    for name in ("init", "reset-password", "check-settings"):
+    for name in ("init", "reset-password", "check-settings", "clear-allowed-ips", "reset-tls"):
         sp = sub.add_parser(name)
         sp.add_argument("--root", type=Path, default=None)
         if name == "init":
@@ -136,6 +175,10 @@ def main(argv: list[str] | None = None) -> int:
             return _init(paths, args.port)
         if args.command == "reset-password":
             return _reset_password(paths)
+        if args.command == "clear-allowed-ips":
+            return _clear_allowed_ips(paths)
+        if args.command == "reset-tls":
+            return _reset_tls(paths)
         return _check(paths)
     finally:
         os.close(fd)

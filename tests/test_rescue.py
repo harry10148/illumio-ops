@@ -100,3 +100,33 @@ def test_rescue_refuses_to_run_as_another_user_than_the_owner(tmp_path, monkeypa
     monkeypatch.setattr(rescue.os, "geteuid", lambda: os.stat(tmp_path / "config").st_uid + 1)
     assert rescue.main(["check-settings", "--root", str(tmp_path)]) == 77
     assert "runuser" in capsys.readouterr().err
+
+
+def test_clear_allowed_ips_lets_a_locked_out_operator_back_in(tmp_path, capsys):
+    """Parity audit 2026-11-06 A6: the GUI can save an address list without the operator's own address ("save
+    anyway"); 5.x could undo that from the shell (config set web_gui.allowed_ips), v6 had no way but editing JSON."""
+    paths = _init(tmp_path)
+    store = SettingsStore(paths.settings_file)
+    store.load()
+    store.update(store.current().revision, lambda d: d["web"].update(allowed_ips=["10.9.9.9"]))
+    assert rescue.main(["clear-allowed-ips", "--root", str(tmp_path)]) == 0
+    assert SettingsStore(paths.settings_file).load().web.allowed_ips == ()
+    assert "10.9.9.9" in capsys.readouterr().out  # what was there, so it can be entered again
+
+
+def test_reset_tls_goes_back_to_the_self_signed_certificate(tmp_path, capsys):
+    """A provided certificate that is gone or does not match its key stops the service (exit 78); the GUI that would
+    fix it cannot start. reset-tls returns to the self-signed certificate made at the next start."""
+    paths = _init(tmp_path)
+    cert, key = tmp_path / "c.pem", tmp_path / "k.pem"
+    cert.write_text("x")
+    key.write_text("x")
+    store = SettingsStore(paths.settings_file)
+    store.load()
+    store.update(store.current().revision, lambda d: d["web"]["tls"].update(
+        mode="provided", cert_file=str(cert), key_file=str(key), ciphers="ECDHE+AESGCM", min_version="TLSv1.3"))
+    assert rescue.main(["reset-tls", "--root", str(tmp_path)]) == 0
+    tls = SettingsStore(paths.settings_file).load().web.tls
+    assert (tls.enabled, tls.mode, tls.cert_file, tls.key_file, tls.ciphers, tls.min_version) == (
+        True, "self_signed", "", "", None, "TLSv1.2")
+    assert str(cert) in capsys.readouterr().out
