@@ -9,6 +9,7 @@
 #     install.sh
 #     rollback.sh             goes back to 5.x after an upgrade (copied into the prefix)
 #     illumio-ops.service.in
+#     THIRD_PARTY_NOTICES     licences of the wheels, the web interface's packages, the fonts and CPython
 #
 # PYTHON (default python3) must have pip-tools for the lock freshness check.
 set -euo pipefail
@@ -77,6 +78,17 @@ rsync -a --exclude '__pycache__' --exclude '*.pyc' illumio_ops/ "$STAGE/illumio_
 cp "$LOCK" scripts/install.sh scripts/rollback.sh scripts/restore-previous.sh scripts/uninstall.sh scripts/preflight.sh \
     scripts/illumio-ops.service.in "$STAGE/"
 chmod +x "$STAGE/install.sh" "$STAGE/rollback.sh" "$STAGE/restore-previous.sh" "$STAGE/uninstall.sh" "$STAGE/preflight.sh"
+
+echo "==> Third-party notices (fails when a shipped package states no licence)"
+PY_LICENSE="$(ls "$STAGE"/python/lib/python3.*/LICENSE.txt 2>/dev/null | head -1)"
+[[ -n "$PY_LICENSE" ]] || { echo "ERROR: the bundled CPython has no LICENSE.txt" >&2; exit 1; }
+"$PYTHON" -I scripts/third_party_notices.py \
+    --wheels "$STAGE/wheels" \
+    --web web \
+    --extra "Montserrat font (web/src/styles/fonts, SIL Open Font License 1.1)=web/src/styles/fonts/OFL-Montserrat.txt" \
+    --extra "CPython ${PBS_PYTHON} (python-build-standalone ${PBS_TAG}, in python/)=$PY_LICENSE" \
+    --title "THIRD-PARTY NOTICES for illumio-ops ${VERSION}" \
+    --out "$STAGE/THIRD_PARTY_NOTICES"
 
 echo "==> Slimming the bundled Python"
 py="$STAGE/python"
