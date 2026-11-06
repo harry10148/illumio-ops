@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Callable
-from datetime import UTC, datetime
+from collections.abc import Callable, Sequence
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from loguru import logger
@@ -261,6 +261,44 @@ def audit_counts(ctx: AppContext, *, start: datetime, end: datetime, top: int = 
                        type_users=type_users,
                        source_ips=ips or 0, users_total=len(users), failed_by_ip=failed, coverage=cov,
                        users=[AuditUser(name=u[0], events=u[1], failures=u[2] or 0, source_ips=u[3]) for u in users[:top]])
+
+
+class FailedThenChange(BaseModel):
+    """A high-risk change by a user who failed to sign in (or was denied) within the minutes before it."""
+    at: datetime
+    user: str
+    change: str
+    failures: int  # the user's failures in the window before the change
+    last_failure: datetime
+    gap_minutes: float  # from the last failure to the change
+
+
+def failed_then_change(ctx: AppContext, *, start: datetime, end: datetime, window_minutes: int, failure_types:
+                       Sequence[str], change_types: Sequence[str], limit: int,
+                       now: datetime | None = None) -> tuple[list[FailedThenChange], int]:
+    """Changes of `change_types` in [start, end) by a user or service account whose `failure_types` events, under the
+    same name, fall in the `window_minutes` before the change (which may reach before `start`). Newest first, at most
+    `limit`, with how many there are."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    seg = EventSegment(filter=EventFilter(start=start, end=end), view=SegmentView.DETAIL, limit=1)
+    kinds = ",".join("?" * len(USER_KINDS))
+    fails, changes = ",".join("?" * len(failure_types)), ",".join("?" * len(change_types))
+    sql = (f"SELECT c.timestamp, c.created_by_name, c.event_type, COUNT(f.id), MAX(f.timestamp) FROM events c "
+           f"JOIN events f ON f.created_by_name = c.created_by_name AND f.event_type IN ({fails}) "
+           "AND f.timestamp < c.timestamp AND f.timestamp >= ? "
+           "AND (julianday(c.timestamp) - julianday(f.timestamp)) * 1440 <= ? "
+           f"WHERE c.event_type IN ({changes}) AND c.timestamp >= ? AND c.timestamp < ? "
+           f"AND c.created_by_kind IN ({kinds}) AND TRIM(COALESCE(c.created_by_name, '')) != '' "
+           "GROUP BY c.id ORDER BY c.timestamp DESC, c.id DESC")
+    params = [*failure_types, db_time(start - timedelta(minutes=window_minutes)), window_minutes, *change_types,
+              db_time(start), db_time(end), *USER_KINDS]
+    found, _ = _segment_read(ctx, seg, at, lambda conn: conn.execute(sql, params).fetchall())
+    rows = []
+    for ts, user, change, n, last in found[:limit]:
+        when, prior = datetime.fromisoformat(ts), datetime.fromisoformat(last)
+        rows.append(FailedThenChange(at=when, user=user, change=change, failures=n, last_failure=prior,
+                                     gap_minutes=round((when - prior).total_seconds() / 60, 1)))
+    return rows, len(found)
 
 
 class PrecursorEvents(BaseModel):

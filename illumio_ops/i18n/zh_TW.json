@@ -2848,5 +2848,16 @@
   "rpt_inv_no_labels": "（無 Label）",
   "rpt_inv_more_sets": "另有 {n} 組未列出",
   "rpt_inv_conflicts_none": "期間流量中每個受管端點都只帶一組 Label 組合。",
-  "rpt_inv_conflicts_note": "上表的端點在期間內不同的流量帶著不同的 Label：可能是期間內改過 Label，或連線兩端回報的 Label 不同。依 Label 撰寫的規則會把每組組合視為不同對象；請到 PCE 確認該主機目前的 Label。每個端點最多列出 5 組組合。"
+  "rpt_inv_conflicts_note": "上表的端點在期間內不同的流量帶著不同的 Label：可能是期間內改過 Label，或連線兩端回報的 Label 不同。依 Label 撰寫的規則會把每組組合視為不同對象；請到 PCE 確認該主機目前的 Label。每個端點最多列出 5 組組合。",
+  "rpt_aud_sec_failed_change": "登入失敗後緊接的高風險變更",
+  "rpt_aud_failed_change_intro": "使用者在變更前 {minutes} 分鐘內，以同一名稱登入失敗或請求被拒（{failures}），接著做了高風險變更（{changes}）。每筆變更一列。",
+  "rpt_aud_tbl_failed_change": "登入失敗後的高風險變更",
+  "rpt_aud_col_change": "變更",
+  "rpt_aud_col_failures_before": "之前的失敗次數",
+  "rpt_aud_col_last_failure": "最後一次失敗",
+  "rpt_aud_col_gap": "相隔分鐘",
+  "rpt_aud_none_failed_change": "沒有任何高風險變更發生在同一使用者登入失敗後 {minutes} 分鐘內。",
+  "rpt_aud_failed_change_title": "{n} 筆高風險變更緊接在登入失敗之後",
+  "rpt_aud_failed_change_why": "使用者：{users}。每位都在以同一名稱登入失敗或請求被拒後 {minutes} 分鐘內做了高風險變更；密碼被猜中或被盜用時就是這個樣子。",
+  "rpt_aud_failed_change_action": "逐一向使用者確認變更是否為本人所做；若不是，還原變更、重設憑證，並檢查該帳號的其他操作。"
 }

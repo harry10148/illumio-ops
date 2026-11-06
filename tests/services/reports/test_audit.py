@@ -150,3 +150,28 @@ def test_provision_as_the_pce_sends_it(ctx):
                     "workloads_affected": {"before": None, "after": 1}}, "change_type": "create"}]})])
     row = _tables(_build(ctx), "policy")[0].rows[0]
     assert row[1:] == ("admin@lab.local", 1, "open db")
+
+
+def test_failed_sign_in_then_high_risk_change_same_user(ctx):
+    """5.x audit_mod04 pattern 1: failed sign-ins followed within 30 minutes by a high-risk change by the same user.
+    Another user's change, or one 31 minutes later, does not count."""
+    _write(ctx, [event("request.authentication_failed", D, user="eve", ip="10.1.1.1", status="failure"),
+                 event("request.authentication_failed", D + timedelta(minutes=3), user="eve", ip="10.1.1.1",
+                       status="failure"),
+                 event("api_key.create", D + timedelta(minutes=10), user="eve"),
+                 event("sec_policy.create", D + timedelta(minutes=10), user="bob"),
+                 event("request.authentication_failed", D + timedelta(hours=2), user="mal", status="failure"),
+                 event("workloads.unpair", D + timedelta(hours=2, minutes=31), user="mal"),
+                 event("rule_set.update", D + timedelta(minutes=11), user="eve")])
+    doc = _build(ctx)
+    table = _tables(doc, "failed_then_change")[0]
+    assert table.total_rows == 1
+    row = dict(zip([c.key for c in table.columns], table.rows[0], strict=True))
+    assert (row["user"], row["change"], row["failures"], row["gap"]) == ("eve", "api_key.create", 2, 7.0)
+    assert doc.findings[0].severity is Severity.HIGH and "eve" in doc.findings[0].why
+
+
+def test_failed_then_change_none_says_so(ctx):
+    _write(ctx, [event("sec_policy.create", D, user="alice")])
+    table = _tables(_build(ctx), "failed_then_change")[0]
+    assert table.rows == () and table.empty_text
