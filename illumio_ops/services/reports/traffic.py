@@ -90,7 +90,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
         ("rpt_trf_tbl_src_label", "rpt_col_src_label", SegmentDimension.SRC_LABEL, env_key),
         ("rpt_trf_tbl_dst_label", "rpt_col_dst_label", SegmentDimension.DST_LABEL, env_key)))
     services = ranking(t("rpt_trf_tbl_services"), SegmentDimension.SERVICE, t("rpt_col_service"))
-    vol = traffic_volume(inp.ctx, spec, top=TOP)
+    vol = traffic_volume(inp.ctx, spec, top=TOP, app_key=APP)
     protocols = TableBlock(
         title=t("rpt_trf_tbl_protocols"),
         columns=(Column(key="proto", label=t("rpt_col_protocol")), Column(key="flows", label=t("rpt_col_flows"), kind="number"),
@@ -121,13 +121,14 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
             group_by=(GroupBy(dimension=SegmentDimension.SRC_HOST), GroupBy(dimension=SegmentDimension.DST_HOST)),
             columns=(Column(key="src", label=t("rpt_col_source")), Column(key="dst", label=t("rpt_col_destination")),
                      Column(key="bytes", label=t("rpt_col_bytes"), kind="number"))),
-            flowsections.ranking(
-                inp, title=t("rpt_trf_tbl_app_bytes"), metric=SegmentMetric.BYTES, limit=TOP,
-                group_by=(GroupBy(dimension=SegmentDimension.SRC_LABEL, label_key=APP),
-                          GroupBy(dimension=SegmentDimension.DST_LABEL, label_key=APP)),
+            TableBlock(
+                title=t("rpt_trf_tbl_app_bytes"),
                 columns=(Column(key="src_app", label=t("rpt_col_src_label", key=APP)),
                          Column(key="dst_app", label=t("rpt_col_dst_label", key=APP)),
-                         Column(key="bytes", label=t("rpt_col_bytes"), kind="number"))),
+                         Column(key="bytes", label=t("rpt_col_bytes"), kind="number")),
+                rows=tuple((a or t("rpt_no_label"), d or t("rpt_no_label"), n) for a, d, n in vol.by_app),
+                total_rows=vol.app_pairs, empty_text=t("rpt_trf_no_bytes"),
+                limit_note=t("rpt_limit_top_n", n=TOP) if vol.app_pairs > TOP else None),
             TextBlock(paragraphs=(t("rpt_trf_rate_note", rated=f"{vol.with_rate:,}", total=f"{vol.with_bytes:,}",
                                     max=f"{vol.max_mbps:.3f}") if vol.max_mbps is not None
                                   else t("rpt_trf_rate_none", total=f"{vol.with_bytes:,}"),)),

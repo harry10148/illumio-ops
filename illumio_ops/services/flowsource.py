@@ -594,14 +594,16 @@ class TrafficVolume(BaseModel):
     by_rate: list[VolumeRow]  # highest rate first, at most `top`
     multi_conn: int  # byte-carrying records of more than one connection
     by_per_conn: list[VolumeRow]  # most bytes per connection first, at most `top`
+    by_app: list[tuple[str, str, int]]  # (source app, destination app, bytes) over byte-carrying records, '' = none
+    app_pairs: int  # app pairs with byte data
 
 
-_SPAN = "(julianday(f.last_detected) - julianday(f.first_detected)) * 86400.0"
+_SPAN = "((julianday(f.last_detected) - julianday(f.first_detected)) * 86400.0)"
 _HAS_BYTES = "(f.bytes_in IS NOT NULL OR f.bytes_out IS NOT NULL)"
 _BYTES = "(COALESCE(f.bytes_in, 0) + COALESCE(f.bytes_out, 0))"
 
 
-def traffic_volume(ctx: AppContext, spec: FilterSpec, *, top: int) -> TrafficVolume:
+def traffic_volume(ctx: AppContext, spec: FilterSpec, *, top: int, app_key: str = "app") -> TrafficVolume:
     """Rates are averages over the time the PCE saw a flow record (first to last detection), so a lower bound of its
     peak: the PCE reports no transfer duration on these records."""
     fdb, gen, settings = _store_read(ctx)
@@ -623,6 +625,9 @@ def traffic_volume(ctx: AppContext, spec: FilterSpec, *, top: int) -> TrafficVol
         by_conn = conn.execute(f"SELECT {cols} FROM flows f WHERE {where} AND {_HAS_BYTES} AND f.num_connections > 1 "
                                f"ORDER BY {_BYTES} * 1.0 / f.num_connections DESC, f.id LIMIT ?",
                                [*params, top]).fetchall()
+        apps = conn.execute(f"SELECT {_label_of('src')} AS sa, {_label_of('dst')} AS da, SUM({_BYTES}) AS b FROM flows f "
+                            f"WHERE {where} AND {_HAS_BYTES} GROUP BY sa, da ORDER BY b DESC, sa, da",
+                            [app_key, app_key, *params]).fetchall()
     if fdb.generation != gen:
         raise StaleGeneration
 
@@ -632,7 +637,8 @@ def traffic_volume(ctx: AppContext, spec: FilterSpec, *, top: int) -> TrafficVol
                          mbps=r[4] * 8 / secs / 1_000_000 if secs >= 1 else None)
     return TrafficVolume(by_proto=[ProtoTotals(proto=p, flows=f, connections=n) for p, f, n in protos],
                          with_bytes=counts[0] or 0, with_rate=counts[1] or 0, multi_conn=counts[2] or 0,
-                         max_mbps=counts[3], by_rate=[row(r) for r in by_rate], by_per_conn=[row(r) for r in by_conn])
+                         max_mbps=counts[3], by_rate=[row(r) for r in by_rate], by_per_conn=[row(r) for r in by_conn],
+                         by_app=[(a, b, n) for a, b, n in apps[:top]], app_pairs=len(apps))
 
 
 class LabelConflict(BaseModel):

@@ -143,7 +143,7 @@ def test_bandwidth_and_bytes_per_connection(ctx):
     """5.x mod11: Mbps where the flow's span is known (bytes over first to last detection, a lower bound), bytes per
     connection, and the data volume by app pair."""
     _write(ctx, [flow(dst="big", port=443, bytes_=50 * 1024 * 1024, conns=2),
-                 flow(dst="small", port=443, bytes_=3000, conns=3, src_app="Batch"), flow(port=22)])
+                 flow(dst="small", port=443, bytes_=3000, conns=3, src_app="Batch"), flow(port=22, src_app="Quiet")])
     sec = _section(_build(ctx), "bytes")
     tables = {b.columns[-1].key: b for b in sec.blocks if isinstance(b, TableBlock)}
     rate = tables["mbps"]
@@ -151,6 +151,6 @@ def test_bandwidth_and_bytes_per_connection(ctx):
     per_conn = tables["per_conn"]
     assert [r[1] for r in per_conn.rows] == ["big", "small"] and per_conn.rows[1][-1] == 1000
     apps = next(b for b in sec.blocks if isinstance(b, TableBlock) and b.columns[0].key == "src_app")
-    assert apps.rows[0][:2] == ("Web", "DB")
+    assert [r[:2] for r in apps.rows] == [("Web", "DB"), ("Batch", "DB")]  # no row for a pair without byte data
     text = " ".join(p for b in sec.blocks if isinstance(b, TextBlock) for p in b.paragraphs)
-    assert "2 of 2" in text and "lower bound" in text
+    assert "2 of 2" in text and "lower bound" in text and "highest here: 1.398 Mbps" in text
