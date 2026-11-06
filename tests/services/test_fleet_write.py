@@ -214,3 +214,55 @@ def test_history_reads_back_this_pce_newest_first(ctx):
     h = fleet_write.history(ctx)
     assert [(a.action, a.target_mode, a.result) for a in h] == [("enforcement", "selective", "ok"),
                                                                 ("traffic_rate", None, "ok")]
+
+
+@responses.activate
+def test_two_overlapping_progressions_of_one_host_never_move_it_back(ctx):
+    """Review 2026-11-06: two requests read visibility_only at once; one wrote full, the other then selective, and
+    both said ok. Progressions run one at a time: the later one reads what the earlier wrote and stops."""
+    import threading
+    state = {"mode": "visibility_only"}
+    second_read, first_put = threading.Event(), threading.Event()
+    later: list = []
+
+    def get(request):
+        if threading.current_thread() is not threading.main_thread():
+            second_read.set()
+        else:
+            t = threading.Thread(target=lambda: later.append(fleet_write.apply(
+                ctx, [EnforcementHost(key=VIS, from_mode="visibility_only")], "selective", by="b", now=NOW)))
+            t.start()
+            later.append(t)
+            second_read.wait(0.5)  # unserialized, the second request reads now, before this one writes
+        return (200, {}, json.dumps({"href": VIS, "managed": True, "enforcement_mode": state["mode"]}))
+
+    def put(request):
+        if threading.current_thread() is not threading.main_thread():
+            first_put.wait(2)
+        state["mode"] = json.loads(request.body)["enforcement_mode"]
+        if threading.current_thread() is threading.main_thread():
+            first_put.set()
+        return (204, {}, "")
+
+    responses.add_callback(responses.GET, f"{API}{VIS}", callback=get)
+    responses.add_callback(responses.PUT, f"{API}{VIS}", callback=put)
+    first = fleet_write.apply(ctx, [EnforcementHost(key=VIS, from_mode="visibility_only")], "full", by="a", now=NOW)
+    later[0].join(5)
+    assert [r.status for r in first.results] == ["ok"]
+    [r] = later[1].results  # it reads Full: from there Selective is backwards (or the mode moved on)
+    assert r.status == "skipped" and r.detail in ("not_forward", "mode_changed")
+    assert state["mode"] == "full"
+
+
+@responses.activate
+def test_a_pce_switched_while_reading_a_host_writes_nothing(ctx):
+    """Review 2026-11-06: the PCE identity was checked only before the read; a switch during it still wrote."""
+    def get(request):
+        ctx.settings.update(ctx.settings.current().revision,
+                            lambda d: d["pce"].update(url="https://other.example.com:8443"))
+        return (200, {}, json.dumps({"href": VIS, "managed": True, "enforcement_mode": "visibility_only"}))
+
+    responses.add_callback(responses.GET, f"{API}{VIS}", callback=get)
+    out = fleet_write.apply(ctx, [EnforcementHost(key=VIS, from_mode="visibility_only")], "full", by="a", now=NOW)
+    assert [(r.status, r.detail) for r in out.results] == [("failed", "pce_changed")]
+    assert not any(c.request.method == "PUT" for c in responses.calls)

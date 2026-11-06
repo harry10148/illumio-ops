@@ -29,14 +29,14 @@ class ResendResult(BaseModel):
     error: str | None
 
 
-def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | None,
+def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | None, error: str | None = None,
            transport_factory: TransportFactory | None = None, now: datetime | None = None) -> ResendResult:
     """ids: those lines; None: the oldest RESEND_MAX of the destination (or of every destination). What went and what
     failed again count in the destination's sends."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.db() as conn:
         dead = store.dlq_by_ids(conn, list(ids)) if ids is not None else store.dlq_after(
-            conn, destination_id=destination_id, after_id=0, limit=RESEND_MAX)
+            conn, destination_id=destination_id, after_id=0, limit=RESEND_MAX, error=error)
     dead = dead[:RESEND_MAX]
     dests = {d.id: d for d in ctx.settings.current().siem.destinations if d.enabled}
     sent = failed = skipped = changed = 0
@@ -93,7 +93,7 @@ def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | 
 
 
 def purge(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | None,
-          older_than_days: int | None = None, now: datetime | None = None) -> int:
+          older_than_days: int | None = None, error: str | None = None, now: datetime | None = None) -> int:
     """ids: those lines; else every line of the destination (or of every destination) — moved to the DLQ more than
     older_than_days days ago when given (5.x's purge by age)."""
     with ctx.db() as conn:
@@ -101,8 +101,8 @@ def purge(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | N
             return store.dlq_delete(conn, list(ids))
         if older_than_days is not None:
             at = (now or datetime.now(UTC)).astimezone(UTC)
-            return store.dlq_purge_before(conn, destination_id, at - timedelta(days=older_than_days))
-        return store.dlq_purge(conn, destination_id)
+            return store.dlq_purge_before(conn, destination_id, at - timedelta(days=older_than_days), error=error)
+        return store.dlq_purge(conn, destination_id, error=error)
 
 
 def run_dlq_retention(ctx: AppContext, *, now: datetime | None = None) -> dict[str, int]:

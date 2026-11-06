@@ -136,6 +136,8 @@ class DlqAction(BaseModel):
     ids: list[int] | None = Field(default=None, max_length=1_000)
     destination_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     older_than_days: int | None = Field(default=None, ge=1, le=3650)
+    # Without ids: only lines whose error contains this text (the list's filter: what is shown is what is acted on).
+    error: str | None = Field(default=None, max_length=200)
 
 
 class DlqResendView(BaseModel):
@@ -262,7 +264,7 @@ def get_dlq(dead_id: int) -> DlqDetail:
 
 @api_route(bp, OP_RESEND)
 def resend(body: DlqAction) -> DlqResendView:
-    r = dlq.resend(get_ctx(), ids=body.ids, destination_id=body.destination_id)
+    r = dlq.resend(get_ctx(), ids=body.ids, destination_id=body.destination_id, error=body.error or None)
     return DlqResendView(**r.model_dump())
 
 
@@ -271,7 +273,7 @@ def purge(body: DlqAction) -> DlqPurgeView:
     if body.ids is not None and body.older_than_days is not None:
         raise ApiFailure(400, "invalid_input", "err_invalid_input", field="older_than_days")
     return DlqPurgeView(deleted=dlq.purge(get_ctx(), ids=body.ids, destination_id=body.destination_id,
-                                          older_than_days=body.older_than_days))
+                                          older_than_days=body.older_than_days, error=body.error or None))
 
 
 @bp.get("/siem/dlq/export")

@@ -77,3 +77,28 @@ def test_overview_filter_progress_and_rate(context, live_app, fake_pce):
     assert f"{ORG}/workloads/set_flow_reporting_frequency" in fake_pce.calls
     expect(fleet.locator("[data-role=fleet-history] tbody tr")).to_have_count(2)
     expect(fleet.locator("[data-role=fleet-history] [data-result=ok]")).to_have_count(2)
+
+
+def test_a_slow_answer_to_an_earlier_filter_does_not_replace_the_newer_list(context, live_app, fake_pce):
+    """Review 2026-11-06: every filter change sent a request and every answer was shown; Prod answering after Dev
+    left the Dev filter over Prod's hosts (and "choose shown" picked them)."""
+    import time
+    _setup(live_app, fake_pce)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+
+    def slow_prod(route):
+        if "env=Prod" in route.request.url:
+            time.sleep(1.5)
+        route.continue_()
+
+    page.route("**/api/fleet/hosts*", slow_prod)
+    page.click(".sidenav .nav-item[data-nav='/fleet']")
+    fleet = page.locator("[data-role=fleet]")
+    expect(fleet.locator("[data-role=fleet-list] tbody tr")).to_have_count(2)
+    fleet.locator("select[name=env]").select_option("Prod")
+    fleet.locator("select[name=env]").select_option("Dev")
+    page.wait_for_timeout(2500)  # Prod's answer has come back by now
+    rows = fleet.locator("[data-role=fleet-list] tbody tr")
+    expect(rows).to_have_count(1)
+    expect(rows.first).to_contain_text("web")

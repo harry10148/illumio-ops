@@ -1,7 +1,7 @@
 // VEN fleet (spec §6.5 「VEN 車隊總覽」「VEN enforcement 推進」「心跳加速」, deferred to v6.1 and built now): the managed
 // hosts the inventory holds, counted and listed; the chosen ones moved forward to a target mode, or asked to report
 // traffic faster, through the write key after a preview; and what was done.
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
@@ -370,11 +370,16 @@ function Fleet() {
     else setError(h.error);
   }, []);
 
+  // Only the newest filter's answer is shown (review 2026-11-06): a slower answer to an earlier filter arriving
+  // last showed and chose another filter's hosts.
+  const latest = useRef(0);
   const loadList = useCallback(async (f: Filter) => {
+    const seq = ++latest.current;
     const query: Record<string, string> = { mode: f.mode, online: f.online, q: f.q.trim() };
     if (f.env === "\u0000") query.no_env = "true";
     else query.env = f.env;
     const env = await call("fleet.hosts", undefined, undefined, query);
+    if (seq !== latest.current) return;
     if (env.ok && env.data) setList(env.data);
     else setError(env.error);
   }, []);

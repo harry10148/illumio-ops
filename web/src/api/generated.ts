@@ -2582,6 +2582,7 @@ total: number
  */
 export interface DlqAction {
 destination_id?: (string | null)
+error?: (string | null)
 ids?: (number[] | null)
 older_than_days?: (number | null)
 }

@@ -47,6 +47,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   }));
   const [recipients, setRecipients] = useState(initial.recipients.join(", "));
   const [filter, setFilter] = useState<FlowCondition | null>(initial.filter ?? null);
+  const [filterValid, setFilterValid] = useState(true);
   const entry = catalog.entries.find((c) => c.report_type === s.report_type);
   const [customs, setCustoms] = useState<CustomReport[] | null>(null);
   useEffect(() => {
@@ -157,7 +158,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
         </label>
       )}
       {entry?.accepts_filter && (
-        <ReportFilter value={filter} onChange={setFilter} requireApp={entry.requires_app} />
+        <ReportFilter value={filter} onChange={setFilter} requireApp={entry.requires_app} onValid={setFilterValid} />
       )}
       <label>
         {t("gui_reports_keep")}
@@ -168,7 +169,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       </label>
       {error && <p className="form-error span-all">{t(error.message_key, error.params)}{error.field ? ` (${error.field})` : ""}</p>}
       <div className="actions span-all">
-        <button type="button" className="btn-primary"
+        <button type="button" className="btn-primary" disabled={!filterValid}
           onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? filter : null,
                                   recipients: recipients.split(/[\s,;]+/).filter((r) => r !== "") })}>{t("btn_save")}</button>
         <button type="button" className="btn-quiet" onClick={onCancel}>{t("btn_cancel")}</button>

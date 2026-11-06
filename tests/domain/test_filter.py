@@ -370,8 +370,10 @@ SVC_ICMP = "/orgs/1/sec_policy/active/services/icmp"
 SVC_ALL = "/orgs/1/sec_policy/active/services/all"
 LG_PROD = "/orgs/1/sec_policy/active/label_groups/prod"
 LG_EU = "/orgs/1/sec_policy/active/label_groups/eu"
+LG_STAGE = "/orgs/1/sec_policy/active/label_groups/stage"  # a second group of the key env
 SERVICES = {SVC_WEB: ((443, None, 6), (8000, 8100, 6)), SVC_ICMP: ((None, None, 1),), SVC_ALL: ((None, None, None),)}
-GROUPS = {LG_PROD: ("env", frozenset({"Prod", "Staging"})), LG_EU: ("loc", frozenset({"EU"}))}
+GROUPS = {LG_PROD: ("env", frozenset({"Prod", "Staging"})), LG_EU: ("loc", frozenset({"EU"})),
+          LG_STAGE: ("env", frozenset({"Staging"}))}
 
 PARITY_SPECS = [
     {"either": EndpointFilter(ips=("10.0.0.9",))},
@@ -380,6 +382,7 @@ PARITY_SPECS = [
     {"either_exclude": EndpointFilter(public=True)},
     {"src": EndpointFilter(label_groups=(LG_PROD,))},
     {"dst": EndpointFilter(label_groups=(LG_PROD, LG_EU))},
+    {"src": EndpointFilter(label_groups=(LG_PROD, LG_STAGE))},  # review 2026-11-06: two groups of one key
     {"src": EndpointFilter(labels=(LabelCond(key="env", values=("Dev",)),), label_groups=(LG_PROD,))},
     {"src": EndpointFilter(labels=(LabelCond(key="app", values=("Pay",)),), label_groups=(LG_PROD,))},
     {"dst_exclude": EndpointFilter(label_groups=(LG_PROD,))},

@@ -400,7 +400,7 @@ def _sql_labels_with_groups(ep: EndpointFilter, side: str, a: str, params: list[
     return (f"((SELECT COUNT(*) FROM label_groups WHERE href IN ({gm})) = {len(groups)} "
             f"AND COALESCE({a}.{side}_label_set, -1) IN (SELECT m.set_id FROM label_set_members m "
             f"WHERE (m.key, m.value) IN ({allowed}) GROUP BY m.set_id "
-            f"HAVING COUNT(DISTINCT m.key) = (SELECT COUNT(*) FROM ({keys}))))")
+            f"HAVING COUNT(DISTINCT m.key) = (SELECT COUNT(DISTINCT key) FROM ({keys}))))")
 
 
 def _sql_services(hrefs: tuple[str, ...], a: str, params: list[Any]) -> str:

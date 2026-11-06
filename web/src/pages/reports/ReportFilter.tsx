@@ -11,9 +11,16 @@ import { chips } from "../workbench/conditions";
 
 let cached: Promise<ConditionChoices> | null = null;
 
-/** The condition choices, read once per page load (the editor and the schedule list share them). */
-function useChoices(): ConditionChoices {
+/** Read the choices again on the next use: the reports page calls it as it opens, so choices read for another PCE
+ * (switched since) are never offered; the forms and the schedule list then share one read. */
+export function forgetChoices(): void {
+  cached = null;
+}
+
+/** The condition choices and whether they have arrived. */
+function useChoices(): [ConditionChoices, boolean] {
   const [choices, setChoices] = useState<ConditionChoices>(NO_CHOICES);
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     cached ??= call("alert_rules.condition_choices").then((env) => {
       if (env.ok && env.data) return env.data;
@@ -21,10 +28,10 @@ function useChoices(): ConditionChoices {
       return NO_CHOICES;
     });
     let live = true;
-    void cached.then((c) => { if (live) setChoices(c); });
+    void cached.then((c) => { if (live) { setChoices(c); setLoaded(true); } });
     return () => { live = false; };
   }, []);
-  return choices;
+  return [choices, loaded];
 }
 
 const APP = "app";
@@ -40,7 +47,7 @@ function empty(cond: FlowCondition): boolean {
 
 /** The filter as words, one per condition (the workbench's chips): what the schedule list shows. */
 export function FilterSummary({ value }: { value: FlowCondition | null | undefined }) {
-  const choices = useChoices();
+  const [choices] = useChoices();
   if (!value) return null;
   const names = Object.fromEntries([...choices.ip_lists, ...choices.label_groups, ...choices.services].map((o) => [o.href, o.name]));
   const words = chips({ mode: "flows", condition: value } as FlowRequest, names);
@@ -52,11 +59,14 @@ export function FilterSummary({ value }: { value: FlowCondition | null | undefin
   );
 }
 
-export function ReportFilter({ value, onChange, requireApp }: {
+export function ReportFilter({ value, onChange, requireApp, onValid }: {
   value: FlowCondition | null; onChange: (next: FlowCondition | null) => void; requireApp: boolean;
+  /** Whether every condition typed parses: the form that holds the filter does not submit until it does. */
+  onValid?: (ok: boolean) => void;
 }) {
-  const choices = useChoices();
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const [choices, loaded] = useChoices();
+  const [invalid, setInvalidField] = useState<string | null>(null);
+  const setInvalid = (field: string | null) => { setInvalidField(field); onValid?.(field === null); };
   const cond = value ?? {};
   const set = (next: FlowCondition) => onChange(empty(next) ? null : next);
   const apps = choices.labels.find((c) => c.key === APP);
@@ -85,8 +95,11 @@ export function ReportFilter({ value, onChange, requireApp }: {
       )}
       <details open={!requireApp || !empty({ ...cond, dst: null })}>
         <summary>{t(requireApp ? "gui_reports_filter_more" : "gui_reports_filter_conditions")}</summary>
-        {/* remounted when the app is picked above, so its address and port fields show what the filter holds */}
-        <ConditionEditor key={app} value={cond} choices={choices} onChange={set} onInvalid={setInvalid} />
+        {/* mounted once the choices are in (its label pickers start from them), and remounted when the app is picked
+            above, so its address and port fields show what the filter holds */}
+        {loaded
+          ? <ConditionEditor key={app} value={cond} choices={choices} onChange={set} onInvalid={setInvalid} />
+          : <p className="hint">{t("loading")}</p>}
       </details>
       {invalid && <p className="form-error" data-field={invalid}>{t("rule_ports_invalid")}</p>}
     </div>

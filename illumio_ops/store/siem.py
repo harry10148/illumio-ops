@@ -233,16 +233,17 @@ def dlq_delete(conn: sqlite3.Connection, ids: Sequence[int]) -> int:
     return n
 
 
-def dlq_purge(conn: sqlite3.Connection, destination_id: str | None) -> int:
+def dlq_purge(conn: sqlite3.Connection, destination_id: str | None, *, error: str | None = None) -> int:
+    """Every line of a destination (or of every destination), narrowed to an error text when given."""
+    where, args = _where(destination_id, error)
     with conn:
-        if destination_id is None:
-            return conn.execute("DELETE FROM siem_dlq").rowcount
-        return conn.execute("DELETE FROM siem_dlq WHERE destination_id = ?", (destination_id,)).rowcount
+        return conn.execute(f"DELETE FROM siem_dlq WHERE {where}", args).rowcount
 
 
-def dlq_purge_before(conn: sqlite3.Connection, destination_id: str | None, before: datetime) -> int:
-    """Lines moved to the DLQ before a time (of a destination, or of every destination)."""
-    where, args = _where(destination_id, None)
+def dlq_purge_before(conn: sqlite3.Connection, destination_id: str | None, before: datetime, *,
+                     error: str | None = None) -> int:
+    """Lines moved to the DLQ before a time (of a destination, or of every destination; of an error text)."""
+    where, args = _where(destination_id, error)
     with conn:
         return conn.execute(f"DELETE FROM siem_dlq WHERE {where} AND quarantined_at < ?", [*args, _t(before)]).rowcount
 

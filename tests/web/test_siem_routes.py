@@ -211,6 +211,18 @@ def test_the_dlq_list_and_export_by_error(client, ctx):
     assert client.get("/siem/dlq/export?error=" + "x" * 201, environ_overrides=LOCAL).status_code == 400
 
 
+def test_purge_and_resend_all_act_on_what_the_error_filter_shows(client, ctx):
+    """Review 2026-11-06: with an error filter on, "purge all" confirmed the filtered count and deleted every line of
+    the destination. Purge-all and resend-all take the same filter as the list."""
+    login(client)
+    configured(client)
+    _fill(ctx, [("refused: 400", 0, "a"), ("format: x", 0, "b")])
+    r = post(client, "/api/siem/dlq/purge", {"destination_id": DEST, "error": "refused"})
+    assert r.status_code == 200 and r.get_json()["data"]["deleted"] == 1
+    with ctx.db() as conn:
+        assert [d.payload for d in store.dlq_page(conn, destination_id=DEST, limit=5, offset=0)] == ["b"]
+
+
 def test_purge_older_than_days(client, ctx):
     login(client)
     configured(client)

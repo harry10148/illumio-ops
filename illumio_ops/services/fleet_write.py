@@ -13,6 +13,7 @@ once a minute for RATE_MINUTES, then goes back to every 10 minutes by itself (Vi
 guide lists only its audit event (workloads.set_flow_reporting_frequency); the call is the one 5.x made."""
 from __future__ import annotations
 
+import threading
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -285,12 +286,23 @@ class _Batch:
                 self.record(t, "refused", why, None)
 
 
+# One progression at a time (review 2026-11-06): two at once both read a host's old mode and both wrote, the later
+# moving it back. Serialized, the later one reads what the earlier wrote (inventory and PCE) and stops there.
+_PROGRESSION = threading.Lock()
+
+
 def apply(ctx: AppContext, hosts: Sequence[EnforcementHost], target: str, *, by: str,
           now: datetime | None = None) -> FleetOutcome:
     """Move each host from the mode the preview showed to `target`. Raises NoWriteKey, ValueError. One PCE
     throughout: the one configured when it starts."""
     if target not in df.TARGETS:
         raise ValueError("unknown target mode")
+    with _PROGRESSION:
+        return _apply(ctx, hosts, target, by=by, now=now)
+
+
+def _apply(ctx: AppContext, hosts: Sequence[EnforcementHost], target: str, *, by: str,
+           now: datetime | None) -> FleetOutcome:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     cfg = ctx.settings.current().pce
     ident = _ident(ctx, cfg)
@@ -323,6 +335,9 @@ def apply(ctx: AppContext, hosts: Sequence[EnforcementHost], target: str, *, by:
                 continue
             live = body.get("enforcement_mode")
             previous = str(live) if live is not None else None
+            if _ident(ctx, ctx.settings.current().pce) != ident:  # switched while the read was answered
+                batch.done(t, "failed", "pce_changed", previous)
+                continue
             if body.get("managed") is False:
                 batch.done(t, "skipped", "unmanaged", previous)
                 continue

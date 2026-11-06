@@ -112,6 +112,28 @@ def test_app_summary_needs_an_app(context, live_app):
     assert "App summary: Finance" in Path(dl.value.path()).read_text(encoding="utf-8")
 
 
+def test_the_report_filter_starts_from_the_loaded_labels_and_holds_back_a_bad_condition(context, live_app):
+    """Review 2026-11-06: the condition editor was mounted before its choices arrived, so its label key stayed empty
+    and offered no values; and a condition that did not parse (443/tcpp) let the report be generated without it."""
+    _finance_inventory(live_app.ctx)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    entry = page.locator("[data-report-type=traffic]")
+    entry.get_by_role("button", name="Generate…").click()
+    form = entry.locator("[data-role=generate-form]")
+    dst = form.locator("[data-side=dst]")
+    expect(dst.locator("select[name=dst_label_key]")).not_to_have_value("")
+    dst.locator("select[name=dst_label_key]").select_option("app")
+    expect(dst.locator("select[name=dst_label_value] option", has_text="Finance")).to_have_count(1)
+    go = form.get_by_role("button", name="Generate", exact=True)
+    form.locator("input[name=ports]").fill("443/tcpp")
+    form.locator("input[name=ports]").blur()
+    expect(go).to_be_disabled()
+    form.locator("input[name=ports]").fill("443")
+    form.locator("input[name=ports]").blur()
+    expect(go).to_be_enabled()
+
+
 def test_schedule_with_filter(context, live_app):
     _finance_inventory(live_app.ctx)
     page = context.new_page()

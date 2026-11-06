@@ -56,7 +56,7 @@ export function Dlq() {
     setConfirm(null);
     setDetail(null);
     const body = { ids: kind === "resend" || kind === "purge" ? picked : null, destination_id: dest || null,
-                   older_than_days: kind === "purge_older" ? olderDays : null };
+                   older_than_days: kind === "purge_older" ? olderDays : null, error: filter || null };
     if (kind.startsWith("resend")) {
       const env = await call("siem.dlq.resend", body);
       if (env.ok && env.data) {

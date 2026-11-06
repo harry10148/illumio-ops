@@ -17,7 +17,7 @@ import {
   periodText,
   word,
 } from "./common";
-import { ReportFilter, namesApp } from "./ReportFilter";
+import { ReportFilter, forgetChoices, namesApp } from "./ReportFilter";
 import { CustomReports } from "./CustomReports";
 import { Schedules } from "./Schedules";
 import { ReportSettings } from "../system/ReportSettings";
@@ -35,6 +35,7 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(entry.latest_day);
   const [filter, setFilter] = useState<FlowCondition | null>(null);
+  const [filterValid, setFilterValid] = useState(true);
   const [lang, setLang] = useState("");
   // The formats this type makes, all on by default (policy_resolver: JSON and CSV only).
   const [formats, setFormats] = useState<CatalogEntry["formats"]>(entry.formats);
@@ -124,12 +125,12 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
         </p>
       )}
       {entry.accepts_filter && (
-        <ReportFilter value={filter} onChange={setFilter} requireApp={entry.requires_app} />
+        <ReportFilter value={filter} onChange={setFilter} requireApp={entry.requires_app} onValid={setFilterValid} />
       )}
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       <div className="actions">
         <button type="button" className="btn-primary"
-          disabled={busy || formats.length === 0 || (entry.requires_app && !namesApp(filter))
+          disabled={busy || formats.length === 0 || !filterValid || (entry.requires_app && !namesApp(filter))
             || (days === "custom" && (from === "" || to === ""))} onClick={() => void submit()}>
           {t("gui_reports_generate")}
         </button>
@@ -341,6 +342,9 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
 
 export function Reports() {
   const [params, setParams] = useSearchParams();
+  // The PCE may have been switched since this page was last open: read the choices again. In the first render (a
+  // lazy state initializer), before the forms' own effects read them.
+  useState(() => { forgetChoices(); return null; });
   const highlight = params.get("id") ? Number(params.get("id")) : null;
   const raw = params.get("tab");
   // An email link names a report (?id=): it opens on the produced list

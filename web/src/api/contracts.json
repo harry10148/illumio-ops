@@ -38302,6 +38302,19 @@
             "default": null,
             "title": "Destination Id"
           },
+          "error": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
           "ids": {
             "anyOf": [
               {
@@ -38368,6 +38381,19 @@
             ],
             "default": null,
             "title": "Destination Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
           },
           "ids": {
             "anyOf": [
