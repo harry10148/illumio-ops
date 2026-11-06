@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.3.0] - 2026-11-06
+
+### Added
+- Reports read the archive back. Traffic and events older than the store keeps were written to `data/archive` but
+  nothing read them; now a report whose period starts before the store's floor reads those days from their archive
+  files (when the archive reaches that far; otherwise traffic is pulled from the PCE as before) and lists which days
+  came from the archive, which were in neither, and any record it could not read. Audit reports read archived events.
+- A manual report can name its own days ("Choose dates": first and last day, whole days in the display time zone);
+  the date fields offer the range the data reaches, the archive's first day included. Schedules keep counting back
+  from today. A period before anything readable is refused and says so.
+
+### Fixed
+- An audit report's event coverage no longer marks the days read from the archive as older than the data kept.
+
 ## [6.2.3] - 2026-11-06
 
 ### Added
