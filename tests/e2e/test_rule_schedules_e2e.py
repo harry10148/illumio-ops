@@ -134,3 +134,31 @@ def test_edit_prefills_the_plan_and_check_now_says_what_happened(context, live_a
     assert sent["plan"].days == ("mon", "tue") and sent["plan"].timezone == "Asia/Taipei"
     page.locator("[data-role=rs-check]").click()
     expect(page.locator("[data-role=rs-checked]")).to_contain_text("already as planned")
+
+
+def test_rule_sets_are_browsed_from_rule_schedules(context, live_app, monkeypatch):
+    """5.x #/policy/rulesets (parity 2026-11-06): read-only, deny rules included, reached from rule schedules."""
+    from illumio_ops.services import rulesets as rsb
+    view = rsb.RulesetBrowse(total=1, limited=False, items=[rsb.RulesetItem(
+        href=RS, name="Backups", enabled=True, description="nightly", draft_pending=False, scheduled=True, rules=[
+            rsb.RuleItem(href=RS + "/sec_rules/9", kind="allow", label="#9", enabled=True,
+                         summary="app=backup → NAS: 445/TCP", description="", draft_pending=False, scheduled=False),
+            rsb.RuleItem(href=RS + "/deny_rules/3", kind="override_deny", label="Deny rule 3", enabled=False,
+                         summary="All workloads → app=backup: 3389/TCP", description="no RDP", draft_pending=True,
+                         scheduled=False)])])
+    asked = []
+    monkeypatch.setattr("illumio_ops.web.routes.rule_schedules.rulesets.browse",
+                        lambda ctx, q: asked.append(q) or view)
+    page = _open(context, live_app)
+    page.locator("[data-role=rs-browse-rulesets]").click()
+    panel = page.locator("[data-role=rsb-ruleset]")
+    expect(panel).to_have_count(1)
+    expect(panel).to_contain_text("Backups")
+    expect(panel).to_contain_text("Override deny")
+    expect(panel).to_contain_text("3389/TCP")
+    expect(panel).to_contain_text("no RDP")
+    assert page.locator("[data-role=rulesets] button:has-text('Delete')").count() == 0  # read-only
+    page.fill("input[name=rsb_q]", "back")
+    page.get_by_role("button", name="Search").click()
+    expect(page.locator("[data-role=rsb-count]")).to_contain_text("Rule sets: 1")
+    assert asked[-1] == "back"

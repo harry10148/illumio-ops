@@ -29963,6 +29963,138 @@
         "type": "object"
       }
     },
+    "rule_schedules.rulesets": {
+      "method": "GET",
+      "path": "/api/rule-schedules/rulesets",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "RuleItem": {
+            "properties": {
+              "description": {
+                "title": "Description",
+                "type": "string"
+              },
+              "draft_pending": {
+                "title": "Draft Pending",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "allow",
+                  "deny",
+                  "override_deny"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "label": {
+                "title": "Label",
+                "type": "string"
+              },
+              "scheduled": {
+                "title": "Scheduled",
+                "type": "boolean"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "href",
+              "kind",
+              "label",
+              "enabled",
+              "summary",
+              "description",
+              "draft_pending",
+              "scheduled"
+            ],
+            "title": "RuleItem",
+            "type": "object"
+          },
+          "RulesetItem": {
+            "properties": {
+              "description": {
+                "title": "Description",
+                "type": "string"
+              },
+              "draft_pending": {
+                "title": "Draft Pending",
+                "type": "boolean"
+              },
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "rules": {
+                "items": {
+                  "$ref": "#/$defs/RuleItem"
+                },
+                "title": "Rules",
+                "type": "array"
+              },
+              "scheduled": {
+                "title": "Scheduled",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "href",
+              "name",
+              "enabled",
+              "description",
+              "draft_pending",
+              "scheduled",
+              "rules"
+            ],
+            "title": "RulesetItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/RulesetItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limited": {
+            "title": "Limited",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limited"
+        ],
+        "title": "RulesetBrowse",
+        "type": "object"
+      }
+    },
     "rule_schedules.runs": {
       "method": "GET",
       "path": "/api/rule-schedules/runs",

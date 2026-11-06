@@ -1,6 +1,7 @@
 // Rule scheduling (UI redesign spec §4.5, sample 05): enable or disable an active PCE rule or rule set by a weekly
 // window or an expiry; the engine checks every five minutes and provisions with the write key.
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type { CheckResult, DeleteResult, RuleSchedulesView, RunView, ScheduleView, TargetHit, Weekly, Expiry } from "../../api/generated";
@@ -339,7 +340,10 @@ export function RuleSchedules() {
   const o = view?.overview;
   return (
     <section className="page" data-role="rule-schedules">
-      <PageHead title={t("nav_rule_schedules")} sub={t("rs_sub")}><ModeMark needs="basic" /></PageHead>
+      <PageHead title={t("nav_rule_schedules")} sub={t("rs_sub")}>
+        <Link to="/rule-schedules/rulesets" data-role="rs-browse-rulesets">{t("rs_browse_rulesets")}</Link>
+        <ModeMark needs="basic" />
+      </PageHead>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {o && !o.write_key && <p className="notice" data-role="rs-no-write-key">{t("rs_no_write_key")}</p>}
       <KpiStrip items={[

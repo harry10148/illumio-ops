@@ -125,3 +125,19 @@ def test_edit_answers_with_the_schedule(client, ctx, monkeypatch):
     r = client.put(f"/api/rule-schedules/{sid}", json={"plan": PLAN}, environ_overrides=LOCAL,
                    headers={"X-CSRFToken": csrf(client)})
     assert r.status_code == 200 and seen["id"] == sid and seen["plan"].kind == "weekly"
+
+
+def test_rulesets_browse_is_read_only_and_says_when_the_pce_fails(client, monkeypatch):
+    from illumio_ops.pce.collections import PceCollectionIncomplete
+    from illumio_ops.services import rulesets
+    login(client)
+    r = client.get("/api/rule-schedules/rulesets", environ_overrides=LOCAL)
+    assert r.status_code == 409 and r.get_json()["error"]["code"] == "pce_not_configured"
+    monkeypatch.setattr(rulesets, "browse", lambda ctx, q: rulesets.RulesetBrowse(items=[], total=0, limited=False))
+    assert client.get("/api/rule-schedules/rulesets?q=back", environ_overrides=LOCAL).status_code == 200
+
+    def boom(ctx, q):
+        raise PceCollectionIncomplete("/sec_policy/active/rule_sets", 0, "HTTP 500")
+    monkeypatch.setattr(rulesets, "browse", boom)
+    r = client.get("/api/rule-schedules/rulesets", environ_overrides=LOCAL)
+    assert r.status_code == 502 and "HTTP 500" in r.get_json()["error"]["params"]["error"]
