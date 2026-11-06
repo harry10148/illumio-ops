@@ -2832,5 +2832,11 @@
   "err_siem_tls_unverified": "Certificate verification is off for {names}: the lines are encrypted, but anyone who can answer in the SIEM's place receives them. Save only if you accept that.",
   "siem_save_anyway": "Save anyway",
   "siem_tls_unverified_warning": "Certificate verification is off: the connection is encrypted, but whether it reaches your SIEM is not checked.",
-  "siem_tls_unverified_badge": "Certificate not verified"
+  "siem_tls_unverified_badge": "Certificate not verified",
+  "siem_rate_1h": "Last hour: {rate}% went through ({sent} of {tried} attempts)",
+  "siem_rate_1h_none": "Last hour: nothing sent or tried",
+  "siem_sends_24h": "Last 24 hours: sent {sent}, failed {failed}",
+  "siem_sends_7d": "Last 7 days: sent {sent}, failed {failed}",
+  "siem_sends_hint": "Sent: lines the destination took. Failed: once for each run the destination could not be reached, and once for each line it refused or that could not be formatted. Counted in 10-minute steps, so each period can reach up to 10 minutes further back.",
+  "siem_dlq_full_hint": "Held at a record the full DLQ has no room for: nothing after it is sent. Resend or purge DLQ lines and it goes on by itself."
 }

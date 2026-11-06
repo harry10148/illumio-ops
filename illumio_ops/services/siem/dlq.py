@@ -29,8 +29,10 @@ class ResendResult(BaseModel):
 
 
 def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | None,
-           transport_factory: TransportFactory | None = None) -> ResendResult:
-    """ids: those lines; None: the oldest RESEND_MAX of the destination (or of every destination)."""
+           transport_factory: TransportFactory | None = None, now: datetime | None = None) -> ResendResult:
+    """ids: those lines; None: the oldest RESEND_MAX of the destination (or of every destination). What went and what
+    failed again count in the destination's sends."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.db() as conn:
         dead = store.dlq_by_ids(conn, list(ids)) if ids is not None else store.dlq_after(
             conn, destination_id=destination_id, after_id=0, limit=RESEND_MAX)
@@ -53,6 +55,7 @@ def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | 
         if not letters:
             continue
         ok: list[int] = []
+        failed_here = 0
         transport = (transport_factory or transport_for)(dest)
         try:
             for d in letters:
@@ -64,12 +67,14 @@ def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | 
                     with ctx.db() as conn:
                         store.dlq_failed_again(conn, d.id, last_error)
                     failed += 1
+                    failed_here += 1
             if ok:
                 try:
                     transport.finish_batch()
                 except OSError as exc:  # not confirmed: they stay, to be resent again
                     last_error = f"delivery_unconfirmed: {exc}"
                     failed += len(ok)
+                    failed_here += 1
                     ok = []
         finally:
             try:
@@ -78,6 +83,7 @@ def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | 
                 logger.debug("SIEM DLQ resend close: {}", exc)
         with ctx.db() as conn:
             store.dlq_delete(conn, ok)
+            store.record_sends(conn, dest_id, at, sent=len(ok), failed=failed_here)
         sent += len(ok)
     with ctx.db() as conn:
         remaining = store.dlq_count(conn, destination_id)

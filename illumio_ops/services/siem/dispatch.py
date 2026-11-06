@@ -9,8 +9,12 @@ through, the first is what fails and goes to the DLQ, so one record a peer alway
 forever; if it fails too, the destination is down and nothing goes to the DLQ (5.x moved a record there every
 max_retries ticks of an outage). A record nothing comes after goes anyway once it has failed STUCK_FACTOR times that
 often while the destination took something else within the hour. A record the destination refuses for good (HTTP
-4xx other than 408/429, a datagram too large) goes to the DLQ at once and the batch goes on. A full DLQ stops the
-destination where it is: nothing is dropped, the status page says so. Nothing here holds a database connection while
+4xx other than 408/429, a datagram too large) goes to the DLQ at once and the batch goes on. A full DLQ holds the
+source where it is (an expired HEC token refuses every line: passing them over would lose all of them): nothing is
+dropped, nothing after the held record is sent ahead of it (a probe would send it again once the cursor moves), the
+status page shows the source as held by a full DLQ, the log says so and the SIEM backlog system alert fires; it goes
+on by itself once the DLQ has room (a resend, a purge, or its retention). Each line sent and each failed attempt is
+counted for the status page's last hour, 24 hours and 7 days. Nothing here holds a database connection while
 sending: a slow SIEM never keeps a PCE switch waiting."""
 from __future__ import annotations
 
@@ -162,13 +166,31 @@ def _run_destination(ctx: AppContext, s: Settings, dest: SiemDestination, deadli
     return results
 
 
-def _quarantine(ctx: AppContext, s: Settings, dest: SiemDestination, source: str, rec: SiemRecord, payload: str,
-                error: str, attempts: int, at: datetime) -> bool:
-    """Into the DLQ; False (nothing written) when the destination's DLQ is full."""
+def _dlq_full(ctx: AppContext, s: Settings, dest: SiemDestination) -> bool:
     with ctx.db() as conn:
-        if store.dlq_count(conn, dest.id) >= s.siem.dlq_max_per_dest:
-            store.note_error(conn, dest.id, source, "dlq_full", at)
-            return False
+        return store.dlq_count(conn, dest.id) >= s.siem.dlq_max_per_dest
+
+
+def _held(ctx: AppContext, dest: SiemDestination, source: str, rec: SiemRecord, at: datetime) -> None:
+    """The record should go to the DLQ and there is no room: the source waits at it, and says so."""
+    with ctx.db() as conn:
+        store.note_error(conn, dest.id, source, "dlq_full", at)
+    logger.error("SIEM destination {} ({}): the DLQ is full, so {} is held and nothing after it is sent; resend or "
+                 "purge DLQ lines to go on", dest.name, source, rec.external_id)
+
+
+def _quarantine(ctx: AppContext, s: Settings, dest: SiemDestination, source: str, rec: SiemRecord, payload: str,
+                error: str, attempts: int, at: datetime, *, failed_now: bool = False) -> bool:
+    """Into the DLQ; False (nothing written, the record held) when the destination's DLQ is full. failed_now: this
+    run's attempt at it failed and is counted here (a head's failures are counted by record_failure)."""
+    with ctx.db() as conn:
+        if failed_now:
+            store.record_sends(conn, dest.id, at, failed=1)
+        full = store.dlq_count(conn, dest.id) >= s.siem.dlq_max_per_dest
+    if full:
+        _held(ctx, dest, source, rec, at)
+        return False
+    with ctx.db() as conn:
         store.quarantine(conn, destination_id=dest.id, source=source, record_id=rec.record_id,
                          external_id=rec.external_id, event_time=rec.time, payload=payload, sent_as=sent_as(dest),
                          error=error, attempts=attempts, at=at)
@@ -244,7 +266,8 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
             try:
                 payload = fmt.format_record(rec)
             except Exception as exc:  # noqa: BLE001 — a record that cannot be formatted must not stop the rest
-                if not _quarantine(ctx, s, dest, source, rec, repr(rec)[:4000], f"format: {exc}", 1, at):
+                if not _quarantine(ctx, s, dest, source, rec, repr(rec)[:4000], f"format: {exc}", 1, at,
+                                   failed_now=True):
                     run.dlq_full = True
                     break
                 run.quarantined += 1
@@ -255,7 +278,8 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
                 transport.send_record(payload, _event_time(rec))
             except Exception as exc:  # noqa: BLE001 — classified below; the cursor stays on it
                 if permanent(exc):
-                    if not _quarantine(ctx, s, dest, source, rec, payload, f"refused: {exc}", 1, at):
+                    if not _quarantine(ctx, s, dest, source, rec, payload, f"refused: {exc}", 1, at,
+                                       failed_now=True):
                         run.dlq_full = True
                         break
                     run.quarantined += 1
@@ -294,10 +318,17 @@ def _run_source(ctx: AppContext, s: Settings, dest: SiemDestination, source: str
             stuck = attempts >= dest.max_retries * HARD_FACTOR or (
                 attempts >= dest.max_retries * STUCK_FACTOR
                 and not read(ctx, s, head.record_id, 1, dest) and _recently_up(ctx, dest, at))
+            if not stuck and attempts < dest.max_retries:
+                return run
+            if _dlq_full(ctx, s, dest):
+                # No room for the head: a probe that goes through would be sent again once the cursor can move.
+                _held(ctx, dest, source, head, at)
+                run.dlq_full, run.error = True, "dlq_full"
+                return run
             ahead = [r for r in records if r.record_id > head.record_id]
-            if not stuck and attempts >= dest.max_retries and len(ahead) < PROBE:  # a small batch: read ahead to probe
+            if not stuck and len(ahead) < PROBE:  # a small batch: read ahead to probe
                 ahead = read(ctx, s, head.record_id, PROBE, dest)
-            probed = None if stuck or attempts < dest.max_retries else _next_goes_through(transport, fmt, ahead, head)
+            probed = None if stuck else _next_goes_through(transport, fmt, ahead, head)
             if stuck or probed is not None:
                 # A record after it went through (or it failed far too often): this one is what fails. The probed
                 # record was sent; any between them are tried again from the next tick.

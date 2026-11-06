@@ -30964,6 +30964,15 @@
                 "title": "Id",
                 "type": "string"
               },
+              "last_24h": {
+                "$ref": "#/$defs/SiemSends"
+              },
+              "last_7d": {
+                "$ref": "#/$defs/SiemSends"
+              },
+              "last_hour": {
+                "$ref": "#/$defs/SiemSends"
+              },
               "name": {
                 "title": "Name",
                 "type": "string"
@@ -30978,6 +30987,17 @@
                 },
                 "title": "Sources",
                 "type": "array"
+              },
+              "success_rate_1h": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Success Rate 1H"
               },
               "tls_unverified": {
                 "title": "Tls Unverified",
@@ -30998,6 +31018,10 @@
               "tls_unverified",
               "dlq",
               "dlq_max",
+              "last_hour",
+              "last_24h",
+              "last_7d",
+              "success_rate_1h",
               "sources"
             ],
             "title": "SiemDestinationStatus",
@@ -31015,6 +31039,24 @@
             ],
             "title": "SiemFormat",
             "type": "string"
+          },
+          "SiemSends": {
+            "properties": {
+              "failed": {
+                "title": "Failed",
+                "type": "integer"
+              },
+              "sent": {
+                "title": "Sent",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "sent",
+              "failed"
+            ],
+            "title": "SiemSends",
+            "type": "object"
           },
           "SiemSourceStatus": {
             "properties": {

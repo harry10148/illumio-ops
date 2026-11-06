@@ -2832,5 +2832,11 @@
   "err_siem_tls_unverified": "{names} 未驗證憑證：送出的內容有加密，但任何能冒充這個 SIEM 回應的人都會收到。確定接受才儲存。",
   "siem_save_anyway": "仍要儲存",
   "siem_tls_unverified_warning": "未驗證憑證：連線有加密，但不確認連到的是不是你的 SIEM。",
-  "siem_tls_unverified_badge": "未驗證憑證"
+  "siem_tls_unverified_badge": "未驗證憑證",
+  "siem_rate_1h": "最近一小時：{tried} 次嘗試中 {sent} 次送達（{rate}%）",
+  "siem_rate_1h_none": "最近一小時：沒有送出，也沒有嘗試",
+  "siem_sends_24h": "最近 24 小時：送出 {sent}，失敗 {failed}",
+  "siem_sends_7d": "最近 7 天：送出 {sent}，失敗 {failed}",
+  "siem_sends_hint": "送出：目的地收下的訊息數。失敗：目的地連不上時每次執行算一次，目的地拒收或無法格式化的訊息每筆算一次。以 10 分鐘為單位計算，所以每段期間最多會往前多算 10 分鐘。",
+  "siem_dlq_full_hint": "停在一筆放不進 DLQ 的紀錄（DLQ 已滿），之後的都不會送。重送或清除 DLQ 的訊息後會自動接續。"
 }

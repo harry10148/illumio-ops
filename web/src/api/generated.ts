@@ -2212,11 +2212,23 @@ enabled: boolean
 format: SiemFormat
 host: string
 id: string
+last_24h: SiemSends
+last_7d: SiemSends
+last_hour: SiemSends
 name: string
 port: number
 sources: SiemSourceStatus[]
+success_rate_1h: (number | null)
 tls_unverified: boolean
 transport: SiemTransport
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SiemSends".
+ */
+export interface SiemSends {
+failed: number
+sent: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema

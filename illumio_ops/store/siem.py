@@ -1,11 +1,12 @@
-"""SIEM forwarding state in data/app.sqlite (owner of siem_cursor and siem_dlq): where each destination got to in
-each source, and what it would not take. The services decide; this module only stores."""
+"""SIEM forwarding state in data/app.sqlite (owner of siem_cursor, siem_dlq and siem_stats): where each destination got
+to in each source, what it would not take, and what it sent and failed over time. The services decide; this module only
+stores."""
 from __future__ import annotations
 
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 FLOW_SOURCES = ("audit", "detections", "new_connections")  # their ids live in the flow store a PCE switch recreates
 
@@ -71,10 +72,10 @@ def set_floor(conn: sqlite3.Connection, destination_id: str, source: str, floor:
 
 def advance(conn: sqlite3.Connection, destination_id: str, source: str, *, pce_url: str, org_id: str, last_id: int,
             sent: int, at: datetime) -> bool:
-    """Move the cursor to last_id after sending `sent` records; False (nothing written) when the cursor now belongs to
-    another PCE — a switch landed while the batch was out."""
+    """Move the cursor to last_id after sending `sent` records, counted in the same transaction; False (nothing
+    written) when the cursor now belongs to another PCE — a switch landed while the batch was out."""
     with conn:
-        return conn.execute(
+        moved = conn.execute(
             "UPDATE siem_cursor SET last_id = MAX(last_id, :last), sent = sent + :sent, "
             "last_sent_at = COALESCE(:at, last_sent_at), "
             # the failing record's count is kept until the cursor is past it (a batch that sent nothing moves nothing)
@@ -83,16 +84,21 @@ def advance(conn: sqlite3.Connection, destination_id: str, source: str, *, pce_u
             "WHERE destination_id = :dest AND source = :source AND pce_url = :pce AND org_id = :org",
             {"last": last_id, "sent": sent, "at": _t(at) if sent else None, "dest": destination_id, "source": source,
              "pce": pce_url, "org": org_id}).rowcount > 0
+        if moved and sent:
+            _count(conn, destination_id, at, sent=sent, failed=0)
+    return moved
 
 
 def record_failure(conn: sqlite3.Connection, destination_id: str, source: str, *, head_id: int | None, error: str,
                    at: datetime) -> int:
-    """A failed send of the batch starting at head_id; returns how many times that record has now failed."""
+    """A failed send of the batch starting at head_id (one failed attempt in the counts); returns how many times that
+    record has now failed."""
     with conn:
         conn.execute(
             "UPDATE siem_cursor SET head_attempts = CASE WHEN head_id IS ? THEN head_attempts + 1 ELSE 1 END, "
             "head_id = ?, last_error = ?, last_error_at = ? WHERE destination_id = ? AND source = ?",
             (head_id, head_id, error[:2000], _t(at), destination_id, source))
+        _count(conn, destination_id, at, sent=0, failed=1)
         row = conn.execute("SELECT head_attempts FROM siem_cursor WHERE destination_id = ? AND source = ?",
                            (destination_id, source)).fetchone()
     return int(row[0]) if row else 0
@@ -222,3 +228,47 @@ def dlq_purge(conn: sqlite3.Connection, destination_id: str | None) -> int:
 def dlq_failed_again(conn: sqlite3.Connection, dead_id: int, error: str) -> None:
     with conn:
         conn.execute("UPDATE siem_dlq SET attempts = attempts + 1, error = ? WHERE id = ?", (error[:2000], dead_id))
+
+
+# ── sends over time ──────────────────────────────────────────────────────────
+
+BUCKET = timedelta(minutes=10)
+STATS_KEEP = timedelta(days=8)  # the longest window shown is 7 days
+
+
+@dataclass(frozen=True)
+class Sends:
+    sent: int
+    failed: int
+
+
+def _bucket(at: datetime) -> str:
+    at = at.astimezone(UTC)
+    return at.replace(minute=at.minute - at.minute % 10, second=0, microsecond=0).isoformat()
+
+
+def _count(conn: sqlite3.Connection, destination_id: str, at: datetime, *, sent: int, failed: int) -> None:
+    conn.execute(
+        "INSERT INTO siem_stats (destination_id, bucket, sent, failed) VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(destination_id, bucket) DO UPDATE SET sent = sent + excluded.sent, failed = failed + excluded.failed",
+        (destination_id, _bucket(at), sent, failed))
+
+
+def record_sends(conn: sqlite3.Connection, destination_id: str, at: datetime, *, sent: int = 0, failed: int = 0) -> None:
+    """Lines sent and failed attempts outside a cursor's move: a refused or unformattable record, a DLQ resend."""
+    if sent or failed:
+        with conn:
+            _count(conn, destination_id, at, sent=sent, failed=failed)
+
+
+def sends_since(conn: sqlite3.Connection, since: datetime) -> dict[str, Sends]:
+    """Per destination, the sends of every bucket from the one holding `since`: a window reaches back up to one
+    bucket (10 minutes) further than asked."""
+    return {r[0]: Sends(int(r[1]), int(r[2])) for r in conn.execute(
+        "SELECT destination_id, SUM(sent), SUM(failed) FROM siem_stats WHERE bucket >= ? GROUP BY 1",
+        (_bucket(since),))}
+
+
+def delete_sends_before(conn: sqlite3.Connection, before: datetime) -> int:
+    with conn:
+        return conn.execute("DELETE FROM siem_stats WHERE bucket < ?", (_bucket(before),)).rowcount
