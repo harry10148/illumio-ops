@@ -30,6 +30,7 @@ class PceConnection(BaseModel):
     # Optional key with write access, used only to enable Rule Hit Count (spec §6.5, P5c-2).
     write_api_key: str
     write_api_secret: str
+    events_timeout_seconds: int | None  # None: the default for the deployment type (pce.events)
 
 
 class PceConnectionUpdate(BaseModel):
@@ -44,6 +45,8 @@ class PceConnectionUpdate(BaseModel):
     write_api_key: str = Field(default="", max_length=512)
     write_api_secret: str = Field(default="", max_length=1024)
     clear_write_key: bool = False
+    # Left out: unchanged (a client from before the field keeps the saved value); null: the default.
+    events_timeout_seconds: int | None = None
 
 
 class PceReset(BaseModel):
@@ -100,6 +103,8 @@ def get_connection() -> PceConnection:
 @api_route(bp, OP_UPDATE)
 def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
     fields = body.model_dump(mode="json", exclude={"revision", "clear_write_key"})
+    if "events_timeout_seconds" not in body.model_fields_set:
+        del fields["events_timeout_seconds"]
     # A blank or masked secret means "keep what is saved": the form never receives
     # the real values, so it cannot send them back.
     kept = [k for k in ("api_key", "api_secret") if fields[k] in ("", MASK)]

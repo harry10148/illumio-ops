@@ -23,6 +23,7 @@ interface Form {
   write_api_secret: string;
   write_saved: boolean;
   clear_write_key: boolean;
+  events_timeout: string;  // blank: the default for the deployment type
 }
 
 function toForm(c: Conn): Form {
@@ -40,6 +41,7 @@ function toForm(c: Conn): Form {
     write_api_secret: c.write_api_secret,
     write_saved: Boolean(c.write_api_key || c.write_api_secret),
     clear_write_key: false,
+    events_timeout: c.events_timeout_seconds === null ? "" : String(c.events_timeout_seconds),
   };
 }
 
@@ -105,6 +107,7 @@ export function PceConnection() {
       write_api_key: form.clear_write_key ? "" : form.write_api_key,
       write_api_secret: form.clear_write_key ? "" : form.write_api_secret,
       clear_write_key: form.clear_write_key,
+      events_timeout_seconds: form.events_timeout.trim() === "" ? null : Number(form.events_timeout.trim()),
     });
     setBusy(false);
     if (env.ok && env.data) {
@@ -196,6 +199,13 @@ export function PceConnection() {
             <FieldError name="ca_path" error={error} />
           </label>
         )}
+        <label>
+          {t("pce_events_timeout")}
+          <input name="events_timeout" type="number" min={5} max={600} inputMode="numeric" value={form.events_timeout}
+                 onChange={(e) => set("events_timeout", e.target.value)} placeholder={saas ? "180" : "30"} />
+          <span className="hint">{t("pce_events_timeout_hint", { seconds: saas ? "180" : "30" })}</span>
+          <FieldError name="events_timeout_seconds" error={error} />
+        </label>
         <fieldset>
           <legend>{t("pce_write_key_title")}</legend>
           <p className="hint">{t("pce_write_key_hint")}</p>

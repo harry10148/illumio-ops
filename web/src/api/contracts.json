@@ -35434,6 +35434,17 @@
           "deployment_type": {
             "$ref": "#/$defs/DeploymentType"
           },
+          "events_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events Timeout Seconds"
+          },
           "org_id": {
             "title": "Org Id",
             "type": "string"
@@ -35476,7 +35487,8 @@
           "console_url",
           "verify_tls",
           "write_api_key",
-          "write_api_secret"
+          "write_api_secret",
+          "events_timeout_seconds"
         ],
         "title": "PceConnection",
         "type": "object"
@@ -35700,6 +35712,18 @@
           "deployment_type": {
             "$ref": "#/$defs/DeploymentType"
           },
+          "events_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Events Timeout Seconds"
+          },
           "org_id": {
             "maxLength": 32,
             "title": "Org Id",
@@ -35813,6 +35837,17 @@
           "deployment_type": {
             "$ref": "#/$defs/DeploymentType"
           },
+          "events_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events Timeout Seconds"
+          },
           "org_id": {
             "title": "Org Id",
             "type": "string"
@@ -35866,6 +35901,7 @@
           "verify_tls",
           "write_api_key",
           "write_api_secret",
+          "events_timeout_seconds",
           "reset"
         ],
         "title": "PceConnectionSaved",

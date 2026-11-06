@@ -2731,6 +2731,7 @@ api_key: string
 api_secret: string
 console_url: (string | null)
 deployment_type: DeploymentType
+events_timeout_seconds: (number | null)
 org_id: string
 revision: number
 url: string
@@ -2774,6 +2775,7 @@ api_secret: string
 clear_write_key?: boolean
 console_url: (string | null)
 deployment_type: DeploymentType
+events_timeout_seconds?: (number | null)
 org_id: string
 revision: number
 url: string
@@ -2798,6 +2800,7 @@ api_key: string
 api_secret: string
 console_url: (string | null)
 deployment_type: DeploymentType
+events_timeout_seconds: (number | null)
 org_id: string
 reset: (PceReset | null)
 revision: number

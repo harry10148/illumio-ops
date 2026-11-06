@@ -2829,5 +2829,7 @@
   "gui_reports_period_from": "從",
   "gui_reports_period_to": "到",
   "gui_reports_period_hint": "以顯示時區的整天計算，含起訖兩天；可選 {first} 到 {last}。本機已不保留的日子從封存讀取，報表會註明。",
-  "shell_version": "版本 {version}"
+  "shell_version": "版本 {version}",
+  "pce_events_timeout": "事件查詢逾時（秒）",
+  "pce_events_timeout_hint": "單次 /events 請求可等待的時間，5–600 秒。留空：此部署類型使用 {seconds} 秒（SaaS 回應 /events 較慢）。"
 }

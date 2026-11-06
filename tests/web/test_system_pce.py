@@ -244,3 +244,16 @@ def test_moving_pce_requires_reentering_or_clearing_write_key(client, ctx):
     assert ctx.settings.current().pce.url == BASE
     ok = _save(client, url=moved, api_key="k2", api_secret="s2", clear_write_key=True)
     assert ok.status_code == 200 and ctx.settings.current().pce.write_api_secret == ""
+
+
+def test_events_timeout_is_edited_on_the_pce_page(client, ctx):
+    """Spec §6.5 管理 lists the events timeout; 5.x/v6 kept it in the file only (parity 2026-11-06)."""
+    login(client)
+    assert client.get("/api/system/pce", environ_overrides=LOCAL).get_json()["data"]["events_timeout_seconds"] is None
+    r = _save(client, events_timeout_seconds=120)
+    assert r.status_code == 200 and r.get_json()["data"]["events_timeout_seconds"] == 120
+    assert ctx.settings.current().pce.events_timeout_seconds == 120
+    assert _save(client, events_timeout_seconds=None).status_code == 200  # blank: the default again
+    assert ctx.settings.current().pce.events_timeout_seconds is None
+    r = _save(client, events_timeout_seconds=3)
+    assert r.status_code == 400 and r.get_json()["error"]["field"] == "pce.events_timeout_seconds"
