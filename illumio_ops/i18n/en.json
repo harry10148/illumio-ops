@@ -2833,7 +2833,7 @@
   "rpt_ven_sec_online": "Online VENs",
   "rpt_ven_online_intro": "Every online VEN with its version, operating system, mode, last heartbeat, policy sync and compatibility. The compatibility count below covers every managed host, online or not.",
   "rpt_ven_tbl_online": "Online VENs",
-  "rpt_ven_col_mode": "Enforcement mode",
+  "rpt_ven_col_mode": "Mode",
   "rpt_ven_col_compat": "Compatibility",
   "rpt_ven_none_online": "No VEN is online: none is marked online by the PCE with a heartbeat in the last hour.",
   "rpt_ven_tbl_compat": "Managed hosts by compatibility",

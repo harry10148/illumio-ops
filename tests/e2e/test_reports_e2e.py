@@ -269,6 +269,11 @@ def test_open_report_in_browser_sandboxed(context, live_app):
     assert "/reports/view/" in report.url
     expect(report.locator("header.cover h1")).to_have_count(1)
     assert report.evaluate("typeof sortTable") == "function"  # the report's inline table script ran
+    said = []
+    report.on("console", lambda m: said.append(m.text))
+    report.locator(".print-btn").click()
+    report.wait_for_timeout(300)
+    assert not [m for m in said if "sandboxed" in m]  # allow-modals: printing is not refused
     # an opaque origin: reading the console's cookies throws
     assert report.evaluate("(() => { try { return document.cookie; } catch (e) { return e.name; } })()") == "SecurityError"
     reached = report.evaluate("fetch('/api/reports').then(() => 'reached', () => 'blocked')")
