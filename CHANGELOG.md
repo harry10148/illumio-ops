@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.4.0] - 2026-11-06
+
+What 5.x had and 6.3.0 still lacked (parity audit 2026-11-06), and the features the v6 design had deferred.
+
+### Added
+- Alerts: an event catalog in the rule editor (categories, descriptions, which events take a status filter); flow
+  conditions for either end, named PCE services, label groups, Windows service names, broadcast/multicast and an
+  excluded process (the inventory now reads services and label groups); the reports filter offers the whole
+  condition editor; a rule's cooldown is shown ("held until …") and can be reset; alert history can be kept forever
+  (0 days); every enabled channel can be tested at once; "evaluate now" runs the collection and alert jobs at once.
+  5.x rules using either-end, Windows service, transmission or excluded-process conditions now migrate.
+- SIEM: per destination, lines sent and failed in the last hour, 24 hours and 7 days and the last hour's success
+  rate; a DLQ line in full, the DLQ filtered and exported by error, purged by age and kept 30 days by default
+  (`siem.dlq_retention_days`); turning certificate verification off needs a confirmation and is flagged.
+- Reports: the VEN status report lists online VENs and their compatibility; network inventory lists endpoints seen
+  with more than one label combination; findings carry MITRE ATT&CK techniques; the audit report correlates failed
+  sign-ins with a following high-risk change; the traffic report has protocol distribution, top rates and bytes per
+  connection and by app pair; new connections lists connections that stopped; reports can be deleted in bulk and
+  opened in the browser (sandboxed); a saved workbench section reopens in Investigate.
+- System: the product version is shown; the events timeout, the admin username, "run retention now", "clear the
+  collected data" (typed confirmation) and backfill of events or traffic only are on the GUI; the same PCE at a new
+  address keeps its data once the new address is verified to serve the same workloads; rule schedules can be edited
+  and checked now; rule sets can be browsed; the upgrade report lists 5.x VEN progression records; the bundle
+  carries THIRD_PARTY_NOTICES.
+- VEN fleet: an overview of enforcement modes, versions, OS, online and policy sync states with a filterable host
+  list; enforcement progression (forward only, preview with the connections that Full would block, explicit
+  confirmation, per-host results and a log) and a temporary increase of the traffic update rate, both through the
+  write key.
+
+### Fixed
+- A full SIEM DLQ no longer sends the same held record again on every run.
+- The audit report reads the source address where the PCE puts it for API sign-in failures.
+
 ## [6.3.0] - 2026-11-06
 
 ### Added
