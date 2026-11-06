@@ -26,6 +26,10 @@ class CustomSectionAdd(BaseModel):
     request: WorkbenchRequest
 
 
+class SectionRequest(BaseModel):
+    request: WorkbenchRequest
+
+
 class CustomRename(BaseModel):
     name: str = Field(min_length=1, max_length=TITLE_MAX)
 
@@ -36,6 +40,8 @@ OP_REMOVE = operation("custom_reports.remove_section", "POST",
                       "/api/custom-reports/<int:report_id>/sections/<int:index>/remove", Empty, CustomReport)
 OP_RENAME = operation("custom_reports.rename", "POST", "/api/custom-reports/<int:report_id>/rename", CustomRename,
                       CustomReport)
+OP_SECTION_REQUEST = operation("custom_reports.section_request", "GET",
+                               "/api/custom-reports/<int:report_id>/sections/<int:index>/request", None, SectionRequest)
 OP_DELETE = operation("custom_reports.delete", "DELETE", "/api/custom-reports/<int:report_id>", None, Empty)
 
 bp = Blueprint("custom_reports", __name__)
@@ -67,6 +73,14 @@ def add_section(body: CustomSectionAdd) -> CustomReport:
 def remove_section(body: Empty, report_id: int, index: int) -> CustomReport:
     try:
         return custom_reports.remove_section(get_ctx(), report_id, index, now=datetime.now(UTC))
+    except (LookupError, ValueError) as exc:
+        raise _mapped(exc) from None
+
+
+@api_route(bp, OP_SECTION_REQUEST)
+def section_request(report_id: int, index: int) -> SectionRequest:
+    try:
+        return SectionRequest(request=custom_reports.section_request(get_ctx(), report_id, index, now=datetime.now(UTC)))
     except (LookupError, ValueError) as exc:
         raise _mapped(exc) from None
 

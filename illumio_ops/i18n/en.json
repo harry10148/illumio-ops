@@ -2884,5 +2884,7 @@
   "gui_reports_delete_confirm": "Delete {n} reports and their files? This cannot be undone.",
   "gui_reports_bulk_result": "Deleted {removed}; {running} still being made were kept; {missing} were already gone.",
   "gui_reports_open": "Open",
-  "gui_reports_open_hint": "Open the HTML report in a new tab"
+  "gui_reports_open_hint": "Open the HTML report in a new tab",
+  "cust_open_section": "Open in Investigate",
+  "cust_open_section_hint": "Opens the section's conditions, view and grouping in Investigate over the last day, the page's default period; a section keeps no period of its own."
 }

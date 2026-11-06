@@ -2884,5 +2884,7 @@
   "gui_reports_delete_confirm": "要刪除 {n} 份報表與其檔案嗎？刪除後無法復原。",
   "gui_reports_bulk_result": "已刪除 {removed} 份；{running} 份仍在產生中，未刪除；{missing} 份原本就不存在。",
   "gui_reports_open": "開啟",
-  "gui_reports_open_hint": "在新分頁開啟 HTML 報表"
+  "gui_reports_open_hint": "在新分頁開啟 HTML 報表",
+  "cust_open_section": "在「調查」頁開啟",
+  "cust_open_section_hint": "在「調查」頁以最近一天（該頁的預設期間）開啟這個區段的條件、檢視與分組；區段本身不保存期間。"
 }
