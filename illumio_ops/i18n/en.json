@@ -58,7 +58,7 @@
   "display_timezone_hint": "Report schedules, report periods and alert times use it. local is this server's clock (now {zone}); also UTC, UTC+8, or a zone name such as Asia/Taipei.",
   "err_archive_retention_short": "Archive files must be kept at least as long as flows and events are (or set 0 to keep them).",
   "err_auth_required": "Please sign in.",
-  "err_backfill_beyond_retention": "Those days are older than flows are kept, so they would be deleted again right away.",
+  "err_backfill_beyond_retention": "Backfill can start no earlier than {earliest}: this data is kept {days} days, so the next retention clean-up would delete older days right after they were read.",
   "err_backfill_range_invalid": "The start date must be on or before the end date, and the end date cannot be in the future.",
   "err_backfill_running": "A backfill is already running. Wait for it to finish.",
   "err_ca_bundle_unreadable": "The service cannot read this file. Use a path outside /root and /home that the service account can read.",
@@ -2832,5 +2832,16 @@
   "shell_version": "Version {version}",
   "pce_events_timeout": "Events query timeout (seconds)",
   "pce_events_timeout_hint": "How long one /events request may take, 5–600 seconds. Blank: {seconds} seconds for this deployment type (SaaS answers /events slowly).",
-  "migrate_fleet_progressions_not_in_v6": "the VEN enforcement progression records of 5.x are not carried: v6.0 does not progress VENs. The file stays in the 5.x directory."
+  "migrate_fleet_progressions_not_in_v6": "the VEN enforcement progression records of 5.x are not carried: v6.0 does not progress VENs. The file stays in the 5.x directory.",
+  "err_backfill_traffic_not_collected": "Lightweight mode does not collect traffic, so traffic cannot be backfilled. Switch to alert or full mode first, or backfill events only.",
+  "backfill_sources": "Read",
+  "backfill_sources_both": "What this mode collects",
+  "backfill_sources_events": "Events only",
+  "backfill_sources_traffic": "Traffic only",
+  "backfill_sources_hint": "Lightweight mode collects no traffic, so it backfills events only. Traffic goes back as far as flows are kept, events as far as events are kept.",
+  "backfill_started_reads": "Reads: {what}.",
+  "collection_maintenance_title": "Collected data",
+  "retention_run_intro": "Retention clean-up runs once a day and deletes data older than the retention days above (with archiving on, only days already archived). Run it now after shortening a retention period.",
+  "btn_retention_run": "Run retention clean-up now",
+  "retention_run_queued": "Retention clean-up started. Its result shows under Background jobs as Retention clean-up."
 }

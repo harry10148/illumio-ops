@@ -32095,6 +32095,16 @@
             "title": "End",
             "type": "string"
           },
+          "sources": {
+            "default": "both",
+            "enum": [
+              "both",
+              "events",
+              "traffic"
+            ],
+            "title": "Sources",
+            "type": "string"
+          },
           "start": {
             "format": "date",
             "title": "Start",
@@ -32435,6 +32445,28 @@
           "settings"
         ],
         "title": "CollectionView",
+        "type": "object"
+      }
+    },
+    "system.collection.retention_run": {
+      "method": "POST",
+      "path": "/api/system/collection/retention/run",
+      "request_schema": {
+        "properties": {},
+        "title": "Empty",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "queued": {
+            "title": "Queued",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "queued"
+        ],
+        "title": "RetentionQueued",
         "type": "object"
       }
     },

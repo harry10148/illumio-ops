@@ -88,3 +88,85 @@ def test_archive_retention_shorter_than_raw_is_a_field_error(client, ctx):
     data["settings"]["archive"] = {"enabled": True, "retention_days": 7}
     err = _send(client, "PUT", "/api/system/collection", data).get_json()["error"]
     assert err["field"] == "settings.archive" and err["code"] == "invalid_input"
+
+
+def _capture_backfill(monkeypatch):
+    import threading
+    seen: dict = {}
+    done = threading.Event()
+
+    def fake(ctx, *, start, end, sources=None, **kw):
+        seen.update(start=start, end=end, sources=sources)
+        done.set()
+    monkeypatch.setattr(backfill, "run_backfill", fake)
+    return seen, done
+
+
+def _days_ago(n):
+    from datetime import UTC, datetime, timedelta
+    return (datetime.now(UTC).date() - timedelta(days=n)).isoformat()
+
+
+def test_backfill_reads_only_what_was_asked(client, ctx, monkeypatch):
+    """5.x backfilled events or traffic per request (parity 2026-11-06); v6 decided by the mode alone."""
+    from illumio_ops.domain.values import IngestSource
+    login(client)
+    seen, done = _capture_backfill(monkeypatch)
+    r = _send(client, "POST", "/api/system/collection/backfill",
+              {"start": _days_ago(3), "end": _days_ago(2), "sources": "events"})
+    assert r.status_code == 200 and done.wait(5)
+    assert seen["sources"] == (IngestSource.EVENTS,)
+    done.clear()
+    r = _send(client, "POST", "/api/system/collection/backfill",
+              {"start": _days_ago(3), "end": _days_ago(2), "sources": "traffic"})
+    assert r.status_code == 200 and done.wait(5) and seen["sources"] == (IngestSource.TRAFFIC,)
+    done.clear()
+    r = _send(client, "POST", "/api/system/collection/backfill", {"start": _days_ago(3), "end": _days_ago(2)})
+    assert r.status_code == 200 and done.wait(5)
+    assert seen["sources"] == (IngestSource.TRAFFIC, IngestSource.EVENTS)  # both, in full mode
+
+
+def test_backfill_of_traffic_the_mode_does_not_collect_is_refused(client, ctx):
+    login(client)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
+    r = _send(client, "POST", "/api/system/collection/backfill",
+              {"start": _days_ago(3), "end": _days_ago(2), "sources": "traffic"})
+    assert r.status_code == 400 and r.get_json()["error"]["code"] == "backfill_source_not_collected"
+
+
+def test_events_backfill_goes_back_as_far_as_events_are_kept(client, ctx, monkeypatch):
+    login(client)
+    _seen, done = _capture_backfill(monkeypatch)
+    keep = ctx.settings.current().collection.retention
+    assert keep.event_days > keep.flow_days
+    old = _days_ago(keep.flow_days + 5)
+    r = _send(client, "POST", "/api/system/collection/backfill", {"start": old, "end": old, "sources": "both"})
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and err["code"] == "backfill_beyond_retention"
+    assert err["params"] == {"days": str(keep.flow_days), "earliest": _days_ago(keep.flow_days)}
+    r = _send(client, "POST", "/api/system/collection/backfill", {"start": old, "end": old, "sources": "events"})
+    assert r.status_code == 200 and done.wait(5)
+
+
+def test_retention_runs_now_through_its_job(client, ctx):
+    """5.x POST /retention/run; v6 moves the daily retention job to now, so job health records the run."""
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.jobs.scheduler import build_scheduler
+    login(client)
+    ctx.scheduler = build_scheduler(ctx)
+    r = _send(client, "POST", "/api/system/collection/retention/run", {})
+    assert r.status_code == 200 and r.get_json()["data"]["queued"] is True
+    nxt = ctx.scheduler.get_job("collect_retention").next_run_time
+    assert abs(nxt - datetime.now(UTC)) < timedelta(seconds=10)
+
+
+def test_retention_runs_beside_the_request_without_a_scheduler(client, ctx, monkeypatch):
+    import threading
+
+    from illumio_ops.web.routes import system_collection
+    login(client)
+    ran = threading.Event()
+    monkeypatch.setattr(system_collection, "run_retention", lambda c: ran.set() or {})
+    r = _send(client, "POST", "/api/system/collection/retention/run", {})
+    assert r.status_code == 200 and ran.wait(5)

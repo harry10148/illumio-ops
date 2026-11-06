@@ -58,7 +58,7 @@
   "display_timezone_hint": "報表排程、報表期間與告警時間都依這個時區。local 是這台伺服器的時鐘（目前 {zone}）；也可填 UTC、UTC+8，或 Asia/Taipei 這類時區名稱。",
   "err_archive_retention_short": "封存檔保留天數不可少於流量與事件的保留天數（或設為 0 表示永久保留）。",
   "err_auth_required": "請先登入。",
-  "err_backfill_beyond_retention": "這段日期早於流量保留期限，回填後會立即被清除。",
+  "err_backfill_beyond_retention": "最早只能從 {earliest} 開始回填：這類資料保留 {days} 天，更早的日子回填後會在下一次保留期清理時被刪除。",
   "err_backfill_range_invalid": "起始日必須早於或等於結束日，且結束日不可晚於今天。",
   "err_backfill_running": "已有回填正在執行，請等它完成。",
   "err_ca_bundle_unreadable": "服務讀不到這個檔案，請放在 /root 與 /home 以外、服務帳號可讀的位置。",
@@ -2832,5 +2832,16 @@
   "shell_version": "版本 {version}",
   "pce_events_timeout": "事件查詢逾時（秒）",
   "pce_events_timeout_hint": "單次 /events 請求可等待的時間，5–600 秒。留空：此部署類型使用 {seconds} 秒（SaaS 回應 /events 較慢）。",
-  "migrate_fleet_progressions_not_in_v6": "5.x 的 VEN 強制模式推進紀錄不會帶入：v6.0 沒有 VEN 推進功能。此檔案保留在 5.x 目錄中。"
+  "migrate_fleet_progressions_not_in_v6": "5.x 的 VEN 強制模式推進紀錄不會帶入：v6.0 沒有 VEN 推進功能。此檔案保留在 5.x 目錄中。",
+  "err_backfill_traffic_not_collected": "輕量模式不收集流量，無法回填流量。請先切換到告警或完整模式，或只回填事件。",
+  "backfill_sources": "回填內容",
+  "backfill_sources_both": "目前模式收集的資料",
+  "backfill_sources_events": "只回填事件",
+  "backfill_sources_traffic": "只回填流量",
+  "backfill_sources_hint": "輕量模式不收集流量，只回填事件。流量最早可回填到流量保留天數，事件最早可回填到事件保留天數。",
+  "backfill_started_reads": "回填內容：{what}。",
+  "collection_maintenance_title": "已收集的資料",
+  "retention_run_intro": "保留期清理每天執行一次，刪除超過上方保留天數的資料（開啟封存時，只刪已封存的日子）。縮短保留天數後可立即執行。",
+  "btn_retention_run": "立即執行保留期清理",
+  "retention_run_queued": "已開始保留期清理，結果見「背景工作」的「保留期清理」。"
 }
