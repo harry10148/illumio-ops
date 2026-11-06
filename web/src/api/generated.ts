@@ -655,6 +655,7 @@ grouped: boolean
 id: number
 last_seen: string
 late: boolean
+next_steps: string[]
 notes: NoteView[]
 params: {
 [k: string]: unknown

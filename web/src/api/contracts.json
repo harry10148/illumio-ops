@@ -9829,6 +9829,13 @@
             "title": "Late",
             "type": "boolean"
           },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
           "notes": {
             "items": {
               "$ref": "#/$defs/NoteView"
@@ -9911,7 +9918,8 @@
           "notes",
           "timeline",
           "beyond_vendor",
-          "quarantine"
+          "quarantine",
+          "next_steps"
         ],
         "title": "AlertDetail",
         "type": "object"
@@ -10585,6 +10593,13 @@
             "title": "Late",
             "type": "boolean"
           },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
           "notes": {
             "items": {
               "$ref": "#/$defs/NoteView"
@@ -10667,7 +10682,8 @@
           "notes",
           "timeline",
           "beyond_vendor",
-          "quarantine"
+          "quarantine",
+          "next_steps"
         ],
         "title": "AlertDetail",
         "type": "object"

@@ -173,3 +173,11 @@ def test_category_and_unprocessed_from_the_query_string(client, ctx):
     assert [i["id"] for i in data["items"]] == [lateral] and data["items"][0]["category"] == "lateral"
     assert data["counts"] == {"critical": 0, "high": 2, "medium": 0, "low": 0, "grouped": 0}
     assert get(client, "/api/alerts?category=nope").status_code == 400
+
+
+def test_detail_says_what_to_do_next(client, ctx):
+    """Parity audit 2026-11-06 A3: the detail page carries the alert's next steps (here the low-disk check)."""
+    login(client)
+    a = seed(ctx)
+    d = get(client, f"/api/alerts/{a}").get_json()["data"]
+    assert len(d["next_steps"]) == 1 and "retention" in d["next_steps"][0]

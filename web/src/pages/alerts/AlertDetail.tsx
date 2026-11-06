@@ -224,6 +224,12 @@ export function AlertDetail() {
           ? <p className="hint" data-role="known-reason">{t("alert_known_reason", { reason: d.params.known_reason })}</p>
           : d.grouped && <p className="hint">{t("alert_grouped_known_cause")}</p>}
       </div>
+      {d.next_steps.length > 0 && (
+        <div className="card stack" data-role="next-steps">
+          <h2>{t("guide_title")}</h2>
+          {d.next_steps.map((s) => <p key={s}>{s}</p>)}
+        </div>
+      )}
       <div className="card stack" data-role="alert-context">
         <h2>{t("alert_timeline_title")}</h2>
         <ol className="timeline" data-role="timeline">

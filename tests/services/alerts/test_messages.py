@@ -113,3 +113,19 @@ def test_tamper_alert_carries_its_reading_on_every_channel():
         assert "nft" in text and "4242" in text and "Added a rule" in text and "regular cycle" in text, channel
         text = json.dumps(render([confirmed], channel, lang=Language.EN, tz=UTC, console_url=None).__dict__)
         assert "no process information" in text, channel
+
+
+def test_next_steps_go_with_the_alert_where_there_is_room():
+    """Parity audit 2026-11-06 A3: what to do next. Mail, Teams and webhook carry it for every alert; LINE and
+    Telegram, short by design, only when the message is about one alert."""
+    from illumio_ops.services.alerts.messages import next_steps
+    [step] = next_steps(view(), Language.EN)
+    assert "restores" in step  # the tampering step: the VEN puts its policy back; the question is who changed it
+    mail = render([view(), view(2)], ChannelKind.SMTP, lang=Language.EN, tz=UTC, console_url=None)
+    assert mail.text.count(step) == 2 and mail.html.count("restores") == 2
+    teams = json.dumps(render([view()], ChannelKind.TEAMS, lang=Language.EN, tz=UTC, console_url=None).card)
+    assert "restores" in teams
+    hook = render([view()], ChannelKind.WEBHOOK, lang=Language.EN, tz=UTC, console_url=None)
+    assert hook.payload["alerts"][0]["next_steps"] == [step]
+    assert step in render([view()], ChannelKind.LINE, lang=Language.EN, tz=UTC, console_url=None).text
+    assert step not in render([view(), view(2)], ChannelKind.LINE, lang=Language.EN, tz=UTC, console_url=None).text

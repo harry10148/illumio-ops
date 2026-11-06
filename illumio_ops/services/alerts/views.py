@@ -21,6 +21,7 @@ from illumio_ops.services.alerts.messages import (
     caveats,
     console_url,
     display_zone,
+    next_steps,
     rule_title,
     summary,
 )
@@ -114,6 +115,7 @@ class AlertDetail(AlertItem):
     timeline: list[TimelineEntry]
     beyond_vendor: list[str]
     quarantine: QuarantineEligibility
+    next_steps: list[str]  # what to do next (domain.guidance); empty when there is nothing specific to say
 
 
 class AlertEvidence(BaseModel):
@@ -325,7 +327,7 @@ def alert_detail(ctx: AppContext, alert_id: int) -> AlertDetail | None:
                         created_at=datetime.fromisoformat(n["created_at"])) for n in notes],
         timeline=_timeline(ctx, row, item.rule_name, detection, lang),
         beyond_vendor=_beyond(ctx, params, lang) if item.rule_type is AlertRuleType.LATERAL else [],
-        quarantine=_quarantine(ctx, detection))
+        quarantine=_quarantine(ctx, detection), next_steps=next_steps(alert_view(row), lang))
 
 
 def evidence_segment(ctx: AppContext, alert_id: int) -> tuple[str | None, dict[str, Any] | None] | None:

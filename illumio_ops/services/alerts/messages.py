@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
 
+from illumio_ops.domain.guidance import guide_keys
 from illumio_ops.domain.tamper import TAMPER_ACTION_KEYS, TAMPER_PATTERN_KEYS
 from illumio_ops.domain.values import (
     ChannelKind,
@@ -131,6 +132,11 @@ def summary(v: AlertView, lang: Language) -> str:
     return f"{text} {reading}" if reading else text
 
 
+def next_steps(v: AlertView, lang: Language) -> list[str]:
+    """What to do next about the alert (domain.guidance): none when there is nothing specific to say."""
+    return [translate(lang, k) for k in guide_keys(v.message_key, v.params, v.pack_key)]
+
+
 def caveats(v: AlertView, lang: Language) -> list[str]:
     """What the reader must weigh (anti-goal 8): late data, a gap in the window, partial field coverage."""
     out = []
@@ -188,11 +194,19 @@ def _fit(lines: list[str], limit: int, lang: Language, *, escape: bool) -> str:
     return "\n".join(out)
 
 
+def _with_steps(line: str, v: AlertView, lang: Language) -> str:
+    steps = next_steps(v, lang)
+    return "\n".join([line, *(f"→ {s}" for s in steps)])
+
+
 def render(alerts: Sequence[AlertView], channel: ChannelKind, *, lang: Language, tz: tzinfo | None,
            console_url: str | None, tz_label: str | None = None) -> Rendered:
     subj = subject(alerts, lang)
     lines = [_line(a, lang, tz, tz_label) for a in alerts]
     if channel in LIMITS:
+        # Short channels carry the next steps only for a message about one alert; with several, room goes to them.
+        if len(alerts) == 1:
+            lines = [_with_steps(lines[0], alerts[0], lang)]
         escape = channel is ChannelKind.TELEGRAM
         head = html.escape(subj) if escape else subj
         body = _fit(lines, LIMITS[channel] - len(head) - 1, lang, escape=escape)
@@ -206,8 +220,10 @@ def render(alerts: Sequence[AlertView], channel: ChannelKind, *, lang: Language,
                                         "weight": "Bolder", "size": "Medium", "wrap": True}]
         # Alert lines carry PCE data (hostnames, users, processes): a TextBlock would render Markdown in them, so
         # they go in TextRuns, which Teams shows as plain text.
-        items += [{"type": "RichTextBlock", "inlines": [{"type": "TextRun", "text": _line(a, lang, tz, tz_label)}]}
-                  for a in shown]
+        for a in shown:
+            items.append({"type": "RichTextBlock", "inlines": [{"type": "TextRun", "text": _line(a, lang, tz, tz_label)}]})
+            items += [{"type": "RichTextBlock", "inlines": [{"type": "TextRun", "text": f"→ {step}", "isSubtle": True}]}
+                      for step in next_steps(a, lang)]
         if more:
             items.append({"type": "RichTextBlock", "inlines": [{"type": "TextRun", "text": more, "isSubtle": True}]})
         card = {"type": "message", "attachments": [{
@@ -216,9 +232,12 @@ def render(alerts: Sequence[AlertView], channel: ChannelKind, *, lang: Language,
                         "version": "1.4", "body": items}}]}
         return Rendered(subject=subj, text="\n".join(lines[:cap]), html=None, card=card, payload=None)
     if channel is ChannelKind.SMTP:
-        plain = "\n".join([subj, "", *lines[:cap], *([more] if more else []),
+        plain = "\n".join([subj, "", *(_with_steps(line, a, lang) for line, a in zip(lines[:cap], shown, strict=True)),
+                           *([more] if more else []),
                            *([translate(lang, "alert_msg_console", {"url": console_url})] if console_url else [])])
-        rows = "".join(f"<li>{html.escape(line)}</li>" for line in lines[:cap])
+        rows = "".join(
+            f"<li>{html.escape(line)}" + "".join(f"<br><small>→ {html.escape(s)}</small>" for s in next_steps(a, lang))
+            + "</li>" for line, a in zip(lines[:cap], shown, strict=True))
         foot = f"<p>{html.escape(more)}</p>" if more else ""
         link = (f'<p><a href="{html.escape(console_url)}">{html.escape(translate(lang, "alert_msg_console_link"))}</a></p>'
                 if console_url else "")
@@ -227,5 +246,5 @@ def render(alerts: Sequence[AlertView], channel: ChannelKind, *, lang: Language,
     payload = {"subject": subj, "truncated": rest, "alerts": [
         {"id": a.id, "rule": rule_title(a, lang), "severity": a.severity.value, "subject": a.subject_key,
          "fired_at": a.fired_at.isoformat(), "late": a.late, "summary": summary(a, lang),
-         "facts": dict(a.facts), "caveats": caveats(a, lang)} for a in shown]}
+         "facts": dict(a.facts), "caveats": caveats(a, lang), "next_steps": next_steps(a, lang)} for a in shown]}
     return Rendered(subject=subj, text="\n".join(lines[:cap]), html=None, card=None, payload=payload)
