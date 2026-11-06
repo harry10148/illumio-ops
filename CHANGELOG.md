@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.2.3] - 2026-11-06
+
+### Added
+- Every alert says what to do next, on its detail page (a "What to do next" card) and in the message: mail, Teams and
+  the webhook payload (`next_steps`) for every alert, LINE and Telegram when the message is about one alert. The steps
+  follow what fired — the PCE event type, the system check, the detector — so a custom rule about the same event gets
+  them too. The PCE facts in them were checked against the vendor documents rather than copied from 5.x (a suspended
+  VEN opens the host's firewall; the offline timer takes a host out of its peers' rules; unpairing leaves the firewall
+  as chosen), and they name only pages and actions that exist.
+
+### Fixed
+- `reset-tls` and the installation guide named the certificate page "TLS"; it is System › Certificate.
+
 ## [6.2.2] - 2026-11-06
 
 ### Added
