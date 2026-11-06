@@ -162,3 +162,26 @@ def test_removed_workload_named_as_removed(ctx):
     names = {r[0] for r in table.rows}
     assert "Removed workload …a8f1eb" in names
     assert not any(n.startswith("/orgs/") for n in names)
+
+
+def _gone(doc):
+    return next(s for s in doc.sections if s.id == "disappeared")
+
+
+def test_disappeared_connections_seen_before_not_since(ctx):
+    """5.x baseline drift's vanished pairs: seen in the previous period and not seen since this one began."""
+    _covered(ctx, START - (END - START), END)
+    _baseline(ctx, [(A, DB, 5432, datetime(2026, 10, 14, tzinfo=UTC), "allowed"),
+                    (A, DB, 50000, datetime(2026, 10, 14, tzinfo=UTC), "allowed")])  # a dynamic port: left out
+    [table] = [b for b in _gone(build_new_connections(_inp(ctx))).blocks if isinstance(b, TableBlock)]
+    assert {(r[0], r[1], r[2]) for r in table.rows} == {("app-01", "10.1.1.2", "443/TCP"),
+                                                        ("app-01", "fin-db-01", "5432/TCP")}
+    assert table.total_rows == 2
+
+
+def test_disappeared_unknown_without_previous_period(ctx):
+    from illumio_ops.domain.report import TextBlock
+    _covered(ctx, START, END)
+    blocks = _gone(build_new_connections(_inp(ctx))).blocks
+    assert not any(isinstance(b, TableBlock) for b in blocks)
+    assert "not collected" in " ".join(p for b in blocks if isinstance(b, TextBlock) for p in b.paragraphs)

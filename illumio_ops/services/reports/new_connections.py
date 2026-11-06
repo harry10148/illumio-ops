@@ -14,6 +14,7 @@ from illumio_ops.domain.report import (
     ReportDocument,
     Section,
     TableBlock,
+    TextBlock,
 )
 from illumio_ops.domain.values import DYNAMIC_PORTS_FROM, Severity
 from illumio_ops.services.analysis.context import LateralContext, load_lateral_context
@@ -139,6 +140,13 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
                                   "ORDER BY first_seen, src_key LIMIT ?", [*window, *params, ADMIN_ROW_LIMIT]).fetchall()
         all_rows = conn.execute(f"SELECT * FROM connection_baseline WHERE {_WINDOW} ORDER BY first_seen, src_key "
                                 "LIMIT ?", [*window, ROW_LIMIT]).fetchall()
+        # Seen in the previous period and not since this one began (5.x baseline drift's vanished pairs).
+        gone_where = f"last_seen >= ? AND last_seen < ? AND {_ELIGIBLE}"
+        gone_window = [db_time(prev_start), db_time(inp.start)]
+        gone_total = int(conn.execute(f"SELECT COUNT(*) FROM connection_baseline WHERE {gone_where}",
+                                      gone_window).fetchone()[0]) if prev_known else 0
+        gone_rows = conn.execute(f"SELECT * FROM connection_baseline WHERE {gone_where} ORDER BY last_seen, src_key "
+                                 "LIMIT ?", [*gone_window, ROW_LIMIT]).fetchall() if prev_known else []
     accumulating = None if lc.baseline_full() else b.t(
         "detector_baseline_accumulating", days=f"{lc.baseline_days:.0f}", required=lc.baseline_required)
     labels = {"new": "rpt_new_kpi_new", "admin": "rpt_new_kpi_admin", "critical": "rpt_new_kpi_critical",
@@ -168,6 +176,14 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
     all_table = TableBlock(title=b.t("rpt_new_tbl_all"), columns=b.columns(), rows=b.connection_rows(all_rows),
                            total_rows=max(now_counts["new"], len(all_rows)), empty_text=empty,
                            limit_note=b.limit_note(len(all_rows), now_counts["new"]))
+    gone_blocks: tuple[TableBlock | TextBlock, ...]
+    if prev_known:
+        gone_blocks = (TableBlock(title=b.t("rpt_new_tbl_disappeared"), columns=b.columns(),
+                                  rows=b.connection_rows(gone_rows), total_rows=max(gone_total, len(gone_rows)),
+                                  empty_text=b.t("rpt_new_disappeared_none"),
+                                  limit_note=b.limit_note(len(gone_rows), gone_total)),)
+    else:
+        gone_blocks = (TextBlock(paragraphs=(b.t("rpt_new_disappeared_unknown"),)),)
     quality = [*coverage_note(inp.ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz)]
     if partial:
         quality.append(partial)
@@ -183,4 +199,6 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
                           blocks=(service_table,)),
                   Section(id="by_destination", title=b.t("rpt_new_sec_by_destination"), blocks=(dst_table,)),
                   Section(id="admin", title=b.t("rpt_new_sec_admin"), blocks=(admin_table,)),
-                  Section(id="all", title=b.t("rpt_new_sec_all"), blocks=(all_table,))))
+                  Section(id="all", title=b.t("rpt_new_sec_all"), blocks=(all_table,)),
+                  Section(id="disappeared", title=b.t("rpt_new_sec_disappeared"),
+                          intro=b.t("rpt_new_disappeared_intro", port=DYNAMIC_FROM), blocks=gone_blocks)))

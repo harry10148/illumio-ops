@@ -2859,5 +2859,10 @@
   "rpt_aud_none_failed_change": "No high-risk change came within {minutes} minutes after a failed sign-in by the same user.",
   "rpt_aud_failed_change_title": "{n} high-risk changes right after failed sign-ins",
   "rpt_aud_failed_change_why": "Users: {users}. Each made a high-risk change within {minutes} minutes after a failed sign-in or denied request under the same name; a guessed or stolen password looks like this.",
-  "rpt_aud_failed_change_action": "Confirm with each user that they made the change; if not, revert it, reset the credential and review the account's other actions."
+  "rpt_aud_failed_change_action": "Confirm with each user that they made the change; if not, revert it, reset the credential and review the account's other actions.",
+  "rpt_new_sec_disappeared": "Connections that stopped",
+  "rpt_new_disappeared_intro": "Connections (source, destination, port and protocol) seen in the previous period of the same length and not seen since this period began. Connections on dynamic ports ({port} and up) or without a port are left out, as for new connections. The previous period here is the one the other metrics compare with.",
+  "rpt_new_tbl_disappeared": "Seen in the previous period, not since",
+  "rpt_new_disappeared_none": "Every connection seen in the previous period was seen again in this one.",
+  "rpt_new_disappeared_unknown": "Which connections stopped cannot be said: the previous period was not collected in full, or is older than the connection baseline keeps."
 }
