@@ -568,6 +568,73 @@ def label_mix(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str, 
                     unmanaged_into_apps_total=len(into))
 
 
+class ProtoTotals(BaseModel):
+    proto: int
+    flows: int
+    connections: int
+
+
+class VolumeRow(BaseModel):
+    src: str  # the flow's hostname, else its address
+    dst: str
+    port: int | None
+    proto: int
+    bytes: int
+    connections: int
+    seconds: float  # first to last detection
+    mbps: float | None  # bytes over that span; None under a second
+
+
+class TrafficVolume(BaseModel):
+    """Protocols, and the byte-carrying flow records ranked by rate and by bytes per connection (traffic report)."""
+    by_proto: list[ProtoTotals]  # most connections first
+    with_bytes: int  # records that carry byte counts
+    with_rate: int  # of those, records seen over at least a second
+    max_mbps: float | None
+    by_rate: list[VolumeRow]  # highest rate first, at most `top`
+    multi_conn: int  # byte-carrying records of more than one connection
+    by_per_conn: list[VolumeRow]  # most bytes per connection first, at most `top`
+
+
+_SPAN = "(julianday(f.last_detected) - julianday(f.first_detected)) * 86400.0"
+_HAS_BYTES = "(f.bytes_in IS NOT NULL OR f.bytes_out IS NOT NULL)"
+_BYTES = "(COALESCE(f.bytes_in, 0) + COALESCE(f.bytes_out, 0))"
+
+
+def traffic_volume(ctx: AppContext, spec: FilterSpec, *, top: int) -> TrafficVolume:
+    """Rates are averages over the time the PCE saw a flow record (first to last detection), so a lower bound of its
+    peak: the PCE reports no transfer duration on these records."""
+    fdb, gen, settings = _store_read(ctx)
+    cols = (f"COALESCE(f.src_hostname, f.src_ip), COALESCE(f.dst_hostname, f.dst_ip), f.port, f.proto, {_BYTES}, "
+            f"f.num_connections, {_SPAN}")
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
+        protos = conn.execute(f"SELECT f.proto, COUNT(*), COALESCE(SUM(f.num_connections), 0) AS n FROM flows f "
+                              f"WHERE {where} GROUP BY f.proto ORDER BY n DESC, f.proto", params).fetchall()
+        counts = conn.execute(
+            f"SELECT COUNT(*), SUM({_SPAN} >= 1), SUM(f.num_connections > 1), "
+            f"MAX(CASE WHEN {_SPAN} >= 1 THEN {_BYTES} * 8.0 / {_SPAN} / 1000000 END) "
+            f"FROM flows f WHERE {where} AND {_HAS_BYTES}", params).fetchone()
+        by_rate = conn.execute(f"SELECT {cols} FROM flows f WHERE {where} AND {_HAS_BYTES} AND {_SPAN} >= 1 "
+                               f"ORDER BY {_BYTES} * 1.0 / {_SPAN} DESC, f.id LIMIT ?", [*params, top]).fetchall()
+        by_conn = conn.execute(f"SELECT {cols} FROM flows f WHERE {where} AND {_HAS_BYTES} AND f.num_connections > 1 "
+                               f"ORDER BY {_BYTES} * 1.0 / f.num_connections DESC, f.id LIMIT ?",
+                               [*params, top]).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+
+    def row(r: Any) -> VolumeRow:
+        secs = float(r[6] or 0.0)
+        return VolumeRow(src=r[0], dst=r[1], port=r[2], proto=r[3], bytes=r[4], connections=r[5], seconds=secs,
+                         mbps=r[4] * 8 / secs / 1_000_000 if secs >= 1 else None)
+    return TrafficVolume(by_proto=[ProtoTotals(proto=p, flows=f, connections=n) for p, f, n in protos],
+                         with_bytes=counts[0] or 0, with_rate=counts[1] or 0, multi_conn=counts[2] or 0,
+                         max_mbps=counts[3], by_rate=[row(r) for r in by_rate], by_per_conn=[row(r) for r in by_conn])
+
+
 class LabelConflict(BaseModel):
     """A managed endpoint the period's flows show with more than one label combination."""
     key: str

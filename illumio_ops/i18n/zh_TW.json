@@ -1213,7 +1213,7 @@
   "rpt_trf_sec_services": "依 port 與協定",
   "rpt_trf_tbl_services": "依 port／協定的連線數",
   "rpt_trf_sec_bytes": "最大傳輸量",
-  "rpt_trf_bytes_intro": "期間內有 {pct}% 的流量帶有位元組數；此排名只涵蓋這些流量。",
+  "rpt_trf_bytes_intro": "期間內有 {pct}% 的流量帶有位元組數；以下各表只涵蓋這些流量。",
   "rpt_trf_tbl_bytes": "依位元組數的主機對",
   "rpt_col_bytes": "位元組",
   "rpt_trf_no_bytes": "期間內沒有任何流量帶有位元組數，因此沒有傳輸量排名。位元組數只來自有回報的 VEN。",
@@ -2864,5 +2864,18 @@
   "rpt_new_disappeared_intro": "上一個等長期間出現過、本期開始後就沒再出現的連線（來源、目的、port 與協定）。動態 port（{port} 以上）或沒有 port 的連線與新連線一樣不列入。這裡的上一期與其他數字比較的是同一期。",
   "rpt_new_tbl_disappeared": "上一期出現、之後未再出現",
   "rpt_new_disappeared_none": "上一期出現過的連線，本期都再出現過。",
-  "rpt_new_disappeared_unknown": "無法判斷哪些連線停止了：上一期的流量沒有完整收集，或早於連線基準保留的範圍。"
+  "rpt_new_disappeared_unknown": "無法判斷哪些連線停止了：上一期的流量沒有完整收集，或早於連線基準保留的範圍。",
+  "rpt_trf_tbl_protocols": "依協定的流量",
+  "rpt_col_protocol": "協定",
+  "rpt_col_share_connections": "占連線比例",
+  "rpt_trf_proto_n": "協定 {n}",
+  "rpt_trf_tbl_app_bytes": "依 app 配對的位元組數",
+  "rpt_trf_rate_note": "{total} 筆帶位元組數的流量紀錄中，{rated} 筆的觀測時間至少一秒，因此算得出速率：位元組數除以首次到最後一次偵測的時間。PCE 不回報實際傳輸時間，所以這個速率是實際速率的下限（此處最高 {max} Mbps）。",
+  "rpt_trf_rate_none": "{total} 筆帶位元組數的流量紀錄都沒有觀測滿一秒，算不出速率。",
+  "rpt_trf_tbl_rate": "速率最高的紀錄（下限）",
+  "rpt_col_mbps": "Mbps（下限）",
+  "rpt_trf_no_rate": "沒有任何帶位元組數的流量紀錄觀測滿一秒。",
+  "rpt_trf_tbl_per_conn": "每條連線位元組數最多的紀錄（多於一條連線者）",
+  "rpt_col_bytes_per_conn": "每條連線位元組數",
+  "rpt_trf_no_multi_conn": "沒有任何帶位元組數的流量紀錄包含一條以上的連線。"
 }

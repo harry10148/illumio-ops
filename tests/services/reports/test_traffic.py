@@ -128,3 +128,29 @@ def test_zh_tw_builds(ctx):
     _write(ctx, [flow(port=5900)])
     doc = _build(ctx, lang=Language.ZH_TW)
     assert doc.title and doc.findings[0].title == "勒索軟體高風險遠端存取 port"
+
+
+def test_protocol_distribution(ctx):
+    _write(ctx, [flow(port=443, conns=3), flow(port=22, conns=1), flow(port=53, proto=17, conns=6)])
+    sec = _section(_build(ctx), "services")
+    proto = next(b for b in sec.blocks if isinstance(b, TableBlock) and b.columns[0].key == "proto")
+    rows = {r[0]: r[1:] for r in proto.rows}
+    assert rows["UDP"][:2] == (1, 6) and rows["TCP"][:2] == (2, 4) and rows["UDP"][2] == "60.0%"
+    assert proto.rows[0][0] == "UDP"  # most connections first
+
+
+def test_bandwidth_and_bytes_per_connection(ctx):
+    """5.x mod11: Mbps where the flow's span is known (bytes over first to last detection, a lower bound), bytes per
+    connection, and the data volume by app pair."""
+    _write(ctx, [flow(dst="big", port=443, bytes_=50 * 1024 * 1024, conns=2),
+                 flow(dst="small", port=443, bytes_=3000, conns=3, src_app="Batch"), flow(port=22)])
+    sec = _section(_build(ctx), "bytes")
+    tables = {b.columns[-1].key: b for b in sec.blocks if isinstance(b, TableBlock)}
+    rate = tables["mbps"]
+    assert rate.rows[0][1] == "big" and rate.rows[0][-1] == "1.398" and rate.total_rows == 2
+    per_conn = tables["per_conn"]
+    assert [r[1] for r in per_conn.rows] == ["big", "small"] and per_conn.rows[1][-1] == 1000
+    apps = next(b for b in sec.blocks if isinstance(b, TableBlock) and b.columns[0].key == "src_app")
+    assert apps.rows[0][:2] == ("Web", "DB")
+    text = " ".join(p for b in sec.blocks if isinstance(b, TextBlock) for p in b.paragraphs)
+    assert "2 of 2" in text and "lower bound" in text
