@@ -36,12 +36,13 @@ APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe", "alert_eval_state", "siem_cu
 # belongs to the alerts. Rule schedules and their runs name their PCE (an operator's definitions and a record of
 # writes, like quarantine actions): a switch leaves them, and they are checked again only while that PCE is set.
 # The SIEM send counts are what each destination took, whichever PCE it came from: a switch leaves them.
+# Fleet actions (enforcement-mode changes, traffic update rate increases) are a record of writes too, each naming its PCE.
 APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "detection_annotations", "alerts",
                                            "alert_deliveries",
                                            "alert_notes", "alert_rule_state", "alert_rule_status", "channel_state",
                                            "reports", "report_schedule_state", "quarantine_actions",
                                            "custom_reports", "alert_id_floor", "siem_dlq", "rule_schedules",
-                                           "rule_schedule_runs", "siem_stats")
+                                           "rule_schedule_runs", "siem_stats", "fleet_actions")
 
 
 def _forget_alert_watermarks(ctx: AppContext) -> None:

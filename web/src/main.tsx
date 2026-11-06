@@ -10,6 +10,7 @@ import "./pages/alerts/RulesAndChannels";
 import "./pages/reports/Reports";
 import "./pages/workbench/Workbench";
 import "./pages/hosts/HostProfile";
+import "./pages/fleet/Fleet";
 import "./pages/lateral/LateralMovement";
 import "./pages/system/PceConnection";
 import "./pages/system/Channels";

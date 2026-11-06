@@ -25,6 +25,7 @@ from illumio_ops.web.routes import (
     alert_rules,
     alerts,
     custom_reports,
+    fleet,
     hosts,
     lateral,
     quarantine,
@@ -136,6 +137,7 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
     app.register_blueprint(hosts.bp)
     app.register_blueprint(lateral.bp)
     app.register_blueprint(quarantine.bp)
+    app.register_blueprint(fleet.bp)
     app.register_blueprint(custom_reports.bp)
     app.register_blueprint(siem.bp)
     app.register_blueprint(shell.bp)
