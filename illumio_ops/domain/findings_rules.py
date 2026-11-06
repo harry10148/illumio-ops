@@ -23,16 +23,47 @@ DISCOVERY_PORTS = frozenset({(137, UDP), (138, UDP), (5353, UDP), (5355, UDP), (
 WINDOWS_MGMT_PORTS = frozenset({(135, TCP), (445, TCP), (5985, TCP), (5986, TCP), (47001, TCP)})
 
 
+Technique = tuple[str, str]  # MITRE ATT&CK (id, official English name)
+
+
 @dataclass(frozen=True)
 class RuleInfo:
     rule_id: str
     category: str  # ransomware | exposure | coverage | lateral | data | hygiene
     name_key: str
     how_key: str
+    techniques: tuple[Technique, ...] = ()
+
+
+# MITRE ATT&CK techniques per rule, as 5.x src/report/analysis/mitre_map.py mapped them (3225b1d9). Governance rules
+# carry none on purpose (B005 policy coverage, B009 cross-environment volume, L008 lateral ports in test mode):
+# forcing a technique onto them would mislead a SOC reader.
+_ENCRYPT: Technique = ("T1486", "Data Encrypted for Impact")
+_REMOTE: Technique = ("T1021", "Remote Services")
+_EXPLOIT: Technique = ("T1210", "Exploitation of Remote Services")
+_EXFIL: Technique = ("T1048", "Exfiltration Over Alternative Protocol")
+TECHNIQUES: dict[str, tuple[Technique, ...]] = {
+    "B001": (_ENCRYPT, ("T1021.002", "SMB/Windows Admin Shares")),
+    "B002": (_ENCRYPT, ("T1219", "Remote Access Software")),
+    "B003": (_ENCRYPT,),
+    "B004": (("T1046", "Network Service Discovery"),),
+    "B006": (_REMOTE,),
+    "B007": (("T1078", "Valid Accounts"),),
+    "B008": (_EXFIL,),
+    "L001": (("T1040", "Network Sniffing"),),
+    "L002": (("T1557.001", "LLMNR/NBT-NS Poisoning and SMB Relay"),),
+    "L003": (_EXPLOIT,),
+    "L004": (_EXPLOIT,),
+    "L005": (("T1558", "Steal or Forge Kerberos Tickets"),),
+    "L006": (_REMOTE,),
+    "L007": (_EXPLOIT,),
+    "L009": (_EXFIL,),
+    "L010": (_REMOTE, ("T1570", "Lateral Tool Transfer")),
+}
 
 
 # Copy keys are spelled out: the i18n gate counts a key as used only where it appears as a literal.
-RULES: tuple[RuleInfo, ...] = (
+_LISTED: tuple[RuleInfo, ...] = (
     RuleInfo("B001", "ransomware", "rpt_rule_b001_name", "rpt_rule_b001_how"),
     RuleInfo("B002", "ransomware", "rpt_rule_b002_name", "rpt_rule_b002_how"),
     RuleInfo("B003", "exposure", "rpt_rule_b003_name", "rpt_rule_b003_how"),
@@ -53,6 +84,8 @@ RULES: tuple[RuleInfo, ...] = (
     RuleInfo("L009", "data", "rpt_rule_l009_name", "rpt_rule_l009_how"),
     RuleInfo("L010", "lateral", "rpt_rule_l010_name", "rpt_rule_l010_how"),
 )
+RULES: tuple[RuleInfo, ...] = tuple(RuleInfo(r.rule_id, r.category, r.name_key, r.how_key, TECHNIQUES.get(r.rule_id, ()))
+                                    for r in _LISTED)
 BY_ID = {r.rule_id: r for r in RULES}
 CATEGORY_KEYS = {"ransomware": "rpt_rule_cat_ransomware", "exposure": "rpt_rule_cat_exposure",
                  "coverage": "rpt_rule_cat_coverage", "lateral": "rpt_rule_cat_lateral", "data": "rpt_rule_cat_data",

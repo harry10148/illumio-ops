@@ -12,7 +12,13 @@ from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
-from illumio_ops.domain.report import XLSX_ROW_CAP, Cell, ReportDocument, period_text
+from illumio_ops.domain.report import (
+    XLSX_ROW_CAP,
+    Cell,
+    ReportDocument,
+    period_text,
+    techniques_text,
+)
 from illumio_ops.domain.values import Language
 from illumio_ops.services.reports.render_html import fmt_time, kpi_trend, tr
 from illumio_ops.services.reports.sheets import RESERVED, sheet_names
@@ -77,8 +83,8 @@ def _summary_rows(doc: ReportDocument, tz: tzinfo | None) -> list[list[Cell]]:
     rows += [[k.label, k.value if k.value is not None else tr(lang, "rpt_kpi_no_value"),
               k.previous, kpi_trend(k, lang), k.note] for k in doc.kpis]
     rows += [[], [tr(lang, "rpt_findings_title")]]
-    findings: list[list[Cell]] = [[tr(lang, "severity_" + f.severity.value), f.title, f.why, f.action]
-                                  for f in doc.findings]
+    findings: list[list[Cell]] = [[tr(lang, "severity_" + f.severity.value), f.title, f.why, f.action,
+                                   techniques_text(f.techniques) or None] for f in doc.findings]
     rows += findings or [[tr(lang, "rpt_findings_none")]]
     rows += [[], [tr(lang, "rpt_data_quality_title")]]
     rows += [[q] for q in doc.data_quality]

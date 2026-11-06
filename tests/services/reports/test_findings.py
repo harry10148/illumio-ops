@@ -241,3 +241,26 @@ def test_l006_not_evaluated_without_exposure(ctx):
     _write(ctx, [flow(port=22)])
     o = run(ctx)["L006"]
     assert o.severity is None and o.error
+
+
+def test_mitre_techniques_per_rule():
+    """5.x mitre_map: ransomware, lateral and exfiltration rules carry ATT&CK techniques; governance rules (B005,
+    B009, L008) carry none rather than a misleading one."""
+    from illumio_ops.domain.findings_rules import BY_ID, RULES
+    assert [t for t, _ in BY_ID["B001"].techniques] == ["T1486", "T1021.002"]
+    assert [t for t, _ in BY_ID["L010"].techniques] == ["T1021", "T1570"]
+    assert {r.rule_id for r in RULES if not r.techniques} == {"B005", "B009", "L008"}
+
+
+def test_findings_carry_mitre_techniques(ctx):
+    _write(ctx, [flow(port=445, src_env="Dev", dst_env="Prod")])
+    outcomes = list(run(ctx).values())
+    from illumio_ops.domain.findings_rules import BY_ID
+    from illumio_ops.services.reports.common import tr
+    found = {f.title: f for f in findings.as_findings(outcomes, Language.EN, limit=20)}
+    b001 = found[tr(Language.EN, BY_ID["B001"].name_key)]
+    assert ("T1486", "Data Encrypted for Impact") in b001.techniques
+    table = findings.outcomes_table(outcomes, Language.EN, title="Findings")
+    col = [c.key for c in table.columns].index("mitre")
+    row = next(r for r in table.rows if r[0] == "B001")
+    assert row[col] == "T1486 Data Encrypted for Impact, T1021.002 SMB/Windows Admin Shares"

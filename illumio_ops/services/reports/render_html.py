@@ -52,6 +52,7 @@ EXTRA_CSS = """
 .findings-table th, .findings-table td { text-align: left; vertical-align: top; padding: 6px 8px;
   border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .findings-table th { color: var(--text-3); font-weight: 600; }
+.mitre-chips { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
 @media print {
   thead { display: table-header-group; }
   tr { break-inside: avoid; }
@@ -188,6 +189,15 @@ def _section_body(s: Section, names: dict[int, str], tz: tzinfo | None, lang: La
     return "".join(parts)
 
 
+def _chips(techniques: tuple[tuple[str, str], ...]) -> str:
+    """MITRE ATT&CK technique ids under a finding's title, the official name on hover; not links (a report makes no
+    external request, and its reader may be offline)."""
+    if not techniques:
+        return ""
+    return '<div class="mitre-chips">' + " ".join(
+        f'<span class="mitre-chip" title="{_esc(name)}">{_esc(tid)}</span>' for tid, name in techniques) + "</div>"
+
+
 def _summary(doc: ReportDocument) -> str:
     """The key numbers, then S01 — findings and actions as a table (severity, finding, action, evidence) — then what
     the data covers."""
@@ -197,7 +207,7 @@ def _summary(doc: ReportDocument) -> str:
         rows = "".join(
             f'<tr><td><span class="badge" data-tone="{SEVERITY_TONE.get(f.severity, "neutral")}">'
             f'{_esc(tr(lang, "severity_" + f.severity.value))}</span></td>'
-            f'<td>{_esc(f.title)}</td><td>{_esc(f.action)}</td><td>{_esc(f.why)}</td></tr>'
+            f'<td>{_esc(f.title)}{_chips(f.techniques)}</td><td>{_esc(f.action)}</td><td>{_esc(f.why)}</td></tr>'
             for f in doc.findings)
         head = "".join(f"<th>{_esc(tr(lang, k))}</th>" for k in (
             "rpt_findings_col_severity", "rpt_findings_col_finding", "rpt_findings_col_action", "rpt_findings_col_evidence"))
