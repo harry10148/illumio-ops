@@ -301,8 +301,13 @@ def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = 
             and params.lookback_days > spec.max_lookback(settings) and not (traffic and "flows" in reached)):
         return "rpt_err_lookback_beyond_retention"
     limit = earliest_start(settings, spec, now, reached) if now is not None else None
+    if limit is None and now is not None and spec.reads_events and params.period_from is not None:
+        # A named period of an events report starts where events can be read (a lookback keeps showing its gaps).
+        floor = now - timedelta(days=settings.collection.retention.event_days)
+        limit = min(floor, reached["events"]) if "events" in reached else floor
     if limit is not None and now is not None and params_period(params, now, tz)[0] < limit:
-        return "rpt_err_before_archive" if traffic and "flows" in reached else "rpt_err_lookback_beyond_retention"
+        archive = "flows" in reached if traffic else "events" in reached and spec.reads_events
+        return "rpt_err_before_archive" if archive else "rpt_err_lookback_beyond_retention"
     if params.filter is not None and not spec.accepts_filter:
         return "rpt_err_filter_not_supported"
     if params.report_type is ReportType.CUSTOM and params.custom_id is None:

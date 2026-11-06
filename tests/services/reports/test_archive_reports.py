@@ -118,3 +118,16 @@ def test_an_audit_report_reads_archived_events(tmp_path):
     html = (ctx.paths.reports_dir / str(rid) / next(f for f in row.files if f.endswith(".html"))).read_text()
     assert "come from the archive" in html
     assert "Events are missing" not in html  # the archived days are read and covered, not a gap before retention
+
+
+def test_a_named_period_is_bounded_for_every_type(tmp_path):
+    """Security review 2026-11-06: a named period of a type with no data floor (audit) must not reach for centuries."""
+    from datetime import date
+    with pytest.raises(ValidationError):
+        ReportParams(report_type=ReportType.AUDIT, period_from=date(1900, 1, 1), period_to=date(1900, 1, 2))
+    with pytest.raises(ValidationError):
+        ReportParams(report_type=ReportType.AUDIT, period_from=date(2001, 1, 1), period_to=date(2026, 1, 1))
+    ctx = _ctx(tmp_path, archive=False)
+    p = ReportParams(report_type=ReportType.AUDIT, period_from=(NOW - timedelta(days=60)).date(),
+                     period_to=(NOW - timedelta(days=1)).date())
+    assert generate.refusal(ctx.settings.current(), p, now=NOW) == "rpt_err_lookback_beyond_retention"

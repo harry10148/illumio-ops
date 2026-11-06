@@ -79,3 +79,38 @@ def events_for_workload(conn: sqlite3.Connection, href: str, *, start: datetime,
                         "WHERE COALESCE(e.workload_href, w.href) = ? AND e.timestamp >= ? AND e.timestamp <= ? "
                         "ORDER BY e.timestamp DESC, e.id DESC LIMIT ?",
                         (href, db_time(start), db_time(end), limit)).fetchall()
+
+
+# ── a throwaway store filled for a period (services/archive_read.py) ─────────────────────────────────────────────
+
+def events_columns(conn: sqlite3.Connection) -> list[str]:
+    """The table's columns but its row id (a copied or archived row gets a new one)."""
+    return [r[1] for r in conn.execute("PRAGMA table_info(events)") if r[1] != "id"]
+
+
+def copy_events_from(conn: sqlite3.Connection, schema: str, start: datetime, end: datetime) -> None:
+    """The attached store's rows of [start, end) by timestamp; a row already here (same identity) is kept."""
+    cols = ", ".join(events_columns(conn))
+    conn.execute(f"INSERT OR IGNORE INTO events ({cols}) SELECT {cols} FROM {schema}.events "
+                 "WHERE timestamp >= ? AND timestamp < ?", (db_time(start), db_time(end)))
+
+
+def insert_archived_events(conn: sqlite3.Connection, keys: Sequence[str], rows: Sequence[Sequence[object]]) -> int:
+    """Archived rows with these columns (an older line has fewer); a row already here is kept. Returns how many the
+    table refused (a NOT NULL column an older line lacks): the others go in."""
+    allowed = set(events_columns(conn))
+    if any(k not in allowed for k in keys):
+        raise ValueError("unknown column")
+    sql = f"INSERT OR IGNORE INTO events ({', '.join(keys)}) VALUES ({', '.join('?' * len(keys))})"
+    try:
+        with transaction(conn):
+            conn.executemany(sql, rows)
+        return 0
+    except sqlite3.IntegrityError:
+        refused = 0
+        for r in rows:
+            try:
+                conn.execute(sql, r)
+            except sqlite3.IntegrityError:
+                refused += 1
+        return refused

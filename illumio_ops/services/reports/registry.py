@@ -26,6 +26,12 @@ class ReportFailed(Exception):
         self.key, self.detail = key, detail
 
 
+# Bounds on a named period whatever its type: what the archive or the store hold is checked when it is queued
+# (generate.refusal); these keep a request from asking for centuries (each day of a period is walked).
+PERIOD_FIRST_DAY = date(2000, 1, 1)
+PERIOD_MAX_DAYS = 3660
+
+
 class ReportParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     report_type: ReportType
@@ -53,8 +59,12 @@ class ReportParams(BaseModel):
     def _period(self) -> ReportParams:
         if (self.period_from is None) != (self.period_to is None):
             raise ValueError("a period needs its first and last day")
-        if self.period_from is not None and self.period_to is not None and self.period_to < self.period_from:
-            raise ValueError("the period ends before it starts")
+        if self.period_from is not None and self.period_to is not None:
+            if self.period_to < self.period_from:
+                raise ValueError("the period ends before it starts")
+            if self.period_from < PERIOD_FIRST_DAY or (self.period_to - self.period_from).days >= PERIOD_MAX_DAYS:
+                raise ValueError(f"a period starts in {PERIOD_FIRST_DAY.year} or later and spans at most "
+                                 f"{PERIOD_MAX_DAYS} days")
         return self
 
     @field_validator("formats")

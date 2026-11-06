@@ -593,3 +593,44 @@ def rollup_top(conn: sqlite3.Connection, src_key: str, *, since_day: str, column
 def rollup_first_day(conn: sqlite3.Connection) -> str | None:
     row = conn.execute("SELECT MIN(day) FROM flow_rollup_daily").fetchone()
     return str(row[0]) if row and row[0] else None
+
+
+# ── a throwaway store filled for a period (services/archive_read.py) ─────────────────────────────────────────────
+
+def flows_columns(conn: sqlite3.Connection) -> list[str]:
+    """The table's columns but its row id (a copied or archived row gets a new one)."""
+    return [r[1] for r in conn.execute("PRAGMA table_info(flows)") if r[1] != "id"]
+
+
+def copy_flows_from(conn: sqlite3.Connection, schema: str, start: datetime, end: datetime) -> None:
+    """The attached store's rows of [start, end) by last_detected; a row already here (same identity) is kept."""
+    cols = ", ".join(flows_columns(conn))
+    conn.execute(f"INSERT OR IGNORE INTO flows ({cols}) SELECT {cols} FROM {schema}.flows "
+                 "WHERE last_detected >= ? AND last_detected < ?", (db_time(start), db_time(end)))
+
+
+def insert_archived_flows(conn: sqlite3.Connection, keys: Sequence[str], rows: Sequence[Sequence[object]]) -> int:
+    """Archived rows with these columns (an older line has fewer); a row already here is kept. Returns how many the
+    table refused (a NOT NULL column an older line lacks): the others go in."""
+    allowed = set(flows_columns(conn))
+    if any(k not in allowed for k in keys):
+        raise ValueError("unknown column")
+    sql = f"INSERT OR IGNORE INTO flows ({', '.join(keys)}) VALUES ({', '.join('?' * len(keys))})"
+    try:
+        with transaction(conn):
+            conn.executemany(sql, rows)
+        return 0
+    except sqlite3.IntegrityError:
+        refused = 0
+        for r in rows:
+            try:
+                conn.execute(sql, r)
+            except sqlite3.IntegrityError:
+                refused += 1
+        return refused
+
+
+def mark_rollup_days(conn: sqlite3.Connection, days: Sequence[str]) -> None:
+    """These days' rollups are to be built (rows were loaded into them without upsert_flows)."""
+    conn.executemany("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET dirty = 1",
+                     [(d,) for d in days])

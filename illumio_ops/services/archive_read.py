@@ -22,9 +22,10 @@ from illumio_ops.domain.values import IngestSource
 from illumio_ops.services.collect.guard import ensure_binding, require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.ondemand import _seed, ondemand_dir
+from illumio_ops.store.flowdb import events as event_store
+from illumio_ops.store.flowdb import flows as flow_store
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import FlowDb, db_time, transaction
-from illumio_ops.store.flowdb.flows import refresh_rollups
 
 # Rows one period may load from archive files in all (an on-demand pull stops at the same count): the rest of the
 # period is a recorded truncated gap. A day of 1M rows took minutes to write; thirty of them would take far longer.
@@ -83,16 +84,9 @@ def _day_window(day: str) -> tuple[datetime, datetime]:
     return a, a + timedelta(days=1)
 
 
-def _columns(conn: sqlite3.Connection, table: str) -> list[str]:
-    return [r[1] for r in conn.execute(f"PRAGMA table_info({table})") if r[1] != "id"]
-
-
-def _copy_store(conn: sqlite3.Connection, kind: str, start: datetime, end: datetime) -> None:
-    """The store's rows of the period (the install is attached as `install`)."""
-    _, col, _ = _KINDS[kind]
-    cols = ", ".join(_columns(conn, kind))
-    conn.execute(f"INSERT OR IGNORE INTO {kind} ({cols}) SELECT {cols} FROM install.{kind} WHERE {col} >= ? AND {col} < ?",
-                 (db_time(start), db_time(end)))
+# kind -> (its columns, copy from an attached store, insert archived rows): each table's own module writes it.
+_STORE = {"flows": (flow_store.flows_columns, flow_store.copy_flows_from, flow_store.insert_archived_flows),
+          "events": (event_store.events_columns, event_store.copy_events_from, event_store.insert_archived_events)}
 
 
 def _copy_coverage(conn: sqlite3.Connection, source: str, start: datetime, end: datetime, floor: datetime,
@@ -117,25 +111,15 @@ def _load_file(conn: sqlite3.Connection, kind: str, path: Path, window: tuple[da
     """A day's archive rows inside the window: (loaded, unreadable, stopped at the budget). A line written by an
     older schema loads with the columns it has; one that is damaged or breaks a constraint is counted, not loaded."""
     _, col, _ = _KINDS[kind]
-    cols = set(_columns(conn, kind))
+    columns, _, insert = _STORE[kind]
+    cols = set(columns(conn))
     lo, hi = db_time(window[0]), db_time(window[1])
     loaded = unreadable = 0
     batch: dict[tuple[str, ...], list[tuple[object, ...]]] = {}
 
     def flush() -> int:
         """Write the batch; a row the table refuses (a NOT NULL an older line lacks) is counted, the others go in."""
-        refused = 0
-        for keys, values in batch.items():
-            sql = f"INSERT OR IGNORE INTO {kind} ({', '.join(keys)}) VALUES ({', '.join('?' * len(keys))})"
-            try:
-                with transaction(conn):
-                    conn.executemany(sql, values)
-            except sqlite3.IntegrityError:
-                for v in values:
-                    try:
-                        conn.execute(sql, v)
-                    except sqlite3.IntegrityError:
-                        refused += 1
+        refused = sum(insert(conn, keys, values) for keys, values in batch.items())
         batch.clear()
         return refused
 
@@ -191,7 +175,7 @@ def archive_period(ctx: AppContext, *, start: datetime, end: datetime, now: date
                 with transaction(conn):
                     for kind in kinds:
                         source = _KINDS[kind][0]
-                        _copy_store(conn, kind, max(start, edge[kind]), end)
+                        _STORE[kind][1](conn, "install", max(start, edge[kind]), end)
                         _copy_coverage(conn, source, start, end, edge[kind], at)
             finally:
                 conn.execute("DETACH DATABASE install")
@@ -229,14 +213,12 @@ def archive_period(ctx: AppContext, *, start: datetime, end: datetime, now: date
                                                 f"stopped at {ARCHIVE_MAX_ROWS} archived rows", at)
                     ingest_state.add_coverage(conn, source, window[0], window[1])
                     if kind == "flows":
-                        conn.execute("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
-                                     "ON CONFLICT(day) DO UPDATE SET dirty = 1", (day,))
+                        flow_store.mark_rollup_days(conn, [day])
                 archived[kind].append(day)
         with fdb.writing(fdb.generation) as conn:
-            for day in _days(max(start, edge["flows"]), end) if "flows" in kinds and start < end else []:
-                conn.execute("INSERT INTO rollup_state (day, dirty) VALUES (?, 1) "
-                             "ON CONFLICT(day) DO UPDATE SET dirty = 1", (day,))
-            refresh_rollups(conn, at, today_every=timedelta(0))
+            if "flows" in kinds and max(start, edge["flows"]) < end:
+                flow_store.mark_rollup_days(conn, _days(max(start, edge["flows"]), end))
+            flow_store.refresh_rollups(conn, at, today_every=timedelta(0))
         yield ArchiveResult(ctx=dataclasses.replace(ctx, flowdb=fdb, ondemand=True), archived_days=archived,
                             missing_days=missing, rows=total, unreadable=unreadable, unread_from=unread_from)
     finally:
