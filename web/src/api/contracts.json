@@ -26630,6 +26630,60 @@
         "type": "object"
       }
     },
+    "reports.bulk_delete": {
+      "method": "POST",
+      "path": "/api/reports/bulk-delete",
+      "request_schema": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "BulkDelete",
+        "type": "object"
+      },
+      "response_schema": {
+        "properties": {
+          "missing": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "removed": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Removed",
+            "type": "array"
+          },
+          "running": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Running",
+            "type": "array"
+          }
+        },
+        "required": [
+          "removed",
+          "running",
+          "missing"
+        ],
+        "title": "BulkDeleted",
+        "type": "object"
+      }
+    },
     "reports.catalog": {
       "method": "GET",
       "path": "/api/reports/catalog",

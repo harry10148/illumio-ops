@@ -2877,5 +2877,12 @@
   "rpt_trf_no_rate": "No flow record with byte counts was seen for a second or more.",
   "rpt_trf_tbl_per_conn": "Most bytes per connection (records of more than one connection)",
   "rpt_col_bytes_per_conn": "Bytes per connection",
-  "rpt_trf_no_multi_conn": "No flow record with byte counts holds more than one connection."
+  "rpt_trf_no_multi_conn": "No flow record with byte counts holds more than one connection.",
+  "gui_reports_select_all": "Select every report on this page",
+  "gui_reports_select_one": "Select this report",
+  "gui_reports_delete_selected": "Delete selected ({n})",
+  "gui_reports_delete_confirm": "Delete {n} reports and their files? This cannot be undone.",
+  "gui_reports_bulk_result": "Deleted {removed}; {running} still being made were kept; {missing} were already gone.",
+  "gui_reports_open": "Open",
+  "gui_reports_open_hint": "Open the HTML report in a new tab"
 }

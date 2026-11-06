@@ -242,3 +242,47 @@ def test_reports_no_overflow_760(narrow_context, live_app):
     page = narrow_context.new_page()
     _reports(page, live_app.url)
     assert no_horizontal_overflow(page)
+
+
+def _made(live_app, n=1):
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.values import ReportType
+    from illumio_ops.services.reports.registry import ReportParams
+    ids = [generate.enqueue(live_app.ctx, ReportParams(report_type=ReportType.UNMANAGED_ENDPOINTS), trigger="manual",
+                            schedule_id=None, now=datetime.now(UTC)) for _ in range(n)]
+    generate.run_queued(live_app.ctx)
+    return ids
+
+
+def test_open_report_in_browser_sandboxed(context, live_app):
+    """5.x opened an HTML report in the browser: here in a new tab, its own script running, sealed off from the
+    console (no session cookie, no API)."""
+    _made(live_app)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    row = page.locator("[data-role=report-list] tbody tr").first
+    with context.expect_page() as opened:
+        row.locator("[data-role=report-open]").click()
+    report = opened.value
+    report.wait_for_load_state()
+    assert "/reports/view/" in report.url
+    expect(report.locator("header.cover h1")).to_have_count(1)
+    assert report.evaluate("typeof sortTable") == "function"  # the report's inline table script ran
+    # an opaque origin: reading the console's cookies throws
+    assert report.evaluate("(() => { try { return document.cookie; } catch (e) { return e.name; } })()") == "SecurityError"
+    reached = report.evaluate("fetch('/api/reports').then(() => 'reached', () => 'blocked')")
+    assert reached == "blocked"
+
+
+def test_bulk_delete_from_the_list(context, live_app):
+    ids = _made(live_app, 3)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    for rid in ids[:2]:
+        page.locator(f"input[name=pick-{rid}]").check()
+    page.locator("[data-role=bulk-delete]").click()
+    page.locator("[data-role=bulk-delete-confirm]").click()
+    expect(page.locator("[data-role=bulk-outcome]")).to_contain_text("Deleted 2")
+    expect(page.locator("[data-role=report-list] tbody tr")).to_have_count(1)
+    expect(page.locator(f"[data-report-id='{ids[2]}']")).to_have_count(1)

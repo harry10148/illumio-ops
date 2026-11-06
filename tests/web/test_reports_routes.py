@@ -195,3 +195,54 @@ def test_copies_count_done_reports(client, ctx):
     _done_report(ctx)
     entries = {e["report_type"]: e for e in get(client, "/api/reports/catalog").get_json()["data"]["entries"]}
     assert entries["unmanaged_endpoints"]["copies"] == 1
+
+
+def test_open_html_inline_sandboxed(client, ctx):
+    """5.x /reports/<file> opened an HTML report in the browser. Inline here, under a sandbox CSP: the report's own
+    inline style and table script run in an opaque origin that cannot reach the console's session or API."""
+    assert get(client, "/reports/view/1/x.html").status_code == 401
+    _configure(ctx)
+    login(client)
+    rid = _done_report(ctx)
+    with ctx.db() as conn:
+        row = store.get(conn, rid)
+    html = next(f for f in row.files if f.endswith(".html"))
+    r = get(client, f"/reports/view/{rid}/{html}")
+    assert r.status_code == 200 and r.headers["Content-Disposition"].startswith("inline")
+    assert r.mimetype == "text/html" and r.headers["X-Content-Type-Options"] == "nosniff"
+    csp = r.headers["Content-Security-Policy"]
+    assert "sandbox allow-scripts" in csp and "allow-same-origin" not in csp and "default-src 'none'" in csp
+    assert "connect-src" not in csp or "connect-src 'none'" in csp
+    assert get(client, f"/reports/view/{rid + 1}/{html}").status_code == 404
+    xlsx = next((f for f in row.files if f.endswith(".xlsx")), None)
+    if xlsx:
+        assert get(client, f"/reports/view/{rid}/{xlsx}").status_code == 404  # only HTML opens inline
+    # the console's own pages keep the app's policy
+    assert "sandbox" not in get(client, "/api/reports").headers.get("Content-Security-Policy", "")
+
+
+def test_open_inline_refused_until_password_changed(client, ctx):
+    _configure(ctx)
+    login(client)
+    rid = _done_report(ctx)
+    with ctx.db() as conn:
+        html = next(f for f in store.get(conn, rid).files if f.endswith(".html"))
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["web"].update(must_change_password=True))
+    assert get(client, f"/reports/view/{rid}/{html}").status_code == 423
+
+
+def test_bulk_delete(client, ctx):
+    _configure(ctx)
+    login(client)
+    a, b = _done_report(ctx), _done_report(ctx)
+    running = post_report(ctx)
+    with ctx.db() as conn:
+        store.claim_next(conn, at=datetime.now(UTC))
+    r = post(client, "/api/reports/bulk-delete", {"ids": [a, b, running, 999]})
+    assert r.status_code == 200
+    assert r.get_json()["data"] == {"removed": [a, b], "running": [running], "missing": [999]}
+    assert not (ctx.paths.reports_dir / str(a)).exists() and not (ctx.paths.reports_dir / str(b)).exists()
+    assert post(client, "/api/reports/bulk-delete", {"ids": []}).status_code == 400
+    assert post(client, "/api/reports/bulk-delete", {"ids": list(range(1, 502))}).status_code == 400
+    r = client.post("/api/reports/bulk-delete", json={"ids": [a]}, environ_overrides=LOCAL)
+    assert r.status_code in (400, 403)  # CSRF
