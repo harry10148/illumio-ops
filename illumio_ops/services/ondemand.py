@@ -37,6 +37,7 @@ from illumio_ops.store.flowdb import (
     ingest_state,
     ip_lists,
     labels,
+    policy_objects,
     ransomware,
     workloads,
 )
@@ -109,7 +110,7 @@ def _seed(conn: sqlite3.Connection, install: Path) -> None:
     try:
         with transaction(conn):
             for copy in (labels.copy_from, workloads.copy_from, ransomware.copy_from, capabilities.copy_from,
-                         analysis.copy_from, ip_lists.copy_from):
+                         analysis.copy_from, ip_lists.copy_from, policy_objects.copy_from):
                 copy(conn, "install")
     finally:
         conn.execute("DETACH DATABASE install")

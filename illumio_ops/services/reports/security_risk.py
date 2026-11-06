@@ -127,7 +127,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                                      admin_ports=admin))
               if traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now, flows=True) else None)
     no_flows = t("rpt_no_flows_filtered" if cond is not None else "rpt_no_flows")
-    hosts = [h for h in lc.hosts.values() if flowsections.host_in_scope(h, cond)]
+    scope_groups = flowsections.label_groups_of(inp.ctx, cond)
+    hosts = [h for h in lc.hosts.values() if flowsections.host_in_scope(h, cond, label_groups=scope_groups)]
     modes = Counter(h.enforcement_mode for h in hosts)
     with reads.reading(inp.ctx) as conn:
         rw_row = analysis.read_result(conn, "ransomware")

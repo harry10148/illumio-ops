@@ -108,3 +108,38 @@ def test_rule_test_routes(client, ctx):
     r = post(client, "/api/alert-rules/test", {"source": "detection", "id": 99})
     assert r.status_code == 404 and r.get_json()["error"]["code"] == "not_found"
     assert post(client, "/api/alert-rules/test", {"source": "alert", "id": 1}).status_code == 400
+
+
+def test_condition_choices_offer_labels_and_the_pce_objects(client, ctx):
+    """5.x parity 2026-11-06: a condition can name label groups and services; the editor offers what the inventory read."""
+    from datetime import UTC, datetime
+
+    from illumio_ops.store.flowdb import ip_lists, policy_objects
+    from illumio_ops.store.flowdb.db import transaction
+    at = datetime(2026, 11, 6, tzinfo=UTC)
+    with ctx.flows().connect() as conn, transaction(conn):
+        ip_lists.replace_all(conn, [ip_lists.IpListRow("/orgs/1/sec_policy/active/ip_lists/1", "Scanners", ())], at=at)
+        policy_objects.replace_services(conn, [policy_objects.ServiceRow("/orgs/1/sec_policy/active/services/2", "Web",
+                                                                         ((443, None, 6),))], at=at)
+        policy_objects.replace_label_groups(conn, [policy_objects.LabelGroupRow(
+            "/orgs/1/sec_policy/active/label_groups/3", "Live", "env", ("Prod",))], at=at)
+    login(client)
+    data = client.get("/api/alert-rules/condition-choices", environ_overrides=LOCAL).get_json()["data"]
+    assert data["ip_lists"] == [{"href": "/orgs/1/sec_policy/active/ip_lists/1", "name": "Scanners"}]
+    assert data["services"] == [{"href": "/orgs/1/sec_policy/active/services/2", "name": "Web"}]
+    assert data["label_groups"] == [{"href": "/orgs/1/sec_policy/active/label_groups/3", "name": "Live", "key": "env"}]
+    assert data["labels"] == []
+
+
+def test_rule_with_the_new_conditions_round_trips(client):
+    login(client)
+    rev = rules(client)["revision"]
+    cond = {"either": {"ips": ["10.0.0.9"]}, "services": ["/orgs/1/sec_policy/active/services/2"],
+            "src": {"label_groups": ["/orgs/1/sec_policy/active/label_groups/3"]},
+            "windows_services": ["wuauserv"], "exclude_transmissions": ["broadcast", "multicast"],
+            "exclude_processes": ["svchost.exe"]}
+    r = post(client, "/api/alert-rules", {"revision": rev, "rule": CUSTOM | {"name": "Parity", "condition": cond}})
+    saved = next(i["rule"] for i in r.get_json()["data"]["items"] if i["rule"]["name"] == "Parity")
+    for k, v in cond.items():
+        got = saved["condition"][k]
+        assert (got if not isinstance(v, dict) else {kk: got[kk] for kk in v}) == v, k

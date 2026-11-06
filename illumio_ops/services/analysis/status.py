@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from illumio_ops.domain.values import DetectorKind, DetectorState, PortClass
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.context import AppContext
-from illumio_ops.store.flowdb import analysis, ip_lists
+from illumio_ops.store.flowdb import analysis, ip_lists, labels, policy_objects
 
 MAX_LABEL_VALUES = 500  # values listed per label key; more are said to exist
 
@@ -33,6 +33,43 @@ class LabelChoice(BaseModel):
 class IpListChoice(BaseModel):
     href: str
     name: str
+
+
+class LabelGroupChoice(BaseModel):
+    href: str
+    name: str
+    key: str  # the label key its members share
+
+
+class ServiceChoice(BaseModel):
+    href: str
+    name: str
+
+
+class ConditionChoices(BaseModel):
+    """What a flow condition editor offers (alert rules, the reports filter): the inventory's labels and the PCE
+    objects the last inventory read."""
+    labels: list[LabelChoice]
+    ip_lists: list[IpListChoice]
+    label_groups: list[LabelGroupChoice]
+    services: list[ServiceChoice]
+
+
+def label_choices(known: set[tuple[str, str]]) -> list[LabelChoice]:
+    by_key: dict[str, list[str]] = {}
+    for k, v in sorted(known):
+        by_key.setdefault(k, []).append(v)
+    return [LabelChoice(key=k, values=vs[:MAX_LABEL_VALUES], truncated=len(vs) > MAX_LABEL_VALUES)
+            for k, vs in sorted(by_key.items())]
+
+
+def condition_choices(ctx: AppContext) -> ConditionChoices:
+    with ctx.flows().connect() as conn:
+        return ConditionChoices(
+            labels=label_choices(labels.known_labels(conn)),
+            ip_lists=[IpListChoice(href=h, name=n) for h, n in ip_lists.names(conn)],
+            label_groups=[LabelGroupChoice(href=h, name=n, key=k) for h, n, k in policy_objects.label_group_names(conn)],
+            services=[ServiceChoice(href=h, name=n) for h, n in policy_objects.service_names(conn)])
 
 
 class DetectorStatusView(BaseModel):

@@ -41,7 +41,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.eventsource import events_in_window
 from illumio_ops.services.flowsource import increment_times, increment_totals
 from illumio_ops.store import alerts as store
-from illumio_ops.store.flowdb import analysis, ip_lists
+from illumio_ops.store.flowdb import analysis, ip_lists, policy_objects
 from illumio_ops.store.flowdb.flows import INCREMENT_KEEP
 
 PREVIEW_SAMPLES = 10
@@ -104,8 +104,9 @@ def _preview_lateral(ctx: AppContext, rule: LateralRule, start: datetime) -> lis
         rows = list(reversed(analysis.detections_since(conn, start, limit=5000)))
         names, labels = inventory(conn)
         nets = ip_lists.networks(conn, rule.exclude.ip_lists if rule.exclude else ())
+        groups = policy_objects.label_groups(conn, rule.exclude.label_groups if rule.exclude else ())
     facts = [detection_fact(r, start=("", 0), names=names, labels=labels, previous=None) for r in rows]
-    return [(t.last_seen, t) for t in evaluate_lateral_rule(rule, facts, ip_lists=nets)]
+    return [(t.last_seen, t) for t in evaluate_lateral_rule(rule, facts, ip_lists=nets, label_groups=groups)]
 
 
 def preview_rule(ctx: AppContext, rule: AlertRule, *, hours: int, now: datetime | None = None) -> RulePreview:

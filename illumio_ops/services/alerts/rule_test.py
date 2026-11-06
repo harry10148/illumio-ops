@@ -20,7 +20,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.eventsource import events_after, max_event_id
 from illumio_ops.services.reports.common import DETECTOR_NAME_KEYS
 from illumio_ops.store import alerts as store
-from illumio_ops.store.flowdb import analysis, ip_lists
+from illumio_ops.store.flowdb import analysis, ip_lists, policy_objects
 
 Source = Literal["detection", "event"]
 CANDIDATES = 20
@@ -100,10 +100,11 @@ def _detection(ctx: AppContext, record_id: int, now: datetime) -> RuleTestResult
             raise LookupError(record_id)
         names, labels = inventory(conn)
         nets = ip_lists.networks(conn, {h for r in rules if r.exclude for h in r.exclude.ip_lists})
+        groups = policy_objects.label_groups(conn, {h for r in rules if r.exclude for h in r.exclude.label_groups})
     fact = detection_fact(row, start=("", 0), names=names, labels=labels, previous=None)
     items = []
     for rule in rules:
-        why = lateral_rule_reason(rule, fact, ip_lists=nets)
+        why = lateral_rule_reason(rule, fact, ip_lists=nets, label_groups=groups)
         items.append(_result(ctx, rule, fact.fingerprint, MISS_KEYS[why] if why else None, now=now))
     return RuleTestResult(source="detection", record_id=record_id, title=_detection_title(row, s.display.language),
                           items=items)

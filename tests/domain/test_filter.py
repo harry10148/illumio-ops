@@ -360,3 +360,189 @@ def test_ip_list_stays_local_for_the_pce():
     payload, residual = to_pce_payload(s, max_results=10, query_name="q", label_hrefs={})
     assert payload["sources"]["include"] == [[]] and residual.src == s.src
     assert payload["destinations"]["exclude"] == [] and residual.dst_exclude == s.dst_exclude
+
+
+# ── 5.x parity keys (2026-11-06): either end, label groups, named services, Windows services, transmission,
+# excluded processes. Every key is checked on all three executions: SQL, the per-record predicate, the payload. ──
+
+SVC_WEB = "/orgs/1/sec_policy/active/services/web"
+SVC_ICMP = "/orgs/1/sec_policy/active/services/icmp"
+SVC_ALL = "/orgs/1/sec_policy/active/services/all"
+LG_PROD = "/orgs/1/sec_policy/active/label_groups/prod"
+LG_EU = "/orgs/1/sec_policy/active/label_groups/eu"
+SERVICES = {SVC_WEB: ((443, None, 6), (8000, 8100, 6)), SVC_ICMP: ((None, None, 1),), SVC_ALL: ((None, None, None),)}
+GROUPS = {LG_PROD: ("env", frozenset({"Prod", "Staging"})), LG_EU: ("loc", frozenset({"EU"}))}
+
+PARITY_SPECS = [
+    {"either": EndpointFilter(ips=("10.0.0.9",))},
+    {"either_exclude": EndpointFilter(ips=("10.0.0.9",))},
+    {"either": EndpointFilter(labels=(LabelCond(key="app", values=("Pay",)),))},
+    {"either_exclude": EndpointFilter(public=True)},
+    {"src": EndpointFilter(label_groups=(LG_PROD,))},
+    {"dst": EndpointFilter(label_groups=(LG_PROD, LG_EU))},
+    {"src": EndpointFilter(labels=(LabelCond(key="env", values=("Dev",)),), label_groups=(LG_PROD,))},
+    {"src": EndpointFilter(labels=(LabelCond(key="app", values=("Pay",)),), label_groups=(LG_PROD,))},
+    {"dst_exclude": EndpointFilter(label_groups=(LG_PROD,))},
+    {"src": EndpointFilter(label_groups=("/orgs/1/sec_policy/active/label_groups/gone",))},
+    {"src": EndpointFilter(match="all", label_groups=(LG_PROD,), ips=("10.0.0.1",))},
+    {"services": (SVC_WEB,)},
+    {"services": (SVC_ICMP,)},
+    {"services": (SVC_ALL,)},
+    {"services": (SVC_WEB,), "ports": (PortProto(port=22, proto=6),)},
+    {"exclude_services": (SVC_WEB,)},
+    {"services": ("/orgs/1/sec_policy/active/services/gone",)},
+    {"windows_services": ("wuauserv",)},
+    {"windows_services": ("WUAUSERV", "spooler")},
+    {"exclude_windows_services": ("wuauserv",)},
+    {"transmissions": ("broadcast",)},
+    {"transmissions": ("broadcast", "multicast")},
+    {"exclude_transmissions": ("broadcast", "multicast")},
+    {"exclude_processes": ("svchost.exe",)},
+    {"exclude_processes": ("nginx", "svchost.exe")},
+]
+
+
+def _parity_records():
+    from dataclasses import replace
+    base = normalize_flow(json.loads(FIXTURE.read_text())[0])
+    lab = {"prod": (("app", "Pay"), ("env", "Prod"), ("loc", "EU")), "stg": (("env", "Staging"), ("loc", "US")),
+           "dev": (("app", "Pay"), ("env", "Dev")), "none": ()}
+    rows = [  # src, dst, port, proto, src labels, dst labels, windows service, transmission, process
+        ("10.0.0.1", "10.0.0.9", 443, 6, "prod", "stg", "wuauserv", None, "svchost.exe"),
+        ("10.0.0.9", "10.0.0.2", 8050, 6, "stg", "prod", None, "unicast", "nginx"),
+        ("10.0.0.3", "10.0.0.255", 137, 17, "dev", "none", "Spooler", "broadcast", None),
+        ("10.0.0.4", "224.0.0.251", 5353, 17, "none", "none", None, "multicast", "avahi"),
+        ("10.0.0.5", "10.0.0.6", None, 1, "prod", "dev", None, None, None),
+        ("10.0.0.6", "8.8.8.8", 22, 6, "dev", "none", None, "unicast", "ssh"),
+    ]
+    out = []
+    for i, (s, d, port, proto, sl, dl, win, tx, proc) in enumerate(rows):
+        out.append(replace(base, src_ip=s, dst_ip=d, src_href=f"/orgs/1/workloads/s{i}", dst_href=None, port=port,
+                           proto=proto, src_labels=lab[sl], dst_labels=lab[dl], windows_service=win, transmission=tx,
+                           own_process=proc))
+    return out
+
+
+@pytest.fixture(scope="module")
+def parity_store(tmp_path_factory):
+    from illumio_ops.store.flowdb import policy_objects
+    db = FlowDb(tmp_path_factory.mktemp("parity") / "flows.sqlite")
+    conn = db.connect()
+    upsert_flows(conn, _parity_records(), origin=DataOrigin.INGEST, now=T1)
+    policy_objects.replace_services(conn, [policy_objects.ServiceRow(h, h.rsplit("/", 1)[1], p)
+                                           for h, p in SERVICES.items()], at=T1)
+    policy_objects.replace_label_groups(conn, [policy_objects.LabelGroupRow(h, h.rsplit("/", 1)[1], k, tuple(sorted(v)))
+                                               for h, (k, v) in GROUPS.items()], at=T1)
+    for name, fn in sql_functions().items():
+        conn.create_function(name, -1, fn, deterministic=True)
+    labels = {}
+    for set_id, key, value in conn.execute("SELECT set_id, key, value FROM label_set_members"):
+        labels.setdefault(set_id, {})[key] = value
+    rows = [dict(r) | {"src_labels": labels.get(r["src_label_set"], {}), "dst_labels": labels.get(r["dst_label_set"], {})}
+            for r in conn.execute("SELECT * FROM flows WHERE is_primary = 1")]
+    assert len(rows) == 6
+    yield conn, rows
+    conn.close()
+
+
+@pytest.mark.parametrize("kw", PARITY_SPECS, ids=[str(i) for i in range(len(PARITY_SPECS))])
+def test_parity_keys_sql_and_predicate_agree(parity_store, kw):
+    conn, rows = parity_store
+    s = FilterSpec(**({"start": T0, "end": T1} | kw))
+    where, params = to_sql(s)
+    via_sql = {r[0] for r in conn.execute(f"SELECT f.id FROM flows f WHERE {where}", params)}
+    via_predicate = {r["id"] for r in rows if matches(s, r, label_groups=GROUPS, services=SERVICES)}
+    assert via_sql == via_predicate
+    # each spec splits the rows, except a deleted object (nothing) and "All Services" (everything)
+    assert 0 < len(via_sql) < len(rows) or kw in ({"src": EndpointFilter(label_groups=(
+        "/orgs/1/sec_policy/active/label_groups/gone",))}, {"services": ("/orgs/1/sec_policy/active/services/gone",)},
+        {"services": (SVC_ALL,)})
+
+
+def _kept(rows, **kw):
+    s = spec(**kw)
+    return sorted((r["src_ip"], r["dst_ip"]) for r in rows if matches(s, r, label_groups=GROUPS, services=SERVICES))
+
+
+def test_either_end_matches_one_end_or_the_other(parity_store):
+    _conn, rows = parity_store
+    assert _kept(rows, either=EndpointFilter(ips=("10.0.0.9",))) == [("10.0.0.1", "10.0.0.9"), ("10.0.0.9", "10.0.0.2")]
+    assert ("10.0.0.1", "10.0.0.9") not in _kept(rows, either_exclude=EndpointFilter(ips=("10.0.0.9",)))
+
+
+def test_label_group_joins_its_key_and_a_deleted_group_matches_nothing(parity_store):
+    _conn, rows = parity_store
+    # env in {Prod, Staging} on the source
+    assert _kept(rows, src=EndpointFilter(label_groups=(LG_PROD,))) == [
+        ("10.0.0.1", "10.0.0.9"), ("10.0.0.5", "10.0.0.6"), ("10.0.0.9", "10.0.0.2")]
+    # a label of the same key widens the group (env Dev or the group), another key narrows
+    assert ("10.0.0.3", "10.0.0.255") in _kept(rows, src=EndpointFilter(
+        labels=(LabelCond(key="env", values=("Dev",)),), label_groups=(LG_PROD,)))
+    assert _kept(rows, src=EndpointFilter(label_groups=("/orgs/1/sec_policy/active/label_groups/gone",))) == []
+    assert not EndpointFilter(label_groups=(LG_PROD,)).is_empty()
+
+
+def test_named_service_is_its_ports_and_joins_the_listed_ports(parity_store):
+    _conn, rows = parity_store
+    assert _kept(rows, services=(SVC_WEB,)) == [("10.0.0.1", "10.0.0.9"), ("10.0.0.9", "10.0.0.2")]
+    assert _kept(rows, services=(SVC_ICMP,)) == [("10.0.0.5", "10.0.0.6")]
+    assert len(_kept(rows, services=(SVC_WEB,), ports=(PortProto(port=22, proto=6),))) == 3
+    assert _kept(rows, services=("/orgs/1/sec_policy/active/services/gone",)) == []
+
+
+def test_windows_service_transmission_and_process_exclusion(parity_store):
+    _conn, rows = parity_store
+    assert _kept(rows, windows_services=("WUAUSERV",)) == [("10.0.0.1", "10.0.0.9")]
+    assert len(_kept(rows, exclude_windows_services=("spooler",))) == 5  # no service name: not excluded
+    assert _kept(rows, transmissions=("broadcast",)) == [("10.0.0.3", "10.0.0.255")]
+    assert len(_kept(rows, exclude_transmissions=("broadcast", "multicast"))) == 4
+    assert ("10.0.0.1", "10.0.0.9") not in _kept(rows, exclude_processes=("svchost.exe",))
+    assert len(_kept(rows, exclude_processes=("svchost.exe",))) == 5
+
+
+def test_excluded_process_names_are_normalized():
+    from illumio_ops.domain.filter import FlowCondition
+    assert FlowCondition(exclude_processes=("C:\\Windows\\System32\\SVCHOST.EXE",)).exclude_processes == ("svchost.exe",)
+
+
+def test_parity_keys_stay_local_for_the_pce():
+    s = spec(either=EndpointFilter(ips=("10.0.0.9",)), src=EndpointFilter(label_groups=(LG_PROD,)),
+             services=(SVC_WEB,), ports=(PortProto(port=22, proto=6),), exclude_services=(SVC_ICMP,),
+             windows_services=("wuauserv",), transmissions=("broadcast",), exclude_processes=("ssh",),
+             dst_exclude=EndpointFilter(labels=(LabelCond(key="env", values=("Dev",)),), label_groups=(LG_EU,)))
+    payload, residual = to_pce_payload(s, max_results=10, query_name="q", label_hrefs={("env", "Dev"): "/l/9"})
+    assert payload["sources"]["include"] == [[]] and residual.src == s.src
+    # ports and named services are one set: neither half goes to the PCE alone
+    assert payload["services"]["include"] == [] and residual.ports == s.ports and residual.services == s.services
+    assert residual.exclude_services == s.exclude_services
+    # an exclusion whose labels must hold with a group is never pushed as the label alone
+    assert payload["destinations"]["exclude"] == [] and residual.dst_exclude == s.dst_exclude
+    for k in ("either", "windows_services", "transmissions", "exclude_processes"):
+        assert getattr(residual, k) == getattr(s, k), k
+
+
+def test_flow_record_view_carries_windows_service_and_transmission():
+    rec = _parity_records()[2]
+    assert matches(spec(windows_services=("spooler",), transmissions=("broadcast",)), rec)
+
+
+def test_endpoint_matches_label_groups():
+    from illumio_ops.domain.filter import endpoint_matches
+    ep = EndpointFilter(label_groups=(LG_PROD,))
+    assert endpoint_matches(ep, href=None, ip="10.0.0.1", labels={"env": "Staging"}, label_groups=GROUPS)
+    assert not endpoint_matches(ep, href=None, ip="10.0.0.1", labels={"env": "Dev"}, label_groups=GROUPS)
+    assert not endpoint_matches(ep, href=None, ip="10.0.0.1", labels={"env": "Prod"}, label_groups={})
+
+
+def test_hrefs_named_on_every_part():
+    from illumio_ops.domain.filter import (
+        FlowCondition,
+        ip_list_hrefs,
+        label_group_hrefs,
+        service_hrefs,
+    )
+    c = FlowCondition(either=EndpointFilter(ip_lists=(IPL,), label_groups=(LG_EU,)),
+                      either_exclude=EndpointFilter(label_groups=(LG_PROD,)), services=(SVC_WEB,),
+                      exclude_services=(SVC_ICMP,))
+    assert ip_list_hrefs(c) == {IPL} and label_group_hrefs(c) == {LG_EU, LG_PROD}
+    assert service_hrefs(c) == {SVC_WEB, SVC_ICMP}

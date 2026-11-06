@@ -394,3 +394,49 @@ def test_late_detail_does_not_replace_the_selected_one(context, live_app, monkey
     expect(side).to_contain_text("Disk space is low")
     page.wait_for_timeout(2500)
     expect(side).to_contain_text("Disk space is low", timeout=100)
+
+
+def test_rule_traffic_parity_conditions_round_trip(context, live_app):
+    """5.x parity 2026-11-06: either end, a label group, a named service, a Windows service, transmission and a
+    process to leave out are offered, saved, and shown again by name."""
+    from datetime import UTC, datetime
+
+    from illumio_ops.store.flowdb import policy_objects
+    at = datetime(2026, 11, 6, tzinfo=UTC)
+    with live_app.ctx.flows().connect() as conn:
+        policy_objects.replace_services(conn, [policy_objects.ServiceRow(
+            "/orgs/1/sec_policy/active/services/2", "Web", ((443, None, 6),))], at=at)
+        policy_objects.replace_label_groups(conn, [policy_objects.LabelGroupRow(
+            "/orgs/1/sec_policy/active/label_groups/3", "Live", "env", ("Prod",))], at=at)
+        conn.commit()
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules/new")
+    form = page.locator("[data-role=rule-editor]")
+    form.locator("select[name=type]").select_option("traffic")
+    form.locator("input[name=name]").fill("Parity conditions")
+    form.locator("[data-side=src]").get_by_role("button", name="Add label group").click()
+    form.get_by_text("Either end").first.click()
+    form.locator("input[name=either_ips]").fill("10.0.0.9")
+    form.locator("input[name=either_ips]").blur()
+    form.locator("[data-role=service]").get_by_role("button", name="Add service").click()
+    form.locator("input[name=windows_services]").fill("wuauserv, Spooler")
+    form.locator("input[name=windows_services]").blur()
+    form.locator("input[name=transmission_broadcast]").check()
+    form.get_by_text("Exclusions").click()
+    form.locator("input[name=exclude_processes]").fill("svchost.exe")
+    form.locator("input[name=exclude_processes]").blur()
+    form.locator("input[name=exclude_transmission_multicast]").check()
+    form.get_by_role("button", name="Save").click()
+    page.wait_for_selector("[data-role=rule-list]")
+    mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Parity conditions")
+    c = mine.condition
+    assert c.src is not None and c.src.label_groups == ("/orgs/1/sec_policy/active/label_groups/3",)
+    assert c.either is not None and c.either.ips == ("10.0.0.9",)
+    assert c.services == ("/orgs/1/sec_policy/active/services/2",)
+    assert c.windows_services == ("wuauserv", "Spooler") and c.transmissions == ("broadcast",)
+    assert c.exclude_processes == ("svchost.exe",) and c.exclude_transmissions == ("multicast",)
+    page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
+    expect(page.locator("[data-side=src] [data-label-group]")).to_contain_text("Live (env)")
+    expect(page.locator("[data-role=service] [data-service]")).to_contain_text("Web")
+    expect(page.locator("input[name=windows_services]")).to_have_value("wuauserv, Spooler")

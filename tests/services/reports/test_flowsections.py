@@ -96,3 +96,43 @@ def test_filter_text_lists_labels():
 def test_report_params_carry_filter():
     p = ReportParams.model_validate({"report_type": "lateral_posture", "filter": APP_FIN.model_dump(mode="json")})
     assert p.filter == APP_FIN
+
+
+def test_filter_text_names_every_condition_the_filter_holds():
+    """5.x parity 2026-11-06: the reports filter offers the whole condition; the cover says all of it, never a part."""
+    from illumio_ops.domain.filter import PortProto
+    cond = FlowCondition(
+        src_exclude=EndpointFilter(labels=(LabelCond(key="env", values=("Dev",)),)),
+        either=EndpointFilter(ips=("10.0.0.9",), label_groups=("/lg/1",)),
+        dst=EndpointFilter(ip_lists=("/ipl/1", "/ipl/2"), public=True),
+        services=("/svc/1",), exclude_ports=(PortProto(port=53, proto=17),), windows_services=("wuauserv",),
+        transmissions=("broadcast",), exclude_processes=("svchost.exe",), initiator_user="alice",
+        exclude_system_accounts=True)
+    text = flowsections.filter_text(cond, Language.EN)
+    for part in ("Source is not env = Dev", "Either end: 1 hosts", "Either end: 1 label groups",
+                 "Destination: 2 IP lists", "Destination: Public addresses", "Service: 1", "Port is not: 53/UDP",
+                 "Windows service: wuauserv", "Transmission: Broadcast", "Process is not: svchost.exe",
+                 "Initiating user: alice", "Without system accounts"):
+        assert part in text, (part, text)
+
+
+def test_host_in_scope_reads_label_groups_and_either_end():
+    from illumio_ops.domain.lateral import HostInfo
+    host = HostInfo(key="/w/1", href="/w/1", hostname="h", managed=True, labels={"env": "Prod"}, enforcement_mode="full",
+                    visibility_level=None, os_id=None, ven_href=None, critical=False, admin_group=False)
+    groups = {"/lg/1": ("env", frozenset({"Prod"}))}
+    by_group = FlowCondition(dst=EndpointFilter(label_groups=("/lg/1",)))
+    assert flowsections.host_in_scope(host, by_group, label_groups=groups)
+    assert not flowsections.host_in_scope(host, by_group, label_groups={})
+    either = FlowCondition(either=EndpointFilter(labels=(LabelCond(key="env", values=("Prod",)),)))
+    assert flowsections.host_in_scope(host, either, label_groups={})
+    assert not flowsections.host_in_scope(host, FlowCondition(either_exclude=either.either), label_groups={})
+
+
+def test_an_app_report_refuses_what_it_cannot_honour():
+    from illumio_ops.services.reports.registry import app_filter_ok
+    assert app_filter_ok(APP_FIN)
+    assert not app_filter_ok(APP_FIN.model_copy(update={"either": EndpointFilter(ips=("10.0.0.1",))}))
+    assert not app_filter_ok(APP_FIN.model_copy(update={"either_exclude": EndpointFilter(ips=("10.0.0.1",))}))
+    side = APP_FIN.dst.model_copy(update={"label_groups": ("/lg/1",)})
+    assert not app_filter_ok(APP_FIN.model_copy(update={"dst": side}))

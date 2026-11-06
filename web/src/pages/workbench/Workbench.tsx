@@ -274,6 +274,12 @@ export function Workbench() {
   // start: the URL's request, else an alert's evidence, else the last day
   useEffect(() => {
     void call("workbench.meta").then((env) => { if (env.ok && env.data) setMeta(env.data); });
+    // the PCE objects a condition names (an alert's evidence can carry them) are shown by name
+    void call("alert_rules.condition_choices").then((env) => {
+      if (!env.ok || !env.data) return;
+      const objects = [...env.data.ip_lists, ...env.data.label_groups, ...env.data.services];
+      setNames((prev) => ({ ...Object.fromEntries(objects.map((o) => [o.href, o.name])), ...prev }));
+    });
     const fromUrl = decode(params.get("q"));
     const alert = params.get("alert");
     if (fromUrl) {

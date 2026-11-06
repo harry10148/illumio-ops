@@ -19,6 +19,7 @@ from illumio_ops.services.alerts.rules import (
     preview_rule,
     rule_list,
 )
+from illumio_ops.services.analysis.status import ConditionChoices, condition_choices
 from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
@@ -61,6 +62,8 @@ OP_DELETE = operation("alert_rules.delete", "DELETE", "/api/alert-rules/<rule_id
 OP_PREVIEW = operation("alert_rules.preview", "POST", "/api/alert-rules/preview", RulePreviewRequest, RulePreview)
 OP_PACK = operation("alert_rules.pack", "POST", "/api/alert-rules/pack", PackApply, RulesView)
 OP_TEST = operation("alert_rules.test", "POST", "/api/alert-rules/test", RuleTestRequest, RuleTestResult)
+OP_CHOICES = operation("alert_rules.condition_choices", "GET", "/api/alert-rules/condition-choices", None,
+                       ConditionChoices)
 OP_TEST_CANDIDATES = operation("alert_rules.test_candidates", "GET", "/api/alert-rules/test-candidates", None,
                                Candidates)
 
@@ -149,3 +152,9 @@ def test_candidates() -> Candidates:
         return rule_test.candidates(get_ctx())
     except BindingMismatch:
         raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
+
+
+@api_route(bp, OP_CHOICES)
+def choices() -> ConditionChoices:
+    """What a flow condition editor offers: the alert rule editor and the reports filter."""
+    return condition_choices(get_ctx())

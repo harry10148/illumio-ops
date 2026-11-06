@@ -191,6 +191,53 @@ export type ProbeName = ("noop" | "health" | "node_available")
 
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "IpListChoice".
+ */
+export interface IpListChoice {
+href: string
+name: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelChoice".
+ */
+export interface LabelChoice {
+key: string
+truncated: boolean
+values: string[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LabelGroupChoice".
+ */
+export interface LabelGroupChoice {
+href: string
+key: string
+name: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ServiceChoice".
+ */
+export interface ServiceChoice {
+href: string
+name: string
+}
+/**
+ * What a flow condition editor offers (alert rules, the reports filter): the inventory's labels and the PCE
+ * objects the last inventory read.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ConditionChoices".
+ */
+export interface ConditionChoices {
+ip_lists: IpListChoice[]
+label_groups: LabelGroupChoice[]
+labels: LabelChoice[]
+services: ServiceChoice[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "BandwidthRule".
  */
 export interface BandwidthRule {
@@ -218,8 +265,14 @@ export interface FlowCondition {
 decisions?: PolicyDecision[]
 dst?: (EndpointFilter | null)
 dst_exclude?: (EndpointFilter | null)
+either?: (EndpointFilter | null)
+either_exclude?: (EndpointFilter | null)
 exclude_ports?: PortProto[]
+exclude_processes?: string[]
+exclude_services?: string[]
 exclude_system_accounts?: boolean
+exclude_transmissions?: ("unicast" | "broadcast" | "multicast")[]
+exclude_windows_services?: string[]
 initiator_process?: (string | null)
 initiator_processes?: string[]
 initiator_user?: (string | null)
@@ -229,9 +282,12 @@ service_process?: (string | null)
 service_processes?: string[]
 service_user?: (string | null)
 service_users?: string[]
+services?: string[]
 src?: (EndpointFilter | null)
 src_exclude?: (EndpointFilter | null)
 text?: (string | null)
+transmissions?: ("unicast" | "broadcast" | "multicast")[]
+windows_services?: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -241,6 +297,7 @@ export interface EndpointFilter {
 hrefs?: string[]
 ip_lists?: string[]
 ips?: string[]
+label_groups?: string[]
 labels?: LabelCond[]
 match?: ("any" | "all")
 public?: boolean
@@ -855,8 +912,14 @@ export interface FlowCondition1 {
 decisions?: PolicyDecision[]
 dst?: (EndpointFilter | null)
 dst_exclude?: (EndpointFilter | null)
+either?: (EndpointFilter | null)
+either_exclude?: (EndpointFilter | null)
 exclude_ports?: PortProto[]
+exclude_processes?: string[]
+exclude_services?: string[]
 exclude_system_accounts?: boolean
+exclude_transmissions?: ("unicast" | "broadcast" | "multicast")[]
+exclude_windows_services?: string[]
 initiator_process?: (string | null)
 initiator_processes?: string[]
 initiator_user?: (string | null)
@@ -866,9 +929,12 @@ service_process?: (string | null)
 service_processes?: string[]
 service_user?: (string | null)
 service_users?: string[]
+services?: string[]
 src?: (EndpointFilter | null)
 src_exclude?: (EndpointFilter | null)
 text?: (string | null)
+transmissions?: ("unicast" | "broadcast" | "multicast")[]
+windows_services?: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1532,6 +1598,7 @@ src_labels: {
 src_managed: boolean
 src_mode: (string | null)
 state: (string | null)
+transmission: (string | null)
 windows_service: (string | null)
 }
 /**
@@ -1844,15 +1911,6 @@ report_type: ReportType
 requires_app: boolean
 schedules: number
 ui_group: ("assessment" | "traffic" | "policy" | "operations")
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "LabelChoice".
- */
-export interface LabelChoice {
-key: string
-truncated: boolean
-values: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -2596,14 +2654,6 @@ proto: (number | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "IpListChoice".
- */
-export interface IpListChoice {
-href: string
-name: string
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "LabelSelector".
  */
 export interface LabelSelector {
@@ -3063,9 +3113,10 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.runs" | "rule_schedules.targets" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.data" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.runs" | "rule_schedules.targets" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.data" | "system.collection.get" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
+  "alert_rules.condition_choices": undefined;
   "alert_rules.create": RuleWrite;
   "alert_rules.delete": RuleDelete;
   "alert_rules.list": undefined;
@@ -3168,6 +3219,7 @@ export interface Requests {
 }
 
 export interface Responses {
+  "alert_rules.condition_choices": ConditionChoices;
   "alert_rules.create": RulesView;
   "alert_rules.delete": RulesView;
   "alert_rules.list": RulesView;
@@ -3270,6 +3322,7 @@ export interface Responses {
 }
 
 export const OPERATIONS = {
+  "alert_rules.condition_choices": { method: "GET", path: "/api/alert-rules/condition-choices" },
   "alert_rules.create": { method: "POST", path: "/api/alert-rules" },
   "alert_rules.delete": { method: "DELETE", path: "/api/alert-rules/<rule_id>" },
   "alert_rules.list": { method: "GET", path: "/api/alert-rules" },

@@ -14,16 +14,24 @@ labels and the hosts (hrefs or addresses, together one part) must both hold when
 "env=Prod and this host", P6a). public is one more host part: a public address no Workload holds (netaddr.outside,
 user 2026-10-31: alert rules leave the internet side of a connection out); so is ip_lists, PCE IP lists by href, whose
 networks the flow store keeps (to_sql reads them there; matches is given them). A list the PCE no longer has matches
+nothing. label_groups are PCE label groups by href, part of the labels: a group's member values join the values of its
+key, and every key must hold (the PCE's own reading of labels and label groups); a group the PCE no longer has matches
 nothing. A port of -1 is "no port" (a protocol
 alone is any port). The *_processes / *_users sets are exact values (domain accounts case-insensitive), the single
 fields are partial matches.
+
+5.x parity (2026-11-06): either / either_exclude are one endpoint condition on either end (5.x any_* / ex_any_*);
+services are PCE services by href, their ports from the flow store, one set with the listed ports; Windows service
+names compare case-insensitively (ASCII, as SQLite's lower()); transmissions are the PCE's unicast / broadcast /
+multicast; exclude_processes leaves out a connection whose process at either end is one of them. An exclusion never
+leaves out a connection that lacks the value.
 """
 from __future__ import annotations
 
 import ipaddress
 import itertools
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import Annotated, Any, Literal
 
@@ -37,12 +45,16 @@ from pydantic import (
 )
 
 from illumio_ops.domain.flows import FlowRecord
-from illumio_ops.domain.identity import is_system_account
+from illumio_ops.domain.identity import is_system_account, normalize_process
 from illumio_ops.domain.netaddr import outside, parse_ip_token
 from illumio_ops.domain.timefmt import pce_time, store_time
 from illumio_ops.domain.values import FlowDirection, PolicyDecision
 
 IpLists = Mapping[str, Sequence[str]]  # IP list href -> its networks
+LabelGroups = Mapping[str, tuple[str, Collection[str]]]  # label group href -> (key, member values)
+ServicePorts = Mapping[str, Sequence[tuple[int | None, int | None, int | None]]]  # service href -> (port, to_port, proto)
+Href = Annotated[str, Field(min_length=1, max_length=255)]
+Transmission = Literal["unicast", "broadcast", "multicast"]
 
 
 class _Model(BaseModel):
@@ -72,13 +84,20 @@ class EndpointFilter(_Model):
     labels: tuple[LabelCond, ...] = ()
     hrefs: tuple[str, ...] = ()
     ips: tuple[str, ...] = ()
-    ip_lists: tuple[Annotated[str, Field(min_length=1, max_length=255)], ...] = ()
+    ip_lists: tuple[Href, ...] = ()
     public: bool = False
     match: Literal["any", "all"] = "any"  # any: one of the parts (the union); all: the labels and the hosts
+    label_groups: tuple[Href, ...] = ()  # part of the labels (module docstring)
+
+    def has_labels(self) -> bool:
+        return bool(self.labels or self.label_groups)
+
+    def has_hosts(self) -> bool:
+        return bool(self.hrefs or self.ips or self.ip_lists or self.public)
 
     def intersects(self) -> bool:
         """Labels and hosts both set under match="all": an intersection, not the union."""
-        return self.match == "all" and bool(self.labels) and bool(self.hrefs or self.ips or self.ip_lists or self.public)
+        return self.match == "all" and self.has_labels() and self.has_hosts()
 
     @field_validator("ips")
     @classmethod
@@ -88,7 +107,7 @@ class EndpointFilter(_Model):
         return v
 
     def is_empty(self) -> bool:
-        return not (self.labels or self.hrefs or self.ips or self.ip_lists or self.public)
+        return not (self.has_labels() or self.has_hosts())
 
 
 class FlowCondition(_Model):
@@ -112,6 +131,28 @@ class FlowCondition(_Model):
     service_users: tuple[str, ...] = ()
     text: str | None = None
     exclude_system_accounts: bool = False
+    # 5.x parity (module docstring)
+    either: EndpointFilter | None = None
+    either_exclude: EndpointFilter | None = None
+    services: tuple[Href, ...] = ()
+    exclude_services: tuple[Href, ...] = ()
+    windows_services: tuple[Annotated[str, Field(min_length=1, max_length=255)], ...] = ()
+    exclude_windows_services: tuple[Annotated[str, Field(min_length=1, max_length=255)], ...] = ()
+    transmissions: tuple[Transmission, ...] = ()
+    exclude_transmissions: tuple[Transmission, ...] = ()
+    exclude_processes: tuple[Annotated[str, Field(min_length=1, max_length=255)], ...] = ()
+
+    @field_validator("exclude_processes")
+    @classmethod
+    def _processes(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        """As the store keeps them (identity.normalize_process): a path or a Windows name typed is still found."""
+        out = []
+        for name in v:
+            n = normalize_process(name.strip())
+            if n is None:
+                raise ValueError("a process name cannot be empty")
+            out.append(n)
+        return tuple(out)
 
     def within(self, start: datetime, end: datetime) -> FilterSpec:
         return FilterSpec(start=start, end=end, **dict(self))
@@ -204,6 +245,11 @@ def _sql_user(column: str) -> str:
             f"THEN lower({column}) ELSE {column} END")
 
 
+def ascii_lower(value: str) -> str:
+    """Lower-case ASCII letters only, as SQLite's lower() does."""
+    return "".join(c.lower() if c.isascii() else c for c in value)
+
+
 def _is_outside(ip: Any, href: Any) -> int:
     return int(outside(ip if isinstance(ip, str) else None, href if isinstance(href, str) else None))
 
@@ -222,7 +268,7 @@ def _pce_side(ep: EndpointFilter | None, label_hrefs: Mapping[tuple[str, str], s
     if ep.intersects():
         return None  # the PCE's include list is a union of groups: the intersection is checked locally
     exact, nets = _split_ips(ep.ips)
-    if nets or ep.public or ep.ip_lists:
+    if nets or ep.public or ep.ip_lists or ep.label_groups:
         return None
     groups: list[list[dict[str, Any]]] = []
     if ep.labels:
@@ -243,7 +289,7 @@ def _pce_exclude(ep: EndpointFilter | None, label_hrefs: Mapping[tuple[str, str]
     if ep is None or ep.intersects():
         return []  # excluding a part of an intersection would exclude too much: the residual excludes it
     out: list[dict[str, Any]] = []
-    if len(ep.labels) == 1:
+    if len(ep.labels) == 1 and not ep.label_groups:  # with a group, the label alone is not the labels part
         for v in ep.labels[0].values:
             href = label_hrefs.get((ep.labels[0].key, v))
             if href:
@@ -269,7 +315,8 @@ def to_pce_payload(spec: FilterSpec, *, max_results: int, query_name: str,
     src_inc = _pce_side(spec.src, label_hrefs)
     dst_inc = _pce_side(spec.dst, label_hrefs)
     # "no port" (-1) has no PCE form: those service lists are checked locally
-    noport_in = any(p.port == -1 for p in spec.ports)
+    # nor do named services: the listed ports and the services are one set, so neither half is pushed alone
+    noport_in = any(p.port == -1 for p in spec.ports) or bool(spec.services)
     noport_ex = any(p.port == -1 for p in spec.exclude_ports)
     payload = {
         "query_name": query_name,
@@ -299,7 +346,9 @@ def to_pce_payload(spec: FilterSpec, *, max_results: int, query_name: str,
 def _sql_side(ep: EndpointFilter, side: str, a: str, params: list[Any]) -> str:
     """The parts of one endpoint (labels, hrefs, addresses), ORed — or labels AND hosts for match="all"."""
     parts: list[str] = []
-    if ep.labels:
+    if ep.label_groups:
+        parts.append(_sql_labels_with_groups(ep, side, a, params))
+    elif ep.labels:
         keys = []
         for cond in ep.labels:
             marks = ",".join("?" * len(cond.values))
@@ -333,6 +382,41 @@ def _sql_side(ep: EndpointFilter, side: str, a: str, params: list[Any]) -> str:
     return "(" + (" AND " if ep.match == "all" else " OR ").join(parts) + ")"
 
 
+def _sql_labels_with_groups(ep: EndpointFilter, side: str, a: str, params: list[Any]) -> str:
+    """The labels part when it names label groups: every named group exists, and the end's label set holds, for each
+    key the part names, one of that key's allowed values (the key's listed values and its groups' members). A label
+    set has one value per key, so counting the keys it matches among the allowed pairs counts the keys it satisfies."""
+    groups = sorted(set(ep.label_groups))
+    gm = ",".join("?" * len(groups))
+    pairs = [(c.key, v) for c in ep.labels for v in c.values]
+    cond_keys = sorted({c.key for c in ep.labels})
+    allowed = f"SELECT key, value FROM label_group_members WHERE href IN ({gm})" + " UNION ALL SELECT ?, ?" * len(pairs)
+    keys = f"SELECT key FROM label_groups WHERE href IN ({gm})" + " UNION SELECT ?" * len(cond_keys)
+    params.extend(groups)
+    params.extend(groups)
+    params.extend(x for pair in pairs for x in pair)
+    params.extend(groups)
+    params.extend(cond_keys)
+    return (f"((SELECT COUNT(*) FROM label_groups WHERE href IN ({gm})) = {len(groups)} "
+            f"AND COALESCE({a}.{side}_label_set, -1) IN (SELECT m.set_id FROM label_set_members m "
+            f"WHERE (m.key, m.value) IN ({allowed}) GROUP BY m.set_id "
+            f"HAVING COUNT(DISTINCT m.key) = (SELECT COUNT(*) FROM ({keys}))))")
+
+
+def _sql_services(hrefs: tuple[str, ...], a: str, params: list[Any]) -> str:
+    params.extend(hrefs)
+    return (f"EXISTS (SELECT 1 FROM pce_service_ports s WHERE s.href IN ({','.join('?' * len(hrefs))}) "
+            f"AND (s.proto IS NULL OR s.proto = {a}.proto) "
+            f"AND (s.port IS NULL OR COALESCE({a}.port, -1) BETWEEN s.port AND COALESCE(s.to_port, s.port)))")
+
+
+def _sql_in(expr: str, values: Sequence[Any], params: list[Any], *, negate: bool) -> str:
+    """expr IN values; negated, a NULL expr is not left out (an exclusion never drops a missing value)."""
+    params.extend(values)
+    inside = f"{expr} IN ({','.join('?' * len(values))})"
+    return f"NOT COALESCE({inside}, 0)" if negate else inside
+
+
 def _sql_port(p: PortProto, a: str, params: list[Any]) -> str:
     parts = []
     if p.proto is not None:
@@ -358,10 +442,27 @@ def to_sql(spec: FilterSpec, *, table_alias: str = "f", wide: bool = False) -> t
         if ep is not None and not ep.is_empty():
             clause = _sql_side(ep, side, a, params)
             clauses.append(f"NOT {clause}" if negate else clause)
-    if spec.ports:
-        clauses.append("(" + " OR ".join(_sql_port(p, a, params) for p in spec.ports) + ")")
-    if spec.exclude_ports:
-        clauses.append("NOT (" + " OR ".join(_sql_port(p, a, params) for p in spec.exclude_ports) + ")")
+    for ep, negate in ((spec.either, False), (spec.either_exclude, True)):
+        if ep is not None and not ep.is_empty():
+            clause = f"({_sql_side(ep, 'src', a, params)} OR {_sql_side(ep, 'dst', a, params)})"
+            clauses.append(f"NOT {clause}" if negate else clause)
+    for ports, services, negate in ((spec.ports, spec.services, False), (spec.exclude_ports, spec.exclude_services, True)):
+        terms = [_sql_port(p, a, params) for p in ports] + ([_sql_services(services, a, params)] if services else [])
+        if terms:
+            clauses.append(("NOT (" if negate else "(") + " OR ".join(terms) + ")")
+    if spec.windows_services:
+        clauses.append(_sql_in(f"lower({a}.windows_service)", [ascii_lower(x) for x in spec.windows_services], params,
+                               negate=False))
+    if spec.exclude_windows_services:
+        clauses.append(_sql_in(f"lower({a}.windows_service)", [ascii_lower(x) for x in spec.exclude_windows_services],
+                               params, negate=True))
+    if spec.transmissions:
+        clauses.append(_sql_in(f"lower({a}.transmission)", list(spec.transmissions), params, negate=False))
+    if spec.exclude_transmissions:
+        clauses.append(_sql_in(f"lower({a}.transmission)", list(spec.exclude_transmissions), params, negate=True))
+    if spec.exclude_processes:
+        clauses.append(_sql_in(f"{a}.initiator_process", spec.exclude_processes, params, negate=True))
+        clauses.append(_sql_in(f"{a}.service_process", spec.exclude_processes, params, negate=True))
     if spec.decisions:
         clauses.append(f"{a}.policy_decision IN ({','.join('?' * len(spec.decisions))})")
         params.extend(d.value for d in spec.decisions)
@@ -399,6 +500,7 @@ def _view(record: FlowRecord | Mapping[str, Any]) -> dict[str, Any]:
             "initiator_user": record.own_user if outbound else None,
             "service_process": None if outbound else record.own_process,
             "service_user": None if outbound else record.own_user,
+            "windows_service": record.windows_service, "transmission": record.transmission,
             "first_detected": record.first_detected, "last_detected": record.last_detected,
         }
     return dict(record)
@@ -408,15 +510,28 @@ def _when(value: Any) -> datetime:
     return value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
 
 
-def _side_matches(ep: EndpointFilter, v: Mapping[str, Any], side: str, ip_lists: IpLists) -> bool:
+def _labels_hold(ep: EndpointFilter, labels: Mapping[str, str], groups: LabelGroups) -> bool:
+    allowed: dict[str, set[str]] = {}
+    for c in ep.labels:
+        allowed.setdefault(c.key, set()).update(c.values)
+    for h in ep.label_groups:
+        if h not in groups:
+            return False  # a group the PCE no longer has matches nothing
+        key, members = groups[h]
+        allowed.setdefault(key, set()).update(members)
+    return all(labels.get(k) in vs for k, vs in allowed.items())
+
+
+def _side_matches(ep: EndpointFilter, v: Mapping[str, Any], side: str, ip_lists: IpLists,
+                  label_groups: LabelGroups) -> bool:
     labels = v.get(f"{side}_labels") or {}
     exact, nets = _split_ips(ep.ips)
     ip = v.get(f"{side}_ip")
     held = []  # (the part is set, the end satisfies it)
-    held.append((bool(ep.labels), bool(ep.labels) and all(labels.get(c.key) in c.values for c in ep.labels)))
+    held.append((ep.has_labels(), ep.has_labels() and _labels_hold(ep, labels, label_groups)))
     href = v.get(f"{side}_href")
     listed = (n for h in ep.ip_lists for n in ip_lists.get(h, ()))
-    held.append((bool(ep.hrefs or ep.ips or ep.ip_lists or ep.public), (href or "") in ep.hrefs
+    held.append((ep.has_hosts(), (href or "") in ep.hrefs
                  or ip in exact or any(ip_in_net(ip, n) for n in nets) or (ep.public and outside(ip, href))
                  or any(ip_in_net(ip, n) for n in listed)))
     if ep.match == "all":
@@ -434,36 +549,87 @@ def _port_matches(p: PortProto, v: Mapping[str, Any]) -> bool:
     return p.port is None or port == p.port
 
 
+def _service_matches(entries: Sequence[tuple[int | None, int | None, int | None]], v: Mapping[str, Any]) -> bool:
+    port = v.get("port")
+    port = -1 if port is None else port
+    return any((proto is None or v.get("proto") == proto)
+               and (lo is None or lo <= port <= (hi if hi is not None else lo)) for lo, hi, proto in entries)
+
+
+def _in_ci(value: Any, values: Sequence[str]) -> bool:
+    return isinstance(value, str) and ascii_lower(value) in {ascii_lower(x) for x in values}
+
+
 def port_matches(p: PortProto, port: int | None, proto: int) -> bool:
     """One port condition on a (port, proto) pair, as matches and to_sql apply it."""
     return _port_matches(p, {"port": port, "proto": proto})
 
 
+def _endpoints(spec: FlowCondition) -> tuple[EndpointFilter, ...]:
+    return tuple(ep for ep in (spec.src, spec.dst, spec.src_exclude, spec.dst_exclude, spec.either,
+                               spec.either_exclude) if ep is not None)
+
+
 def ip_list_hrefs(spec: FlowCondition) -> set[str]:
     """The IP lists a spec names on any side (what matches needs the networks of)."""
-    return {h for ep in (spec.src, spec.dst, spec.src_exclude, spec.dst_exclude) if ep is not None for h in ep.ip_lists}
+    return {h for ep in _endpoints(spec) for h in ep.ip_lists}
+
+
+def label_group_hrefs(spec: FlowCondition) -> set[str]:
+    """The label groups a spec names on any side (what matches needs the members of)."""
+    return {h for ep in _endpoints(spec) for h in ep.label_groups}
+
+
+def service_hrefs(spec: FlowCondition) -> set[str]:
+    """The services a spec names (what matches needs the ports of)."""
+    return set(spec.services) | set(spec.exclude_services)
 
 
 def endpoint_matches(ep: EndpointFilter, *, href: str | None, ip: str, labels: Mapping[str, str],
-                     ip_lists: IpLists | None = None) -> bool:
+                     ip_lists: IpLists | None = None, label_groups: LabelGroups | None = None) -> bool:
     """One endpoint condition on one end (a host's href, address and labels), as matches applies it."""
-    return _side_matches(ep, {"x_href": href, "x_ip": ip, "x_labels": labels}, "x", ip_lists or {})
+    return _side_matches(ep, {"x_href": href, "x_ip": ip, "x_labels": labels}, "x", ip_lists or {}, label_groups or {})
 
 
-def matches(spec: FilterSpec, record: FlowRecord | Mapping[str, Any], *, ip_lists: IpLists | None = None) -> bool:
-    """ip_lists: the networks of the IP lists the spec names (the flow store's ip_lists.networks)."""
+def _service_set(ports: tuple[PortProto, ...], services: tuple[str, ...], v: Mapping[str, Any],
+                 known: ServicePorts) -> bool:
+    return (any(_port_matches(p, v) for p in ports)
+            or any(_service_matches(known.get(h, ()), v) for h in services))
+
+
+def matches(spec: FilterSpec, record: FlowRecord | Mapping[str, Any], *, ip_lists: IpLists | None = None,
+            label_groups: LabelGroups | None = None, services: ServicePorts | None = None) -> bool:
+    """ip_lists, label_groups, services: what the spec's IP lists, label groups and services stand for (the flow
+    store's ip_lists.networks, policy_objects.label_groups and policy_objects.service_ports)."""
     v = _view(record)
     if v.get("is_primary", 1) != 1:
         return False
     if _when(v["last_detected"]) < spec.start or _when(v["first_detected"]) > spec.end:
         return False
+    nets, groups, known = ip_lists or {}, label_groups or {}, services or {}
     for side, ep, negate in (("src", spec.src, False), ("dst", spec.dst, False),
                              ("src", spec.src_exclude, True), ("dst", spec.dst_exclude, True)):
-        if ep is not None and not ep.is_empty() and _side_matches(ep, v, side, ip_lists or {}) == negate:
+        if ep is not None and not ep.is_empty() and _side_matches(ep, v, side, nets, groups) == negate:
             return False
-    if spec.ports and not any(_port_matches(p, v) for p in spec.ports):
+    for ep, negate in ((spec.either, False), (spec.either_exclude, True)):
+        if ep is not None and not ep.is_empty() and (
+                _side_matches(ep, v, "src", nets, groups) or _side_matches(ep, v, "dst", nets, groups)) == negate:
+            return False
+    if (spec.ports or spec.services) and not _service_set(spec.ports, spec.services, v, known):
         return False
-    if spec.exclude_ports and any(_port_matches(p, v) for p in spec.exclude_ports):
+    if (spec.exclude_ports or spec.exclude_services) and _service_set(spec.exclude_ports, spec.exclude_services, v,
+                                                                      known):
+        return False
+    if spec.windows_services and not _in_ci(v.get("windows_service"), spec.windows_services):
+        return False
+    if spec.exclude_windows_services and _in_ci(v.get("windows_service"), spec.exclude_windows_services):
+        return False
+    if spec.transmissions and not _in_ci(v.get("transmission"), spec.transmissions):
+        return False
+    if spec.exclude_transmissions and _in_ci(v.get("transmission"), spec.exclude_transmissions):
+        return False
+    if spec.exclude_processes and (v.get("initiator_process") in spec.exclude_processes
+                                   or v.get("service_process") in spec.exclude_processes):
         return False
     if spec.decisions and v.get("policy_decision") not in {d.value for d in spec.decisions}:
         return False

@@ -83,8 +83,9 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     cond = inp.params.filter
     dst_scope = FlowCondition(dst=cond.dst, dst_exclude=cond.dst_exclude) if cond is not None else None
     hosts: dict[tuple[str | None, str | None], Counter[str]] = {}
+    scope_groups = flowsections.label_groups_of(inp.ctx, dst_scope)
     for h in lc.hosts.values():
-        if flowsections.host_in_scope(h, dst_scope):
+        if flowsections.host_in_scope(h, dst_scope, label_groups=scope_groups):
             key = (h.labels.get(APP) or None, h.labels.get(env_key) or None)
             hosts.setdefault(key, Counter())[h.enforcement_mode or "unknown"] += 1
     no_label = t("rpt_no_label")
