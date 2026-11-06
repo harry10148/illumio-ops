@@ -127,7 +127,7 @@ def _reset_tls(paths: InstallPaths) -> int:
     store.update(store.current().revision, mutate)
     print(f"TLS was using {was}" + (", ciphers " + tls.ciphers if tls.ciphers else "") + f", {tls.min_version} or newer.")
     print("It now uses the self-signed certificate (made at the next start when missing), TLS 1.2 or newer and the "
-          "default ciphers. The provided files were not touched. Import a certificate again in System › TLS.")
+          "default ciphers. The provided files were not touched. Import a certificate again in System › Certificate.")
     return 0
 
 
