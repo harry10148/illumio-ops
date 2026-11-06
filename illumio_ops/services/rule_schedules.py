@@ -290,6 +290,22 @@ def _apply(ctx: AppContext, client: PceClient, row: sqlite3.Row, plan: Plan, dra
     return "switched"
 
 
+def _check_fresh(ctx: AppContext, client: PceClient, schedule_id: int, at: datetime, *,
+                 updated_at: str | None = None) -> Outcome | None:
+    """One schedule, read again first: None when it is gone or paused, or (updated_at given) changed since it was
+    listed — never checked with an old row. The PCE's failures are recorded as the run's."""
+    with ctx.db() as conn:
+        row = store.get(conn, schedule_id)
+    if row is None or row["paused"] or (updated_at is not None and row["updated_at"] != updated_at):
+        return None
+    try:
+        return _check_one(ctx, client, row, at)
+    except PCE_ERRORS as exc:
+        _run(ctx, row, href=row["href"], name=row["name"], at=at, action="error", result="failed",
+             status=getattr(exc, "status", None), detail=f"{type(exc).__name__}: {exc}")
+        return "failed"
+
+
 def tick(ctx: AppContext, *, now: datetime | None = None) -> TickResult:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     out = TickResult()
@@ -308,17 +324,10 @@ def tick(ctx: AppContext, *, now: datetime | None = None) -> TickResult:
             if _ident(ctx) != ident:
                 logger.info("rule schedules: the PCE changed during the check; the rest waits for the next run")
                 break
-            with ctx.db() as conn:  # paused, deleted or changed since the round began: not with the old row
-                row = store.get(conn, first_read["id"])
-            if row is None or row["paused"] or row["updated_at"] != first_read["updated_at"]:
+            result = _check_fresh(ctx, client, first_read["id"], at, updated_at=first_read["updated_at"])
+            if result is None:
                 continue
             out.checked += 1
-            try:
-                result = _check_one(ctx, client, row, at)
-            except PCE_ERRORS as exc:
-                _run(ctx, row, href=row["href"], name=row["name"], at=at, action="error", result="failed",
-                     status=getattr(exc, "status", None), detail=f"{type(exc).__name__}: {exc}")
-                result = "failed"
             if result == "switched":
                 out.switched += 1
             elif result == "failed":
@@ -486,6 +495,37 @@ def update(ctx: AppContext, schedule_id: int, plan: Plan, *, now: datetime | Non
         fresh = store.get(conn, schedule_id)
         assert fresh is not None
         return _view(conn, fresh, at)
+
+
+class SchedulePaused(Exception):
+    """A paused schedule is not checked, on demand either."""
+
+
+class CheckResult(BaseModel):
+    outcome: Outcome
+    item: ScheduleView | None  # None: the check ended the schedule (an expiry carried out)
+
+
+def check_now(ctx: AppContext, schedule_id: int, *, now: datetime | None = None) -> CheckResult:
+    """5.x "check now": one round of the rule_schedules_tick job for this schedule, exactly as the job checks it.
+    Raises LookupError (not this PCE's), NoWriteKey, SchedulePaused."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    cfg = ctx.settings.current().pce
+    row = _own(ctx, schedule_id, cfg)
+    if not (cfg.write_api_key and cfg.write_api_secret):
+        raise NoWriteKey
+    if row["paused"]:
+        raise SchedulePaused
+    with ctx.pce_write_client(cfg) as client:
+        outcome = _check_fresh(ctx, client, schedule_id, at)
+    with ctx.db() as conn:
+        fresh = store.get(conn, schedule_id)
+        item = None if fresh is None else _view(conn, fresh, at)
+    if outcome is None:  # paused or deleted between the two reads
+        if fresh is None:
+            raise LookupError(schedule_id)
+        raise SchedulePaused
+    return CheckResult(outcome=outcome, item=item)
 
 
 def set_paused(ctx: AppContext, schedule_id: int, paused: bool, *, now: datetime | None = None) -> ScheduleView:

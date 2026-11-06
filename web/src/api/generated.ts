@@ -1943,34 +1943,6 @@ timezone: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "Weekly".
- */
-export interface Weekly {
-action: ("enable_in_window" | "disable_in_window")
-/**
- * @minItems 1
- */
-days: [("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"), ...(("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"))[]]
-end: string
-kind?: "weekly"
-start: string
-timezone: string
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "ScheduleCreate".
- */
-export interface ScheduleCreate {
-href: string
-name: string
-org_id: string
-pce_url: string
-plan: (Weekly | Expiry)
-ruleset_name: string
-summary: string
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RunView".
  */
 export interface RunView {
@@ -2002,6 +1974,42 @@ preview_key: string
 preview_params: {
 [k: string]: string
 }
+ruleset_name: string
+summary: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Weekly".
+ */
+export interface Weekly {
+action: ("enable_in_window" | "disable_in_window")
+/**
+ * @minItems 1
+ */
+days: [("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"), ...(("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"))[]]
+end: string
+kind?: "weekly"
+start: string
+timezone: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "CheckResult".
+ */
+export interface CheckResult {
+item: (ScheduleView | null)
+outcome: ("switched" | "failed" | "skipped" | "none")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ScheduleCreate".
+ */
+export interface ScheduleCreate {
+href: string
+name: string
+org_id: string
+pce_url: string
+plan: (Weekly | Expiry)
 ruleset_name: string
 summary: string
 }
@@ -2065,6 +2073,13 @@ items: TargetHit[]
 limited: boolean
 org_id?: string
 pce_url?: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "ScheduleEdit".
+ */
+export interface ScheduleEdit {
+plan: (Weekly | Expiry)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -3077,7 +3092,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.runs" | "rule_schedules.targets" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -3130,6 +3145,7 @@ export interface Requests {
   "reports.list": undefined;
   "rhc.enable": RhcEnable;
   "rhc.status": undefined;
+  "rule_schedules.check": Empty;
   "rule_schedules.create": ScheduleCreate;
   "rule_schedules.delete": undefined;
   "rule_schedules.list": undefined;
@@ -3137,6 +3153,7 @@ export interface Requests {
   "rule_schedules.resume": Empty;
   "rule_schedules.runs": undefined;
   "rule_schedules.targets": undefined;
+  "rule_schedules.update": ScheduleEdit;
   "shell.status": undefined;
   "siem.destination.test": SiemTestRequest;
   "siem.dlq.list": undefined;
@@ -3233,6 +3250,7 @@ export interface Responses {
   "reports.list": ReportPage;
   "rhc.enable": RhcEnabled;
   "rhc.status": RhcStatus;
+  "rule_schedules.check": CheckResult;
   "rule_schedules.create": ScheduleView;
   "rule_schedules.delete": DeleteResult;
   "rule_schedules.list": RuleSchedulesView;
@@ -3240,6 +3258,7 @@ export interface Responses {
   "rule_schedules.resume": ScheduleView;
   "rule_schedules.runs": RunList;
   "rule_schedules.targets": TargetSearch;
+  "rule_schedules.update": ScheduleView;
   "shell.status": ShellStatus;
   "siem.destination.test": SiemTestView;
   "siem.dlq.list": DlqPage;
@@ -3336,6 +3355,7 @@ export const OPERATIONS = {
   "reports.list": { method: "GET", path: "/api/reports" },
   "rhc.enable": { method: "POST", path: "/api/rhc/enable" },
   "rhc.status": { method: "GET", path: "/api/rhc" },
+  "rule_schedules.check": { method: "POST", path: "/api/rule-schedules/<int:schedule_id>/check" },
   "rule_schedules.create": { method: "POST", path: "/api/rule-schedules" },
   "rule_schedules.delete": { method: "DELETE", path: "/api/rule-schedules/<int:schedule_id>" },
   "rule_schedules.list": { method: "GET", path: "/api/rule-schedules" },
@@ -3343,6 +3363,7 @@ export const OPERATIONS = {
   "rule_schedules.resume": { method: "POST", path: "/api/rule-schedules/<int:schedule_id>/resume" },
   "rule_schedules.runs": { method: "GET", path: "/api/rule-schedules/runs" },
   "rule_schedules.targets": { method: "GET", path: "/api/rule-schedules/targets" },
+  "rule_schedules.update": { method: "PUT", path: "/api/rule-schedules/<int:schedule_id>" },
   "shell.status": { method: "GET", path: "/api/shell/status" },
   "siem.destination.test": { method: "POST", path: "/api/siem/test" },
   "siem.dlq.list": { method: "GET", path: "/api/siem/dlq" },

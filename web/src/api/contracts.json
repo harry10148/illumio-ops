@@ -28225,6 +28225,327 @@
         "type": "object"
       }
     },
+    "rule_schedules.check": {
+      "method": "POST",
+      "path": "/api/rule-schedules/<int:schedule_id>/check",
+      "request_schema": {
+        "properties": {},
+        "title": "Empty",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Expiry": {
+            "additionalProperties": false,
+            "properties": {
+              "expire_at": {
+                "format": "date-time",
+                "title": "Expire At",
+                "type": "string"
+              },
+              "kind": {
+                "const": "expiry",
+                "default": "expiry",
+                "title": "Kind",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "expire_at",
+              "timezone"
+            ],
+            "title": "Expiry",
+            "type": "object"
+          },
+          "RunView": {
+            "properties": {
+              "action": {
+                "title": "Action",
+                "type": "string"
+              },
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "result": {
+                "title": "Result",
+                "type": "string"
+              },
+              "schedule_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Schedule Id"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "at",
+              "schedule_id",
+              "name",
+              "action",
+              "result",
+              "status",
+              "detail"
+            ],
+            "title": "RunView",
+            "type": "object"
+          },
+          "ScheduleView": {
+            "properties": {
+              "href": {
+                "title": "Href",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "is_ruleset": {
+                "title": "Is Ruleset",
+                "type": "boolean"
+              },
+              "last_checked_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Last Checked At"
+              },
+              "last_run": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RunView"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "live": {
+                "enum": [
+                  "enabled",
+                  "disabled",
+                  "unknown"
+                ],
+                "title": "Live",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "next_change": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Next Change"
+              },
+              "paused": {
+                "title": "Paused",
+                "type": "boolean"
+              },
+              "pce_status": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "unknown"
+                ],
+                "title": "Pce Status",
+                "type": "string"
+              },
+              "plan": {
+                "discriminator": {
+                  "mapping": {
+                    "expiry": "#/$defs/Expiry",
+                    "weekly": "#/$defs/Weekly"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/Weekly"
+                  },
+                  {
+                    "$ref": "#/$defs/Expiry"
+                  }
+                ],
+                "title": "Plan"
+              },
+              "preview_key": {
+                "title": "Preview Key",
+                "type": "string"
+              },
+              "preview_params": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "title": "Preview Params",
+                "type": "object"
+              },
+              "ruleset_name": {
+                "title": "Ruleset Name",
+                "type": "string"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "href",
+              "is_ruleset",
+              "name",
+              "ruleset_name",
+              "summary",
+              "plan",
+              "paused",
+              "pce_status",
+              "live",
+              "last_checked_at",
+              "last_run",
+              "next_change",
+              "preview_key",
+              "preview_params"
+            ],
+            "title": "ScheduleView",
+            "type": "object"
+          },
+          "Weekly": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "enable_in_window",
+                  "disable_in_window"
+                ],
+                "title": "Action",
+                "type": "string"
+              },
+              "days": {
+                "items": {
+                  "enum": [
+                    "mon",
+                    "tue",
+                    "wed",
+                    "thu",
+                    "fri",
+                    "sat",
+                    "sun"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Days",
+                "type": "array"
+              },
+              "end": {
+                "title": "End",
+                "type": "string"
+              },
+              "kind": {
+                "const": "weekly",
+                "default": "weekly",
+                "title": "Kind",
+                "type": "string"
+              },
+              "start": {
+                "title": "Start",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "start",
+              "end",
+              "timezone",
+              "action"
+            ],
+            "title": "Weekly",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ScheduleView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "switched",
+              "failed",
+              "skipped",
+              "none"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "item"
+        ],
+        "title": "CheckResult",
+        "type": "object"
+      }
+    },
     "rule_schedules.create": {
       "method": "POST",
       "path": "/api/rule-schedules",
@@ -29813,6 +30134,404 @@
           "limited"
         ],
         "title": "TargetSearch",
+        "type": "object"
+      }
+    },
+    "rule_schedules.update": {
+      "method": "PUT",
+      "path": "/api/rule-schedules/<int:schedule_id>",
+      "request_schema": {
+        "$defs": {
+          "Expiry": {
+            "additionalProperties": false,
+            "properties": {
+              "expire_at": {
+                "format": "date-time",
+                "title": "Expire At",
+                "type": "string"
+              },
+              "kind": {
+                "const": "expiry",
+                "default": "expiry",
+                "title": "Kind",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "expire_at",
+              "timezone"
+            ],
+            "title": "Expiry",
+            "type": "object"
+          },
+          "Weekly": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "enable_in_window",
+                  "disable_in_window"
+                ],
+                "title": "Action",
+                "type": "string"
+              },
+              "days": {
+                "items": {
+                  "enum": [
+                    "mon",
+                    "tue",
+                    "wed",
+                    "thu",
+                    "fri",
+                    "sat",
+                    "sun"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Days",
+                "type": "array"
+              },
+              "end": {
+                "title": "End",
+                "type": "string"
+              },
+              "kind": {
+                "const": "weekly",
+                "default": "weekly",
+                "title": "Kind",
+                "type": "string"
+              },
+              "start": {
+                "title": "Start",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "start",
+              "end",
+              "timezone",
+              "action"
+            ],
+            "title": "Weekly",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "plan": {
+            "discriminator": {
+              "mapping": {
+                "expiry": "#/$defs/Expiry",
+                "weekly": "#/$defs/Weekly"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Weekly"
+              },
+              {
+                "$ref": "#/$defs/Expiry"
+              }
+            ],
+            "title": "Plan"
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "title": "ScheduleEdit",
+        "type": "object"
+      },
+      "response_schema": {
+        "$defs": {
+          "Expiry": {
+            "additionalProperties": false,
+            "properties": {
+              "expire_at": {
+                "format": "date-time",
+                "title": "Expire At",
+                "type": "string"
+              },
+              "kind": {
+                "const": "expiry",
+                "default": "expiry",
+                "title": "Kind",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "expire_at",
+              "timezone"
+            ],
+            "title": "Expiry",
+            "type": "object"
+          },
+          "RunView": {
+            "properties": {
+              "action": {
+                "title": "Action",
+                "type": "string"
+              },
+              "at": {
+                "format": "date-time",
+                "title": "At",
+                "type": "string"
+              },
+              "detail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Detail"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "result": {
+                "title": "Result",
+                "type": "string"
+              },
+              "schedule_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Schedule Id"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Status"
+              }
+            },
+            "required": [
+              "at",
+              "schedule_id",
+              "name",
+              "action",
+              "result",
+              "status",
+              "detail"
+            ],
+            "title": "RunView",
+            "type": "object"
+          },
+          "Weekly": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "enable_in_window",
+                  "disable_in_window"
+                ],
+                "title": "Action",
+                "type": "string"
+              },
+              "days": {
+                "items": {
+                  "enum": [
+                    "mon",
+                    "tue",
+                    "wed",
+                    "thu",
+                    "fri",
+                    "sat",
+                    "sun"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "title": "Days",
+                "type": "array"
+              },
+              "end": {
+                "title": "End",
+                "type": "string"
+              },
+              "kind": {
+                "const": "weekly",
+                "default": "weekly",
+                "title": "Kind",
+                "type": "string"
+              },
+              "start": {
+                "title": "Start",
+                "type": "string"
+              },
+              "timezone": {
+                "title": "Timezone",
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "start",
+              "end",
+              "timezone",
+              "action"
+            ],
+            "title": "Weekly",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "href": {
+            "title": "Href",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_ruleset": {
+            "title": "Is Ruleset",
+            "type": "boolean"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/RunView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "live": {
+            "enum": [
+              "enabled",
+              "disabled",
+              "unknown"
+            ],
+            "title": "Live",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_change": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Change"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "pce_status": {
+            "enum": [
+              "active",
+              "deleted",
+              "unknown"
+            ],
+            "title": "Pce Status",
+            "type": "string"
+          },
+          "plan": {
+            "discriminator": {
+              "mapping": {
+                "expiry": "#/$defs/Expiry",
+                "weekly": "#/$defs/Weekly"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Weekly"
+              },
+              {
+                "$ref": "#/$defs/Expiry"
+              }
+            ],
+            "title": "Plan"
+          },
+          "preview_key": {
+            "title": "Preview Key",
+            "type": "string"
+          },
+          "preview_params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Preview Params",
+            "type": "object"
+          },
+          "ruleset_name": {
+            "title": "Ruleset Name",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "href",
+          "is_ruleset",
+          "name",
+          "ruleset_name",
+          "summary",
+          "plan",
+          "paused",
+          "pce_status",
+          "live",
+          "last_checked_at",
+          "last_run",
+          "next_change",
+          "preview_key",
+          "preview_params"
+        ],
+        "title": "ScheduleView",
         "type": "object"
       }
     },

@@ -12,6 +12,7 @@ from illumio_ops.services import rule_schedule_targets as targets
 from illumio_ops.services import rule_schedules as rs
 from illumio_ops.services.rule_schedule_targets import TargetSearch
 from illumio_ops.services.rule_schedules import (
+    CheckResult,
     DeleteResult,
     PlanField,
     RunView,
@@ -37,6 +38,10 @@ class ScheduleCreate(BaseModel):
     org_id: str = Field(max_length=50)
 
 
+class ScheduleEdit(BaseModel):
+    plan: PlanField
+
+
 class RunList(BaseModel):
     items: list[RunView]
 
@@ -48,6 +53,9 @@ OP_CREATE = operation("rule_schedules.create", "POST", "/api/rule-schedules", Sc
 OP_PAUSE = operation("rule_schedules.pause", "POST", "/api/rule-schedules/<int:schedule_id>/pause", Empty, ScheduleView)
 OP_RESUME = operation("rule_schedules.resume", "POST", "/api/rule-schedules/<int:schedule_id>/resume", Empty,
                       ScheduleView)
+OP_UPDATE = operation("rule_schedules.update", "PUT", "/api/rule-schedules/<int:schedule_id>", ScheduleEdit,
+                      ScheduleView)
+OP_CHECK = operation("rule_schedules.check", "POST", "/api/rule-schedules/<int:schedule_id>/check", Empty, CheckResult)
 OP_DELETE = operation("rule_schedules.delete", "DELETE", "/api/rule-schedules/<int:schedule_id>", None, DeleteResult)
 
 bp = Blueprint("rule_schedules", __name__)
@@ -62,6 +70,8 @@ def _mapped(exc: Exception) -> ApiFailure:
         return ApiFailure(409, "already_scheduled", "rs_err_already_scheduled")
     if isinstance(exc, rs.NotProvisioned):
         return ApiFailure(409, "not_provisioned", "rs_err_not_provisioned")
+    if isinstance(exc, rs.SchedulePaused):
+        return ApiFailure(409, "paused", "rs_err_paused")
     if isinstance(exc, rs.PceSwitched):
         return ApiFailure(409, "pce_switched", "rs_err_pce_switched")
     if isinstance(exc, rs.PceRefused):
@@ -100,6 +110,23 @@ def create(body: ScheduleCreate) -> ScheduleView:
                          summary=body.summary, by=str(current_user.get_id()), pce=(body.pce_url, body.org_id))
     except (rs.NoWriteKey, PceNotConfigured, rs.DraftPending, rs.AlreadyScheduled, rs.NotProvisioned,
             rs.PceRefused, rs.PceSwitched) as exc:
+        raise _mapped(exc) from None
+
+
+@api_route(bp, OP_UPDATE)
+def update(body: ScheduleEdit, schedule_id: int) -> ScheduleView:
+    """5.x edited a schedule in place: the new plan's note is written and provisioned first; refused, nothing changes."""
+    try:
+        return rs.update(get_ctx(), schedule_id, body.plan)
+    except (LookupError, rs.NoWriteKey, PceNotConfigured, rs.DraftPending, rs.PceRefused, rs.PceSwitched) as exc:
+        raise _mapped(exc) from None
+
+
+@api_route(bp, OP_CHECK)
+def check(body: Empty, schedule_id: int) -> CheckResult:
+    try:
+        return rs.check_now(get_ctx(), schedule_id)
+    except (LookupError, rs.NoWriteKey, PceNotConfigured, rs.SchedulePaused) as exc:
         raise _mapped(exc) from None
 
 

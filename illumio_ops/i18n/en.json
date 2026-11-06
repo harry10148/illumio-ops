@@ -2853,5 +2853,16 @@
   "err_pce_not_the_same": "The PCE at the new address knows none of the {n} stored workloads checked, so it is not the same PCE. Nothing was saved. Check the address, or choose “Another PCE” to clear the data.",
   "err_pce_same_nothing_to_compare": "No workload of this organization has been collected yet, so the new address cannot be checked against stored data. Nothing was saved. Choose “Another PCE” instead.",
   "err_pce_same_unverifiable": "The new address could not be checked ({reason}). Nothing was saved. Check the address, the TLS setting and the API key, then try again.",
-  "err_pce_keep_needs_same_org": "Data can be kept only for the same organization; the organization ID changed, so this is another PCE."
+  "err_pce_keep_needs_same_org": "Data can be kept only for the same organization; the organization ID changed, so this is another PCE.",
+  "rs_edit": "Edit",
+  "rs_edit_title": "Edit schedule",
+  "rs_edit_save": "Save and provision the note",
+  "rs_check_now": "Check now",
+  "rs_checking": "Checking…",
+  "rs_check_paused": "A paused schedule is not checked; resume it first.",
+  "rs_check_switched": "{name}: checked now; the target was switched and provisioned.",
+  "rs_check_none": "{name}: checked now; the target is already as planned, nothing was changed.",
+  "rs_check_skipped": "{name}: checked now and skipped: the target or its rule set has a change not yet provisioned, it is not provisioned, or the PCE no longer has it.",
+  "rs_check_failed": "{name}: checked now and failed; the PCE's answer is in the latest run below.",
+  "rs_err_paused": "That schedule is paused; resume it before checking it."
 }

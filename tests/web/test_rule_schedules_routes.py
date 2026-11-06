@@ -90,3 +90,38 @@ def test_csrf_required_for_writes(client):
     login(client)
     r = client.post("/api/rule-schedules", json=BODY, environ_overrides=LOCAL)
     assert r.status_code in (400, 403)
+
+
+def test_edit_and_check_now_need_the_write_key(client, ctx):
+    """5.x edited a schedule in place and checked on demand (parity 2026-11-06); both write to the PCE."""
+    login(client)
+    sid = _add(ctx)
+    r = client.put(f"/api/rule-schedules/{sid}", json={"plan": PLAN}, environ_overrides=LOCAL,
+                   headers={"X-CSRFToken": csrf(client)})
+    assert r.status_code == 412 and r.get_json()["error"]["code"] == "no_write_key"
+    r = post(client, f"/api/rule-schedules/{sid}/check", {})
+    assert r.status_code == 412 and r.get_json()["error"]["code"] == "no_write_key"
+    assert post(client, "/api/rule-schedules/999/check", {}).status_code in (404, 412)
+
+
+def test_check_now_answers_with_the_outcome(client, ctx, monkeypatch):
+    login(client)
+    sid = _add(ctx)
+    view = rs.schedules(ctx)[1][0]
+    monkeypatch.setattr(rs, "check_now", lambda c, i, **kw: rs.CheckResult(outcome="none", item=view))
+    data = post(client, f"/api/rule-schedules/{sid}/check", {}).get_json()["data"]
+    assert data["outcome"] == "none" and data["item"]["id"] == sid
+    monkeypatch.setattr(rs, "check_now", lambda c, i, **kw: (_ for _ in ()).throw(rs.SchedulePaused()))
+    r = post(client, f"/api/rule-schedules/{sid}/check", {})
+    assert r.status_code == 409 and r.get_json()["error"]["code"] == "paused"
+
+
+def test_edit_answers_with_the_schedule(client, ctx, monkeypatch):
+    login(client)
+    sid = _add(ctx)
+    view = rs.schedules(ctx)[1][0]
+    seen = {}
+    monkeypatch.setattr(rs, "update", lambda c, i, plan, **kw: seen.update(id=i, plan=plan) or view)
+    r = client.put(f"/api/rule-schedules/{sid}", json={"plan": PLAN}, environ_overrides=LOCAL,
+                   headers={"X-CSRFToken": csrf(client)})
+    assert r.status_code == 200 and seen["id"] == sid and seen["plan"].kind == "weekly"

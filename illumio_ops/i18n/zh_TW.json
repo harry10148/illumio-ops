@@ -2853,5 +2853,16 @@
   "err_pce_not_the_same": "新位址的 PCE 不認得所檢查的 {n} 台已儲存 Workload，因此不是同一台 PCE。未儲存任何變更。請確認位址，或選擇「另一台 PCE」清除資料。",
   "err_pce_same_nothing_to_compare": "尚未收集到此組織的任何 Workload，無法用已儲存的資料確認新位址。未儲存任何變更。請改選「另一台 PCE」。",
   "err_pce_same_unverifiable": "無法確認新位址（{reason}）。未儲存任何變更。請檢查位址、TLS 設定與 API key 後再試一次。",
-  "err_pce_keep_needs_same_org": "只有同一個組織才能保留資料；組織 ID 已變更，代表這是另一台 PCE。"
+  "err_pce_keep_needs_same_org": "只有同一個組織才能保留資料；組織 ID 已變更，代表這是另一台 PCE。",
+  "rs_edit": "編輯",
+  "rs_edit_title": "編輯排程",
+  "rs_edit_save": "儲存並 Provision 註記",
+  "rs_check_now": "立即檢查",
+  "rs_checking": "檢查中…",
+  "rs_check_paused": "暫停中的排程不會檢查，請先恢復。",
+  "rs_check_switched": "{name}：已立即檢查，目標已切換並 Provision。",
+  "rs_check_none": "{name}：已立即檢查，目標已符合排程，未做任何變更。",
+  "rs_check_skipped": "{name}：已立即檢查但略過：目標或其 Ruleset 有尚未 Provision 的變更、目標尚未 Provision，或 PCE 上已找不到它。",
+  "rs_check_failed": "{name}：已立即檢查但失敗，PCE 的回應見下方最近一次執行紀錄。",
+  "rs_err_paused": "這個排程已暫停，請先恢復再檢查。"
 }
