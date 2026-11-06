@@ -379,3 +379,10 @@ def test_a_new_address_that_refuses_the_key_cannot_be_verified(client, ctx):
     err = r.get_json()["error"]
     assert r.status_code == 409 and err["code"] == "pce_same_unverifiable" and err["params"] == {"reason": "HTTP 401"}
     assert ctx.settings.current().pce.url == BASE
+
+
+def test_keep_for_an_unbound_store_at_a_new_address_is_not_called_another_org(client, ctx):
+    login(client)
+    _save(client)  # nothing collected: no choice is asked, the address simply changes
+    r = _save(client, url=NEW, api_key="k2", api_secret="s2", data_choice="keep")
+    assert r.status_code == 200 and ctx.settings.current().pce.url == NEW

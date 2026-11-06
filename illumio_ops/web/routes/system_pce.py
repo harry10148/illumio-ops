@@ -151,7 +151,8 @@ def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
                              params={"old": saved.url, "new": body.url.rstrip("/")})
         if body.data_choice == "keep":
             return _keep_for_new_address(body, saved, fields, mutate)
-    elif body.data_choice == "keep" and saved.url and other_pce:
+    elif (body.data_choice == "keep" and saved.url
+          and normalize_target(saved.url, saved.org_id)[1] != normalize_target(body.url, body.org_id)[1]):
         raise ApiFailure(400, "pce_keep_needs_same_org", "err_pce_keep_needs_same_org", field="org_id")
     new = ctx.settings.update(body.revision, mutate).pce
     # Cleared only after the save succeeded: a rejected save must not cost the collected data.
