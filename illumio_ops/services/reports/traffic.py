@@ -4,7 +4,10 @@ of the rule engine. Every number is the flow store's primary rows under the repo
 analysis segments (the workbench's numbers)."""
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from illumio_ops.domain.report import (
+    Cell,
     Column,
     Kpi,
     ReportDocument,
@@ -15,9 +18,15 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.segment import GroupBy
 from illumio_ops.domain.values import SegmentDimension, SegmentMetric
 from illumio_ops.services.analysis.context import load_lateral_context
-from illumio_ops.services.flowsource import FlowTotals, field_coverage, flow_totals
+from illumio_ops.services.flowsource import (
+    FlowTotals,
+    VolumeRow,
+    field_coverage,
+    flow_totals,
+    traffic_volume,
+)
 from illumio_ops.services.reports import findings, flowsections
-from illumio_ops.services.reports.common import tr
+from illumio_ops.services.reports.common import PROTOCOLS, port_text, tr
 from illumio_ops.services.reports.flowsections import DECISION_KEYS
 from illumio_ops.services.reports.generate import (
     coverage_note,
@@ -28,6 +37,7 @@ from illumio_ops.services.reports.registry import BuildInput
 
 TOP = 20
 KEY_FINDINGS = 5
+APP = "app"
 _KPI_KEYS = {"flows": "rpt_trf_kpi_flows", "connections": "rpt_trf_kpi_connections",
              "sources": "rpt_trf_kpi_sources", "destinations": "rpt_trf_kpi_destinations"}
 
@@ -80,6 +90,27 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
         ("rpt_trf_tbl_src_label", "rpt_col_src_label", SegmentDimension.SRC_LABEL, env_key),
         ("rpt_trf_tbl_dst_label", "rpt_col_dst_label", SegmentDimension.DST_LABEL, env_key)))
     services = ranking(t("rpt_trf_tbl_services"), SegmentDimension.SERVICE, t("rpt_col_service"))
+    vol = traffic_volume(inp.ctx, spec, top=TOP, app_key=APP)
+    protocols = TableBlock(
+        title=t("rpt_trf_tbl_protocols"),
+        columns=(Column(key="proto", label=t("rpt_col_protocol")), Column(key="flows", label=t("rpt_col_flows"), kind="number"),
+                 Column(key="connections", label=t("rpt_col_connections"), kind="number"),
+                 Column(key="share", label=t("rpt_col_share_connections"))),
+        rows=tuple((PROTOCOLS.get(p.proto) or t("rpt_trf_proto_n", n=p.proto), p.flows, p.connections,
+                    pct(p.connections, totals.connections)) for p in vol.by_proto),
+        total_rows=len(vol.by_proto), empty_text=no_flows)
+
+    def volume_table(title: str, rows: list[VolumeRow], total: int, last: Column, value: Callable[[VolumeRow], Cell],
+                     empty: str) -> TableBlock:
+        return TableBlock(
+            title=title,
+            columns=(Column(key="src", label=t("rpt_col_source")), Column(key="dst", label=t("rpt_col_destination")),
+                     Column(key="service", label=t("rpt_col_service")),
+                     Column(key="bytes", label=t("rpt_col_bytes"), kind="number"),
+                     Column(key="connections", label=t("rpt_col_connections"), kind="number"), last),
+            rows=tuple((r.src, r.dst, port_text(r.port, r.proto), r.bytes, r.connections, value(r)) for r in rows),
+            total_rows=total, empty_text=empty,
+            limit_note=t("rpt_limit_top_n", n=TOP) if total > len(rows) else None)
 
     fc = field_coverage(inp.ctx, spec)
     bytes_intro = t("rpt_trf_bytes_intro", pct=f"{100 * fc.bytes / fc.total:.1f}" if fc.total else "0.0")
@@ -89,7 +120,24 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
             inp, title=t("rpt_trf_tbl_bytes"), metric=SegmentMetric.BYTES, limit=TOP,
             group_by=(GroupBy(dimension=SegmentDimension.SRC_HOST), GroupBy(dimension=SegmentDimension.DST_HOST)),
             columns=(Column(key="src", label=t("rpt_col_source")), Column(key="dst", label=t("rpt_col_destination")),
-                     Column(key="bytes", label=t("rpt_col_bytes"), kind="number"))),)
+                     Column(key="bytes", label=t("rpt_col_bytes"), kind="number"))),
+            TableBlock(
+                title=t("rpt_trf_tbl_app_bytes"),
+                columns=(Column(key="src_app", label=t("rpt_col_src_label", key=APP)),
+                         Column(key="dst_app", label=t("rpt_col_dst_label", key=APP)),
+                         Column(key="bytes", label=t("rpt_col_bytes"), kind="number")),
+                rows=tuple((a or t("rpt_no_label"), d or t("rpt_no_label"), n) for a, d, n in vol.by_app),
+                total_rows=vol.app_pairs, empty_text=t("rpt_trf_no_bytes"),
+                limit_note=t("rpt_limit_top_n", n=TOP) if vol.app_pairs > TOP else None),
+            TextBlock(paragraphs=(t("rpt_trf_rate_note", rated=f"{vol.with_rate:,}", total=f"{vol.with_bytes:,}",
+                                    max=f"{vol.max_mbps:.3f}") if vol.max_mbps is not None
+                                  else t("rpt_trf_rate_none", total=f"{vol.with_bytes:,}"),)),
+            volume_table(t("rpt_trf_tbl_rate"), vol.by_rate, vol.with_rate,
+                         Column(key="mbps", label=t("rpt_col_mbps")), lambda r: f"{r.mbps or 0:.3f}",
+                         t("rpt_trf_no_rate")),
+            volume_table(t("rpt_trf_tbl_per_conn"), vol.by_per_conn, vol.multi_conn,
+                         Column(key="per_conn", label=t("rpt_col_bytes_per_conn"), kind="number"),
+                         lambda r: r.bytes // max(r.connections, 1), t("rpt_trf_no_multi_conn")))
     else:
         bytes_blocks = (TextBlock(paragraphs=(t("rpt_trf_no_bytes") if totals.flows else no_flows,)),)
 
@@ -110,7 +158,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
         sections=(Section(id="decisions", title=t("rpt_trf_sec_decisions"), intro=t("rpt_trf_decisions_intro"),
                           blocks=(decisions,)),
                   Section(id="labels", title=t("rpt_trf_sec_labels"), blocks=labels),
-                  Section(id="services", title=t("rpt_trf_sec_services"), blocks=(services,)),
+                  Section(id="services", title=t("rpt_trf_sec_services"), blocks=(services, protocols)),
                   Section(id="bytes", title=t("rpt_trf_sec_bytes"), intro=bytes_intro, blocks=bytes_blocks),
                   Section(id="unmanaged", title=t("rpt_trf_sec_unmanaged"), blocks=(unmanaged,)),
                   Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),

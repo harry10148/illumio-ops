@@ -946,6 +946,13 @@ name: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SectionRequest".
+ */
+export interface SectionRequest {
+request: (FlowRequest | EventRequest)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "EnforcementHost".
  */
 export interface EnforcementHost {
@@ -2040,6 +2047,26 @@ schedule_id: (string | null)
 schedule_name: (string | null)
 status: ReportStatus
 trigger: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "BulkDelete".
+ */
+export interface BulkDelete {
+/**
+ * @minItems 1
+ * @maxItems 500
+ */
+ids: [number, ...(number)[]]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "BulkDeleted".
+ */
+export interface BulkDeleted {
+missing: number[]
+removed: number[]
+running: number[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -3397,7 +3424,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.create" | "alert_rules.delete" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.create": RuleWrite;
@@ -3425,6 +3452,7 @@ export interface Requests {
   "custom_reports.list": undefined;
   "custom_reports.remove_section": Empty;
   "custom_reports.rename": CustomRename;
+  "custom_reports.section_request": undefined;
   "fleet.enforcement_apply": EnforcementApplyRequest;
   "fleet.enforcement_preview": EnforcementPreviewRequest;
   "fleet.history": undefined;
@@ -3451,6 +3479,7 @@ export interface Requests {
   "report_schedules.list": undefined;
   "report_schedules.run_now": RunNow;
   "report_schedules.update": ScheduleWrite;
+  "reports.bulk_delete": BulkDelete;
   "reports.catalog": undefined;
   "reports.delete": undefined;
   "reports.generate": ReportParams;
@@ -3541,6 +3570,7 @@ export interface Responses {
   "custom_reports.list": CustomReportList;
   "custom_reports.remove_section": CustomReport;
   "custom_reports.rename": CustomReport;
+  "custom_reports.section_request": SectionRequest;
   "fleet.enforcement_apply": FleetOutcome;
   "fleet.enforcement_preview": EnforcementPreview;
   "fleet.history": FleetHistory;
@@ -3567,6 +3597,7 @@ export interface Responses {
   "report_schedules.list": SchedulesView;
   "report_schedules.run_now": ReportItem;
   "report_schedules.update": SchedulesView;
+  "reports.bulk_delete": BulkDeleted;
   "reports.catalog": Catalog;
   "reports.delete": Empty;
   "reports.generate": ReportItem;
@@ -3657,6 +3688,7 @@ export const OPERATIONS = {
   "custom_reports.list": { method: "GET", path: "/api/custom-reports" },
   "custom_reports.remove_section": { method: "POST", path: "/api/custom-reports/<int:report_id>/sections/<int:index>/remove" },
   "custom_reports.rename": { method: "POST", path: "/api/custom-reports/<int:report_id>/rename" },
+  "custom_reports.section_request": { method: "GET", path: "/api/custom-reports/<int:report_id>/sections/<int:index>/request" },
   "fleet.enforcement_apply": { method: "POST", path: "/api/fleet/enforcement/apply" },
   "fleet.enforcement_preview": { method: "POST", path: "/api/fleet/enforcement/preview" },
   "fleet.history": { method: "GET", path: "/api/fleet/actions" },
@@ -3683,6 +3715,7 @@ export const OPERATIONS = {
   "report_schedules.list": { method: "GET", path: "/api/report-schedules" },
   "report_schedules.run_now": { method: "POST", path: "/api/report-schedules/<schedule_id>/run" },
   "report_schedules.update": { method: "PUT", path: "/api/report-schedules/<schedule_id>" },
+  "reports.bulk_delete": { method: "POST", path: "/api/reports/bulk-delete" },
   "reports.catalog": { method: "GET", path: "/api/reports/catalog" },
   "reports.delete": { method: "DELETE", path: "/api/reports/<int:report_id>" },
   "reports.generate": { method: "POST", path: "/api/reports" },

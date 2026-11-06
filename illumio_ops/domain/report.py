@@ -49,6 +49,12 @@ class Finding(_Model):
     title: str
     why: str
     action: str
+    techniques: tuple[tuple[str, str], ...] = ()  # MITRE ATT&CK (id, official English name), never translated
+
+
+def techniques_text(techniques: tuple[tuple[str, str], ...]) -> str:
+    """'T1486 Data Encrypted for Impact, T1021.002 SMB/Windows Admin Shares' (a table cell, an XLSX cell)."""
+    return ", ".join(f"{tid} {name}" for tid, name in techniques)
 
 
 class Column(_Model):

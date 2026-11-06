@@ -60,3 +60,12 @@ def test_xlsx_shortened_sheet_name_keeps_full_title():
     first, second = (ws for ws in wb.worksheets if ws.title != "Summary")
     assert first.title != long and first["A1"].value == long and first["A2"].value == "Col 0"
     assert second.title == "Short" and second["A1"].value == "Col 0"
+
+
+def test_xlsx_findings_list_mitre_techniques():
+    from illumio_ops.domain.report import Finding
+    from illumio_ops.domain.values import Severity
+    doc = make_doc(findings=(Finding(severity=Severity.HIGH, title="SMB", why="w", action="a",
+                                     techniques=(("T1486", "Data Encrypted for Impact"),)),))
+    values = [c.value for row in _wb(doc)["Summary"].iter_rows() for c in row if c.value is not None]
+    assert "T1486 Data Encrypted for Impact" in values

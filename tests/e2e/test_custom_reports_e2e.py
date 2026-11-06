@@ -32,3 +32,28 @@ def test_no_custom_report_says_how_to_make_one(context, live_app):
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/reports")
     expect(page.locator("[data-role=custom-none]")).to_have_count(1)
+
+
+def test_saved_section_reopened_in_the_workbench(context, live_app):
+    """5.x saved queries could be reopened: a section opens Investigate with what was saved."""
+    import json
+    from urllib.parse import parse_qs, urlparse
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/investigate")
+    page.locator("[data-role=save-section]").click()
+    form = page.locator("[data-role=save-section-form]")
+    form.locator("input[name=custom-name]").fill("Reopen")
+    form.locator("input[name=section-title]").fill("Saved view")
+    form.locator("button[type=submit]").click()
+    expect(form.locator("[data-role=save-section-done]")).to_have_count(1)
+    saved = json.loads(parse_qs(urlparse(page.url).query)["q"][0])
+
+    page.goto(f"{live_app.url}/reports")
+    with page.expect_request("**/api/workbench/run") as ran:
+        page.locator("[data-role=custom-section-open]").first.click()
+    assert "/investigate" in page.url
+    sent = ran.value.post_data_json["request"]
+    def dims(r):
+        return [g["dimension"] for g in r.get("group_by", [])]
+    assert (sent["mode"], sent["view"], dims(sent)) == (saved["mode"], saved["view"], dims(saved))

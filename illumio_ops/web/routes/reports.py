@@ -1,5 +1,6 @@
-"""Reports: the catalog, generating one, the list, one report, deleting one (spec §6.5 報表, §6.5.5), and
-downloading a report's file (not under /api: a file, not an envelope; the login check is done here)."""
+"""Reports: the catalog, generating one, the list, one report, deleting one or several (spec §6.5 報表, §6.5.5), and
+a report's file — downloaded, or an HTML report opened in the browser (not under /api: a file, not an envelope; the
+login check is done here)."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -22,11 +23,39 @@ class ListQuery(BaseModel):
     page: int = Field(default=1, ge=1, le=10_000)
 
 
+BULK_MAX = 500
+
+
+class BulkDelete(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=BULK_MAX)
+
+
+class BulkDeleted(BaseModel):
+    removed: list[int]
+    running: list[int]  # being made: kept, deleted once done
+    missing: list[int]
+
+
+# An HTML report opened in the browser runs its own inline style and table script, which the console's policy
+# forbids. It gets its own: a sandbox without allow-same-origin gives the page an opaque origin, so its script can
+# reach neither the console's session cookie nor its API, and it may load nothing from anywhere.
+INLINE_REPORT_CSP: dict[str, str | list[str]] = {
+    "default-src": "'none'",
+    "style-src": "'unsafe-inline'",
+    "script-src": "'unsafe-inline'",
+    "img-src": "data:",
+    "base-uri": "'none'",
+    "form-action": "'none'",
+    "sandbox": "allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox",
+}
+
+
 OP_CATALOG = operation("reports.catalog", "GET", "/api/reports/catalog", None, Catalog)
 OP_LIST = operation("reports.list", "GET", "/api/reports", None, ReportPage)
 OP_GET = operation("reports.get", "GET", "/api/reports/<int:report_id>", None, ReportItem)
 OP_GENERATE = operation("reports.generate", "POST", "/api/reports", ReportParams, ReportItem)
 OP_DELETE = operation("reports.delete", "DELETE", "/api/reports/<int:report_id>", None, Empty)
+OP_BULK_DELETE = operation("reports.bulk_delete", "POST", "/api/reports/bulk-delete", BulkDelete, BulkDeleted)
 
 bp = Blueprint("reports", __name__)
 
@@ -73,16 +102,40 @@ def delete_report(report_id: int) -> Empty:
     return Empty()
 
 
-@bp.get("/reports/files/<int:report_id>/<name>")
-def download(report_id: int, name: str) -> Response | tuple[Response, int]:
+@api_route(bp, OP_BULK_DELETE)
+def bulk_delete(body: BulkDelete) -> BulkDeleted:
+    ctx = get_ctx()
+    out: dict[str, list[int]] = {"removed": [], "running": [], "missing": []}
+    for rid in dict.fromkeys(body.ids):
+        out[retention.remove_report(ctx, rid)].append(rid)
+    return BulkDeleted(**out)
+
+
+def _report_file(report_id: int, name: str, *, inline: bool) -> Response | tuple[Response, int]:
     ctx = get_ctx()
     if not current_user.is_authenticated:
         return api_error(401, "auth_required", "err_auth_required")
     if ctx.settings.current().web.must_change_password:
         return api_error(423, "password_change_required", "err_password_change_required")
     path = views.report_file(ctx, report_id, name)
-    if path is None:
+    if path is None or (inline and path.suffix.lower() != ".html"):
         raise NotFound()
-    resp = send_from_directory(path.parent, path.name, as_attachment=True, max_age=0)
+    resp = send_from_directory(path.parent, path.name, as_attachment=not inline, max_age=0,
+                               mimetype="text/html" if inline else None)
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
+
+
+@bp.get("/reports/files/<int:report_id>/<name>")
+def download(report_id: int, name: str) -> Response | tuple[Response, int]:
+    return _report_file(report_id, name, inline=False)
+
+
+@bp.get("/reports/view/<int:report_id>/<name>")
+def open_inline(report_id: int, name: str) -> Response | tuple[Response, int]:
+    """An HTML report shown in the browser (5.x /reports/<file>), under INLINE_REPORT_CSP."""
+    return _report_file(report_id, name, inline=True)
+
+
+# flask-talisman reads a view's own options from this attribute (what its @talisman(...) decorator sets).
+open_inline.talisman_view_options = {"content_security_policy": INLINE_REPORT_CSP}  # type: ignore[attr-defined]

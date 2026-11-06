@@ -21,6 +21,12 @@ AUTH_FAILED = "request.authentication_failed"
 AUTHZ_DENIED = "request.authorization_failed"
 PROVISION = "sec_policy.create"
 DRAFT_FAMILIES = ("rule_set.", "sec_rule.")
+# 5.x audit_mod04_correlation pattern 1: a failed sign-in (or a denied request, or an expired password) by a user,
+# then within FAILED_THEN_CHANGE_MINUTES a change of one of these types by the same user.
+SIGN_IN_FAILURES = (AUTH_FAILED, AUTHZ_DENIED, "user.use_expired_password")
+HIGH_RISK_CHANGES = ("sec_policy.create", "sec_policy.delete", "workloads.unpair", "agents.unpair",
+                     "authentication_settings.update", "firewall_settings.update", "api_key.create", "api_key.delete")
+FAILED_THEN_CHANGE_MINUTES = 30
 AGENT_SECURITY = ("agent.tampering", "agent.clone_detected", "agent.suspend", "workloads.unpair", "agents.unpair")
 
 

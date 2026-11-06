@@ -1,5 +1,5 @@
 // Custom reports (spec §6.5.5, P6e): reports made of sections saved from the workbench — each listed with its
-// sections, made now, renamed, sections removed; a report a schedule still makes is not deleted.
+// sections, made now, renamed, sections removed or reopened in the workbench; a report a schedule still makes is not deleted.
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -50,6 +50,8 @@ function One({ rep, onChanged, generate }: {
         {rep.sections.map((s, i) => (
           <li key={`${i}|${s.title}`}>
             {s.title} <span className="hint">（{t(MODE_KEYS[s.segment.mode] ?? s.segment.mode)}・{t(VIEW_KEYS[s.segment.view] ?? s.segment.view)}）</span>{" "}
+            <Link className="btn-quiet" data-role="custom-section-open" title={t("cust_open_section_hint")}
+              to={`/investigate?custom=${rep.id}&section=${i}`}>{t("cust_open_section")}</Link>{" "}
             {rep.sections.length > 1 && (
               <button type="button" className="btn-quiet" data-role="custom-section-remove"
                 onClick={() => void act(call("custom_reports.remove_section", {}, { report_id: String(rep.id), index: String(i) }))}>

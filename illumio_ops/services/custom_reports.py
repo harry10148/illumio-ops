@@ -23,7 +23,7 @@ from illumio_ops.domain.filter import FlowCondition
 from illumio_ops.domain.segment import EventFilter, EventSegment, FlowSegment, GroupBy
 from illumio_ops.domain.values import ReportType, SegmentMetric, SegmentView
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.workbench import EventRequest, FlowRequest
+from illumio_ops.services.workbench import EventRequest, FlowRequest, default_period
 from illumio_ops.store import custom_reports as store
 
 SECTIONS_MAX = 20
@@ -170,6 +170,18 @@ def add_section(ctx: AppContext, *, report_id: int | None, name: str | None, tit
             raise ValueError(f"at most {SECTIONS_MAX} sections")
         store.update(conn, report_id, name=current.name, sections_json=_dump([*current.sections, section]), at=now)
         return _view(store.get(conn, report_id), _schedules(ctx))
+
+
+def section_request(ctx: AppContext, report_id: int, index: int, *, now: datetime) -> FlowRequest | EventRequest:
+    """A saved section reopened in the workbench (5.x saved queries): its request on the workbench's default period,
+    since a section keeps no period. LookupError: no such report or section."""
+    rep = get(ctx, report_id)
+    if rep is None or not 0 <= index < len(rep.sections):
+        raise LookupError("no such section")
+    req = rep.sections[index].segment.request(*default_period(now))
+    if req is None:  # cannot happen on the default period; said rather than shown as an empty workbench
+        raise ValueError("the workbench cannot take this section")
+    return req
 
 
 def remove_section(ctx: AppContext, report_id: int, index: int, *, now: datetime) -> CustomReport:

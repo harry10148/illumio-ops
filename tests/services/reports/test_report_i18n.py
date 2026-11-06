@@ -181,7 +181,8 @@ def _p5b2_sample(c):
                       "sec_policy": {"commit_message": "open db", "workloads_affected": 3}}}]}),
                   audit_event("rule_set.update", d, user="alice"),
                   *(audit_event("request.authentication_failed", d + timedelta(minutes=i), user="eve",
-                                ip="10.1.1.1", status="failure") for i in range(5))]
+                                ip="10.1.1.1", status="failure") for i in range(5)),
+                  audit_event("api_key.create", d + timedelta(minutes=12), user="eve")]  # after the failures
         upsert_events(conn, events, origin=DataOrigin.INGEST, now=NOW)
         conn.commit()
 

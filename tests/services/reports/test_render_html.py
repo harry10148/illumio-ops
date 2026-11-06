@@ -166,3 +166,9 @@ def test_no_external_requests():
     out = _first_page()
     refs = re.findall(r'(?:src|href)="(https?://[^"]+)"', out) + re.findall(r"url\((https?://[^)]+)\)", out)
     assert refs == []
+
+
+def test_findings_show_mitre_chips_without_external_links():
+    out = _first_page(findings=(Finding(severity=Severity.HIGH, title="SMB", why="w", action="a",
+                                        techniques=(("T1021.002", "SMB/Windows Admin Shares"),)),))
+    assert re.search(r'<span class="mitre-chip" title="SMB/Windows Admin Shares">T1021\.002</span>', out)

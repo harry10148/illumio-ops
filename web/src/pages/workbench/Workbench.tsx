@@ -271,11 +271,14 @@ export function Workbench() {
   const [text, setText] = useState("");
   const lang = useLang();
 
-  // start: the URL's request, else an alert's evidence, else the last day
+  // start: the URL's request, else an alert's evidence, else a saved section, else the last day
   useEffect(() => {
     void call("workbench.meta").then((env) => { if (env.ok && env.data) setMeta(env.data); });
     const fromUrl = decode(params.get("q"));
     const alert = params.get("alert");
+    // a section saved in a custom report, reopened (5.x saved queries): its conditions on the default period
+    const custom = params.get("custom");
+    const section = params.get("section");
     if (fromUrl) {
       setReq(fromUrl);
       setAlertId(alert);
@@ -285,6 +288,14 @@ export function Workbench() {
           setReq({ ...env.data.request, view: "detail" });
           setAlertId(alert);
         } else {
+          setError(env.error);
+          setReq(emptyFlows(24));
+        }
+      });
+    } else if (custom !== null && section !== null) {
+      void call("custom_reports.section_request", undefined, { report_id: custom, index: section }).then((env) => {
+        if (env.ok && env.data) setReq(env.data.request);
+        else {
           setError(env.error);
           setReq(emptyFlows(24));
         }

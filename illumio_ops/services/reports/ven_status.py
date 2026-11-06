@@ -38,6 +38,13 @@ _KPI_KEYS = {"managed": "rpt_ven_kpi_managed", "online": "rpt_ven_kpi_online", "
              "unexplained_tamper": "rpt_ven_kpi_unexplained_tamper"}
 _BUCKET_KEYS = {"lost_24h": "rpt_ven_bucket_24h", "lost_48h": "rpt_ven_bucket_48h",
                 "long_offline": "rpt_ven_bucket_long"}
+_MODE_KEYS = {"full": "rpt_col_mode_full", "selective": "rpt_col_mode_selective",
+              "visibility_only": "rpt_col_mode_visibility", "idle": "rpt_col_mode_idle"}
+COMPAT_STATES = ("pass", "warn", "fail", "unknown")
+_COMPAT_KEYS = {"pass": "rpt_ven_compat_pass", "warn": "rpt_ven_compat_warn", "fail": "rpt_ven_compat_fail",
+                "unknown": "rpt_ven_compat_unknown"}
+_ERROR_SEVERITIES = frozenset({"err", "error", "critical"})
+_WARN_SEVERITIES = frozenset({"warn", "warning"})
 _PROBLEM_KEYS = {"sync_state": "rpt_ven_problem_sync_state", "fw_stale": "rpt_ven_problem_fw_stale",
                  "behind": "rpt_ven_problem_behind", "never_applied": "rpt_ven_problem_never_applied",
                  "health": "rpt_ven_problem_health"}
@@ -74,6 +81,21 @@ def problems(w: WorkloadRow) -> list[str]:
     if any(isinstance(h, Mapping) and str(h.get("severity", "")).lower() in ("error", "warning") for h in health):
         out.append("health")
     return out
+
+
+def compat_state(agent_health_json: str | None) -> str:
+    """5.x analysis/fleet.compat_state: pass, warn, fail or unknown from the VEN health entries whose type names
+    compatibility (other health signals do not answer whether the host can move to enforcement); none: unknown."""
+    try:
+        health: Any = json.loads(agent_health_json) if agent_health_json else []
+    except ValueError:
+        return "unknown"
+    items = [h for h in health if isinstance(h, Mapping) and "compatibility" in str(h.get("type") or "").lower()] \
+        if isinstance(health, list) else []
+    if not items:
+        return "unknown"
+    levels = {str(h.get("severity") or "").lower() for h in items}
+    return "fail" if levels & _ERROR_SEVERITIES else "warn" if levels & _WARN_SEVERITIES else "pass"
 
 
 def build_ven_status(inp: BuildInput) -> ReportDocument:
@@ -118,6 +140,32 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         rows=tuple((name[w.href], t(_BUCKET_KEYS[buckets[w.href]]), stamp(w.last_heartbeat_at),
                     w.policy_sync_state or "—", w.ven_version or "—") for w in offline),
         total_rows=len(offline), empty_text=t("rpt_ven_none_offline"))
+    no_label = t("rpt_no_label")
+
+    def app_env(w: WorkloadRow) -> str:
+        lab = sets.get(w.label_set, {}) if w.label_set is not None else {}
+        return f"{lab.get('app') or no_label} ({lab.get(env_key) or no_label})"
+    compat = {w.href: compat_state(w.agent_health_json) for w in fleet}
+    online = sorted((w for w in fleet if buckets[w.href] == "online"), key=lambda w: name[w.href])
+    online_table = TableBlock(
+        title=t("rpt_ven_tbl_online"),
+        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="app", label=t("rpt_col_app_env")),
+                 Column(key="version", label=t("rpt_ven_col_version")), Column(key="os", label=t("rpt_ven_col_os")),
+                 Column(key="mode", label=t("rpt_ven_col_mode")),
+                 Column(key="heartbeat", label=t("rpt_ven_col_heartbeat"), kind="time"),
+                 Column(key="sync", label=t("rpt_ven_col_sync")), Column(key="compat", label=t("rpt_ven_col_compat"))),
+        rows=tuple((name[w.href], app_env(w), w.ven_version or "—", w.os_id or "—",
+                    t(_MODE_KEYS[w.enforcement_mode]) if w.enforcement_mode in _MODE_KEYS else t("rpt_ven_unknown"),
+                    stamp(w.last_heartbeat_at), w.policy_sync_state or "—", t(_COMPAT_KEYS[compat[w.href]]))
+                   for w in online),
+        total_rows=len(online), empty_text=t("rpt_ven_none_online"))
+    compat_counts = Counter(compat.values())
+    compat_table = TableBlock(
+        title=t("rpt_ven_tbl_compat"),
+        columns=(Column(key="state", label=t("rpt_ven_col_compat")),
+                 Column(key="n", label=t("rpt_col_managed_hosts"), kind="number")),
+        rows=tuple((t(_COMPAT_KEYS[c]), compat_counts[c]) for c in COMPAT_STATES), total_rows=len(COMPAT_STATES),
+        empty_text=t("rpt_ven_none_hosts"))
     by_href = {w.href: w for w in fleet}
     sync_rows = sorted(trouble.items(), key=lambda kv: name[kv[0]])
     sync_table = TableBlock(
@@ -139,12 +187,9 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     versions = tally(t("rpt_ven_tbl_versions"), t("rpt_ven_col_version"), lambda w: w.ven_version)
     systems = tally(t("rpt_ven_tbl_os"), t("rpt_ven_col_os"), lambda w: w.os_id)
 
-    no_label = t("rpt_no_label")
     groups: dict[str, Counter[str]] = {}
     for w in fleet:
-        lab = sets.get(w.label_set, {}) if w.label_set is not None else {}
-        g = f"{lab.get('app') or no_label} ({lab.get(env_key) or no_label})"
-        groups.setdefault(g, Counter())[w.enforcement_mode if w.enforcement_mode in MODES else "unknown"] += 1
+        groups.setdefault(app_env(w), Counter())[w.enforcement_mode if w.enforcement_mode in MODES else "unknown"] += 1
 
     def pct(n: int, d: int) -> str:
         return f"{100 * n / d:.1f}%" if d else "—"
@@ -184,7 +229,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
 
     latest = max((w.fetched_at for w in fleet), default=None)
     quality = [t("rpt_ven_quality_inventory", at=fmt_time(latest, inp.tz)) if latest else t("rpt_ven_quality_no_inventory"),
-               t("rpt_ven_quality_online")]
+               t("rpt_ven_quality_online"), t("rpt_ven_quality_compat", n=compat_counts["unknown"])]
     if computed_at:
         quality.append(t("rpt_quality_analysis_at", at=fmt_time(computed_at, inp.tz)))
     if run_error:
@@ -195,7 +240,9 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ven_status"), period_start=inp.start,
         period_end=inp.end, generated_at=now, pce_label=inp.pce_label, kpis=kpis, findings=(),
         data_quality=tuple(quality),
-        sections=(Section(id="offline", title=t("rpt_ven_sec_offline"), intro=t("rpt_ven_offline_intro"),
+        sections=(Section(id="online", title=t("rpt_ven_sec_online"), intro=t("rpt_ven_online_intro"),
+                          blocks=(online_table, compat_table)),
+                  Section(id="offline", title=t("rpt_ven_sec_offline"), intro=t("rpt_ven_offline_intro"),
                           blocks=(offline_table,)),
                   Section(id="sync", title=t("rpt_ven_sec_sync"), intro=t("rpt_ven_sync_intro"), blocks=(sync_table,)),
                   Section(id="versions", title=t("rpt_ven_sec_versions"), blocks=(versions, systems)),

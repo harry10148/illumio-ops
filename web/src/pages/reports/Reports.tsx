@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type { Catalog, CatalogEntry, ReportItem, ReportPage } from "../../api/generated";
+import type { BulkDeleted, Catalog, CatalogEntry, ReportItem, ReportPage } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { ModeMark, PageHead, Tag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
@@ -205,9 +205,17 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   const lang = useLang();
   const marked = useRef<HTMLTableRowElement | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  // Several reports deleted at once (5.x bulk delete): picked on this page, confirmed, then what happened to each said.
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const [outcome, setOutcome] = useState<BulkDeleted | null>(null);
   useEffect(() => {
     marked.current?.scrollIntoView({ block: "center" });
   }, [highlight, data]);
+  // a report that left the list (deleted, another page) is no longer picked
+  useEffect(() => {
+    setPicked((now) => new Set([...now].filter((id) => data.items.some((r) => r.id === id && r.status !== "running"))));
+  }, [data]);
 
   async function remove(id: number) {
     const env = await call("reports.delete", undefined, { report_id: String(id) });
@@ -217,14 +225,61 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
     } else setError(env.error);
   }
 
+  async function removePicked() {
+    setConfirming(false);
+    const [first, ...rest] = [...picked];
+    if (first === undefined) return;
+    const env = await call("reports.bulk_delete", { ids: [first, ...rest] });
+    if (env.ok && env.data) {
+      setError(null);
+      setOutcome(env.data);
+      setPicked(new Set());
+      onChanged();
+    } else setError(env.error);
+  }
+
+  const pickable = data.items.filter((r) => r.status !== "running");
+  const toggle = (id: number, on: boolean) => {
+    const next = new Set(picked);
+    if (on) next.add(id); else next.delete(id);
+    setPicked(next);
+    setConfirming(false);
+  };
+
   if (data.items.length === 0) return <p className="muted">{t("gui_reports_none")}</p>;
   return (
     <>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      <div className="row" data-role="bulk-actions">
+        {confirming ? (
+          <>
+            <span>{t("gui_reports_delete_confirm", { n: String(picked.size) })}</span>
+            <button type="button" className="btn-danger" data-role="bulk-delete-confirm" onClick={() => void removePicked()}>
+              {t("gui_reports_delete")}
+            </button>
+            <button type="button" className="btn-quiet" onClick={() => setConfirming(false)}>{t("btn_cancel")}</button>
+          </>
+        ) : (
+          <button type="button" className="btn-quiet" data-role="bulk-delete" disabled={picked.size === 0}
+            onClick={() => { setOutcome(null); setConfirming(true); }}>
+            {t("gui_reports_delete_selected", { n: String(picked.size) })}
+          </button>
+        )}
+        {outcome && (
+          <span className="hint" data-role="bulk-outcome">{t("gui_reports_bulk_result", {
+            removed: String(outcome.removed.length), running: String(outcome.running.length),
+            missing: String(outcome.missing.length) })}</span>
+        )}
+      </div>
       <div className="table-wrap">
         <table className="table" data-role="report-list">
           <thead>
             <tr>
+              <th>
+                <input type="checkbox" name="pick-all" aria-label={t("gui_reports_select_all")}
+                  checked={pickable.length > 0 && pickable.every((r) => picked.has(r.id))} disabled={pickable.length === 0}
+                  onChange={(e) => { setPicked(new Set(e.target.checked ? pickable.map((r) => r.id) : [])); setConfirming(false); }} />
+              </th>
               <th>{t("gui_reports_col_report")}</th><th>{t("gui_reports_col_period")}</th>
               <th>{t("gui_reports_col_trigger")}</th><th>{t("gui_reports_col_status")}</th>
               <th>{t("gui_reports_col_files")}</th><th>{t("gui_reports_col_email")}</th><th />
@@ -234,6 +289,11 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
             {data.items.map((r: ReportItem) => (
               <tr key={r.id} data-report-id={r.id} data-status={r.status} data-highlight={r.id === highlight ? "true" : undefined}
                 ref={r.id === highlight ? marked : undefined} className={r.id === highlight ? "notice" : undefined}>
+                <td>
+                  <input type="checkbox" name={`pick-${r.id}`} aria-label={t("gui_reports_select_one")}
+                    checked={picked.has(r.id)} disabled={r.status === "running"}
+                    onChange={(e) => toggle(r.id, e.target.checked)} />
+                </td>
                 <td>
                   <div data-role="report-conclusion">{r.conclusion || `${word(TYPE_KEYS, r.report_type)}${r.custom_name ? `：${r.custom_name}` : ""}`}</div>
                   <div className="hint">{word(TYPE_KEYS, r.report_type)}{r.custom_name ? `：${r.custom_name}` : ""} · {r.pce_label}</div>
@@ -250,7 +310,16 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                 </td>
                 <td>
                   {r.files.map((f) => (
-                    <div key={f}><a href={`/reports/files/${r.id}/${encodeURIComponent(f)}`} download>{f.split(".").pop()?.toUpperCase()}</a></div>
+                    <div key={f}>
+                      <a href={`/reports/files/${r.id}/${encodeURIComponent(f)}`} download>{f.split(".").pop()?.toUpperCase()}</a>
+                      {f.toLowerCase().endsWith(".html") && (
+                        <>
+                          {" · "}
+                          <a href={`/reports/view/${r.id}/${encodeURIComponent(f)}`} target="_blank" rel="noopener noreferrer"
+                            data-role="report-open" title={t("gui_reports_open_hint")}>{t("gui_reports_open")}</a>
+                        </>
+                      )}
+                    </div>
                   ))}
                 </td>
                 <td>

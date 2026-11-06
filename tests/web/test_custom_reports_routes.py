@@ -41,3 +41,21 @@ def test_schedule_for_a_missing_custom_report_refused(client):
              "formats": ["html"], "email": False, "recipients": [], "lang": None, "keep": 5}
     r = post(client, "/api/report-schedules", {"revision": rev, "schedule": sched})
     assert r.status_code == 400 and r.get_json()["error"]["field"] == "schedule.custom_id"
+
+
+def test_section_reopened_as_a_workbench_request(client):
+    """5.x saved queries could be reopened: a saved section comes back as the workbench's request on its default
+    period (the section keeps no period of its own), conditions, view, grouping and limit as saved."""
+    login(client)
+    req = {**_req(), "condition": {"dst": {"labels": [{"key": "app", "values": ["DB"]}]}}, "metric": "connections"}
+    rid = post(client, "/api/custom-reports/sections", {"name": "DB", "title": "Who", "request": req}).get_json()["data"]["id"]
+    r = client.get(f"/api/custom-reports/{rid}/sections/0/request", environ_overrides=LOCAL)
+    assert r.status_code == 200
+    got = r.get_json()["data"]["request"]
+    assert (got["mode"], got["view"], got["metric"], got["group_by"][0]["dimension"]) == (
+        "flows", "ranking", "connections", "src_host")
+    assert got["condition"]["dst"]["labels"] == [{"key": "app", "values": ["DB"]}]
+    span = datetime.fromisoformat(got["end"]) - datetime.fromisoformat(got["start"])
+    assert span == timedelta(days=1) and datetime.fromisoformat(got["end"]) > datetime.now(UTC) - timedelta(minutes=5)
+    assert client.get(f"/api/custom-reports/{rid}/sections/5/request", environ_overrides=LOCAL).status_code == 404
+    assert client.get(f"/api/custom-reports/{rid + 9}/sections/0/request", environ_overrides=LOCAL).status_code == 404
