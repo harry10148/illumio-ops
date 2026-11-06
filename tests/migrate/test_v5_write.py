@@ -209,3 +209,23 @@ def test_upgrade_without_rule_schedules_says_so(v5, tmp_path):
     root = tmp_path / "v6"
     upgrade(v5, root, now=NOW)
     assert "rule_schedules.json" in (root / "logs" / "migration-report.txt").read_text()
+
+
+def test_fleet_progressions_are_listed_as_not_supported(v5, tmp_path, capsys):
+    """Spec §7: 5.x's VEN progression records (config/fleet_progressions.json) are not carried; the upgrade report
+    says so, in the written report and in --report-only (parity 2026-11-06)."""
+    from illumio_ops.migrate.__main__ import main
+
+    (v5 / "config" / "fleet_progressions.json").write_text('{"records": {}}')
+    root = tmp_path / "v6"
+    upgrade(v5, root, now=NOW)
+    report = (root / "logs" / "migration-report.txt").read_text()
+    assert "config/fleet_progressions.json" in report and "VEN" in report
+    assert main(["--from", str(v5), "--report-only"]) == 0
+    assert "config/fleet_progressions.json" in capsys.readouterr().out
+
+
+def test_no_fleet_progressions_no_line(v5, tmp_path):
+    root = tmp_path / "v6"
+    upgrade(v5, root, now=NOW)
+    assert "fleet_progressions" not in (root / "logs" / "migration-report.txt").read_text()

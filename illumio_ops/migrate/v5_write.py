@@ -25,7 +25,12 @@ from illumio_ops.domain.values import IngestSource, Language
 from illumio_ops.i18n import translate
 from illumio_ops.migrate import v5_rule_schedules
 from illumio_ops.migrate.report import render
-from illumio_ops.migrate.v5 import MigrationResult, migrate_v5, read_v5
+from illumio_ops.migrate.v5 import (
+    MigrationResult,
+    migrate_v5,
+    not_carried_files,
+    read_v5,
+)
 from illumio_ops.migrate.v5_alerts import read_v5_rules
 from illumio_ops.migrate.v5_handover import Handover, cache_store, read_handover
 from illumio_ops.paths import InstallPaths
@@ -225,6 +230,7 @@ def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Langua
     schedules, schedule_items = v5_rule_schedules.convert(_rule_schedules(v5_root, read),
                                                           local_zone=v5_rule_schedules.host_zone())
     result.report.items.extend(schedule_items)
+    result.report.items.extend(not_carried_files(v5_root))
     with connect(paths.app_db) as conn:  # as the service's start does (runtime.prepare)
         migrate(conn)
         v5_rule_schedules.write(conn, schedules, pce_url=s.pce.url, org_id=s.pce.org_id, now=now)

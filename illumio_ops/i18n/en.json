@@ -2831,5 +2831,6 @@
   "gui_reports_period_hint": "Whole days in the display time zone, both ends included; from {first} to {last}. Days the store no longer keeps are read from the archive, and the report says so.",
   "shell_version": "Version {version}",
   "pce_events_timeout": "Events query timeout (seconds)",
-  "pce_events_timeout_hint": "How long one /events request may take, 5–600 seconds. Blank: {seconds} seconds for this deployment type (SaaS answers /events slowly)."
+  "pce_events_timeout_hint": "How long one /events request may take, 5–600 seconds. Blank: {seconds} seconds for this deployment type (SaaS answers /events slowly).",
+  "migrate_fleet_progressions_not_in_v6": "the VEN enforcement progression records of 5.x are not carried: v6.0 does not progress VENs. The file stays in the 5.x directory."
 }
