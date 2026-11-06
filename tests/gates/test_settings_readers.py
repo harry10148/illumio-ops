@@ -106,6 +106,7 @@ SETTINGS_READERS: dict[str, str] = {
     "siem.enabled": "illumio_ops.services.siem.dispatch",
     "siem.destinations": "illumio_ops.services.siem.dispatch",
     "siem.dlq_max_per_dest": "illumio_ops.services.siem.dispatch",
+    "siem.dlq_retention_days": "illumio_ops.services.siem.dlq",
     "siem.tick_seconds": "illumio_ops.services.siem.dispatch",
     "siem.backlog_warn_rows": "illumio_ops.services.siem.status",
     "reports.rule_thresholds.unmanaged_connection": "illumio_ops.services.reports.findings",

@@ -71,3 +71,64 @@ def test_a_line_is_not_resent_to_another_host(ctx):
     t = FakeTransport()
     assert dlq.resend(ctx, ids=None, destination_id=DEST, transport_factory=lambda d: t).changed == 1
     assert t.lines == []
+
+
+def quarantine_at(ctx, at, *, error="refused: 400", dest=DEST, payload="line"):
+    with ctx.db() as conn:
+        store.quarantine(conn, destination_id=dest, source="audit", record_id=1, external_id="audit:1", event_time=at,
+                         payload=payload, sent_as="[]", error=error, attempts=1, at=at)
+
+
+def test_purge_older_than_a_number_of_days(ctx):
+    from datetime import timedelta
+    quarantine_at(ctx, NOW - timedelta(days=10))
+    quarantine_at(ctx, NOW - timedelta(days=2))
+    quarantine_at(ctx, NOW - timedelta(days=10), dest="e" * 32)
+    assert dlq.purge(ctx, ids=None, destination_id=DEST, older_than_days=5, now=NOW) == 1
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 1 and store.dlq_count(conn, "e" * 32) == 1
+    assert dlq.purge(ctx, ids=None, destination_id=None, older_than_days=5, now=NOW) == 1
+
+
+def test_export_by_error(ctx):
+    quarantine_at(ctx, NOW, error="refused: 400 Bad Request")
+    quarantine_at(ctx, NOW, error="format: bad value")
+    quarantine_at(ctx, NOW, error="refused: 413 100%_full")
+    lines = [json.loads(x) for x in dlq.export_lines(ctx, destination_id=None, error="refused")]
+    assert [x["error"] for x in lines] == ["refused: 400 Bad Request", "refused: 413 100%_full"]
+    # % and _ are matched as written, not as wildcards
+    assert len(list(dlq.export_lines(ctx, destination_id=None, error="100%_"))) == 1
+    assert list(dlq.export_lines(ctx, destination_id=None, error="4_3")) == []  # as a LIKE pattern: "413"
+
+
+def test_dlq_retention_deletes_lines_older_than_the_setting_and_old_counts(ctx):
+    from datetime import timedelta
+    quarantine_at(ctx, NOW - timedelta(days=31))
+    quarantine_at(ctx, NOW - timedelta(days=29))
+    with ctx.db() as conn:
+        store.record_sends(conn, DEST, NOW - timedelta(days=9), sent=3)
+        store.record_sends(conn, DEST, NOW - timedelta(days=6), sent=4)
+    assert ctx.settings.current().siem.dlq_retention_days == 30  # the default
+    assert dlq.run_dlq_retention(ctx, now=NOW) == {"dlq": 1, "sends": 1}
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 1
+        assert store.sends_since(conn, NOW - timedelta(days=30))[DEST].sent == 4
+
+
+def test_dlq_retention_zero_keeps_every_line(ctx):
+    from datetime import timedelta
+    configure(ctx, destination(), dlq_retention_days=0)
+    quarantine_at(ctx, NOW - timedelta(days=400))
+    assert dlq.run_dlq_retention(ctx, now=NOW)["dlq"] == 0
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 1
+
+
+def test_the_retention_job_runs_the_dlq_retention(ctx):
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.jobs.scheduler import _collector_jobs
+    quarantine_at(ctx, datetime.now(UTC) - timedelta(days=40))
+    _collector_jobs(ctx)["collect_retention"]()
+    with ctx.db() as conn:
+        assert store.dlq_count(conn, DEST) == 0

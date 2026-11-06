@@ -1,11 +1,12 @@
 """The SIEM DLQ (spec §6.5 SIEM 轉送: DLQ 檢視、重送、清除、匯出, P7). A resend sends the stored line itself — the
 source row may be gone — to its destination as it is configured now; a line that goes through leaves the DLQ, one
-that fails again stays with the new error. Bounded: one resend handles at most RESEND_MAX lines."""
+that fails again stays with the new error. Bounded: one resend handles at most RESEND_MAX lines. Lines older than
+siem.dlq_retention_days are deleted by the daily retention job."""
 from __future__ import annotations
 
 import json
 from collections.abc import Iterator, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 from pydantic import BaseModel
@@ -91,19 +92,41 @@ def resend(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | 
                         error=last_error)
 
 
-def purge(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | None) -> int:
+def purge(ctx: AppContext, *, ids: Sequence[int] | None, destination_id: str | None,
+          older_than_days: int | None = None, now: datetime | None = None) -> int:
+    """ids: those lines; else every line of the destination (or of every destination) — moved to the DLQ more than
+    older_than_days days ago when given (5.x's purge by age)."""
     with ctx.db() as conn:
-        return store.dlq_delete(conn, list(ids)) if ids is not None else store.dlq_purge(conn, destination_id)
+        if ids is not None:
+            return store.dlq_delete(conn, list(ids))
+        if older_than_days is not None:
+            at = (now or datetime.now(UTC)).astimezone(UTC)
+            return store.dlq_purge_before(conn, destination_id, at - timedelta(days=older_than_days))
+        return store.dlq_purge(conn, destination_id)
 
 
-def export_lines(ctx: AppContext, *, destination_id: str | None) -> Iterator[str]:
-    """The DLQ as JSON lines, oldest first, a page at a time (a full DLQ of 20 destinations is 200,000 lines). The
-    lines are what was formatted for the SIEM: they carry no destination secret."""
+def run_dlq_retention(ctx: AppContext, *, now: datetime | None = None) -> dict[str, int]:
+    """Lines older than siem.dlq_retention_days leave the DLQ (0: kept until resent or purged; 5.x kept 30 days), and
+    send counts older than the 7-day window go. Run by the daily retention job."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    days = ctx.settings.current().siem.dlq_retention_days
+    with ctx.db() as conn:
+        dropped = store.dlq_purge_before(conn, None, at - timedelta(days=days)) if days else 0
+        sends = store.delete_sends_before(conn, at - store.STATS_KEEP)
+    if dropped:
+        logger.info("SIEM DLQ retention: {} lines older than {} days deleted", dropped, days)
+    return {"dlq": dropped, "sends": sends}
+
+
+def export_lines(ctx: AppContext, *, destination_id: str | None, error: str | None = None) -> Iterator[str]:
+    """The DLQ as JSON lines, oldest first, a page at a time (a full DLQ of 20 destinations is 200,000 lines); error:
+    only lines whose error contains it. The lines are what was formatted for the SIEM: they carry no destination
+    secret."""
     names = {d.id: d.name for d in ctx.settings.current().siem.destinations}
     after = 0
     while True:
         with ctx.db() as conn:
-            page = store.dlq_after(conn, destination_id=destination_id, after_id=after, limit=EXPORT_PAGE)
+            page = store.dlq_after(conn, destination_id=destination_id, after_id=after, limit=EXPORT_PAGE, error=error)
         if not page:
             return
         for d in page:

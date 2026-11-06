@@ -172,3 +172,68 @@ def test_the_status_says_which_destinations_do_not_verify(client):
     assert r.status_code == 200
     st = client.get("/api/siem/status", environ_overrides=LOCAL).get_json()["data"]
     assert st["destinations"][0]["tls_unverified"] is True
+
+
+def _fill(ctx, rows):
+    from datetime import timedelta
+    with ctx.db() as conn:
+        for i, (error, days, payload) in enumerate(rows):
+            store.quarantine(conn, destination_id=DEST, source="audit", record_id=i, external_id=f"audit:{i}",
+                             event_time=NOW, payload=payload, sent_as="[]", error=error, attempts=2,
+                             at=NOW - timedelta(days=days))
+        return [d.id for d in store.dlq_after(conn, destination_id=DEST, after_id=0, limit=100)]
+
+
+def test_one_dlq_line_in_full(client, ctx):
+    login(client)
+    configured(client)
+    long_line = "x" * 5000 + "END"
+    [dead] = _fill(ctx, [("refused: 400", 0, long_line)])
+    page = client.get("/api/siem/dlq", environ_overrides=LOCAL).get_json()["data"]
+    assert len(page["items"][0]["preview"]) == 300
+    r = client.get(f"/api/siem/dlq/{dead}", environ_overrides=LOCAL)
+    assert r.status_code == 200
+    d = r.get_json()["data"]
+    assert d["payload"] == long_line and d["destination"] == "splunk" and d["attempts"] == 2
+    assert d["error"] == "refused: 400" and d["external_id"] == "audit:0"
+    r = client.get(f"/api/siem/dlq/{dead + 1}", environ_overrides=LOCAL)
+    assert r.status_code == 404 and r.get_json()["error"]["code"] == "not_found"
+
+
+def test_the_dlq_list_and_export_by_error(client, ctx):
+    login(client)
+    configured(client)
+    _fill(ctx, [("refused: 400", 0, "a"), ("format: x", 0, "b"), ("refused: 413", 0, "c")])
+    page = client.get("/api/siem/dlq?error=refused", environ_overrides=LOCAL).get_json()["data"]
+    assert page["total"] == 2 and {x["error"] for x in page["items"]} == {"refused: 400", "refused: 413"}
+    out = client.get(f"/siem/dlq/export?destination_id={DEST}&error=format", environ_overrides=LOCAL)
+    assert [json.loads(x)["payload"] for x in out.get_data(as_text=True).splitlines()] == ["b"]
+    assert client.get("/siem/dlq/export?error=" + "x" * 201, environ_overrides=LOCAL).status_code == 400
+
+
+def test_purge_older_than_days(client, ctx):
+    login(client)
+    configured(client)
+    _fill(ctx, [("e", 40, "old"), ("e", 1, "new")])
+    r = post(client, "/api/siem/dlq/purge", {"destination_id": DEST, "older_than_days": 30})
+    assert r.status_code == 200 and r.get_json()["data"]["deleted"] == 1
+    with ctx.db() as conn:
+        [left] = store.dlq_page(conn, destination_id=DEST, limit=5, offset=0)
+    assert left.payload == "new"
+    r = post(client, "/api/siem/dlq/purge", {"ids": [left.id], "older_than_days": 30})
+    assert r.status_code == 400  # one or the other
+
+
+def test_the_dlq_retention_is_a_setting_the_page_keeps(client, ctx):
+    login(client)
+    s = configured(client)["siem"]
+    assert s["dlq_retention_days"] == 30
+    s["dlq_retention_days"] = 7
+    assert put(client, s).status_code == 200
+    assert ctx.settings.current().siem.dlq_retention_days == 7
+    s = view(client)["siem"]
+    s["destinations"][0]["name"] = "renamed"
+    assert put(client, s).status_code == 200
+    assert ctx.settings.current().siem.dlq_retention_days == 7
+    s["dlq_retention_days"] = -1
+    assert put(client, s).status_code == 400

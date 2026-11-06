@@ -90,3 +90,78 @@ def test_dlq_purge_asks_on_the_page_first(context, live_app):
     page.locator("[data-role=dlq-confirm-yes]").click()
     expect(rows).to_have_count(2)
     expect(page.locator("[data-role=dlq-done]")).to_contain_text("Purged 1.")
+
+
+def _hec(**kw):
+    base = {"id": DEST, "name": "splunk", "enabled": True, "transport": "hec", "format": "json",
+            "host": "splunk.example", "port": 8088, "framing": "lf", "verify_tls": True, "hec_token": "HEC-TOKEN",
+            "batch_size": 100, "max_retries": 10, "sources": ["audit"], "new_connection_decisions": [],
+            "new_connection_internal_only": True, "mask_pii": False}
+    base.update(kw)
+    return base
+
+
+def test_turning_certificate_verification_off_asks_and_then_warns(context, live_app):
+    _set(live_app, lambda d: d["siem"].update(enabled=True, destinations=[_hec(transport="tls", port=6514,
+                                                                                  hec_token="")]))
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/siem")
+    card = page.locator("[data-role=siem-destination]")
+    expect(card.locator("[data-role=siem-tls-warning]")).to_have_count(0)
+    card.locator("input[name=siem_verify_tls]").uncheck()
+    expect(card.locator("[data-role=siem-tls-warning]")).to_be_visible()
+    page.get_by_role("button", name="Save").click()
+    expect(page.locator("p.form-error")).to_contain_text("Certificate verification is off for splunk")
+    assert live_app.ctx.settings.current().siem.destinations[0].verify_tls is True  # not saved yet
+    page.locator("[data-role=siem-save-anyway]").click()
+    expect(page.locator("p.form-ok[role=status]")).to_have_text("Saved.")
+    assert live_app.ctx.settings.current().siem.destinations[0].verify_tls is False
+    expect(page.locator("[data-role=siem-status] [data-role=siem-tls-unverified]")).to_be_visible()
+
+
+def test_the_status_shows_the_last_day_and_week(context, live_app):
+    from datetime import timedelta
+    _set(live_app, lambda d: d["siem"].update(enabled=True, destinations=[_hec()]))
+    now = datetime.now(UTC)
+    with live_app.ctx.db() as conn:
+        store.record_sends(conn, DEST, now - timedelta(minutes=5), sent=9, failed=1)
+        store.record_sends(conn, DEST, now - timedelta(days=3), sent=1200)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/siem")
+    status = page.locator("[data-role=siem-status]")
+    expect(status.locator("[data-role=siem-rate-1h]")).to_have_text("Last hour: 90% went through (9 of 10 attempts)")
+    expect(status.locator("[data-role=siem-sends-24h]")).to_have_text("Last 24 hours: sent 9, failed 1")
+    expect(status.locator("[data-role=siem-sends-7d]")).to_have_text("Last 7 days: sent 1,209, failed 1")
+
+
+def test_a_dlq_line_in_full_by_error_and_purged_by_age(context, live_app):
+    from datetime import timedelta
+    now = datetime.now(UTC)
+    long_line = "y" * 900 + "TAIL"
+    with live_app.ctx.db() as conn:
+        for i, (error, days, payload) in enumerate([("refused: 413 too large", 40, long_line),
+                                                    ("format: bad", 1, "short"), ("refused: 400", 2, "other")]):
+            store.quarantine(conn, destination_id=DEST, source="audit", record_id=i, external_id=f"audit:{i}",
+                             event_time=now, payload=payload, sent_as="[]", error=error, attempts=1,
+                             at=now - timedelta(days=days))
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/siem/dlq")
+    rows = page.locator("[data-role=dlq-rows] tbody tr")
+    expect(rows).to_have_count(3)
+    page.locator("input[name=dlq_error]").fill("413")
+    expect(rows).to_have_count(1)
+    expect(rows.first).to_contain_text("first 300 of 904 characters")
+    assert "error=413" in page.locator("[data-role=dlq-export]").get_attribute("href")
+    rows.first.locator("[data-role=dlq-show]").click()
+    expect(page.locator("[data-role=dlq-payload]")).to_have_text(long_line)
+    page.locator("input[name=dlq_error]").fill("")
+    expect(rows).to_have_count(3)
+    page.locator("input[name=dlq_older_days]").fill("30")
+    page.locator("[data-role=dlq-purge-older]").click()
+    expect(page.locator("[data-role=dlq-confirm]")).to_contain_text("more than 30 days ago")
+    page.locator("[data-role=dlq-confirm-yes]").click()
+    expect(rows).to_have_count(2)
+    expect(page.locator("[data-role=dlq-done]")).to_contain_text("Purged 1.")

@@ -1,5 +1,6 @@
 """SIEM forwarding (spec §6.5 SIEM 轉送, P7): the destinations (HEC tokens masked), the status of every destination and
-source, a test line with the values on the page (saved or not), and the DLQ — list, resend, purge, export."""
+source, a test line with the values on the page (saved or not), and the DLQ — list (by error too), one line in
+full, resend, purge (all, selected, or older than some days), export (by error too)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -59,6 +60,7 @@ class SiemSettingsInput(BaseModel):
     dlq_max_per_dest: int
     tick_seconds: int
     backlog_warn_rows: int
+    dlq_retention_days: int
 
 
 class SiemSettingsView(BaseModel):
@@ -95,6 +97,23 @@ class DlqItem(BaseModel):
     attempts: int
     quarantined_at: datetime
     preview: str        # the start of the stored line
+    length: int         # of the whole line: the page says when the preview is cut, and shows the line in full
+
+
+class DlqDetail(BaseModel):
+    """One DLQ line in full: the line exactly as it was formatted for the destination (the source row may be gone,
+    and the line is what a resend sends)."""
+    id: int
+    destination_id: str
+    destination: str
+    source: str
+    record_id: int
+    external_id: str
+    event_time: datetime | None
+    error: str
+    attempts: int
+    quarantined_at: datetime
+    payload: str
 
 
 class DlqPage(BaseModel):
@@ -108,12 +127,15 @@ class DlqQuery(BaseModel):
     destination_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     limit: int = Field(default=50, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
+    error: str | None = Field(default=None, max_length=200)  # lines whose error contains it
 
 
 class DlqAction(BaseModel):
-    """ids: those lines; none: every line of destination_id (or of every destination)."""
+    """ids: those lines; none: every line of destination_id (or of every destination) — with older_than_days, those
+    moved to the DLQ more than that many days ago (purge only)."""
     ids: list[int] | None = Field(default=None, max_length=1_000)
     destination_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    older_than_days: int | None = Field(default=None, ge=1, le=3650)
 
 
 class DlqResendView(BaseModel):
@@ -134,6 +156,7 @@ OP_GET = operation("siem.settings.get", "GET", "/api/siem/settings", None, SiemS
 OP_UPDATE = operation("siem.settings.update", "PUT", "/api/siem/settings", SiemSettingsUpdate, SiemSettingsView)
 OP_TEST = operation("siem.destination.test", "POST", "/api/siem/test", SiemTestRequest, SiemTestView)
 OP_DLQ = operation("siem.dlq.list", "GET", "/api/siem/dlq", None, DlqPage)
+OP_DLQ_GET = operation("siem.dlq.get", "GET", "/api/siem/dlq/<int:dead_id>", None, DlqDetail)
 OP_RESEND = operation("siem.dlq.resend", "POST", "/api/siem/dlq/resend", DlqAction, DlqResendView)
 OP_PURGE = operation("siem.dlq.purge", "POST", "/api/siem/dlq/purge", DlqAction, DlqPurgeView)
 
@@ -214,13 +237,27 @@ def list_dlq() -> DlqPage:
     ctx = get_ctx()
     names = {d.id: d.name for d in ctx.settings.current().siem.destinations}
     with ctx.db() as conn:
-        rows = store.dlq_page(conn, destination_id=q.destination_id, limit=q.limit, offset=q.offset)
-        total = store.dlq_count(conn, q.destination_id)
+        rows = store.dlq_page(conn, destination_id=q.destination_id, limit=q.limit, offset=q.offset, error=q.error)
+        total = store.dlq_count(conn, q.destination_id, error=q.error)
     return DlqPage(items=[DlqItem(id=d.id, destination_id=d.destination_id,
                                   destination=names.get(d.destination_id, d.destination_id), source=d.source,
                                   external_id=d.external_id, event_time=d.event_time, error=d.error,
-                                  attempts=d.attempts, quarantined_at=d.quarantined_at, preview=d.payload[:300])
+                                  attempts=d.attempts, quarantined_at=d.quarantined_at, preview=d.payload[:300],
+                                  length=len(d.payload))
                           for d in rows], total=total, limit=q.limit, offset=q.offset)
+
+
+@api_route(bp, OP_DLQ_GET)
+def get_dlq(dead_id: int) -> DlqDetail:
+    ctx = get_ctx()
+    with ctx.db() as conn:
+        d = store.dlq_get(conn, dead_id)
+    if d is None:
+        raise ApiFailure(404, "not_found", "err_not_found")
+    names = {x.id: x.name for x in ctx.settings.current().siem.destinations}
+    return DlqDetail(id=d.id, destination_id=d.destination_id, destination=names.get(d.destination_id, d.destination_id),
+                     source=d.source, record_id=d.record_id, external_id=d.external_id, event_time=d.event_time,
+                     error=d.error, attempts=d.attempts, quarantined_at=d.quarantined_at, payload=d.payload)
 
 
 @api_route(bp, OP_RESEND)
@@ -231,7 +268,10 @@ def resend(body: DlqAction) -> DlqResendView:
 
 @api_route(bp, OP_PURGE)
 def purge(body: DlqAction) -> DlqPurgeView:
-    return DlqPurgeView(deleted=dlq.purge(get_ctx(), ids=body.ids, destination_id=body.destination_id))
+    if body.ids is not None and body.older_than_days is not None:
+        raise ApiFailure(400, "invalid_input", "err_invalid_input", field="older_than_days")
+    return DlqPurgeView(deleted=dlq.purge(get_ctx(), ids=body.ids, destination_id=body.destination_id,
+                                          older_than_days=body.older_than_days))
 
 
 @bp.get("/siem/dlq/export")
@@ -241,10 +281,12 @@ def export() -> Response | tuple[Response, int]:
         return api_error(401, "auth_required", "err_auth_required")
     if ctx.settings.current().web.must_change_password:
         return api_error(423, "password_change_required", "err_password_change_required")
-    dest = request.args.get("destination_id") or None
-    if dest is not None and not (len(dest) == 32 and all(c in "0123456789abcdef" for c in dest)):
+    try:
+        q = DlqQuery.model_validate({k: v for k, v in request.args.items() if k in ("destination_id", "error")})
+    except ValidationError:
         return api_error(400, "invalid_input", "err_invalid_input")
-    resp = Response(stream_with_context(dlq.export_lines(ctx, destination_id=dest)), mimetype="application/x-ndjson")
+    resp = Response(stream_with_context(dlq.export_lines(ctx, destination_id=q.destination_id, error=q.error or None)),
+                    mimetype="application/x-ndjson")
     resp.headers["Content-Disposition"] = f'attachment; filename="{dlq.export_name()}"'
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Cache-Control"] = "no-store"

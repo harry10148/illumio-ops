@@ -160,10 +160,22 @@ def _dead(row: sqlite3.Row) -> DeadLetter:
                       quarantined_at=datetime.fromisoformat(row["quarantined_at"]))
 
 
-def dlq_count(conn: sqlite3.Connection, destination_id: str | None = None) -> int:
-    if destination_id is None:
-        return int(conn.execute("SELECT COUNT(*) FROM siem_dlq").fetchone()[0])
-    return int(conn.execute("SELECT COUNT(*) FROM siem_dlq WHERE destination_id = ?", (destination_id,)).fetchone()[0])
+def _where(destination_id: str | None, error: str | None) -> tuple[str, list[object]]:
+    """The DLQ filter: a destination, and lines whose error contains a text as written (no wildcards)."""
+    parts: list[str] = ["1 = 1"]
+    args: list[object] = []
+    if destination_id is not None:
+        parts.append("destination_id = ?")
+        args.append(destination_id)
+    if error:
+        parts.append("instr(error, ?) > 0")
+        args.append(error)
+    return " AND ".join(parts), args
+
+
+def dlq_count(conn: sqlite3.Connection, destination_id: str | None = None, *, error: str | None = None) -> int:
+    where, args = _where(destination_id, error)
+    return int(conn.execute(f"SELECT COUNT(*) FROM siem_dlq WHERE {where}", args).fetchone()[0])
 
 
 def dlq_counts(conn: sqlite3.Connection) -> dict[str, int]:
@@ -181,13 +193,17 @@ def quarantine(conn: sqlite3.Connection, *, destination_id: str, source: str, re
              _t(at)))
 
 
-def dlq_page(conn: sqlite3.Connection, *, destination_id: str | None, limit: int, offset: int) -> list[DeadLetter]:
-    if destination_id is None:
-        rows = conn.execute("SELECT * FROM siem_dlq ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM siem_dlq WHERE destination_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
-                            (destination_id, limit, offset)).fetchall()
+def dlq_page(conn: sqlite3.Connection, *, destination_id: str | None, limit: int, offset: int,
+             error: str | None = None) -> list[DeadLetter]:
+    where, args = _where(destination_id, error)
+    rows = conn.execute(f"SELECT * FROM siem_dlq WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+                        [*args, limit, offset]).fetchall()
     return [_dead(r) for r in rows]
+
+
+def dlq_get(conn: sqlite3.Connection, dead_id: int) -> DeadLetter | None:
+    row = conn.execute("SELECT * FROM siem_dlq WHERE id = ?", (dead_id,)).fetchone()
+    return _dead(row) if row else None
 
 
 def dlq_by_ids(conn: sqlite3.Connection, ids: Sequence[int]) -> list[DeadLetter]:
@@ -199,13 +215,12 @@ def dlq_by_ids(conn: sqlite3.Connection, ids: Sequence[int]) -> list[DeadLetter]
     return out
 
 
-def dlq_after(conn: sqlite3.Connection, *, destination_id: str | None, after_id: int, limit: int) -> list[DeadLetter]:
+def dlq_after(conn: sqlite3.Connection, *, destination_id: str | None, after_id: int, limit: int,
+              error: str | None = None) -> list[DeadLetter]:
     """Oldest first, after an id: export and resend-all page through the whole DLQ with this."""
-    if destination_id is None:
-        rows = conn.execute("SELECT * FROM siem_dlq WHERE id > ? ORDER BY id LIMIT ?", (after_id, limit)).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM siem_dlq WHERE destination_id = ? AND id > ? ORDER BY id LIMIT ?",
-                            (destination_id, after_id, limit)).fetchall()
+    where, args = _where(destination_id, error)
+    rows = conn.execute(f"SELECT * FROM siem_dlq WHERE {where} AND id > ? ORDER BY id LIMIT ?",
+                        [*args, after_id, limit]).fetchall()
     return [_dead(r) for r in rows]
 
 
@@ -223,6 +238,13 @@ def dlq_purge(conn: sqlite3.Connection, destination_id: str | None) -> int:
         if destination_id is None:
             return conn.execute("DELETE FROM siem_dlq").rowcount
         return conn.execute("DELETE FROM siem_dlq WHERE destination_id = ?", (destination_id,)).rowcount
+
+
+def dlq_purge_before(conn: sqlite3.Connection, destination_id: str | None, before: datetime) -> int:
+    """Lines moved to the DLQ before a time (of a destination, or of every destination)."""
+    where, args = _where(destination_id, None)
+    with conn:
+        return conn.execute(f"DELETE FROM siem_dlq WHERE {where} AND quarantined_at < ?", [*args, _t(before)]).rowcount
 
 
 def dlq_failed_again(conn: sqlite3.Connection, dead_id: int, error: str) -> None:

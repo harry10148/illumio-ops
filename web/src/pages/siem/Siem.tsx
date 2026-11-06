@@ -331,6 +331,11 @@ export function Siem() {
               <input name="siem_dlq_max" type="number" min={100} max={1000000} value={siem.dlq_max_per_dest}
                      onChange={(e) => change({ ...siem, dlq_max_per_dest: Number(e.target.value) })} />
             </label>
+            <label>{t("siem_dlq_retention_days")}
+              <input name="siem_dlq_retention_days" type="number" min={0} max={3650} value={siem.dlq_retention_days}
+                     onChange={(e) => change({ ...siem, dlq_retention_days: Number(e.target.value) })} />
+              <span className="hint">{t("siem_dlq_retention_hint")}</span>
+            </label>
             <label>{t("siem_backlog_warn")}
               <input name="siem_backlog_warn" type="number" min={1000} max={10000000} value={siem.backlog_warn_rows}
                      onChange={(e) => change({ ...siem, backlog_warn_rows: Number(e.target.value) })} />

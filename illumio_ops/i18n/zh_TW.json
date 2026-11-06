@@ -2838,5 +2838,18 @@
   "siem_sends_24h": "最近 24 小時：送出 {sent}，失敗 {failed}",
   "siem_sends_7d": "最近 7 天：送出 {sent}，失敗 {failed}",
   "siem_sends_hint": "送出：目的地收下的訊息數。失敗：目的地連不上時每次執行算一次，目的地拒收或無法格式化的訊息每筆算一次。以 10 分鐘為單位計算，所以每段期間最多會往前多算 10 分鐘。",
-  "siem_dlq_full_hint": "停在一筆放不進 DLQ 的紀錄（DLQ 已滿），之後的都不會送。重送或清除 DLQ 的訊息後會自動接續。"
+  "siem_dlq_full_hint": "停在一筆放不進 DLQ 的紀錄（DLQ 已滿），之後的都不會送。重送或清除 DLQ 的訊息後會自動接續。",
+  "siem_dlq_retention_days": "DLQ 訊息保留天數",
+  "siem_dlq_retention_hint": "移入 DLQ 超過這個天數的訊息每天清除一次。0 表示保留到重送或手動清除為止。",
+  "siem_dlq_filter_error": "錯誤包含",
+  "siem_dlq_filter_error_hint": "例如 refused: 413",
+  "siem_dlq_export_filtered": "匯出符合的訊息（JSON lines）",
+  "siem_dlq_none_match": "沒有錯誤包含這段文字的 DLQ 訊息。",
+  "siem_dlq_older_than": "移入超過（天）",
+  "siem_dlq_purge_older": "清除移入超過 {days} 天的訊息",
+  "siem_dlq_confirm_purge_older": "清除移入 DLQ 超過 {days} 天的所有訊息（上方所選的目的地）？清除後無法復原。",
+  "siem_dlq_show": "顯示完整內容",
+  "siem_dlq_cut": "（{n} 個字元中的前 300 個）",
+  "siem_dlq_full_line": "為目的地格式化後的完整訊息（{n} 個字元）；重送時送出的就是這一行。",
+  "siem_dlq_event_time": "事件時間"
 }
