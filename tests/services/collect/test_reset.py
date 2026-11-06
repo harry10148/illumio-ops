@@ -91,3 +91,40 @@ def test_a_switch_whose_reset_failed_is_finished_by_the_next_collector_run(tmp_p
         bound = binding.current(conn)
         assert bound is not None and bound.pce_url == "https://pce.example.com:8443"
         assert conn.execute("SELECT count(*) FROM events").fetchone()[0] == 0
+
+
+def test_every_app_db_table_naming_a_pce_moves_with_the_same_pce(tmp_path):
+    """Decision D3 (parity 2026-11-06): "the same PCE at a new address" keeps the data, so every app.sqlite table whose
+    rows name their PCE (a pce_url or pce_target column) is re-keyed — or cleared, for the PCE-derived ones. A new
+    table with such a column must be added to one of them."""
+    from illumio_ops.services.collect.reset import APP_DB_REKEYED
+    ctx = configured_ctx(tmp_path)
+    with ctx.db() as conn:
+        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        naming = {t for t in tables
+                  if {c[1] for c in conn.execute(f"PRAGMA table_info({t})")} & {"pce_url", "pce_target"}}
+    assert naming == set(APP_DB_REKEYED) | {"pce_probe"}  # the probe is forgotten: it is redone for the new address
+
+
+def test_a_rebind_between_the_check_and_the_reset_is_not_wiped(tmp_path, monkeypatch):
+    """A collector's finish_pending_switch reads the binding without the write lock. If the PCE page rebinds the store
+    to the same PCE's new address in between, the reset must see that under the lock and leave the data."""
+    from illumio_ops.services.collect import reset as reset_mod
+    from illumio_ops.store.flowdb.binding import Binding
+    ctx = configured_ctx(tmp_path)  # settings: https://pce.example.com:8443, org 1
+    with ctx.flows().connect() as conn:
+        binding.bind(conn, "https://pce.example.com:8443", "1", NOW)  # already rebound
+        conn.execute("INSERT INTO events (href, event_type, timestamp, raw_json, origin, ingested_at) "
+                     "VALUES ('/orgs/1/events/1', 'x', '2026-10-24T00:00:00Z', '{}', 'ingest', 'x')")
+        conn.commit()
+    real = binding.current
+    calls = []
+
+    def stale_first(conn):
+        calls.append(1)
+        return Binding("https://old-address.example.com:8443", "1", NOW) if len(calls) == 1 else real(conn)
+    monkeypatch.setattr(reset_mod.binding, "current", stale_first)
+    assert reset_mod.finish_pending_switch(ctx, now=NOW) is None
+    monkeypatch.setattr(reset_mod.binding, "current", real)
+    with ctx.flows().connect() as conn:
+        assert conn.execute("SELECT count(*) FROM events").fetchone()[0] == 1

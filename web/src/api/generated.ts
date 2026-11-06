@@ -2782,6 +2782,7 @@ api_key: string
 api_secret: string
 clear_write_key?: boolean
 console_url: (string | null)
+data_choice?: (("keep" | "clear") | null)
 deployment_type: DeploymentType
 events_timeout_seconds?: (number | null)
 org_id: string
@@ -2809,6 +2810,7 @@ api_secret: string
 console_url: (string | null)
 deployment_type: DeploymentType
 events_timeout_seconds: (number | null)
+kept_data?: boolean
 org_id: string
 reset: (PceReset | null)
 revision: number

@@ -85,3 +85,12 @@ def last_run(conn: sqlite3.Connection, schedule_id: int) -> sqlite3.Row | None:
 
 def prune_runs(conn: sqlite3.Connection, before: datetime) -> int:
     return conn.execute("DELETE FROM rule_schedule_runs WHERE at < ?", (before.isoformat(),)).rowcount
+
+
+def move_pce(conn: sqlite3.Connection, *, old_url: str, new_url: str, org_id: str) -> int:
+    """The same PCE moved to a new address (System › PCE connection, decision D3): its rows follow it."""
+    # OR IGNORE: a target already scheduled under the new address (the operator was there before) keeps that one.
+    n = conn.execute("UPDATE OR IGNORE rule_schedules SET pce_url = ? WHERE pce_url = ? AND org_id = ?",
+                     (new_url, old_url, org_id)).rowcount
+    conn.execute("UPDATE rule_schedule_runs SET pce_url = ? WHERE pce_url = ? AND org_id = ?", (new_url, old_url, org_id))
+    return int(n)

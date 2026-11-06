@@ -35741,6 +35741,22 @@
             ],
             "title": "Console Url"
           },
+          "data_choice": {
+            "anyOf": [
+              {
+                "enum": [
+                  "keep",
+                  "clear"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Data Choice"
+          },
           "deployment_type": {
             "$ref": "#/$defs/DeploymentType"
           },
@@ -35879,6 +35895,11 @@
               }
             ],
             "title": "Events Timeout Seconds"
+          },
+          "kept_data": {
+            "default": false,
+            "title": "Kept Data",
+            "type": "boolean"
           },
           "org_id": {
             "title": "Org Id",

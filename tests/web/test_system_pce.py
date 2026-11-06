@@ -257,3 +257,125 @@ def test_events_timeout_is_edited_on_the_pce_page(client, ctx):
     assert ctx.settings.current().pce.events_timeout_seconds is None
     r = _save(client, events_timeout_seconds=3)
     assert r.status_code == 400 and r.get_json()["error"]["field"] == "pce.events_timeout_seconds"
+
+
+# ── the same PCE at a new address (decision D3, parity 2026-11-06) ─────────────
+
+NEW = "https://pce-new.example.com:8443"
+WL = "/orgs/1/workloads/0b5f2c1e-1111-4222-8333-444455556666"
+
+
+def _stored_workload(ctx, href=WL):
+    from illumio_ops.store.flowdb import workloads
+    row = workloads.WorkloadRow(href=href, hostname="db01", name=None, managed=1, enforcement_mode="visibility_only",
+                                visibility_level=None, os_id=None, ven_version=None, ven_href=None, label_set=None,
+                                online=1, risk_exposure=None, risk_percent=None, risk_updated_at=None,
+                                fetched_at="2026-11-06T00:00:00+00:00")
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [row])
+
+
+def _alert_and_schedule(ctx, url):
+    from datetime import UTC, datetime
+
+    from illumio_ops.store import rule_schedules
+    from tests.web.test_shell_status import _alert
+    _alert(ctx, at=datetime.now(UTC), pce_url=url)
+    with ctx.db() as conn:
+        rule_schedules.create(conn, pce_url=url, org_id="1", href="/orgs/1/sec_policy/active/rule_sets/5",
+                              is_ruleset=True, name="rs", ruleset_name="rs", summary="", plan_json="{}", paused=False,
+                              pce_status="active", by="t", at=datetime.now(UTC))
+        conn.commit()
+
+
+def _workload_count(ctx):
+    with ctx.flows().connect() as conn:
+        return conn.execute("SELECT count(*) FROM workloads").fetchone()[0]
+
+
+def test_a_new_address_of_a_bound_store_asks_what_to_do(client, ctx):
+    login(client)
+    _save(client)
+    _bind(ctx)
+    r = _save(client, url=NEW, api_key="k2", api_secret="s2")
+    err = r.get_json()["error"]
+    assert r.status_code == 409 and err["code"] == "pce_target_needs_choice"
+    assert err["params"] == {"old": BASE, "new": NEW}
+    assert ctx.settings.current().pce.url == BASE and _bound(ctx) is not None
+
+
+@responses.activate
+def test_same_pce_at_a_new_address_keeps_the_data_once_verified(client, ctx):
+    responses.add_passthru("http://localhost")
+    login(client)
+    _save(client)
+    _bind(ctx)
+    _stored_workload(ctx)
+    _alert_and_schedule(ctx, BASE)
+    responses.add(responses.GET, f"{NEW}/api/v2{WL}", json={"href": WL, "hostname": "db01"})
+    r = _save(client, url=NEW, api_key="k2", api_secret="s2", data_choice="keep")
+    assert r.status_code == 200, r.get_json()
+    data = r.get_json()["data"]
+    assert data["reset"] is None and data["kept_data"] is True
+    assert ctx.settings.current().pce.url == NEW
+    assert _bound(ctx).pce_url == NEW and _workload_count(ctx) == 1
+    from illumio_ops.services import shell
+    from illumio_ops.store import rule_schedules
+    assert shell.status(ctx).unprocessed_alerts == 1  # the alert history follows the PCE
+    with ctx.db() as conn:
+        assert len(rule_schedules.list_for(conn, pce_url=NEW, org_id="1")) == 1
+
+
+@responses.activate
+def test_another_pce_at_the_new_address_is_refused_and_nothing_changes(client, ctx):
+    responses.add_passthru("http://localhost")
+    login(client)
+    _save(client)
+    _bind(ctx)
+    _stored_workload(ctx)
+    responses.add(responses.GET, f"{NEW}/api/v2{WL}", status=404)
+    r = _save(client, url=NEW, api_key="k2", api_secret="s2", data_choice="keep")
+    err = r.get_json()["error"]
+    assert r.status_code == 409 and err["code"] == "pce_not_the_same"
+    assert ctx.settings.current().pce.url == BASE and _bound(ctx).pce_url == BASE and _workload_count(ctx) == 1
+
+
+def test_keep_with_nothing_to_compare_is_refused(client, ctx):
+    login(client)
+    _save(client)
+    _bind(ctx)
+    r = _save(client, url=NEW, api_key="k2", api_secret="s2", data_choice="keep")
+    assert r.status_code == 409 and r.get_json()["error"]["code"] == "pce_same_unverifiable"
+    assert ctx.settings.current().pce.url == BASE
+
+
+def test_keep_is_not_offered_for_another_org(client, ctx):
+    login(client)
+    _save(client)
+    _bind(ctx)
+    r = _save(client, url=NEW, org_id="2", api_key="k2", api_secret="s2", data_choice="keep")
+    assert r.status_code == 400 and r.get_json()["error"]["code"] == "pce_keep_needs_same_org"
+
+
+def test_clear_choice_clears_as_before(client, ctx):
+    login(client)
+    _save(client)
+    _bind(ctx)
+    _stored_workload(ctx)
+    r = _save(client, url=NEW, api_key="k2", api_secret="s2", data_choice="clear")
+    assert r.status_code == 200 and r.get_json()["data"]["reset"] is not None
+    assert _bound(ctx) is None and _workload_count(ctx) == 0
+
+
+@responses.activate
+def test_a_new_address_that_refuses_the_key_cannot_be_verified(client, ctx):
+    responses.add_passthru("http://localhost")
+    login(client)
+    _save(client)
+    _bind(ctx)
+    _stored_workload(ctx)
+    responses.add(responses.GET, f"{NEW}/api/v2{WL}", status=401)
+    r = _save(client, url=NEW, api_key="k2", api_secret="s2", data_choice="keep")
+    err = r.get_json()["error"]
+    assert r.status_code == 409 and err["code"] == "pce_same_unverifiable" and err["params"] == {"reason": "HTTP 401"}
+    assert ctx.settings.current().pce.url == BASE

@@ -62,6 +62,7 @@ export function PceConnection() {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [resetNote, setResetNote] = useState<{ moved: string | null } | null>(null);
+  const [keptNote, setKeptNote] = useState(false);
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<ProbeRun | null>(null);
 
@@ -92,6 +93,11 @@ export function PceConnection() {
 
   async function save(e: FormEvent) {
     e.preventDefault();
+    await send(null);
+  }
+
+  /** choice: what to do with the collected data when only the address changes (asked by the server). */
+  async function send(choice: "keep" | "clear" | null) {
     if (!form || revision === null) return;
     setBusy(true);
     const verify_tls = form.tls === "bundle" ? form.ca_path : form.tls === "system";
@@ -108,6 +114,7 @@ export function PceConnection() {
       write_api_secret: form.clear_write_key ? "" : form.write_api_secret,
       clear_write_key: form.clear_write_key,
       events_timeout_seconds: form.events_timeout.trim() === "" ? null : Number(form.events_timeout.trim()),
+      data_choice: choice,
     });
     setBusy(false);
     if (env.ok && env.data) {
@@ -116,6 +123,7 @@ export function PceConnection() {
       setError(null);
       setSaved(true);
       setResetNote(env.data.reset ? { moved: env.data.reset.archive_moved_to } : null);
+      setKeptNote(Boolean(env.data.kept_data));
     } else {
       setError(env.error);
       setSaved(false);
@@ -238,7 +246,22 @@ export function PceConnection() {
             )}
           </div>
         )}
+        {error?.code === "pce_target_needs_choice" && (
+          <div className="notice span-all" role="alert" data-role="pce-data-choice">
+            <p>{t("pce_choice_intro", error.params)}</p>
+            <div className="actions">
+              <button type="button" className="btn-primary" disabled={busy} onClick={() => void send("keep")}>
+                {t("pce_choice_keep")}
+              </button>
+              <button type="button" className="btn-quiet" disabled={busy} onClick={() => void send("clear")}>
+                {t("pce_choice_clear")}
+              </button>
+            </div>
+            <p className="hint">{t("pce_choice_hint")}</p>
+          </div>
+        )}
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
+        {keptNote && <p className="notice" role="status">{t("pce_kept_notice")}</p>}
         {resetNote && (
           <p className="notice" role="status">
             {t("pce_reset_notice")}

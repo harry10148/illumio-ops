@@ -2843,5 +2843,15 @@
   "collection_maintenance_title": "已收集的資料",
   "retention_run_intro": "保留期清理每天執行一次，刪除超過上方保留天數的資料（開啟封存時，只刪已封存的日子）。縮短保留天數後可立即執行。",
   "btn_retention_run": "立即執行保留期清理",
-  "retention_run_queued": "已開始保留期清理，結果見「背景工作」的「保留期清理」。"
+  "retention_run_queued": "已開始保留期清理，結果見「背景工作」的「保留期清理」。",
+  "err_pce_target_needs_choice": "位址已變更，且已從 {old} 收集了資料。請在下方選擇 {new} 是否為同一台 PCE。",
+  "pce_choice_intro": "已從 {old} 收集了資料。{new} 是否為同一台 PCE 的新位址？",
+  "pce_choice_keep": "同一台 PCE：保留已收集的資料",
+  "pce_choice_clear": "另一台 PCE：清除已收集的資料",
+  "pce_choice_hint": "保留前會先確認：用上方的 API key 從新位址讀取幾台已儲存的 Workload，只有該 PCE 認得它們才會儲存；之後收集的資料、告警紀錄、規則排程與報表都歸新位址。清除會刪掉已收集的流量、事件與分析結果；設定、告警紀錄與報表保留，封存檔移到旁邊的資料夾。",
+  "pce_kept_notice": "已存為同一台 PCE 的新位址：已收集的資料、告警紀錄、規則排程與報表都歸它所有。",
+  "err_pce_not_the_same": "新位址的 PCE 不認得所檢查的 {n} 台已儲存 Workload，因此不是同一台 PCE。未儲存任何變更。請確認位址，或選擇「另一台 PCE」清除資料。",
+  "err_pce_same_nothing_to_compare": "尚未收集到此組織的任何 Workload，無法用已儲存的資料確認新位址。未儲存任何變更。請改選「另一台 PCE」。",
+  "err_pce_same_unverifiable": "無法確認新位址（{reason}）。未儲存任何變更。請檢查位址、TLS 設定與 API key 後再試一次。",
+  "err_pce_keep_needs_same_org": "只有同一個組織才能保留資料；組織 ID 已變更，代表這是另一台 PCE。"
 }

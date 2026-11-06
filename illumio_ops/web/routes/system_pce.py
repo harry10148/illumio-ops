@@ -2,17 +2,25 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from flask import Blueprint
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from illumio_ops.domain.values import DeploymentType, ProbeName
 from illumio_ops.pce.health import ProbeResult
 from illumio_ops.services import pce_health
-from illumio_ops.services.collect.reset import pce_target_changed, reset_for_new_pce
+from illumio_ops.services.collect import same_pce
+from illumio_ops.services.collect.guard import normalize_target
+from illumio_ops.services.collect.reset import (
+    move_to_new_address,
+    pce_target_changed,
+    reset_for_new_pce,
+)
+from illumio_ops.settings.schema import PceSettings
 from illumio_ops.settings.secrets import MASK, redact
+from illumio_ops.store.flowdb import binding
 from illumio_ops.store.flowdb.db import FlowDbBusy
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
@@ -47,6 +55,9 @@ class PceConnectionUpdate(BaseModel):
     clear_write_key: bool = False
     # Left out: unchanged (a client from before the field keeps the saved value); null: the default.
     events_timeout_seconds: int | None = None
+    # When only the address changes (same org) and data has been collected: "keep" — the same PCE at a new address,
+    # verified before anything is saved; "clear" — another PCE, its data cleared (decision D3, spec §6.4).
+    data_choice: Literal["keep", "clear"] | None = None
 
 
 class PceReset(BaseModel):
@@ -57,6 +68,8 @@ class PceReset(BaseModel):
 class PceConnectionSaved(PceConnection):
     # Set when the save pointed the product at another PCE and its collected data was cleared.
     reset: PceReset | None
+    # The same PCE at a new address: its data was kept and now belongs to the new address.
+    kept_data: bool = False
 
 
 class ProbeItem(BaseModel):
@@ -102,7 +115,7 @@ def get_connection() -> PceConnection:
 
 @api_route(bp, OP_UPDATE)
 def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
-    fields = body.model_dump(mode="json", exclude={"revision", "clear_write_key"})
+    fields = body.model_dump(mode="json", exclude={"revision", "clear_write_key", "data_choice"})
     if "events_timeout_seconds" not in body.model_fields_set:
         del fields["events_timeout_seconds"]
     # A blank or masked secret means "keep what is saved": the form never receives
@@ -132,6 +145,14 @@ def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
         d["pce"].update(fields)
 
     ctx = get_ctx()
+    if saved.url and _new_address_of_bound_store(saved, body):
+        if body.data_choice is None:
+            raise ApiFailure(409, "pce_target_needs_choice", "err_pce_target_needs_choice", field="url",
+                             params={"old": saved.url, "new": body.url.rstrip("/")})
+        if body.data_choice == "keep":
+            return _keep_for_new_address(body, saved, fields, mutate)
+    elif body.data_choice == "keep" and saved.url and other_pce:
+        raise ApiFailure(400, "pce_keep_needs_same_org", "err_pce_keep_needs_same_org", field="org_id")
     new = ctx.settings.update(body.revision, mutate).pce
     # Cleared only after the save succeeded: a rejected save must not cost the collected data.
     # In between, the collectors refuse to write (their database is still bound to the old PCE).
@@ -145,6 +166,46 @@ def update_connection(body: PceConnectionUpdate) -> PceConnectionSaved:
     elif other_pce:
         pce_health.forget(ctx)
     return PceConnectionSaved(**_view().model_dump(), reset=reset)
+
+
+def _bound() -> bool:
+    with get_ctx().flows().connect() as conn:
+        return binding.current(conn) is not None
+
+
+def _new_address_of_bound_store(saved: PceSettings, body: PceConnectionUpdate) -> bool:
+    """Only the address changes (same org) and data has been collected for the saved one: the operator says whether it
+    is the same PCE (keep) or another (clear)."""
+    old_url, old_org = normalize_target(saved.url, saved.org_id)
+    new_url, new_org = normalize_target(body.url, body.org_id)
+    return old_org == new_org and old_url != new_url and _bound()
+
+
+def _keep_for_new_address(body: PceConnectionUpdate, saved: PceSettings, fields: dict[str, Any],
+                          mutate: Any) -> PceConnectionSaved:
+    """Verify that the new address is the same PCE before anything is saved; then save and rebind in one hold of the
+    flow database's write lock, so no collector clears the data in between (finish_pending_switch re-checks)."""
+    ctx = get_ctx()
+    try:
+        candidate = PceSettings.model_validate({**saved.model_dump(mode="json"), **fields})
+    except ValidationError:
+        candidate = None  # the save below reports the field, nothing is verified or written
+    if candidate is not None:
+        try:
+            same_pce.verify(ctx, candidate)
+        except same_pce.NothingToCompare:
+            raise ApiFailure(409, "pce_same_unverifiable", "err_pce_same_nothing_to_compare") from None
+        except same_pce.Unverifiable as exc:
+            raise ApiFailure(409, "pce_same_unverifiable", "err_pce_same_unverifiable",
+                             params={"reason": exc.reason}) from None
+        except same_pce.NotTheSame as exc:
+            raise ApiFailure(409, "pce_not_the_same", "err_pce_not_the_same",
+                             params={"n": str(exc.asked)}) from None
+    fdb = ctx.flows()
+    with fdb.writing(fdb.generation) as conn:
+        new = ctx.settings.update(body.revision, mutate).pce
+        move_to_new_address(ctx, conn, saved, new, now=datetime.now(UTC))
+    return PceConnectionSaved(**_view().model_dump(), reset=None, kept_data=True)
 
 
 @api_route(bp, OP_PROBE)

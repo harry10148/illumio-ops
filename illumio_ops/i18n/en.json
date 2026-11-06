@@ -2843,5 +2843,15 @@
   "collection_maintenance_title": "Collected data",
   "retention_run_intro": "Retention clean-up runs once a day and deletes data older than the retention days above (with archiving on, only days already archived). Run it now after shortening a retention period.",
   "btn_retention_run": "Run retention clean-up now",
-  "retention_run_queued": "Retention clean-up started. Its result shows under Background jobs as Retention clean-up."
+  "retention_run_queued": "Retention clean-up started. Its result shows under Background jobs as Retention clean-up.",
+  "err_pce_target_needs_choice": "The address changed and data has been collected from {old}. Choose below whether {new} is the same PCE.",
+  "pce_choice_intro": "Data has been collected from {old}. Is {new} the same PCE at a new address?",
+  "pce_choice_keep": "Same PCE: keep the collected data",
+  "pce_choice_clear": "Another PCE: clear the collected data",
+  "pce_choice_hint": "Keeping is checked first: a few stored workloads are read from the new address with the API key above, and only if that PCE answers for them is anything saved; the data, alert history, rule schedules and reports then belong to the new address. Clearing removes the collected traffic, events and analysis; settings, alert history and reports stay, and archive files are moved aside.",
+  "pce_kept_notice": "Saved as the same PCE at a new address: the collected data, alert history, rule schedules and reports now belong to it.",
+  "err_pce_not_the_same": "The PCE at the new address knows none of the {n} stored workloads checked, so it is not the same PCE. Nothing was saved. Check the address, or choose “Another PCE” to clear the data.",
+  "err_pce_same_nothing_to_compare": "No workload of this organization has been collected yet, so the new address cannot be checked against stored data. Nothing was saved. Choose “Another PCE” instead.",
+  "err_pce_same_unverifiable": "The new address could not be checked ({reason}). Nothing was saved. Check the address, the TLS setting and the API key, then try again.",
+  "err_pce_keep_needs_same_org": "Data can be kept only for the same organization; the organization ID changed, so this is another PCE."
 }

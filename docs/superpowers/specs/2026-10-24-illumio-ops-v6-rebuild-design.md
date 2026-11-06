@@ -312,7 +312,14 @@ PCE 主控台沒有中文介面（原廠中文文件的截圖欄位也是英文�
 - **大量資料**（events、flows、聚合、封存）與**應用狀態**分開管理，清除、回填、換 PCE 都不碰設定與
   告警紀錄。實體上是兩個 DB 還是同庫分表，由 builder 決定。
 - 每種產出（報表檔、封存、快照、log）都有保留期限與清理機制，並列入同一份清單核對。
-- 換 PCE（url／org_id 改變）時清除所有衍生資料，清單只有一份。
+- 換 PCE（url／org_id 改變）時清除所有衍生資料，清單只有一份。【修訂 2026-11-06，parity 決策 D3】只改網址（org 不變）
+  且已收集過資料時，PCE 連線頁要操作者選：「另一台 PCE」照上面清除；「同一台 PCE 換了網址」則**先驗證再保留**——用讀取用
+  key 從新網址讀回幾台已儲存 workload 的 href（含 `/orgs/<org>/`），PCE 以同一 href 回答才算同一台；驗證不過（不認得、
+  沒有可比對的 workload、連不上或拒絕 key）一律拒絕且不存任何變更，並說明原因。驗證通過後，在 flow store 寫入鎖內
+  存設定並把 binding 改綁新網址（不清資料），app.sqlite 中以 `pce_url`／`pce_target` 標示所屬 PCE 的列（告警、
+  告警評估水位、竄改／偵測註記、隔離紀錄、SIEM 游標、規則排程與執行紀錄、報表）一起改到新網址，只有健康檢查結果
+  重做。收集器補完切換（finish_pending_switch）在鎖內重查 binding，不會把剛改綁的資料清掉。5.x 的 same-pce 選項
+  只搬 binding；v6 多做了驗證與其他表的搬移。
 - **流量資料的形狀**【判斷 修訂】：5.x 的 raw flows 只存 `raw_json`，無法做多維彙整。v6 的 flow store 要把
   分析會用到的維度存成可索引欄位：來源／目的的 workload href、IP、hostname、各 label key 的值、enforcement
   mode；port、協定、發起端與服務端的 process／使用者（§6.5.7）；reported policy decision、方向；`timestamp_range` 的首見／最後見；

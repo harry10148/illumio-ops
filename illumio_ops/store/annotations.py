@@ -21,3 +21,9 @@ def remove(conn: sqlite3.Connection, annotation_id: int, *, pce_url: str, org_id
 def for_pce(conn: sqlite3.Connection, pce_url: str, org_id: str) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM tamper_annotations WHERE pce_url = ? AND org_id = ? ORDER BY id",
                         (pce_url, org_id)).fetchall()
+
+
+def move_pce(conn: sqlite3.Connection, *, old_url: str, new_url: str, org_id: str) -> int:
+    """The same PCE moved to a new address (System › PCE connection, decision D3): its rows follow it."""
+    return int(conn.execute("UPDATE tamper_annotations SET pce_url = ? WHERE pce_url = ? AND org_id = ?",
+                            (new_url, old_url, org_id)).rowcount)

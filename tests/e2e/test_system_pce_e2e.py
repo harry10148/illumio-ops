@@ -91,3 +91,35 @@ def test_url_guidance_follows_the_deployment_type(context, live_app):
     expect(url_label).to_contain_text("illum.io")
     expect(url_label).not_to_contain_text("8443")
     assert console.get_attribute("placeholder") == "https://console.illum.io"
+
+
+def test_same_pce_at_a_new_address_keeps_the_data(context, live_app, fake_pce):
+    """Decision D3: 127.0.0.1 and localhost are one fake PCE at two addresses; the page asks, verifies and keeps."""
+    from datetime import UTC, datetime
+
+    from illumio_ops.store.flowdb import binding
+    from tests.web.test_system_pce import WL, _stored_workload
+
+    page = context.new_page()
+    _open_pce_page(page, live_app.url)
+    _fill_connection(page, fake_pce.url)
+    page.click("button[type=submit]")
+    page.wait_for_selector("text=Saved.")
+    ctx = live_app.ctx
+    with ctx.flows().connect() as conn:
+        binding.bind(conn, fake_pce.url, "1", datetime.now(UTC))
+    _stored_workload(ctx)
+    fake_pce.set(f"/api/v2{WL}", 200, {"href": WL})
+
+    moved = fake_pce.url.replace("127.0.0.1", "localhost")
+    _fill_connection(page, moved)
+    page.click("button[type=submit]")
+    choice = page.locator("[data-role=pce-data-choice]")
+    choice.wait_for()
+    assert moved in choice.inner_text()
+    choice.locator("text=Same PCE: keep the collected data").click()
+    page.wait_for_selector("text=Saved as the same PCE at a new address")
+    assert ctx.settings.current().pce.url == moved
+    with ctx.flows().connect() as conn:
+        assert binding.current(conn).pce_url == moved
+        assert conn.execute("SELECT count(*) FROM workloads").fetchone()[0] == 1
