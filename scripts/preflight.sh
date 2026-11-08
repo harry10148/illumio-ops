@@ -32,6 +32,8 @@ echo "illumio-ops preflight for $PREFIX"
 BUNDLE_VERSION="$(grep -oP '^__version__ = "\K[0-9.]+' "$BUNDLE_DIR/illumio_ops/__init__.py" 2>/dev/null || true)"
 if [[ -e "$PREFIX/illumio-ops.py" ]]; then
     pass "$PREFIX holds 5.x: install.sh upgrades it to v6 ${BUNDLE_VERSION} (the migration report comes first)"
+elif [[ -f "$PREFIX/config/settings.json" && ! -e "$PREFIX/illumio_ops" ]]; then
+    pass "$PREFIX holds the settings and data uninstall.sh kept: install.sh installs $BUNDLE_VERSION and uses them"
 elif [[ -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ]]; then
     INSTALLED="$(grep -oP '^__version__ = "\K[0-9.]+' "$PREFIX/illumio_ops/__init__.py" 2>/dev/null || true)"
     if [[ -z "$INSTALLED" || ! -f "$PREFIX/config/settings.json" ]]; then

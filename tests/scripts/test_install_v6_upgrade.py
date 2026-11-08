@@ -151,6 +151,9 @@ def test_uninstall_keeps_settings_and_data_and_a_reinstall_uses_them(bundle, v6)
     r = _uninstall(v6, "--yes")
     assert r.returncode == 0, r.stderr
     assert sorted(p.name for p in v6.iterdir()) == ["config", "data", "reports"]
+    r = _run("bash", bundle / "preflight.sh", "--prefix", v6)  # .135 2026-11-08: it called the kept state partial
+    prefix_line = r.stdout.splitlines()[1]  # the test bundle has no wheels: only what install.sh would do is checked
+    assert prefix_line.startswith("  PASS") and "settings and data uninstall.sh kept" in prefix_line, r.stdout
     r = _install(bundle, "--prefix", v6)
     assert r.returncode == 0, r.stderr
     assert "kept" in r.stdout and _version(v6) == __version__
