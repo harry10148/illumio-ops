@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.4.3] - 2026-11-09
+
+### Fixed
+
+- VEN compatibility (VEN status report): read from the PCE's compatibility report of each VEN
+  (`GET /vens/<id>/compatibility_report`: green, yellow, red). It was taken from workload `agent_health`, which carries
+  no compatibility entries on a real PCE (lab 26.2.20: empty on every host), so every host read "unknown". The
+  inventory reads the report once a day for each VEN not in Full, at most 200 per run; a host in Full reads "not
+  checked". A warning or fail names the checks the PCE did not pass, and the report's data notes give the oldest
+  report the PCE holds.
+
 ## [6.4.2] - 2026-11-08
 
 Found by testing on .106 and .135 (rescue, uninstall and reinstall) and by sampling the lab PCE's /health every minute.
