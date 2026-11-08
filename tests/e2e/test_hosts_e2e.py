@@ -121,7 +121,10 @@ def test_cut_answer_is_said(context, live_app):
     page.route("**/api/workbench/dimension", truncated)
     page.goto(f"{live_app.url}/hosts?key={DB}")
     expect(page.locator("[data-section=src_host] [data-role=caveat]").first).to_have_count(1)
-    page.unroute_all(behavior="wait")  # the other sections' answers are still being rewritten: not at browser close
+    # The other sections' answers may still be in the handler: let them finish, then drop the route without racing a
+    # fulfill (behavior="wait" could still collide with one: "Route is already handled", CI 2026-11-09).
+    page.wait_for_load_state("networkidle")
+    page.unroute_all(behavior="ignoreErrors")
 
 
 # ── the host page (UI redesign spec §4.4) ───────────────────────────────────
