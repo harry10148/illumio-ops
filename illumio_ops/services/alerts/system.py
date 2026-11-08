@@ -30,7 +30,11 @@ def system_facts(ctx: AppContext, *, since_gap_id: int, now: datetime) -> tuple[
     probe = None
     found = pce_health.latest(ctx)
     if found is not None and found[0] >= now - PROBE_FRESH:
-        probe = ProbeFact(found[0], tuple(r.name.value for r in found[1] if not r.ok))
+        failed = [r for r in found[1] if not r.ok]
+        why = failed[-1] if failed else None  # the first failing probe ends the run: it is the last one
+        probe = ProbeFact(found[0], tuple(r.name.value for r in failed), consecutive=pce_health.failing_streak(ctx),
+                          category=why.category if why else "", detail_key=why.detail_key if why else "",
+                          http_status=why.status if why else None, notes=why.notes if why else ())
     with ctx.flows().connect() as conn:
         gaps = ingest_state.gaps_after(conn, since_gap_id)
         newest = max([since_gap_id, *(g.id for g in gaps)])

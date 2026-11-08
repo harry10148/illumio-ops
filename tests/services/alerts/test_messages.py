@@ -3,7 +3,7 @@ import json
 from datetime import UTC, datetime, timedelta, timezone
 
 from illumio_ops.domain.values import ChannelKind, Language, Severity
-from illumio_ops.services.alerts.messages import AlertView, console_url, render
+from illumio_ops.services.alerts.messages import AlertView, console_url, render, summary
 
 NOW = datetime(2026, 10, 26, 4, 0, tzinfo=UTC)
 
@@ -129,3 +129,31 @@ def test_next_steps_go_with_the_alert_where_there_is_room():
     assert hook.payload["alerts"][0]["next_steps"] == [step]
     assert step in render([view()], ChannelKind.LINE, lang=Language.EN, tz=UTC, console_url=None).text
     assert step not in render([view(), view(2)], ChannelKind.LINE, lang=Language.EN, tz=UTC, console_url=None).text
+
+
+def _pce_health(params):
+    return AlertView(id=1, rule_name="", pack_key="rule_system_pce_health", severity=Severity.HIGH,
+                     subject_key="pce_health", fired_at=NOW, late=False, message_key="alert_system_pce_health",
+                     params=params, facts=params, confidence={})
+
+
+def test_pce_health_alert_says_what_the_pce_reported():
+    v = _pce_health({"failures": ["health"], "checked_at": NOW.isoformat(), "consecutive": 2, "category": "critical",
+                     "detail_key": "probe_health_bad", "http_status": 200,
+                     "notes": ["required service(s) are not running: database_monitor"]})
+    zh = summary(v, Language.ZH_TW)
+    assert "PCE 健康狀態" in zh and "health" not in zh.split("。")[0]  # the probe by name, not its id
+    assert "PCE 回報狀態為 critical" in zh and "database_monitor" in zh and "連續 2 次" in zh
+    en = summary(v, Language.EN)
+    assert "critical" in en and "database_monitor" in en and "2 checks in a row" in en
+
+
+def test_pce_health_alert_names_the_http_status_of_a_server_error():
+    v = _pce_health({"failures": ["noop"], "checked_at": NOW.isoformat(), "consecutive": 3,
+                     "category": "server_error", "detail_key": "probe_server_error", "http_status": 503, "notes": []})
+    assert "HTTP 503" in summary(v, Language.EN)
+
+
+def test_pce_health_alert_from_before_the_reasons_still_reads():
+    v = _pce_health({"failures": ["health"], "checked_at": NOW.isoformat()})
+    assert summary(v, Language.EN).startswith("The PCE health check failed: PCE health")

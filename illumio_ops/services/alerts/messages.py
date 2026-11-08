@@ -32,6 +32,12 @@ SEVERITY_KEYS: Mapping[Severity, str] = {
     Severity.CRITICAL: "severity_critical",
 }
 
+PROBE_NAME_KEYS: Mapping[str, str] = {
+    "noop": "probe_name_noop", "health": "probe_name_health", "node_available": "probe_name_node_available",
+}
+# The probe categories whose words carry no HTTP status of their own (pce.health DETAIL_KEYS).
+_PROBE_HTTP_UNSAID = ("server_error", "http_error")
+
 
 @dataclass(frozen=True)
 class Rendered:
@@ -119,6 +125,22 @@ def tamper_reading(v: AlertView, lang: Language) -> str | None:
     return translate(lang, "alert_tamper_confirmed", {"pattern": pattern})
 
 
+def pce_health_reading(v: AlertView, lang: Language) -> str | None:
+    """Why the PCE health check failed: the failing probe's words, what the PCE said, and how many checks in a row.
+    Alerts written before these were kept have none."""
+    p = v.params
+    if v.message_key != "alert_system_pce_health" or not p.get("detail_key"):
+        return None
+    parts = [translate(lang, str(p["detail_key"]), {"status": str(p.get("category") or "")})]
+    if p.get("category") in _PROBE_HTTP_UNSAID and p.get("http_status"):
+        parts[0] += f" (HTTP {p['http_status']})"
+    if p.get("notes"):
+        parts.append(translate(lang, "alert_pce_health_notes", {"notes": " / ".join(map(str, p["notes"]))}))
+    if p.get("consecutive"):
+        parts.append(translate(lang, "alert_pce_health_streak", {"n": str(p["consecutive"])}))
+    return " ".join(parts)
+
+
 def summary(v: AlertView, lang: Language) -> str:
     """The alert's one sentence: its message with the facts and parameters filled in (and a tampering alert's
     reading after it)."""
@@ -127,7 +149,10 @@ def summary(v: AlertView, lang: Language) -> str:
     total = v.params.get("hosts_total")
     if isinstance(hosts, list) and isinstance(total, int) and total > len(hosts):
         values["hosts"] = f"{_text_value(hosts)} (+{total - len(hosts)})"
-    reading = tamper_reading(v, lang)
+    if v.message_key == "alert_system_pce_health" and isinstance(v.params.get("failures"), list):
+        values["failures"] = ", ".join(translate(lang, PROBE_NAME_KEYS[f]) if f in PROBE_NAME_KEYS else str(f)
+                                       for f in v.params["failures"])
+    reading = tamper_reading(v, lang) or pce_health_reading(v, lang)
     text = translate(lang, v.message_key, values)
     return f"{text} {reading}" if reading else text
 

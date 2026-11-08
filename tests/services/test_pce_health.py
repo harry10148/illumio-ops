@@ -69,3 +69,32 @@ def test_latest_ignores_result_of_other_pce(tmp_path):
     assert pce_health.latest(ctx) is not None
     _configure(ctx, org_id="2")  # same host, another organization
     assert pce_health.latest(ctx) is None
+
+
+@responses.activate
+def test_failing_probes_are_counted_until_one_passes(tmp_path):
+    ctx = make_ctx(tmp_path)
+    _configure(ctx, deployment_type="saas")
+    for status in (401, 401, 204, 401, 401):
+        responses.add(responses.GET, f"{BASE}/api/v2/noop", status=status)
+    seen = []
+    for _ in range(4):
+        pce_health.run_probe(ctx)
+        seen.append(pce_health.failing_streak(ctx))
+    assert seen == [1, 2, 0, 1]
+    _configure(ctx, org_id="2")  # another PCE: its count starts again
+    assert pce_health.failing_streak(ctx) == 0
+    pce_health.run_probe(ctx)
+    assert pce_health.failing_streak(ctx) == 1
+
+
+@responses.activate
+def test_stored_result_keeps_the_pces_notes(tmp_path):
+    ctx = make_ctx(tmp_path)
+    _configure(ctx, deployment_type="on_prem")
+    responses.add(responses.GET, f"{BASE}/api/v2/noop", status=204)
+    responses.add(responses.GET, f"{BASE}/api/v2/health",
+                  json=[{"status": "critical", "notifications": [{"message": "database_monitor is down"}]}])
+    results = pce_health.run_probe(ctx)
+    assert results[-1].notes == ("database_monitor is down",)
+    assert pce_health.latest(ctx)[1] == results

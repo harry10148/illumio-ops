@@ -4,6 +4,7 @@ import responses
 from illumio_ops.domain.values import DeploymentType, ProbeName
 from illumio_ops.pce.client import PceClient
 from illumio_ops.pce.health import (
+    NOTE_CHARS,
     health_status_from_body,
     pce_probe_category,
     probe_pce,
@@ -102,3 +103,27 @@ def test_transport_error_becomes_probe_result():
     res = probe_pce(c, DeploymentType.ON_PREM)
     assert [(r.name, r.ok, r.status, r.category) for r in res] == [(ProbeName.NOOP, False, None, "refused")]
     assert res[0].detail_key
+
+
+DB_MONITOR = "The following required service(s) are not running in the cluster: database_monitor"
+
+
+@responses.activate
+def test_bad_health_keeps_what_the_pce_says_about_it():
+    # lab 2026-11-08: /health said critical for under two minutes and the alert could not say why
+    responses.add(responses.GET, NOOP, status=204)
+    responses.add(responses.GET, HEALTH, json=[
+        {"status": "critical", "notifications": [{"status": "warning", "token": "metrics", "message": DB_MONITOR}]},
+        {"status": "normal", "notifications": [{"status": "warning", "message": "x" * 1000}] * 9}])
+    res = probe_pce(_client(), DeploymentType.ON_PREM)
+    assert res[-1].category == "critical"
+    assert res[-1].notes[0] == DB_MONITOR
+    assert len(res[-1].notes) == 2 and len(res[-1].notes[1]) == NOTE_CHARS  # repeats once, cut to a bound
+
+
+@responses.activate
+def test_healthy_or_other_failures_carry_no_notes():
+    responses.add(responses.GET, NOOP, status=204)
+    responses.add(responses.GET, HEALTH, json=[{"status": "normal", "notifications": [{"message": "fyi"}]}])
+    responses.add(responses.GET, NODE, status=200)
+    assert all(r.notes == () for r in probe_pce(_client(), DeploymentType.ON_PREM))

@@ -1,4 +1,5 @@
 """Pure alert evaluation: thresholds, cooldown, throttle, and what each rule type fires on."""
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from illumio_ops.domain.alerting import (
@@ -312,11 +313,17 @@ def test_disk_low():
     assert not evaluate_system(system_rule(SystemCheck.DISK_LOW), facts(disk_free_bytes=10, disk_warn_bytes=10), now=NOW)
 
 
-def test_pce_health_from_probe():
-    f = facts(probe=ProbeFact(NOW, ("health",)))
-    [t] = evaluate_system(system_rule(SystemCheck.PCE_HEALTH), f, now=NOW)
-    assert t.params["failures"] == ["health"]
-    assert not evaluate_system(system_rule(SystemCheck.PCE_HEALTH), facts(probe=ProbeFact(NOW, ())), now=NOW)
+def test_pce_health_waits_for_a_second_failed_check_and_says_why():
+    # lab 2026-11-08: the PCE reported critical for under two minutes, 2-3 times a day; each one was a HIGH alert
+    rule = system_rule(SystemCheck.PCE_HEALTH)
+    once = ProbeFact(NOW, ("health",), consecutive=1, category="critical", detail_key="probe_health_bad",
+                     http_status=200, notes=("database_monitor is down",))
+    assert not evaluate_system(rule, facts(probe=once), now=NOW)
+    [t] = evaluate_system(rule, facts(probe=replace(once, consecutive=2)), now=NOW)
+    assert t.params == {"failures": ["health"], "checked_at": NOW.isoformat(), "consecutive": 2,
+                        "category": "critical", "detail_key": "probe_health_bad", "http_status": 200,
+                        "notes": ["database_monitor is down"]}
+    assert not evaluate_system(rule, facts(probe=ProbeFact(NOW, (), consecutive=0)), now=NOW)
 
 
 def test_rule_state_is_hashable_value():

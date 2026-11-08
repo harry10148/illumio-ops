@@ -13,6 +13,9 @@ from illumio_ops.domain.values import DeploymentType, ProbeName
 from illumio_ops.pce.client import PceClient, PceTransportError
 
 _HEALTH_BAD_ORDER = ("critical", "error", "degraded", "warning")
+# What a bad /health says about itself (its notifications), kept for the alert: a few, each cut to a bound.
+MAX_NOTES = 5
+NOTE_CHARS = 300
 
 # i18n keys for every category a probe can end in (literal strings: the dictionary gate reads them).
 DETAIL_KEYS: dict[str, str] = {
@@ -44,6 +47,7 @@ class ProbeResult:
     status: int | None
     category: str
     detail_key: str
+    notes: tuple[str, ...] = ()  # a bad /health's notifications, in the PCE's words
 
 
 def pce_probe_category(status: int) -> str:
@@ -77,8 +81,25 @@ def health_status_from_body(text: str) -> str:
     return ""
 
 
-def _result(name: ProbeName, status: int | None, category: str) -> ProbeResult:
-    return ProbeResult(name, category == "ok", status, category, DETAIL_KEYS[category])
+def health_notes_from_body(text: str) -> tuple[str, ...]:
+    """The notification messages of a /api/v2/health body (every node's), each once, at most MAX_NOTES."""
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return ()
+    nodes = data if isinstance(data, list) else [data]
+    out: list[str] = []
+    for node in nodes:
+        notes = node.get("notifications") if isinstance(node, dict) else None
+        for n in notes if isinstance(notes, list) else []:
+            message = " ".join(str(n.get("message") or "").split())[:NOTE_CHARS] if isinstance(n, dict) else ""
+            if message and message not in out:
+                out.append(message)
+    return tuple(out[:MAX_NOTES])
+
+
+def _result(name: ProbeName, status: int | None, category: str, notes: tuple[str, ...] = ()) -> ProbeResult:
+    return ProbeResult(name, category == "ok", status, category, DETAIL_KEYS[category], notes)
 
 
 def probe_pce(client: PceClient, deployment: DeploymentType) -> list[ProbeResult]:
@@ -94,13 +115,16 @@ def probe_pce(client: PceClient, deployment: DeploymentType) -> list[ProbeResult
             out.append(_result(name, None, exc.kind))
             return out
         category = pce_probe_category(r.status) if accepted is None else _endpoint_category(r.status, accepted)
+        notes: tuple[str, ...] = ()
         if category == "ok" and name is ProbeName.HEALTH:
-            body = health_status_from_body(r.body.decode("utf-8", errors="replace"))
+            text = r.body.decode("utf-8", errors="replace")
+            body = health_status_from_body(text)
             if body == "":
                 category = "health_unknown"
             elif body in _HEALTH_BAD_ORDER:
                 category = body
-        out.append(_result(name, r.status, category))
+                notes = health_notes_from_body(text)
+        out.append(_result(name, r.status, category, notes))
         if category != "ok" or deployment is DeploymentType.SAAS:
             return out
     return out

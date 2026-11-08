@@ -568,12 +568,18 @@ def test_pce_health_from_probe(ctx, monkeypatch):
     from illumio_ops.pce.health import ProbeResult
     from illumio_ops.services import pce_health
     now = datetime.now(UTC)
-    monkeypatch.setattr(pce_health, "latest", lambda c: (now, [ProbeResult(ProbeName.HEALTH, False, 503, "x", None)]))
+    monkeypatch.setattr(pce_health, "latest", lambda c: (now, [
+        ProbeResult(ProbeName.HEALTH, False, 200, "critical", "probe_health_bad", ("database_monitor is down",))]))
+    streak = iter([1, 2, 3])
+    monkeypatch.setattr(pce_health, "failing_streak", lambda c: next(streak))
+    assert evaluate_system(ctx, now=now).fired == 0  # one failed check is not reported
     evaluate_system(ctx, now=now)
     r = evaluate_system(ctx, now=now)
     assert r.fired == 0  # within the cooldown of the first run's alert
     rows = [x for x in _alerts(ctx) if x["subject_key"] == "pce_health"]
-    assert len(rows) == 1 and json.loads(rows[0]["params_json"])["failures"] == ["health"]
+    assert len(rows) == 1
+    params = json.loads(rows[0]["params_json"])
+    assert params["failures"] == ["health"] and params["notes"] == ["database_monitor is down"]
 
 
 def test_lateral_batches_do_not_skip_detections_sharing_an_update_time(ctx, monkeypatch):

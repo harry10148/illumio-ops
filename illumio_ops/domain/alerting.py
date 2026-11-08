@@ -46,6 +46,9 @@ EVIDENCE_ROWS = 200
 LATE_AFTER = timedelta(hours=2)
 # A source or job failing this many times in a row is reported (5.x's watchdog threshold).
 FAILURES_TO_REPORT = 3
+# The PCE health probe (every 5 minutes) failing this many times in a row is reported: a PCE reporting itself
+# unhealthy for a minute or two (lab 2026-11-08: a service restarting) is not.
+PROBE_FAILURES_TO_REPORT = 2
 
 EVENT_MESSAGE_KEYS: Mapping[ThresholdType, str] = {
     ThresholdType.IMMEDIATE: "alert_event_immediate", ThresholdType.COUNT: "alert_event_count",
@@ -194,6 +197,12 @@ class DetectionFact:
 class ProbeFact:
     checked_at: datetime
     failures: tuple[str, ...]  # the probes that did not pass
+    consecutive: int = 1       # failed probes in a row, ending with this one
+    # Why the failing probe failed: its category and i18n key (pce.health), the HTTP status, and the PCE's notes.
+    category: str = ""
+    detail_key: str = ""
+    http_status: int | None = None
+    notes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -425,10 +434,13 @@ def _gb(n: int) -> str:
 def evaluate_system(rule: SystemRule, facts: SystemFacts, *, now: datetime) -> list[Trigger]:
     check = rule.check
     if check is SystemCheck.PCE_HEALTH:
-        if facts.probe is None or not facts.probe.failures:
+        p = facts.probe
+        if p is None or not p.failures or p.consecutive < PROBE_FAILURES_TO_REPORT:
             return []
-        return [_system(rule, check.value, now, {"failures": list(facts.probe.failures),
-                                                 "checked_at": facts.probe.checked_at.isoformat()})]
+        return [_system(rule, check.value, now, {"failures": list(p.failures), "checked_at": p.checked_at.isoformat(),
+                                                 "consecutive": p.consecutive, "category": p.category,
+                                                 "detail_key": p.detail_key, "http_status": p.http_status,
+                                                 "notes": list(p.notes)})]
     if check is SystemCheck.COLLECTION_FAILING:
         return [_system(rule, f"{check.value}:{s.source}", now,
                         {"source": s.source, "failures": s.consecutive_failures, "error": s.last_error,
