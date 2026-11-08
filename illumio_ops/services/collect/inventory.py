@@ -10,7 +10,7 @@ import json
 import sqlite3
 import time
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from loguru import logger
@@ -38,6 +38,7 @@ from illumio_ops.store.flowdb import (
     ip_lists,
     policy_objects,
     ransomware,
+    ven_compat,
     workloads,
 )
 from illumio_ops.store.flowdb.db import (
@@ -52,6 +53,8 @@ from illumio_ops.store.flowdb.labels import label_set_id
 SOURCE = IngestSource.INVENTORY
 RISK_SOURCE = IngestSource.RANSOMWARE
 DEADLINE_SECONDS = 900
+COMPAT_EVERY = timedelta(hours=24)  # how often a VEN's compatibility report is read again
+COMPAT_PER_RUN = 200                # reports read per inventory run, oldest first: a large fleet spreads over runs
 
 
 def _ransomware(w: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -213,6 +216,53 @@ def _risk_details(client: PceClient, fdb: FlowDb, gen: int, rows: list[dict[str,
     return len(todo), fetched, failed
 
 
+def _compat_report(body: Any) -> tuple[str | None, tuple[str, ...], str | None]:
+    """(qualify status, the checks not green, when the PCE wrote it) from a compatibility report: each item of
+    results.qualify_tests names its check by its one key besides status (lab PCE 26.2.20)."""
+    if not isinstance(body, Mapping):
+        raise TypeError("compatibility report is not an object")
+    status = str(body.get("qualify_status") or "").strip().lower() or None
+    tests = _map(body.get("results")).get("qualify_tests")
+    issues: list[str] = []
+    for item in tests if isinstance(tests, list) else ():
+        if isinstance(item, Mapping) and str(item.get("status") or "green").strip().lower() != "green":
+            issues.extend(str(k) for k in item if k != "status")
+    return status, tuple(issues), _stamp(body.get("last_updated_at"))
+
+
+def _ven_compat(client: PceClient, fdb: FlowDb, gen: int, rows: list[dict[str, Any]],
+                at: datetime) -> tuple[int, int]:
+    """Read the compatibility report of each VEN not yet in Full whose report was last read COMPAT_EVERY ago or never,
+    at most COMPAT_PER_RUN, oldest first: (read, failed). The report answers whether a host can move to enforcement,
+    so a host in Full is not asked about. A VEN the PCE has no report for (404) is recorded as such; a failed read is
+    asked again on the next run."""
+    with fdb.connect() as conn:
+        held = ven_compat.fetched(conn)
+    due = db_time(at - COMPAT_EVERY)
+    vens = {str(v) for w in rows if w.get("enforcement_mode") != "full" and (v := _map(w.get("ven")).get("href"))}
+    todo = sorted((v for v in vens if held.get(v, "") <= due), key=lambda v: (held.get(v, ""), v))[:COMPAT_PER_RUN]
+    read = failed = 0
+    for href in todo:
+        try:
+            resp = client.request("GET", f"{href}/compatibility_report", org_scoped=False, timeout=60,
+                                  deadline=_deadline())
+            if resp.status == 404:
+                report: tuple[str | None, tuple[str, ...], str | None] = (None, (), None)
+            elif resp.status == 200:
+                report = _compat_report(resp.json())
+            else:
+                failed += 1
+                continue
+        except (*PCE_FAILURES, ValueError, TypeError) as exc:  # ValueError, TypeError: an unreadable body
+            failed += 1
+            logger.warning("compatibility report of a VEN could not be read: {}", exc)
+            continue
+        with fdb.writing(gen) as conn:
+            ven_compat.record(conn, href, qualify_status=report[0], issues=report[1], report_at=report[2], at=at)
+        read += 1
+    return read, failed
+
+
 @drops_stale
 def run_inventory_cycle(ctx: AppContext, *, now: datetime | None = None) -> CycleResult:
     gen = ctx.flows().generation  # noted before the settings it goes with (FlowDb.generation)
@@ -262,6 +312,7 @@ def _inventory(ctx: AppContext, client: PceClient, pce: PceSettings, fdb: FlowDb
             with transaction(conn):
                 workloads.replace_inventory(conn, [_row(conn, w, stamp) for w in rows])
                 ransomware.prune_missing(conn, (str(w["href"]) for w in rows))
+                ven_compat.prune_missing(conn, (str(v) for w in rows if (v := _map(w.get("ven")).get("href"))))
                 for name, state in detect_from_workloads(rows).items():
                     capabilities.record(conn, name, state, None, at)
                 ingest_state.mark_ok(conn, SOURCE, at, watermark=None, rows=len(rows))
@@ -282,6 +333,13 @@ def _inventory(ctx: AppContext, client: PceClient, pce: PceSettings, fdb: FlowDb
                     ingest_state.mark_failed(conn, RISK_SOURCE, at, "; ".join(problems))
                 else:
                     ingest_state.mark_ok(conn, RISK_SOURCE, at, watermark=None, rows=fetched)
+        try:
+            read, failed = _ven_compat(client, fdb, gen, rows, at)
+        except sqlite3.Error as exc:
+            logger.warning("VEN compatibility could not be stored: {}", exc)
+        else:
+            if failed:
+                logger.warning("compatibility reports: {} read, {} failed (asked again on the next run)", read, failed)
     with fdb.writing(gen) as conn:
         workloads.snapshot_day(conn, day)
         ransomware.snapshot_day(conn, day)

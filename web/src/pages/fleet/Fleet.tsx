@@ -1,4 +1,4 @@
-// VEN fleet (spec §6.5 「VEN 車隊總覽」「VEN enforcement 推進」「心跳加速」, deferred to v6.1 and built now): the managed
+// VEN fleet (spec §6.5 「VEN 總覽」「VEN enforcement 推進」「心跳加速」, deferred to v6.1 and built now): the managed
 // hosts the inventory holds, counted and listed; the chosen ones moved forward to a target mode, or asked to report
 // traffic faster, through the write key after a preview; and what was done.
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";

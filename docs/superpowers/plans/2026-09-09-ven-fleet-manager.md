@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 VEN 車隊分析（版本／compat／進程管線／coverage gaps／health score）接進既有 ven_summary 排程、新 GUI 頁 `#/investigate/fleet` 與 VEN 狀態報表，並提供兩段式（preview→apply）批次推進 enforcement_mode。
+**Goal:** 把 VEN 總覽分析（版本／compat／進程管線／coverage gaps／health score）接進既有 ven_summary 排程、新 GUI 頁 `#/investigate/fleet` 與 VEN 狀態報表，並提供兩段式（preview→apply）批次推進 enforcement_mode。
 
 **Architecture:** 一個純函式模組 `src/report/analysis/fleet.py` 產出 fleet dict；`run_ven_summary` 在既有那一次 `fetch_managed_workloads` 後呼叫它寫進 `dashboard_summary.json["fleet"]`；GUI 與報表都只讀這個 dict。寫入 PCE 只在 `POST /api/fleet/progress/apply`，走 `PUT /workloads/bulk_update`，逐筆結果落 `config/fleet_progressions.json`（含 previous_mode，可還原）。
 

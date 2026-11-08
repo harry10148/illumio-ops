@@ -7,7 +7,7 @@
 
 ## 0. 背景與範圍
 
-illumio-plugger（alexgoller）的 ven-fleet-manager 提供 VEN 車隊層級視角：版本分布、compat 檢查、
+illumio-plugger（alexgoller）的 ven-fleet-manager 提供 VEN 總覽層級視角：版本分布、compat 檢查、
 enforcement 進程管線、coverage gaps、fleet health score，以及唯一的寫入功能 batch_progress（批次
 推進 enforcement_mode）。本專案已有 VEN 狀態報表（`src/report/ven_status_generator.py`）與儀表板
 `ven_summary`（`src/scheduler/jobs.py:run_ven_summary`），缺 compat 四態、管線、score、gaps、批次推進。
@@ -148,7 +148,7 @@ fleet health score（含 partial 註記與缺分量）、coverage gaps。表格�
 
 ## 7. 錯誤處理
 
-- 快照缺 `fleet` 鍵（job 尚未跑）：GUI 顯示「尚無車隊快照，下次排程時間 T」，不顯示 0。
+- 快照缺 `fleet` 鍵（job 尚未跑）：GUI 顯示「尚無 VEN 總覽快照，下次排程時間 T」，不顯示 0。
 - `fleet.last_error` 存在：頁首 tone=warn 條顯示上次成功時間與錯誤。
 - apply 部分失敗：回 200 含 failed 清單，紀錄逐筆狀態；GUI 列出失敗原因。
 - bulk_update 非 2xx：整批 failed，紀錄 http 與 body 前 500 字。

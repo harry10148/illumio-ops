@@ -1,4 +1,4 @@
-"""VEN fleet overview (spec §6.5 「VEN 車隊總覽」, deferred to v6.1 and built now): the managed-workload inventory the
+"""VEN fleet overview (spec §6.5 「VEN 總覽」, deferred to v6.1 and built now): the managed-workload inventory the
 store holds, counted by enforcement mode, VEN version, operating system, online state and policy sync, and a host
 list filtered by mode, environment label and online state. Online and sync use the VEN status report's own
 definitions (services.reports.ven_status), so the page and the report give the same numbers. Read-only: the

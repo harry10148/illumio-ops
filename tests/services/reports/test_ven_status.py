@@ -9,7 +9,7 @@ from illumio_ops.domain.report import TableBlock, TextBlock
 from illumio_ops.domain.values import Language, ReportType
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.reports.render_html import render_html
-from illumio_ops.store.flowdb import analysis, labels, workloads
+from illumio_ops.store.flowdb import analysis, labels, ven_compat, workloads
 from illumio_ops.store.flowdb.db import db_time
 from tests.services.collect.conftest import configured_ctx
 
@@ -18,9 +18,11 @@ START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=U
 
 
 def host(name, *, online=1, hb=timedelta(minutes=5), sync="applied", fw=1, received=None, applied=None,
-         health=None, mode="full", version="26.2.20", os_id="ubuntu", status="active", app="Web", env="Prod"):
+         health=None, mode="full", version="26.2.20", os_id="ubuntu", status="active", app="Web", env="Prod",
+         compat=None):
     return {"name": name, "online": online, "hb": hb, "sync": sync, "fw": fw, "received": received, "applied": applied, "health": health,
-                "mode": mode, "version": version, "os_id": os_id, "status": status, "app": app, "env": env}
+                "mode": mode, "version": version, "os_id": os_id, "status": status, "app": app, "env": env,
+                "compat": compat}
 
 
 def _inventory(ctx, hosts, read_at=NOW):
@@ -32,13 +34,18 @@ def _inventory(ctx, hosts, read_at=NOW):
             rows.append(workloads.WorkloadRow(
                 href=f"/orgs/1/workloads/{h['name']}", hostname=h["name"], name=None, managed=1,
                 enforcement_mode=h["mode"], visibility_level=None, os_id=h["os_id"], ven_version=h["version"],
-                ven_href=None, label_set=labels.label_set_id(conn, (("app", h["app"]), ("env", h["env"]))),
+                ven_href=f"/orgs/1/vens/{h['name']}", label_set=labels.label_set_id(conn, (("app", h["app"]), ("env", h["env"]))),
                 online=h["online"], risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at=db_time(read_at),
                 agent_status=h["status"], last_heartbeat_at=None if h["hb"] is None else db_time(read_at - h["hb"]),
                 policy_sync_state=h["sync"], policy_received_at=None if h["status"] is None else db_time(received),
                 policy_applied_at=None if h["status"] is None else db_time(applied), managed_since=None,
                 fw_config_current=h["fw"], agent_health_json=json.dumps(h["health"]) if h["health"] else None))
         workloads.replace_inventory(conn, rows)
+        for h in hosts:
+            if h["compat"] is not None:  # (qualify_status, issues, report_at)
+                status, issues, report_at = h["compat"]
+                ven_compat.record(conn, f"/orgs/1/vens/{h['name']}", qualify_status=status, issues=issues,
+                                  report_at=report_at, at=read_at)
         conn.commit()
 
 
@@ -140,29 +147,52 @@ def test_zh_tw_builds(ctx):
     assert _build(ctx, Language.ZH_TW).title
 
 
-def test_compat_state_four_states():
-    """5.x analysis/fleet.compat_state: only VEN health entries about compatibility count; none reported is unknown."""
+def test_compat_state_from_the_pces_compatibility_report():
+    """The PCE's VEN compatibility report (GET /vens/<id>/compatibility_report, lab 26.2.20): green, yellow, red.
+    Workload agent_health carries no compatibility entries on a real PCE, so it is not read. A host already in Full is
+    not checked (the report answers whether a host can move to enforcement)."""
     from illumio_ops.services.reports.ven_status import compat_state
-    assert compat_state(None) == "unknown"
-    assert compat_state(json.dumps([{"type": "agent.missing_heartbeats", "severity": "error"}])) == "unknown"
-    assert compat_state(json.dumps([{"type": "workload_compatibility", "severity": "info"}])) == "pass"
-    assert compat_state(json.dumps([{"type": "Compatibility.report", "severity": "Warning"}])) == "warn"
-    assert compat_state(json.dumps([{"type": "compatibility", "severity": "warning"},
-                                    {"type": "compatibility", "severity": "err"}])) == "fail"
-    assert compat_state("not json") == "unknown"
+    from illumio_ops.store.flowdb.ven_compat import VenCompat
+
+    def row(status):
+        return VenCompat("/orgs/1/vens/v", status, (), None, "2026-10-27T00:00:00.000000Z")
+    assert compat_state(row("green"), "idle") == "pass"
+    assert compat_state(row("Yellow"), "selective") == "warn"
+    assert compat_state(row("red"), "visibility_only") == "fail"
+    assert compat_state(row(None), "idle") == "unknown"  # the PCE has no report for this VEN
+    assert compat_state(row("purple"), "idle") == "unknown"
+    assert compat_state(None, "idle") == "unknown"  # not read yet
+    assert compat_state(row("red"), "full") == "na"
+    assert compat_state(None, "full") == "na"
 
 
 def test_online_list_and_compat_tally(ctx):
-    _inventory(ctx, [host("b-on", health=[{"type": "compatibility", "severity": "warning"}], mode="idle"),
-                     host("a-on", version="25.2.1"),
-                     host("off", online=0, hb=timedelta(hours=5), health=[{"type": "compatibility", "severity": "error"}])])
+    _inventory(ctx, [host("b-on", mode="idle", compat=("yellow", ("ipv4_forwarding_enabled", "iptables_rule_cnt"),
+                                                         db_time(NOW - timedelta(days=40)))),
+                     host("a-on", version="25.2.1", mode="selective"),
+                     host("c-on", version="25.2.1"),
+                     host("off", online=0, hb=timedelta(hours=5), mode="selective",
+                          compat=("red", ("required_packages_installed",), db_time(NOW - timedelta(days=1))))])
     doc = _build(ctx)
     online = _table(doc, "online")
-    assert [r[0] for r in online.rows] == ["a-on", "b-on"] and online.total_rows == 2
+    assert [r[0] for r in online.rows] == ["a-on", "b-on", "c-on"] and online.total_rows == 3
     cols = [c.key for c in online.columns]
     assert len(cols) < 9  # stays a portrait table
     row = dict(zip(cols, online.rows[1], strict=True))
-    assert row["app"] == "Web (Prod)" and row["version"] == "26.2.20" and row["compat"] == "Warning"
+    assert row["app"] == "Web (Prod)" and row["version"] == "26.2.20"
+    assert row["compat"] == "Warning (ipv4_forwarding_enabled, iptables_rule_cnt)"  # says which checks
     assert row["mode"] == "Idle"
+    assert dict(zip(cols, online.rows[0], strict=True))["compat"] == "Unknown"
+    assert dict(zip(cols, online.rows[2], strict=True))["compat"] == "Not checked (Full)"
     tally = {r[0]: r[1] for r in _table(doc, "online", 1).rows}
-    assert tally == {"Pass": 0, "Warning": 1, "Fail": 1, "Unknown": 1}
+    assert tally == {"Pass": 0, "Warning": 1, "Fail": 1, "Unknown": 1, "Not checked (Full)": 1}
+    quality = " ".join(doc.data_quality)
+    assert "compatibility report" in quality and "1 hosts" in quality
+    assert "2026-09-17" in quality  # the oldest report the PCE holds, so a stale one is visible
+
+
+def test_compat_issues_beyond_three_are_counted(ctx):
+    _inventory(ctx, [host("h", mode="idle", compat=("yellow", ("a", "b", "c", "d", "e"), None))])
+    row = dict(zip([c.key for c in _table(_build(ctx), "online").columns], _table(_build(ctx), "online").rows[0],
+                   strict=True))
+    assert row["compat"] == "Warning (a, b, c +2)"

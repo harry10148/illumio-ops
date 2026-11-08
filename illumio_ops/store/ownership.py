@@ -55,6 +55,7 @@ TABLE_OWNERS: dict[str, str] = {
     "workload_snapshot_daily": "illumio_ops.store.flowdb.workloads",
     "ransomware_services": "illumio_ops.store.flowdb.ransomware",
     "ransomware_fetch": "illumio_ops.store.flowdb.ransomware",
+    "ven_compat": "illumio_ops.store.flowdb.ven_compat",
     "ransomware_snapshot_daily": "illumio_ops.store.flowdb.ransomware",
     "org_risk_snapshot_daily": "illumio_ops.store.flowdb.ransomware",
     "pce_capabilities": "illumio_ops.store.flowdb.capabilities",

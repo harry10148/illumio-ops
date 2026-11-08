@@ -11,7 +11,7 @@ FLOWDB_TABLES = {
     "pce_binding", "ingest_state", "ingest_gaps", "label_sets", "label_set_members", "flows",
     "flow_rollup_daily", "rollup_state", "connection_baseline", "user_baseline", "events", "workloads",
     "workload_snapshot_daily", "ransomware_services", "ransomware_snapshot_daily",
-    "org_risk_snapshot_daily", "pce_capabilities", "archive_log",
+    "org_risk_snapshot_daily", "pce_capabilities", "archive_log", "ven_compat",
 }
 
 
@@ -24,7 +24,7 @@ def test_flowdb_migrates_on_first_connect(tmp_path):
     fdb = FlowDb(tmp_path / "data" / "flows.sqlite")
     with fdb.connect() as conn:
         assert FLOWDB_TABLES <= _tables(conn)
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 15
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 16
         assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
 
 

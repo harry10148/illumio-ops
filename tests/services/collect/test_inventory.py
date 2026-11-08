@@ -277,3 +277,113 @@ def test_a_policy_object_failure_matches_nothing_until_the_next_read(tmp_path):
         assert po.label_groups(conn, ["/orgs/1/sec_policy/active/label_groups/a"]) == {
             "/orgs/1/sec_policy/active/label_groups/a": ("env", frozenset())}
         assert ingest_state.get(conn, IngestSource.INVENTORY).last_error is None
+
+
+VENS = f"{API}/orgs/1/vens"
+
+
+def _compat_report(status="yellow", updated="2026-11-08T15:04:55.203Z"):
+    """The shape the lab PCE 26.2.20 returns from GET /vens/<id>/compatibility_report."""
+    return {"last_updated_at": updated, "qualify_status": status, "results": {"qualify_tests": [
+        {"required_packages": ["openssl", "ipset"]}, {"required_packages_installed": True, "status": "green"},
+        {"required_packages_missing": []}, {"ipv4_forwarding_enabled": "true", "status": status},
+        {"iptables_rule_cnt": 87, "status": status}, {"routing_table_conflict": "false", "status": "green"}]}}
+
+
+def _compat_calls():
+    return [c for c in responses.calls if c.request.url.endswith("/compatibility_report")]
+
+
+def _compat_rows(ctx):
+    from illumio_ops.store.flowdb import ven_compat
+    with ctx.flows().connect() as conn:
+        return ven_compat.by_ven(conn)
+
+
+def _two_hosts():
+    w1, w2 = _workload(1, risk=None), _workload(2, risk=None)
+    w2["enforcement_mode"] = "full"
+    return [w1, w2]
+
+
+@responses.activate
+def test_ven_compatibility_read_for_vens_not_in_full(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=_two_hosts())
+    responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
+    responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", json=_compat_report())
+    run_inventory_cycle(ctx, now=NOW)
+    assert [c.request.url for c in _compat_calls()] == [f"{VENS}/v-1/compatibility_report"]  # v-2 is in Full
+    got = _compat_rows(ctx)["/orgs/1/vens/v-1"]
+    assert got.qualify_status == "yellow"
+    assert got.issues == ("ipv4_forwarding_enabled", "iptables_rule_cnt")
+    assert got.report_at is not None and got.report_at.startswith("2026-11-08T15:04:55")
+
+
+@responses.activate
+def test_ven_compatibility_read_once_a_day(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=_two_hosts())
+    responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
+    responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", json=_compat_report())
+    run_inventory_cycle(ctx, now=NOW)
+    run_inventory_cycle(ctx, now=NOW + timedelta(hours=2))
+    assert len(_compat_calls()) == 1
+    run_inventory_cycle(ctx, now=NOW + timedelta(hours=25))
+    assert len(_compat_calls()) == 2
+
+
+@responses.activate
+def test_ven_without_a_report_is_recorded_and_a_failed_read_retried(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    w1, w2 = _workload(1, risk=None), _workload(2, risk=None)
+    responses.add(responses.GET, WL, json=[w1, w2])
+    responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
+    responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", status=404, json={"status": 404})
+    responses.add(responses.GET, f"{VENS}/v-2/compatibility_report", status=500, json={})
+    result = run_inventory_cycle(ctx, now=NOW)
+    assert result.rows == 2  # the inventory itself is unaffected
+    rows = _compat_rows(ctx)
+    assert rows["/orgs/1/vens/v-1"].qualify_status is None  # the PCE has none: not asked again today
+    assert "/orgs/1/vens/v-2" not in rows  # a failure is asked again on the next run
+    run_inventory_cycle(ctx, now=NOW + timedelta(hours=1))
+    assert [c.request.url.rsplit("/", 2)[-2] for c in _compat_calls()] == ["v-1", "v-2", "v-2"]
+
+
+@responses.activate
+def test_ven_compatibility_reads_at_most_a_batch_per_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(inventory, "COMPAT_PER_RUN", 2)
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(i, risk=None) for i in range(1, 6)])
+    responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
+    for i in range(1, 6):
+        responses.add(responses.GET, f"{VENS}/v-{i}/compatibility_report", json=_compat_report("green"))
+    run_inventory_cycle(ctx, now=NOW)
+    assert len(_compat_calls()) == 2
+    run_inventory_cycle(ctx, now=NOW + timedelta(hours=1))
+    run_inventory_cycle(ctx, now=NOW + timedelta(hours=2))
+    assert len(_compat_rows(ctx)) == 5  # the rest follow on the next runs
+
+
+@responses.activate
+def test_ven_compatibility_of_a_ven_that_left_is_dropped(tmp_path):
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
+    responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
+    responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", json=_compat_report())
+    run_inventory_cycle(ctx, now=NOW)
+    responses.replace(responses.GET, WL, json=[])
+    run_inventory_cycle(ctx, now=NOW + timedelta(hours=1))
+    assert _compat_rows(ctx) == {}
+
+
+@responses.activate
+def test_an_empty_compatibility_report_reads_as_none(tmp_path):
+    """The NFR SaaS (2026-11-09) answers 200 with {} for a host in Selective."""
+    ctx = configured_ctx(tmp_path)
+    responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
+    responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
+    responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", json={})
+    run_inventory_cycle(ctx, now=NOW)
+    got = _compat_rows(ctx)["/orgs/1/vens/v-1"]
+    assert (got.qualify_status, got.issues, got.report_at) == (None, (), None)

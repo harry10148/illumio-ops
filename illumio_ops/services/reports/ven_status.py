@@ -25,7 +25,8 @@ from illumio_ops.services.reports.common import tr
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
-from illumio_ops.store.flowdb import analysis, labels, workloads
+from illumio_ops.store.flowdb import analysis, labels, ven_compat, workloads
+from illumio_ops.store.flowdb.ven_compat import VenCompat
 from illumio_ops.store.flowdb.workloads import WorkloadRow
 
 ONLINE_WITHIN = timedelta(hours=1)
@@ -40,11 +41,11 @@ _BUCKET_KEYS = {"lost_24h": "rpt_ven_bucket_24h", "lost_48h": "rpt_ven_bucket_48
                 "long_offline": "rpt_ven_bucket_long"}
 _MODE_KEYS = {"full": "rpt_col_mode_full", "selective": "rpt_col_mode_selective",
               "visibility_only": "rpt_col_mode_visibility", "idle": "rpt_col_mode_idle"}
-COMPAT_STATES = ("pass", "warn", "fail", "unknown")
+COMPAT_STATES = ("pass", "warn", "fail", "unknown", "na")
 _COMPAT_KEYS = {"pass": "rpt_ven_compat_pass", "warn": "rpt_ven_compat_warn", "fail": "rpt_ven_compat_fail",
-                "unknown": "rpt_ven_compat_unknown"}
-_ERROR_SEVERITIES = frozenset({"err", "error", "critical"})
-_WARN_SEVERITIES = frozenset({"warn", "warning"})
+                "unknown": "rpt_ven_compat_unknown", "na": "rpt_ven_compat_na"}
+_QUALIFY = {"green": "pass", "yellow": "warn", "red": "fail"}
+COMPAT_ISSUES_SHOWN = 3
 _PROBLEM_KEYS = {"sync_state": "rpt_ven_problem_sync_state", "fw_stale": "rpt_ven_problem_fw_stale",
                  "behind": "rpt_ven_problem_behind", "never_applied": "rpt_ven_problem_never_applied",
                  "health": "rpt_ven_problem_health"}
@@ -87,19 +88,14 @@ def problems(w: WorkloadRow) -> list[str]:
     return out
 
 
-def compat_state(agent_health_json: str | None) -> str:
-    """5.x analysis/fleet.compat_state: pass, warn, fail or unknown from the VEN health entries whose type names
-    compatibility (other health signals do not answer whether the host can move to enforcement); none: unknown."""
-    try:
-        health: Any = json.loads(agent_health_json) if agent_health_json else []
-    except ValueError:
-        return "unknown"
-    items = [h for h in health if isinstance(h, Mapping) and "compatibility" in str(h.get("type") or "").lower()] \
-        if isinstance(health, list) else []
-    if not items:
-        return "unknown"
-    levels = {str(h.get("severity") or "").lower() for h in items}
-    return "fail" if levels & _ERROR_SEVERITIES else "warn" if levels & _WARN_SEVERITIES else "pass"
+def compat_state(report: VenCompat | None, mode: str | None) -> str:
+    """pass, warn or fail from the qualify status of the PCE's compatibility report (green, yellow, red); unknown when
+    the PCE has none or it was not read yet; na for a host already in Full (the report answers whether a host can move
+    to enforcement, and the collector does not ask about one in Full)."""
+    if mode == "full":
+        return "na"
+    status = (report.qualify_status or "").lower() if report is not None else ""
+    return _QUALIFY.get(status, "unknown")
 
 
 def build_ven_status(inp: BuildInput) -> ReportDocument:
@@ -113,6 +109,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     with reads.reading(inp.ctx) as conn:
         fleet = [w for w in workloads.all_workloads(conn) if w.managed]
         sets = labels.label_sets(conn, {w.label_set for w in fleet if w.label_set is not None})
+        reports = ven_compat.by_ven(conn)
         tamper_row = analysis.read_result(conn, "tamper")
         computed_at, run_error = reads.analysis_state(conn, "tamper")
     name = {w.href: w.hostname or w.href.rsplit("/", 1)[-1] for w in fleet}
@@ -149,7 +146,17 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     def app_env(w: WorkloadRow) -> str:
         lab = sets.get(w.label_set, {}) if w.label_set is not None else {}
         return f"{lab.get('app') or no_label} ({lab.get(env_key) or no_label})"
-    compat = {w.href: compat_state(w.agent_health_json) for w in fleet}
+    report_of = {w.href: reports.get(w.ven_href) if w.ven_href else None for w in fleet}
+    compat = {w.href: compat_state(report_of[w.href], w.enforcement_mode) for w in fleet}
+
+    def compat_cell(w: WorkloadRow) -> str:
+        state, report = t(_COMPAT_KEYS[compat[w.href]]), report_of[w.href]
+        issues = report.issues if report is not None and compat[w.href] in ("warn", "fail") else ()
+        if not issues:
+            return state
+        shown = ", ".join(issues[:COMPAT_ISSUES_SHOWN])
+        more = len(issues) - COMPAT_ISSUES_SHOWN
+        return t("rpt_ven_compat_issues", state=state, issues=f"{shown} +{more}" if more > 0 else shown)
     online = sorted((w for w in fleet if buckets[w.href] == "online"), key=lambda w: name[w.href])
     online_table = TableBlock(
         title=t("rpt_ven_tbl_online"),
@@ -160,7 +167,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                  Column(key="sync", label=t("rpt_ven_col_sync")), Column(key="compat", label=t("rpt_ven_col_compat"))),
         rows=tuple((name[w.href], app_env(w), w.ven_version or "—", w.os_id or "—",
                     t(_MODE_KEYS[w.enforcement_mode]) if w.enforcement_mode in _MODE_KEYS else t("rpt_ven_unknown"),
-                    stamp(w.last_heartbeat_at), w.policy_sync_state or "—", t(_COMPAT_KEYS[compat[w.href]]))
+                    stamp(w.last_heartbeat_at), w.policy_sync_state or "—", compat_cell(w))
                    for w in online),
         total_rows=len(online), empty_text=t("rpt_ven_none_online"))
     compat_counts = Counter(compat.values())
@@ -234,6 +241,10 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     latest = max((w.fetched_at for w in fleet), default=None)
     quality = [t("rpt_ven_quality_inventory", at=fmt_time(latest, inp.tz)) if latest else t("rpt_ven_quality_no_inventory"),
                t("rpt_ven_quality_online"), t("rpt_ven_quality_compat", n=compat_counts["unknown"])]
+    oldest = min((r.report_at for h, r in report_of.items() if r is not None and r.report_at
+                  and compat[h] != "na"), default=None)
+    if oldest:
+        quality.append(t("rpt_ven_quality_compat_oldest", at=fmt_time(oldest, inp.tz)))
     if computed_at:
         quality.append(t("rpt_quality_analysis_at", at=fmt_time(computed_at, inp.tz)))
     if run_error:
