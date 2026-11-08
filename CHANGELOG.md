@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.4.2] - 2026-11-08
+
+Found by testing on .106 and .135 (rescue, uninstall and reinstall) and by sampling the lab PCE's /health every minute.
+
+### Fixed
+
+- PCE health alert: raised on two failed checks in a row (about 10 minutes), not on one. The lab PCE reports itself
+  critical for under two minutes a few times a day (a required service, `database_monitor`, not running), and each
+  check that landed in one was a HIGH alert.
+- PCE health alert: says why: the check that failed, the status the PCE reported or the connection failure, the HTTP
+  status of a server error, the PCE's own notifications, and how many checks in a row failed.
+- `preflight.sh` no longer calls the settings and data `uninstall.sh` kept a partial installation; `install.sh`
+  already installed over them.
+
 ## [6.4.1] - 2026-11-06
 
 Found by the lab PCE write test of 6.4.0 (enforcement progression and traffic update rate, verified against the PCE's
