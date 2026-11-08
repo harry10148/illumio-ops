@@ -180,7 +180,7 @@ def test_online_list_and_compat_tally(ctx):
     assert len(cols) < 9  # stays a portrait table
     row = dict(zip(cols, online.rows[1], strict=True))
     assert row["app"] == "Web (Prod)" and row["version"] == "26.2.20"
-    assert row["compat"] == "Warning (ipv4_forwarding_enabled, iptables_rule_cnt)"  # says which checks
+    assert row["compat"] == "Warning (IPv4 forwarding, existing iptables rules)"  # says which checks, readably
     assert row["mode"] == "Idle"
     assert dict(zip(cols, online.rows[0], strict=True))["compat"] == "Unknown"
     assert dict(zip(cols, online.rows[2], strict=True))["compat"] == "Not checked (Full)"
@@ -189,6 +189,16 @@ def test_online_list_and_compat_tally(ctx):
     quality = " ".join(doc.data_quality)
     assert "compatibility report" in quality and "1 hosts" in quality
     assert "2026-09-17" in quality  # the oldest report the PCE holds, so a stale one is visible
+
+
+def test_compat_checks_read_as_words_in_both_languages(ctx):
+    """The PCE names its checks in snake_case; a known one reads as words, an unknown one breaks at its underscores so
+    a narrow table can wrap it rather than cut it."""
+    _inventory(ctx, [host("h", mode="idle", compat=("red", ("routing_table_conflict", "windows_firewall_gpo_state"),
+                                                      None))])
+    zh = _build(ctx, Language.ZH_TW)
+    row = dict(zip([c.key for c in _table(zh, "online").columns], _table(zh, "online").rows[0], strict=True))
+    assert row["compat"] == "不通過（路由表衝突、windows firewall gpo state）"
 
 
 def test_compat_issues_beyond_three_are_counted(ctx):

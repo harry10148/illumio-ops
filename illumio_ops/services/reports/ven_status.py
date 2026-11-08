@@ -46,6 +46,13 @@ _COMPAT_KEYS = {"pass": "rpt_ven_compat_pass", "warn": "rpt_ven_compat_warn", "f
                 "unknown": "rpt_ven_compat_unknown", "na": "rpt_ven_compat_na"}
 _QUALIFY = {"green": "pass", "yellow": "warn", "red": "fail"}
 COMPAT_ISSUES_SHOWN = 3
+# The checks of the lab PCE 26.2.20's compatibility report for Linux; any other reads as its name split at underscores.
+_COMPAT_CHECK_KEYS = {"required_packages_installed": "rpt_ven_check_packages",
+                      "ipsec_service_enabled": "rpt_ven_check_ipsec",
+                      "ipv4_forwarding_enabled": "rpt_ven_check_ipv4_forwarding",
+                      "ipv6_forwarding_enabled": "rpt_ven_check_ipv6_forwarding",
+                      "iptables_rule_cnt": "rpt_ven_check_iptables", "ip6tables_rule_cnt": "rpt_ven_check_ip6tables",
+                      "routing_table_conflict": "rpt_ven_check_routing"}
 _PROBLEM_KEYS = {"sync_state": "rpt_ven_problem_sync_state", "fw_stale": "rpt_ven_problem_fw_stale",
                  "behind": "rpt_ven_problem_behind", "never_applied": "rpt_ven_problem_never_applied",
                  "health": "rpt_ven_problem_health"}
@@ -154,7 +161,9 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         issues = report.issues if report is not None and compat[w.href] in ("warn", "fail") else ()
         if not issues:
             return state
-        shown = ", ".join(issues[:COMPAT_ISSUES_SHOWN])
+        names = [t(_COMPAT_CHECK_KEYS[i]) if i in _COMPAT_CHECK_KEYS else i.replace("_", " ")
+                 for i in issues[:COMPAT_ISSUES_SHOWN]]
+        shown = t("rpt_ven_compat_sep").join(names)
         more = len(issues) - COMPAT_ISSUES_SHOWN
         return t("rpt_ven_compat_issues", state=state, issues=f"{shown} +{more}" if more > 0 else shown)
     online = sorted((w for w in fleet if buckets[w.href] == "online"), key=lambda w: name[w.href])
