@@ -149,33 +149,37 @@ def test_zh_tw_builds(ctx):
 
 def test_compat_state_from_the_pces_compatibility_report():
     """The PCE's VEN compatibility report (GET /vens/<id>/compatibility_report, lab 26.2.20): green, yellow, red.
-    Workload agent_health carries no compatibility entries on a real PCE, so it is not read. A host already in Full is
-    not checked (the report answers whether a host can move to enforcement)."""
+    Workload agent_health carries no compatibility entries on a real PCE, so it is not read. Only a host in Idle is
+    checked: the PCE writes the report while a VEN is in Idle, and a report kept from before is a leftover."""
     from illumio_ops.services.reports.ven_status import compat_state
     from illumio_ops.store.flowdb.ven_compat import VenCompat
 
     def row(status):
         return VenCompat("/orgs/1/vens/v", status, (), None, "2026-10-27T00:00:00.000000Z")
     assert compat_state(row("green"), "idle") == "pass"
-    assert compat_state(row("Yellow"), "selective") == "warn"
-    assert compat_state(row("red"), "visibility_only") == "fail"
+    assert compat_state(row("Yellow"), "idle") == "warn"
+    assert compat_state(row("red"), "idle") == "fail"
     assert compat_state(row(None), "idle") == "unknown"  # the PCE has no report for this VEN
     assert compat_state(row("purple"), "idle") == "unknown"
     assert compat_state(None, "idle") == "unknown"  # not read yet
     assert compat_state(row("red"), "full") == "na"
     assert compat_state(None, "full") == "na"
+    assert compat_state(row("yellow"), "selective") == "na"  # a leftover from its time in Idle
+    assert compat_state(row("green"), "visibility_only") == "na"
+    assert compat_state(None, None) == "na"
 
 
 def test_online_list_and_compat_tally(ctx):
     _inventory(ctx, [host("b-on", mode="idle", compat=("yellow", ("ipv4_forwarding_enabled", "iptables_rule_cnt"),
                                                          db_time(NOW - timedelta(days=40)))),
-                     host("a-on", version="25.2.1", mode="selective"),
+                     host("a-on", version="25.2.1", mode="idle"),
                      host("c-on", version="25.2.1"),
-                     host("off", online=0, hb=timedelta(hours=5), mode="selective",
+                     host("d-on", mode="selective", compat=("green", (), db_time(NOW - timedelta(days=100)))),
+                     host("off", online=0, hb=timedelta(hours=5), mode="idle",
                           compat=("red", ("required_packages_installed",), db_time(NOW - timedelta(days=1))))])
     doc = _build(ctx)
     online = _table(doc, "online")
-    assert [r[0] for r in online.rows] == ["a-on", "b-on", "c-on"] and online.total_rows == 3
+    assert [r[0] for r in online.rows] == ["a-on", "b-on", "c-on", "d-on"] and online.total_rows == 4
     cols = [c.key for c in online.columns]
     assert len(cols) < 9  # stays a portrait table
     row = dict(zip(cols, online.rows[1], strict=True))
@@ -183,12 +187,14 @@ def test_online_list_and_compat_tally(ctx):
     assert row["compat"] == "Warning (IPv4 forwarding, existing iptables rules)"  # says which checks, readably
     assert row["mode"] == "Idle"
     assert dict(zip(cols, online.rows[0], strict=True))["compat"] == "Unknown"
-    assert dict(zip(cols, online.rows[2], strict=True))["compat"] == "Not checked (Full)"
+    assert dict(zip(cols, online.rows[2], strict=True))["compat"] == "Not checked (not Idle)"
+    assert dict(zip(cols, online.rows[3], strict=True))["compat"] == "Not checked (not Idle)"  # its report is a leftover
     tally = {r[0]: r[1] for r in _table(doc, "online", 1).rows}
-    assert tally == {"Pass": 0, "Warning": 1, "Fail": 1, "Unknown": 1, "Not checked (Full)": 1}
+    assert tally == {"Pass": 0, "Warning": 1, "Fail": 1, "Unknown": 1, "Not checked (not Idle)": 2}
     quality = " ".join(doc.data_quality)
     assert "compatibility report" in quality and "1 hosts" in quality
     assert "2026-09-17" in quality  # the oldest report the PCE holds, so a stale one is visible
+    assert "2026-07-19" not in quality  # a leftover of a host out of Idle is not counted
 
 
 def test_compat_checks_read_as_words_in_both_languages(ctx):

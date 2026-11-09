@@ -232,14 +232,14 @@ def _compat_report(body: Any) -> tuple[str | None, tuple[str, ...], str | None]:
 
 def _ven_compat(client: PceClient, fdb: FlowDb, gen: int, rows: list[dict[str, Any]],
                 at: datetime) -> tuple[int, int]:
-    """Read the compatibility report of each VEN not yet in Full whose report was last read COMPAT_EVERY ago or never,
-    at most COMPAT_PER_RUN, oldest first: (read, failed). The report answers whether a host can move to enforcement,
-    so a host in Full is not asked about. A VEN the PCE has no report for (404) is recorded as such; a failed read is
+    """Read the compatibility report of each VEN in Idle whose report was last read COMPAT_EVERY ago or never, at most
+    COMPAT_PER_RUN, oldest first: (read, failed). The PCE writes the report while a VEN is in Idle, so out of Idle it
+    is a leftover and is not asked about. A VEN the PCE has no report for (404) is recorded as such; a failed read is
     asked again on the next run."""
     with fdb.connect() as conn:
         held = ven_compat.fetched(conn)
     due = db_time(at - COMPAT_EVERY)
-    vens = {str(v) for w in rows if w.get("enforcement_mode") != "full" and (v := _map(w.get("ven")).get("href"))}
+    vens = {str(v) for w in rows if w.get("enforcement_mode") == "idle" and (v := _map(w.get("ven")).get("href"))}
     todo = sorted((v for v in vens if held.get(v, "") <= due), key=lambda v: (held.get(v, ""), v))[:COMPAT_PER_RUN]
     read = failed = 0
     for href in todo:

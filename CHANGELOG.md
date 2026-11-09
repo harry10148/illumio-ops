@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.4.4] - 2026-11-09
+
+### Fixed
+
+- VEN compatibility (VEN status report): read only for a VEN in Idle. The PCE writes the compatibility report while a
+  VEN is in Idle; out of Idle the report it keeps is a leftover (lab: a visibility_only host still held one from
+  2026-09-08), which 6.4.3 read and showed as current for every host not in Full. A host not in Idle now reads
+  "not checked (not Idle)", and the oldest-report note counts only hosts in Idle.
+
 ## [6.4.3] - 2026-11-09
 
 ### Fixed

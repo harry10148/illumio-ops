@@ -19,10 +19,10 @@ WL = f"{API}/orgs/1/workloads"
 SUMMARY = f"{API}/orgs/1/reports/risk_summary"
 
 
-def _workload(i, *, risk="critical", updated="2026-10-24T08:49:37Z", visibility="flow_summary"):
+def _workload(i, *, risk="critical", updated="2026-10-24T08:49:37Z", visibility="flow_summary", mode="visibility_only"):
     return {
         "href": f"/orgs/1/workloads/w-{i}", "hostname": f"host-{i}", "name": None, "managed": True,
-        "enforcement_mode": "visibility_only", "visibility_level": visibility, "os_id": "ubuntu-x86_64-noble",
+        "enforcement_mode": mode, "visibility_level": visibility, "os_id": "ubuntu-x86_64-noble",
         "online": True, "labels": [{"key": "app", "value": "Fin"}, {"key": "env", "value": "Prod"}],
         "ven": {"href": f"/orgs/1/vens/v-{i}", "version": "26.2.20-2063", "status": "active"},
         "risk_summary": None if risk is None else {"ransomware": {"workload_exposure_severity": risk,
@@ -301,19 +301,20 @@ def _compat_rows(ctx):
 
 
 def _two_hosts():
-    w1, w2 = _workload(1, risk=None), _workload(2, risk=None)
-    w2["enforcement_mode"] = "full"
-    return [w1, w2]
+    return [_workload(1, risk=None, mode="idle"), _workload(2, risk=None, mode="full")]
 
 
 @responses.activate
-def test_ven_compatibility_read_for_vens_not_in_full(tmp_path):
+def test_ven_compatibility_read_for_idle_vens_only(tmp_path):
+    """The PCE writes a VEN's compatibility report while the VEN is in Idle; out of Idle the report is a leftover, so
+    only a VEN in Idle is asked about."""
     ctx = configured_ctx(tmp_path)
-    responses.add(responses.GET, WL, json=_two_hosts())
+    responses.add(responses.GET, WL, json=_two_hosts() + [_workload(3, risk=None, mode="visibility_only"),
+                                                           _workload(4, risk=None, mode="selective")])
     responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
     responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", json=_compat_report())
     run_inventory_cycle(ctx, now=NOW)
-    assert [c.request.url for c in _compat_calls()] == [f"{VENS}/v-1/compatibility_report"]  # v-2 is in Full
+    assert [c.request.url for c in _compat_calls()] == [f"{VENS}/v-1/compatibility_report"]  # v-2..4 are not in Idle
     got = _compat_rows(ctx)["/orgs/1/vens/v-1"]
     assert got.qualify_status == "yellow"
     assert got.issues == ("ipv4_forwarding_enabled", "iptables_rule_cnt")
@@ -336,7 +337,7 @@ def test_ven_compatibility_read_once_a_day(tmp_path):
 @responses.activate
 def test_ven_without_a_report_is_recorded_and_a_failed_read_retried(tmp_path):
     ctx = configured_ctx(tmp_path)
-    w1, w2 = _workload(1, risk=None), _workload(2, risk=None)
+    w1, w2 = _workload(1, risk=None, mode="idle"), _workload(2, risk=None, mode="idle")
     responses.add(responses.GET, WL, json=[w1, w2])
     responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
     responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", status=404, json={"status": 404})
@@ -354,7 +355,7 @@ def test_ven_without_a_report_is_recorded_and_a_failed_read_retried(tmp_path):
 def test_ven_compatibility_reads_at_most_a_batch_per_run(tmp_path, monkeypatch):
     monkeypatch.setattr(inventory, "COMPAT_PER_RUN", 2)
     ctx = configured_ctx(tmp_path)
-    responses.add(responses.GET, WL, json=[_workload(i, risk=None) for i in range(1, 6)])
+    responses.add(responses.GET, WL, json=[_workload(i, risk=None, mode="idle") for i in range(1, 6)])
     responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
     for i in range(1, 6):
         responses.add(responses.GET, f"{VENS}/v-{i}/compatibility_report", json=_compat_report("green"))
@@ -368,7 +369,7 @@ def test_ven_compatibility_reads_at_most_a_batch_per_run(tmp_path, monkeypatch):
 @responses.activate
 def test_ven_compatibility_of_a_ven_that_left_is_dropped(tmp_path):
     ctx = configured_ctx(tmp_path)
-    responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
+    responses.add(responses.GET, WL, json=[_workload(1, risk=None, mode="idle")])
     responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
     responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", json=_compat_report())
     run_inventory_cycle(ctx, now=NOW)
@@ -381,7 +382,7 @@ def test_ven_compatibility_of_a_ven_that_left_is_dropped(tmp_path):
 def test_an_empty_compatibility_report_reads_as_none(tmp_path):
     """The NFR SaaS (2026-11-09) answers 200 with {} for a host in Selective."""
     ctx = configured_ctx(tmp_path)
-    responses.add(responses.GET, WL, json=[_workload(1, risk=None)])
+    responses.add(responses.GET, WL, json=[_workload(1, risk=None, mode="idle")])
     responses.add(responses.GET, SUMMARY, json={"ransomware": {}})
     responses.add(responses.GET, f"{VENS}/v-1/compatibility_report", json={})
     run_inventory_cycle(ctx, now=NOW)

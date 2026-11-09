@@ -97,9 +97,9 @@ def problems(w: WorkloadRow) -> list[str]:
 
 def compat_state(report: VenCompat | None, mode: str | None) -> str:
     """pass, warn or fail from the qualify status of the PCE's compatibility report (green, yellow, red); unknown when
-    the PCE has none or it was not read yet; na for a host already in Full (the report answers whether a host can move
-    to enforcement, and the collector does not ask about one in Full)."""
-    if mode == "full":
+    the PCE has none or it was not read yet; na for a host not in Idle (the PCE writes the report while a VEN is in
+    Idle, so a report kept from before is a leftover, and the collector asks only about a host in Idle)."""
+    if mode != "idle":
         return "na"
     status = (report.qualify_status or "").lower() if report is not None else ""
     return _QUALIFY.get(status, "unknown")
