@@ -246,3 +246,53 @@ def test_detect_no_overflow_760(narrow_context, live_app):
     page.goto(f"{live_app.url}/detect")
     page.locator("[data-section=detections]").wait_for()
     assert no_horizontal_overflow(page)
+
+
+def _admin_flows(live_app):
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.flows import upsert_flows
+    from tests.services.reports.test_findings import flow
+    now = datetime.now(UTC)
+    long_name = "CORP\\" + "svc-a-very-long-service-account-name-" * 3
+    rows = [flow(src="adm", dst="db1", port=3389, user="CORP\\alice"), flow(src="adm", dst="db2", port=3389, user="CORP\\alice"),
+            flow(src="adm", dst="db1", port=22, user=long_name), flow(src="bak", dst="db1", port=445, user="root"),
+            flow(src="bak", dst="db2", port=445)]
+    for r in rows:  # inside the period the page reads
+        object.__setattr__(r, "first_detected", now - timedelta(hours=2))
+        object.__setattr__(r, "last_detected", now - timedelta(hours=1))
+    with live_app.ctx.flows().connect() as conn:
+        upsert_flows(conn, rows, origin=DataOrigin.INGEST, now=now)
+        conn.commit()
+
+
+def test_initiator_rankings_and_their_coverage(context, live_app):
+    """6.5.0 B3: who initiates management-port connections, and how much of that traffic names a user at all."""
+    _seed(live_app)
+    _admin_flows(live_app)
+    page = _open(context, live_app, "/detect")
+    card = page.locator("[data-section=initiators]")
+    card.locator("[data-role=init-users] tbody tr").first.wait_for()
+    assert card.locator("[data-role=init-users] tbody tr").first.inner_text().split() == ["corp\\alice", "2"]
+    assert "root" in card.locator("[data-role=init-system]").inner_text()
+    assert "No management-port connection names a process." in card.locator("[data-role=init-processes]").inner_text()
+    cov = card.locator("[data-role=initiators-coverage]").inner_text()
+    assert "connections in the last" in cov and "5;" in cov and "4 (80.0%)" in cov and "0 (0.0%)" in cov
+
+
+def test_initiators_basic_mode_says_what_it_needs(context, live_app):
+    _seed(live_app, mode="lightweight")
+    page = _open(context, live_app, "/detect")
+    expect(page.locator("[data-role=initiators-need-mode] [data-role=needs-advanced]")).to_have_count(1)
+
+
+def test_initiators_no_overflow_760_with_a_long_account_name(narrow_context, live_app):
+    from tests.e2e.conftest import no_horizontal_overflow
+    _seed(live_app)
+    _admin_flows(live_app)
+    page = narrow_context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/detect")
+    page.locator("[data-role=init-users] tbody tr").first.wait_for()
+    assert no_horizontal_overflow(page)
+    cell = page.locator("[data-role=init-users] td.wrap-any", has_text="svc-a-very-long").first
+    assert cell.evaluate("e => e.scrollWidth <= e.clientWidth + 1")  # wrapped, not cut

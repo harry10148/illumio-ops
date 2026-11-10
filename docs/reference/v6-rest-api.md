@@ -10,7 +10,7 @@ verified_against:
 
 > 本頁由 `scripts/gen_api_reference.py` 從 API 契約產生，請勿手改。新增或修改操作後重新執行該腳本。
 
-這些是網頁介面自己使用的 API，共 121 個操作。每個操作的請求與回應欄位（JSON Schema）在
+這些是網頁介面自己使用的 API，共 122 個操作。每個操作的請求與回應欄位（JSON Schema）在
 `web/src/api/contracts.json`，以下只列操作、方法、路徑與模型名稱。
 
 ## 共通規則
@@ -120,6 +120,7 @@ verified_against:
 | 操作 | 方法 | 路徑 | 請求模型 | 回應模型 |
 |---|---|---|---|---|
 | `lateral.compute` | POST | `/api/lateral/compute` | `LateralCompute` | `LateralPage` |
+| `lateral.initiators` | GET | `/api/lateral/initiators` | — | `LateralInitiators` |
 | `lateral.simulate` | POST | `/api/lateral/simulate` | `LateralSimulate` | `DenySimulationView` |
 | `lateral.view` | GET | `/api/lateral` | — | `LateralPage` |
 

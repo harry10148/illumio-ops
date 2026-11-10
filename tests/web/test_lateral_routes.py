@@ -63,3 +63,14 @@ def test_failures_mapped(client, monkeypatch, exc, status, code):
     assert r.status_code == status and r.get_json()["error"]["code"] == code
     if code == "pce_switched":
         assert client.get("/api/lateral", environ_overrides=LOCAL).status_code == 409
+
+
+def test_initiators_signed_in_and_by_mode(client, ctx):
+    """6.5.0 B3: the management-port initiator rankings; lightweight mode keeps no traffic to rank and says so."""
+    assert client.get("/api/lateral/initiators", environ_overrides=LOCAL).status_code == 401
+    login(client)
+    got = client.get("/api/lateral/initiators", environ_overrides=LOCAL).get_json()["data"]
+    assert got["state"] == "ok" and got["result"]["users"] == [] and got["result"]["connections"] == 0
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
+    got = client.get("/api/lateral/initiators", environ_overrides=LOCAL).get_json()["data"]
+    assert got["state"] == "lightweight" and got["result"] is None

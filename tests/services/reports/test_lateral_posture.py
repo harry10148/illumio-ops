@@ -277,3 +277,33 @@ def test_finding_params_name_hosts_not_their_href(ctx):
     assert named.title.startswith("app-01 reached fin-db-01 through bak-01;")
     assert removed.title.startswith("app-01 reached Removed workload …556666 through bak-01;")
     assert all("/orgs/" not in f.title + f.why for f in (named, removed))
+
+
+def test_initiators_section_is_the_pages_ranking(ctx, monkeypatch):
+    """6.5.0 B3 (spec §6.5.7): the report's users and processes section prints what the lateral movement page
+    shows — both read lateral_defaults, neither keeps a copy of the segments — with the field coverage."""
+    from illumio_ops.services.analysis import lateral_defaults as mod
+    from illumio_ops.services.analysis.lateral_defaults import (
+        Initiator,
+        LateralDefaults,
+    )
+    from illumio_ops.services.reports import lateral_posture
+    asked = []
+
+    assert lateral_posture.lateral_defaults is mod.lateral_defaults  # the shared function, not a copy
+
+    def fake(c, *, start, end, now):
+        asked.append((start, end))
+        return LateralDefaults(start=start, end=end, users=[Initiator(name="corp\\alice", destinations=7)],
+                               processes=[], system_accounts=[Initiator(name="root", destinations=2)],
+                               more={"users": 3}, connections=200, with_user=50, with_process=0)
+    monkeypatch.setattr(lateral_posture, "lateral_defaults", fake)
+    assert lateral_posture.lateral_defaults is fake and mod.lateral_defaults is not fake
+    doc = build_lateral_posture(_inp(ctx))
+    sec = _section(doc, "initiators")
+    assert asked == [(START, END)]
+    assert "200" in sec.intro and "50 (25.0%)" in sec.intro and "0 (0.0%)" in sec.intro
+    tables = [b for b in sec.blocks if isinstance(b, TableBlock)]
+    assert [t.rows for t in tables] == [(("corp\\alice", 7),), (), (("root", 2),)]
+    assert tables[0].total_rows == 4 and tables[0].limit_note  # three more exist and the table says so
+    assert tables[1].empty_text == "No management-port connection names a process."

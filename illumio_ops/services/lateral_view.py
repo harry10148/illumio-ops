@@ -22,14 +22,24 @@ from illumio_ops.domain.exposure import EdgeIn, ExposureResult
 from illumio_ops.domain.filter import FilterSpec, PortProto
 from illumio_ops.domain.focus import DETECTION_TITLE_KEYS
 from illumio_ops.domain.lateral import GRAPH_CLASSES
-from illumio_ops.domain.values import CapabilityState, CollectionMode, DetectorKind
+from illumio_ops.domain.values import (
+    CapabilityState,
+    CollectionMode,
+    DetectorKind,
+    IngestSource,
+)
 from illumio_ops.services import workbench
 from illumio_ops.services.analysis.context import LateralContext, load_lateral_context
 from illumio_ops.services.analysis.deny_sim import DenySimulation, simulate_deny
 from illumio_ops.services.analysis.exposure import exposure_from, graph_edges
 from illumio_ops.services.analysis.focus import STALE_AFTER
+from illumio_ops.services.analysis.lateral_defaults import (
+    LateralDefaults,
+    lateral_defaults,
+)
 from illumio_ops.services.analysis.status import DetectorStatusView, detector_states
 from illumio_ops.services.collect.guard import require_same_pce
+from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.ondemand import INTERACTIVE_PULL, pull_period
@@ -269,6 +279,28 @@ def view(ctx: AppContext, *, now: datetime | None = None) -> LateralPage:
                        exposure=result, names=display_names(ctx, _keys_of(result)), pull=None,
                        surface=_surface(result, critical_set=base["critical_set"], snaps=snap_rows or [],
                                         new_this_week=new_week), **base)
+
+
+class LateralInitiators(BaseModel):
+    """Who initiates management-port connections (spec §6.5.7), for the kept traffic of the observation period.
+    state: lightweight keeps no traffic and collection_off collects none: the rankings need stored traffic."""
+    state: Literal["ok", "lightweight", "collection_off"]
+    days: int  # the period read: the observation days, at most the days of traffic kept
+    result: LateralDefaults | None
+
+
+def initiators(ctx: AppContext, *, now: datetime | None = None) -> LateralInitiators:
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    with ctx.flows().connect() as conn:
+        require_same_pce(conn, ctx.settings.current().pce)
+    settings = ctx.settings.current()
+    days = max(1, min(settings.lateral.observation_days, settings.collection.retention.flow_days))
+    if _lightweight(ctx):
+        return LateralInitiators(state="lightweight", days=days, result=None)
+    if not collects(settings, IngestSource.TRAFFIC):
+        return LateralInitiators(state="collection_off", days=days, result=None)
+    return LateralInitiators(state="ok", days=days,
+                             result=lateral_defaults(ctx, start=at - timedelta(days=days), end=at, now=at))
 
 
 def _floor(t: datetime) -> datetime:

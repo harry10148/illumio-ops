@@ -12,6 +12,7 @@ from illumio_ops.services import lateral_view
 from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.lateral_view import (
     DenySimulationView,
+    LateralInitiators,
     LateralPage,
     NotComputed,
 )
@@ -31,6 +32,7 @@ class LateralSimulate(BaseModel):
 
 OP_VIEW = operation("lateral.view", "GET", "/api/lateral", None, LateralPage)
 OP_COMPUTE = operation("lateral.compute", "POST", "/api/lateral/compute", LateralCompute, LateralPage)
+OP_INITIATORS = operation("lateral.initiators", "GET", "/api/lateral/initiators", None, LateralInitiators)
 OP_SIMULATE = operation("lateral.simulate", "POST", "/api/lateral/simulate", LateralSimulate, DenySimulationView)
 
 bp = Blueprint("lateral", __name__)
@@ -52,6 +54,14 @@ def _invalid(exc: Exception) -> ApiFailure:
 def view() -> LateralPage:
     try:
         return lateral_view.view(get_ctx())
+    except (StaleGeneration, BindingMismatch):
+        raise _switched() from None
+
+
+@api_route(bp, OP_INITIATORS)
+def initiators() -> LateralInitiators:
+    try:
+        return lateral_view.initiators(get_ctx())
     except (StaleGeneration, BindingMismatch):
         raise _switched() from None
 

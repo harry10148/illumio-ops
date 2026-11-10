@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type { AssetExposure, Cut, DenyProposal, EndpointFilter, ExposureResult, LateralPage } from "../../api/generated";
+import type { AssetExposure, Cut, DenyProposal, EndpointFilter, ExposureResult, Initiator, LateralInitiators, LateralPage } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { KpiStrip, NeedsAdvanced, PageHead, type Tone } from "../../components/ui";
 import { t, useLang } from "../../i18n";
@@ -207,6 +207,7 @@ export default function LateralMovement() {
         </div>
       )}
       <Happening page={page} />
+      <Initiators />
       <Attention />
     </section>
   );
@@ -468,6 +469,58 @@ function Groups({ ex }: { ex: ExposureResult }) {
           {view.total > view.shown.length && (
             <p className="hint">{t("lat_groups_more", { shown: String(view.shown.length), total: String(view.total) })}</p>
           )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Who initiates management-port connections (spec §6.5.7): users, processes and system accounts by the number of
+ * distinct destination hosts — the rankings the lateral posture report prints, from the same computation — with how
+ * much of that traffic names a user or a process at all. */
+function Initiators() {
+  const [view, setView] = useState<LateralInitiators | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  useEffect(() => {
+    let live = true;
+    void call("lateral.initiators").then((env) => {
+      if (!live) return;
+      if (env.ok && env.data) setView(env.data);
+      else setError(env.error);
+    });
+    return () => { live = false; };
+  }, []);
+  const r = view?.result;
+  const share = (n: number, d: number): string => (d ? `${(100 * n / d).toFixed(1)}%` : "0.0%");
+  const table = (role: string, title: string, col: string, rows: Initiator[], none: string, more: number | undefined) => (
+    <div className="stack" data-role={role}>
+      <h3>{title}</h3>
+      {rows.length === 0 ? <p className="muted">{none}</p> : (
+        <table className="table">
+          <thead><tr><th>{col}</th><th className="num">{t("lat_init_col_dst")}</th></tr></thead>
+          <tbody>{rows.map((x) => <tr key={x.name}><td className="wrap-any">{x.name}</td><td className="num">{x.destinations.toLocaleString()}</td></tr>)}</tbody>
+        </table>
+      )}
+      {more ? <p className="hint">{t("lat_init_more", { n: String(more) })}</p> : null}
+    </div>
+  );
+  return (
+    <div className="card stack" id="lat-initiators" data-section="initiators">
+      <h2>{t("lat_init_title")}</h2>
+      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {!view && !error && <p className="muted">{t("loading")}</p>}
+      {view && view.state === "lightweight" && <div data-role="initiators-need-mode"><NeedsAdvanced what={t("lat_init_need_mode")} /></div>}
+      {view && view.state === "collection_off" && <p className="notice" data-role="initiators-off">{t("lat_init_collection_off")}</p>}
+      {r && (
+        <>
+          <p className="hint" data-role="initiators-coverage">{t("lat_init_coverage", { days: String(view.days),
+            total: r.connections.toLocaleString(), user: r.with_user.toLocaleString(), user_pct: share(r.with_user, r.connections),
+            process: r.with_process.toLocaleString(), process_pct: share(r.with_process, r.connections) })}</p>
+          <div className="lat-initiators">
+            {table("init-users", t("lat_init_users"), t("lat_init_col_user"), r.users, t("lat_init_none_users"), r.more.users)}
+            {table("init-processes", t("lat_init_processes"), t("lat_init_col_process"), r.processes, t("lat_init_none_processes"), r.more.processes)}
+            {table("init-system", t("lat_init_system"), t("lat_init_col_user"), r.system_accounts, t("lat_init_none_system"), r.more.system_accounts)}
+          </div>
         </>
       )}
     </div>

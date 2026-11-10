@@ -386,3 +386,9 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .rpt-column > h2 { margin-bottom: var(--space-4); }
 .rpt-card { padding: var(--space-5) var(--space-6); }
 .rpt-card strong { font-family: var(--font-display); font-weight: 600; }
+
+/* Lateral movement: the three initiator rankings side by side, one column when narrow. A long account or process
+   name wraps inside its cell (never cut, never widening the page). */
+.lat-initiators { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); align-items: start; }
+.lat-initiators .wrap-any { overflow-wrap: anywhere; }
+@media (max-width: 900px) { .lat-initiators { grid-template-columns: minmax(0, 1fr); } }

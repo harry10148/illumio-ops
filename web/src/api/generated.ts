@@ -1776,6 +1776,43 @@ surface?: (SurfaceNumbers | null)
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "Initiator".
+ */
+export interface Initiator {
+destinations: number
+name: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralDefaults".
+ */
+export interface LateralDefaults {
+connections: number
+end: string
+more: {
+[k: string]: number
+}
+processes: Initiator[]
+start: string
+system_accounts: Initiator[]
+users: Initiator[]
+with_process: number
+with_user: number
+}
+/**
+ * Who initiates management-port connections (spec §6.5.7), for the kept traffic of the observation period.
+ * state: lightweight keeps no traffic and collection_off collects none: the rankings need stored traffic.
+ * 
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "LateralInitiators".
+ */
+export interface LateralInitiators {
+days: number
+result: (LateralDefaults | null)
+state: ("ok" | "lightweight" | "collection_off")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DenyProposal".
  */
 export interface DenyProposal {
@@ -3560,7 +3597,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.initiators" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.condition_choices": undefined;
@@ -3609,6 +3646,7 @@ export interface Requests {
   "hosts.tamper_note_remove": HostKey;
   "i18n.dictionary": undefined;
   "lateral.compute": LateralCompute;
+  "lateral.initiators": undefined;
   "lateral.simulate": LateralSimulate;
   "lateral.view": undefined;
   "quarantine.apply": QuarantineApplyRequest;
@@ -3733,6 +3771,7 @@ export interface Responses {
   "hosts.tamper_note_remove": HostProfile;
   "i18n.dictionary": Dictionary;
   "lateral.compute": LateralPage;
+  "lateral.initiators": LateralInitiators;
   "lateral.simulate": DenySimulationView;
   "lateral.view": LateralPage;
   "quarantine.apply": QuarantineOutcome;
@@ -3857,6 +3896,7 @@ export const OPERATIONS = {
   "hosts.tamper_note_remove": { method: "POST", path: "/api/hosts/tamper-notes/<int:note_id>/remove" },
   "i18n.dictionary": { method: "GET", path: "/api/i18n/<lang>" },
   "lateral.compute": { method: "POST", path: "/api/lateral/compute" },
+  "lateral.initiators": { method: "GET", path: "/api/lateral/initiators" },
   "lateral.simulate": { method: "POST", path: "/api/lateral/simulate" },
   "lateral.view": { method: "GET", path: "/api/lateral" },
   "quarantine.apply": { method: "POST", path: "/api/quarantine/apply" },

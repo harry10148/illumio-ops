@@ -22,6 +22,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.values import FocusKind, Language, Severity
 from illumio_ops.services.analysis.anomaly_inputs import directory_servers
 from illumio_ops.services.analysis.context import LateralContext, load_lateral_context
+from illumio_ops.services.analysis.lateral_defaults import Initiator, lateral_defaults
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import (
     detector_name,
@@ -322,6 +323,34 @@ class _Builder:
         intro = self.t("rpt_lat_directory_intro", ports=", ".join(port_text(p, q or 6) for p, q in ds.ports))
         return Section(id="directory", title=title, intro=intro, blocks=(server_table, det_table, source_table))
 
+    def initiators_section(self) -> Section:
+        """Who initiates management-port connections in the period (spec §6.5.7): the rankings the lateral
+        movement page shows, from the same function, with how much of that traffic carries each field."""
+        inp = self.inp
+        d = lateral_defaults(inp.ctx, start=inp.start, end=inp.end, now=inp.now)
+
+        def share(n: int) -> str:
+            return f"{n:,} ({100 * n / d.connections:.1f}%)" if d.connections else "0 (0.0%)"
+
+        def table(key: str, title_key: str, col_key: str, rows: Sequence[Initiator], none_key: str) -> TableBlock:
+            more = d.more.get(key, 0)
+            return TableBlock(
+                title=self.t(title_key),
+                columns=(Column(key="name", label=self.t(col_key)),
+                         Column(key="n", label=self.t("rpt_col_distinct_destinations"), kind="number")),
+                rows=tuple((r.name, r.destinations) for r in rows), total_rows=len(rows) + more,
+                empty_text=self.t(none_key),
+                limit_note=self.t("rpt_limit_top_n", n=len(rows)) if more else None)
+        return Section(
+            id="initiators", title=self.t("rpt_lat_sec_initiators"),
+            intro=self.t("rpt_lat_initiators_intro", total=f"{d.connections:,}", user=share(d.with_user),
+                         process=share(d.with_process)),
+            blocks=(table("users", "rpt_lat_tbl_init_users", "rpt_col_user", d.users, "rpt_lat_init_none_users"),
+                    table("processes", "rpt_lat_tbl_init_processes", "rpt_col_process", d.processes,
+                          "rpt_lat_init_none_processes"),
+                    table("system_accounts", "rpt_lat_tbl_init_system", "rpt_col_user", d.system_accounts,
+                          "rpt_lat_init_none_system")))
+
     def _detail(self, summary: Mapping[str, Any]) -> str:
         parts = []
         if summary.get("target"):
@@ -382,5 +411,5 @@ def build_lateral_posture(inp: BuildInput) -> ReportDocument:
         findings=_findings(focus, b.lc.hosts, inp.lang), data_quality=b.quality(exposure_row),
         sections=(b.exposure_section(exposure, snaps), b.assets_section(exposure), b.reach_section(exposure),
                   b.pivots_section(exposure), b.detections_section(counts, rows, total),
-                  b.cross_env_section(exposure), b.directory_section()))
+                  b.cross_env_section(exposure), b.initiators_section(), b.directory_section()))
 
