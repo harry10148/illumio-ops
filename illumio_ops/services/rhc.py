@@ -19,6 +19,7 @@ from typing import Any
 from loguru import logger
 from pydantic import BaseModel
 
+from illumio_ops.domain.rule_schedule import strip_notes
 from illumio_ops.domain.values import DeploymentType, RhcState
 from illumio_ops.pce.client import (
     PceBudgetExhausted,
@@ -355,6 +356,6 @@ def parse_rhc_csv(text: str) -> tuple[list[RhcRow], int]:
             unparsed += 1
             continue
         rows.append(RhcRow(rule_href=rec["rule_href"], ruleset_name=rec.get("ruleset_name", ""),
-                           description=rec.get("description", ""), hit_count=hits,
+                           description=strip_notes(rec.get("description", "")), hit_count=hits,
                            last_hit_at=_when(rec.get("last_hit_at", ""))))
     return rows, unparsed

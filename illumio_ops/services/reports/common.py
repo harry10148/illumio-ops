@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from illumio_ops.domain.lateral import HostInfo
+from illumio_ops.domain.tamper import TAMPER_PATTERN_KEYS
 from illumio_ops.domain.values import DetectorKind, Language, PortClass
 from illumio_ops.i18n import translate
 
@@ -39,6 +40,11 @@ PORT_CLASS_KEYS: Mapping[PortClass, str] = {
 SEVERITY_KEYS = {"low": "severity_low", "medium": "severity_medium", "high": "severity_high",
                  "critical": "severity_critical"}
 PROTOCOLS = {6: "TCP", 17: "UDP", 1: "ICMP"}
+# The PCE's own values for a VEN's policy sync state and an event's outcome. A value outside these has no wording
+# here and is shown as the PCE sent it.
+SYNC_STATE_KEYS = {"applied": "rpt_sync_applied", "synced": "rpt_sync_applied", "syncing": "rpt_sync_syncing",
+                   "staged": "rpt_sync_staged"}
+EVENT_STATUS_KEYS = {"success": "rpt_status_success", "failure": "rpt_status_failure"}
 
 
 def tr(lang: Language, msg: str, /, **params: object) -> str:
@@ -88,3 +94,25 @@ def detector_name(lang: Language, detector: str) -> str:
 def severity_name(lang: Language, severity: str) -> str:
     key = SEVERITY_KEYS.get(severity)
     return tr(lang, key) if key else severity
+
+
+def sync_state_name(lang: Language, state: str | None) -> str:
+    key = SYNC_STATE_KEYS.get(state or "")
+    return tr(lang, key) if key else state or "—"
+
+
+def event_status_name(lang: Language, status: str | None) -> str:
+    key = EVENT_STATUS_KEYS.get(status or "")
+    return tr(lang, key) if key else status or "—"
+
+
+def tamper_pattern_name(lang: Language, pattern: str | None) -> str:
+    key = next((k for p, k in TAMPER_PATTERN_KEYS.items() if p.value == pattern), None)
+    return tr(lang, key) if key else pattern or "—"
+
+
+def rule_label(lang: Language, ruleset_name: str, description: str | None, href: str) -> str:
+    """A rule as a reader can find it on the PCE: its ruleset and its description, or its id when it has none."""
+    if description:
+        return f"{ruleset_name}: {description}"
+    return tr(lang, "rpt_rule_no_description", ruleset=ruleset_name, id=href.rsplit("/", 1)[-1])

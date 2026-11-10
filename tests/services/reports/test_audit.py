@@ -212,3 +212,13 @@ def test_failed_then_change_names_five_users_and_counts_the_rest(ctx):
     why = _build(ctx, Language.ZH_TW).findings[0].why
     assert all(f"u{i}" in why for i in range(5)) and "u5" not in why and "另有 2 位" in why
     assert "2 more" in _build(ctx, Language.EN).findings[0].why
+
+
+def test_agent_event_status_reads_as_words(ctx):
+    # 2026-11-10 report review: the status column printed the PCE's raw "success" in a zh_TW report.
+    at = START + timedelta(days=1)
+    _write(ctx, [event("agent.tampering", at, system=True), event("agent.suspend", at, system=True, status="failure"),
+                 event("agent.clone_detected", at, system=True, status="pending")])
+    for lang, ok, failed in ((Language.EN, "Success", "Failure"), (Language.ZH_TW, "成功", "失敗")):
+        status = {r[1]: r[3] for r in _tables(_build(ctx, lang), "agent")[0].rows}
+        assert status == {"agent.tampering": ok, "agent.suspend": failed, "agent.clone_detected": "pending"}

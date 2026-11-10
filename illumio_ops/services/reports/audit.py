@@ -41,7 +41,7 @@ from illumio_ops.services.eventsource import (
     event_detail,
     failed_then_change,
 )
-from illumio_ops.services.reports.common import severity_name, tr
+from illumio_ops.services.reports.common import event_status_name, severity_name, tr
 from illumio_ops.services.reports.generate import previous_period
 from illumio_ops.services.reports.registry import BuildInput
 
@@ -204,7 +204,7 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         title=t("rpt_aud_tbl_agent"),
         columns=(Column(key="at", label=t("rpt_aud_col_time"), kind="time"), Column(key="type", label=t("rpt_aud_col_type")),
                  Column(key="host", label=t("rpt_col_host")), Column(key="status", label=t("rpt_aud_col_status"))),
-        rows=tuple((r.timestamp.isoformat(), r.event_type, r.created_by_name or "—", r.status or "—") for r in agent_rows),
+        rows=tuple((r.timestamp.isoformat(), r.event_type, r.created_by_name or "—", event_status_name(lang, r.status)) for r in agent_rows),
         total_rows=now_v["agent_security"], empty_text=t("rpt_aud_none_agent") if counts.total else none,
         limit_note=t("rpt_aud_newest_n", n=DETAIL_ROWS) if agent_more else None)
 

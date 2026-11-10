@@ -245,3 +245,24 @@ def test_offline_under_48_hours_is_medium(ctx):
     _inventory(ctx, [host("on"), host("d1", online=0, hb=timedelta(hours=5))])
     (finding,) = _build(ctx, Language.ZH_TW).findings
     assert finding.severity is Severity.MEDIUM and finding.title.startswith("1 ")
+
+
+def test_sync_state_and_tamper_pattern_read_as_words(ctx):
+    # 2026-11-10 report review: the tables printed the PCE's raw "syncing" and the analysis' raw "sporadic".
+    _inventory(ctx, [host("on"), host("busy", sync="syncing"), host("odd", sync="quarantined")])
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "tamper", params={}, at=NOW, result={"unmatched": 0, "hosts": [
+            {"href": "/orgs/1/workloads/on", "hostname": "on", "n_60d": 4, "n_7d": 1, "pattern": "sporadic",
+             "median_minutes": None, "last_at": NOW.isoformat(), "unexplained_7d": 1, "has_signal": False},
+            {"href": "/orgs/1/workloads/busy", "hostname": "busy", "n_60d": 4, "n_7d": 1, "pattern": "periodic",
+             "median_minutes": None, "last_at": NOW.isoformat(), "unexplained_7d": 1, "has_signal": False}]})
+        conn.commit()
+    for lang, applied, syncing, sporadic in ((Language.EN, "Applied", "Syncing", "sporadic"),
+                                             (Language.ZH_TW, "已套用", "同步中", "零星")):
+        doc = _build(ctx, lang)
+        sync = {r[0]: r[6] for r in _table(doc, "online").rows}
+        # a state with no wording is shown as the PCE sent it, never guessed
+        assert (sync["on"], sync["busy"], sync["odd"]) == (applied, syncing, "quarantined")
+        assert {r[0]: r[2] for r in _table(doc, "sync").rows}["busy"] == syncing
+        pattern = {r[0]: r[4] for r in _table(doc, "tamper").rows}
+        assert (pattern["on"], pattern["busy"]) == (sporadic, "periodic")

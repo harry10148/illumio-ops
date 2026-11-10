@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from illumio_ops.domain.anomaly import is_public
+from illumio_ops.domain.netaddr import address_scope
 from illumio_ops.domain.report import (
     Column,
     Finding,
@@ -33,6 +34,8 @@ CANDIDATE_MIN_PEERS = 3
 TOP_PORTS = 3
 DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
                  "blocked": "decision_blocked", "unknown": "decision_unknown"}
+SCOPE_KEYS = {"public": "rpt_unm_public", "private": "rpt_unm_private", "shared": "rpt_unm_shared",
+              "other": "rpt_unm_other"}
 # One side of each rollup row is a managed host and the other an address without a VEN.
 _SIDES = ("SELECT src_key AS ep, 'in' AS dir, dst_key AS peer, port, proto, policy_decision, connections, day "
           "FROM flow_rollup_daily WHERE day >= ? AND day <= ? AND src_key LIKE 'ip:%' AND dst_key NOT LIKE 'ip:%' "
@@ -117,7 +120,7 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
         return t("rpt_unm_dir_in") if "in" in e.dirs else t("rpt_unm_dir_out")
 
     def scope(e: _Endpoint) -> str:
-        return t("rpt_unm_public") if is_public(e.address) else t("rpt_unm_private")
+        return t(SCOPE_KEYS[address_scope(e.address)])
 
     def top_ports(e: _Endpoint) -> str:
         return ", ".join(port_text(p, q) for _, p, q in e.ports[:TOP_PORTS])
@@ -157,10 +160,12 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
     public = [e for e in ordered if is_public(e.address)]
     public_table = TableBlock(title=t("rpt_unm_tbl_public"), columns=columns, rows=tuple(row(e) for e in public),
                               total_rows=len(public), empty_text=t("rpt_unm_public_none"))
+    # an internet source first, then by managed hosts reached: the findings run from the highest severity down
+    flagged = sorted(admin_eps, key=lambda e: (not is_public(e.address), -e.admin_peers, e.key))[:5]
     findings = tuple(Finding(severity=Severity.MEDIUM if not is_public(e.address) else Severity.HIGH,
                              title=t("rpt_unm_finding_admin", address=e.address,
                                      ports=", ".join(port_text(p, q) for p, q in e.admin_in), peers=e.admin_peers),
-                             why=t("rpt_unm_why_admin"), action=t("rpt_unm_action_admin")) for e in admin_eps[:5])
+                             why=t("rpt_unm_why_admin"), action=t("rpt_unm_action_admin")) for e in flagged)
     quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz), t("rpt_quality_utc_days"))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_unmanaged"), period_start=inp.start,

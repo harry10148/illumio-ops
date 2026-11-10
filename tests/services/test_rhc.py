@@ -387,3 +387,10 @@ def test_pull_non_json_submit_answer(wctx):
     with pytest.raises(rhc.RhcPullError) as e:
         rhc.pull_rhc(wctx, START, END)
     assert e.value.key == "rhc_err_pull_failed"
+
+
+def test_csv_rule_name_leaves_out_the_schedule_note():
+    # the PCE's report repeats the rule description, with the note illumio-ops wrote there for its own schedule
+    rows, _ = rhc.parse_rhc_csv("Rule HREF,Rule Hit Count,Rule Name\n"
+                                "/orgs/1/x/1,3,old [📅 Recurring: Mon 09:00-17:00 (Asia/Taipei) Enable in window]\n")
+    assert rows[0].description == "old"

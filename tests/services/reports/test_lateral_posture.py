@@ -259,3 +259,21 @@ def test_finding_params_show_addresses_without_key_prefix(ctx):
         conn.commit()
     [f] = build_lateral_posture(_inp(ctx)).findings
     assert f.title.startswith("139.138.105.82 ")
+
+
+def test_finding_params_name_hosts_not_their_href(ctx):
+    # 2026-11-10 report review: a key finding read "/orgs/1/workloads/<uuid> is a pivot".
+    _hosts(ctx)
+    gone = "/orgs/1/workloads/0f3c9a7e-1111-2222-3333-444455556666"
+    items = [{"kind": "pivot_host", "fingerprint": f"f{i}", "severity": "high", "critical_asset": False,
+              "confidence": "high", "title_key": "focus_title_pivot_chain", "why_key": "focus_why_pivot",
+              "params": {"host": A, "via": B, "target": target}, "action": {"target": "host"}, "score": 1,
+              "first_seen": NOW.isoformat(), "new_this_week": True, "weeks_persisting": 0}
+             for i, target in enumerate((DB, gone))]
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "focus", params={}, result={"items": items}, at=NOW)
+        conn.commit()
+    named, removed = build_lateral_posture(_inp(ctx)).findings
+    assert named.title.startswith("app-01 reached fin-db-01 through bak-01;")
+    assert removed.title.startswith("app-01 reached Removed workload …556666 through bak-01;")
+    assert all("/orgs/" not in f.title + f.why for f in (named, removed))

@@ -212,3 +212,15 @@ def test_rule_provisioned_after_the_period_is_not_zero(ctx, monkeypatch):
     assert _ids(_table(doc, "zero")) == []
     listed = [b for b in _section(doc, "no_record").blocks if isinstance(b, TableBlock)][1]
     assert [r[1].split()[0] for r in listed.rows] == ["#11"]
+
+
+def test_rule_text_leaves_out_the_schedule_note(ctx, monkeypatch):
+    # 2026-11-10 report review: a scheduled rule read "#10 web [📅 Recurring: ...]" - the note illumio-ops writes
+    # into the PCE description to mark its own schedule is not part of what the rule is called. The PCE's own CSV
+    # carries the same description for a rule no longer in the policy: tests/services/test_rhc.py.
+    note = "[📅 Recurring: mon 09:00-17:00 (Asia/Taipei) enable]"
+    sets = [{**RULE_SETS[0], "rules": [{**r, "description": f"web {note}"} for r in RULE_SETS[0]["rules"]]}]
+    monkeypatch.setattr(rule_hit_count, "fetch_rule_sets", lambda client, pversion, *, deadline: sets)
+    doc = _build(ctx)
+    texts = [r[1] for sid in ("hit", "zero", "no_record") for r in _table(doc, sid).rows]
+    assert sorted(texts) == ["#10 web", "#11 web", "#12 web"]

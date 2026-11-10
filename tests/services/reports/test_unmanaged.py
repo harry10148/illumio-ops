@@ -120,3 +120,28 @@ def test_previous_none_when_previous_period_not_collected(ctx):
     with ctx.flows().connect() as conn:
         ingest_state.add_coverage(conn, IngestSource.TRAFFIC, START, END)
     assert all(k.previous is None for k in build_unmanaged(_inp(ctx)).kpis)
+
+
+def test_findings_run_from_the_highest_severity_down(tmp_path):
+    # 2026-11-10 report review: the findings read medium, medium, high - ordered by hosts reached, not by severity.
+    c = configured_ctx(tmp_path)
+    _rollup(c, [("2026-10-21", "ip:10.4.4.4", W.format(h), 22, "allowed", 3) for h in "abc"]
+            + [("2026-10-21", "ip:10.4.4.5", W.format(h), 22, "allowed", 3) for h in "ab"]
+            + [("2026-10-21", "ip:8.8.4.4", W.format("a"), 22, "allowed", 3)])
+    doc = build_unmanaged(_inp(c))
+    assert [f.severity.value for f in doc.findings] == ["high", "medium", "medium"]
+    assert "8.8.4.4" in doc.findings[0].title and "10.4.4.4" in doc.findings[1].title
+
+
+def test_shared_address_space_is_not_called_private(tmp_path):
+    # 100.64.0.0/10 (RFC 6598) is carrier shared space: not public, and not a private address either.
+    c = configured_ctx(tmp_path)
+    _rollup(c, [("2026-10-21", "ip:100.64.1.9", W.format("a"), 443, "allowed", 3),
+                ("2026-10-21", "ip:169.254.3.3", W.format("a"), 443, "allowed", 3),
+                ("2026-10-21", "ip:192.168.1.9", W.format("a"), 443, "allowed", 3)])
+    doc = build_unmanaged(_inp(c))
+    rows = {r[0]: r[1] for r in _table(doc, "all").rows}
+    assert rows == {"100.64.1.9": "Shared (100.64.0.0/10)", "169.254.3.3": "Other non-public",
+                    "192.168.1.9": "Private"}
+    kpi = next(k for k in doc.kpis if k.key == "private")
+    assert kpi.value == 3 and kpi.label == "Non-public addresses"

@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
+from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.report import (
     BarBlock,
     Column,
@@ -60,15 +61,18 @@ def _snapshot_on_or_before(snaps: Sequence[tuple[str, dict[str, Any]]], day: str
     return found
 
 
-def _findings(focus: Mapping[str, Any] | None, lang: Language) -> tuple[Finding, ...]:
+def _findings(focus: Mapping[str, Any] | None, hosts: Mapping[str, HostInfo], lang: Language) -> tuple[Finding, ...]:
+    def shown(value: object) -> object:
+        # A host is named as an operator knows it, never by its href or its ip:<address> key.
+        if isinstance(value, str) and (value in hosts or value.startswith("ip:") or "workloads/" in value):
+            return host_name(hosts, value, lang)
+        return value
     out = []
     for item in (focus or {}).get("items") or ():
         action = FINDING_KINDS.get(item.get("kind"))
         if action is None:
             continue
-        # Endpoint keys of unmanaged addresses are ip:<address>; a reader sees the address.
-        params = {k: v.removeprefix("ip:") if isinstance(v, str) else v
-                  for k, v in (item.get("params") or {}).items() if not isinstance(v, (dict, list))}
+        params = {k: shown(v) for k, v in (item.get("params") or {}).items() if not isinstance(v, (dict, list))}
         out.append(Finding(severity=Severity(item.get("severity", "medium")),
                            title=tr(lang, item["title_key"], **params), why=tr(lang, item["why_key"], **params),
                            action=tr(lang, action)))
@@ -375,7 +379,7 @@ def build_lateral_posture(inp: BuildInput) -> ReportDocument:
         report_type=inp.params.report_type, lang=inp.lang, title=b.t("rpt_title_lateral_posture"),
         period_start=inp.start, period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label,
         kpis=b.kpis(exposure, snaps, sum(n for n, _ in counts.values()), before_count),
-        findings=_findings(focus, inp.lang), data_quality=b.quality(exposure_row),
+        findings=_findings(focus, b.lc.hosts, inp.lang), data_quality=b.quality(exposure_row),
         sections=(b.exposure_section(exposure, snaps), b.assets_section(exposure), b.reach_section(exposure),
                   b.pivots_section(exposure), b.detections_section(counts, rows, total),
                   b.cross_env_section(exposure), b.directory_section()))

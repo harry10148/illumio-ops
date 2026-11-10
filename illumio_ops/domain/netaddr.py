@@ -36,6 +36,26 @@ def is_public(value: str | None) -> bool:
     return addr.is_global
 
 
+_PRIVATE = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"))
+_SHARED = ipaddress.ip_network("100.64.0.0/10")
+
+
+def address_scope(value: str | None) -> str:
+    """Which space an address is numbered in: "public" (globally routed), "private" (RFC 1918, IPv6 ULA), "shared"
+    (RFC 6598 carrier space, 100.64.0.0/10) or "other" (link-local, loopback, reserved, not an address)."""
+    if is_public(value):
+        return "public"
+    try:
+        addr = ipaddress.ip_address(str(value or "").strip())
+    except ValueError:
+        return "other"
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    if addr.version == 4 and addr in _SHARED:
+        return "shared"
+    return "private" if any(addr.version == n.version and addr in n for n in _PRIVATE) else "other"
+
+
 def outside(ip: str | None, href: str | None) -> bool:
     """An end outside the estate: a public address no workload holds. Some organisations number their own hosts in
     public space; a workload the PCE knows is inside whatever its address."""

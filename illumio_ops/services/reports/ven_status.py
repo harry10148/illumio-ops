@@ -23,7 +23,7 @@ from illumio_ops.domain.values import SEVERITY_ORDER, Severity
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.analysis.tamper import list_annotations
 from illumio_ops.services.reports import reads
-from illumio_ops.services.reports.common import tr
+from illumio_ops.services.reports.common import sync_state_name, tamper_pattern_name, tr
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
@@ -148,7 +148,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                  Column(key="heartbeat", label=t("rpt_ven_col_heartbeat"), kind="time"),
                  Column(key="sync", label=t("rpt_ven_col_sync")), Column(key="version", label=t("rpt_ven_col_version"))),
         rows=tuple((name[w.href], t(_BUCKET_KEYS[buckets[w.href]]), stamp(w.last_heartbeat_at),
-                    w.policy_sync_state or "—", w.ven_version or "—") for w in offline),
+                    sync_state_name(lang, w.policy_sync_state), w.ven_version or "—") for w in offline),
         total_rows=len(offline), empty_text=t("rpt_ven_none_offline"))
     no_label = t("rpt_no_label")
 
@@ -178,7 +178,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                  Column(key="sync", label=t("rpt_ven_col_sync")), Column(key="compat", label=t("rpt_ven_col_compat"))),
         rows=tuple((name[w.href], app_env(w), w.ven_version or "—", w.os_id or "—",
                     t(_MODE_KEYS[w.enforcement_mode]) if w.enforcement_mode in _MODE_KEYS else t("rpt_ven_unknown"),
-                    stamp(w.last_heartbeat_at), w.policy_sync_state or "—", compat_cell(w))
+                    stamp(w.last_heartbeat_at), sync_state_name(lang, w.policy_sync_state), compat_cell(w))
                    for w in online),
         total_rows=len(online), empty_text=t("rpt_ven_none_online"))
     compat_counts = Counter(compat.values())
@@ -196,7 +196,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                  Column(key="sync", label=t("rpt_ven_col_sync")),
                  Column(key="received", label=t("rpt_ven_col_received"), kind="time"),
                  Column(key="applied", label=t("rpt_ven_col_applied"), kind="time")),
-        rows=tuple((name[h], ", ".join(t(_PROBLEM_KEYS[p]) for p in ps), by_href[h].policy_sync_state or "—",
+        rows=tuple((name[h], ", ".join(t(_PROBLEM_KEYS[p]) for p in ps), sync_state_name(lang, by_href[h].policy_sync_state),
                     stamp(by_href[h].policy_received_at), stamp(by_href[h].policy_applied_at)) for h, ps in sync_rows),
         total_rows=len(sync_rows), empty_text=t("rpt_ven_none_sync"))
 
@@ -244,7 +244,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                      Column(key="pattern", label=t("rpt_ven_col_pattern")),
                      Column(key="last", label=t("rpt_ven_col_last"), kind="time")),
             rows=tuple((h.get("hostname") or name.get(str(h.get("href")), str(h.get("href"))), int(h.get("n_60d") or 0),
-                        int(h.get("n_7d") or 0), int(h.get("unexplained_7d") or 0), str(h.get("pattern") or "—"),
+                        int(h.get("n_7d") or 0), int(h.get("unexplained_7d") or 0), tamper_pattern_name(lang, h.get("pattern")),
                         stamp(h.get("last_at"))) for h in tamper_hosts),
             total_rows=len(tamper_hosts), empty_text=t("rpt_ven_none_tamper")),
             TextBlock(paragraphs=(t("rpt_ven_tamper_known", n=len(notes)),)))

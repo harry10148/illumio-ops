@@ -25,7 +25,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.values import Severity
 from illumio_ops.services.analysis.ransomware import host_ransomware
 from illumio_ops.services.reports import reads
-from illumio_ops.services.reports.common import port_text, severity_name, tr
+from illumio_ops.services.reports.common import port_text, rule_label, severity_name, tr
 from illumio_ops.services.reports.generate import previous_period
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
@@ -211,7 +211,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
             port, _, proto = key.partition("/")
             state = found.allow_status.get(key, "ok")
             text = (t(_STATUS_KEYS[state]) if state in _STATUS_KEYS and not rules
-                    else "; ".join(f"{r.ruleset_name}: {r.description or r.href.rsplit('/', 1)[-1]}" for r in rules)
+                    else "; ".join(rule_label(lang, r.ruleset_name, r.description, r.href) for r in rules)
                     or t("rpt_rw_allow_none"))
             if state == "error":
                 text = t("rpt_rw_allow_error")

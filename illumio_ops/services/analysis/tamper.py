@@ -119,13 +119,17 @@ def tamper_summary(ctx: AppContext, now: datetime) -> None:
     notes = list_annotations(ctx)
     ranked: list[tuple[int, str, dict[str, object]]] = []
     for host, raws in by_host.items():
-        readings = [r for raw in raws for r in interpret(raw)]
-        stamps = sorted({parse_time(raw["timestamp"]) for raw in raws})
+        per_event = [(parse_time(raw["timestamp"]), interpret(raw)) for raw in raws]
+        readings = [r for _, found_in in per_event for r in found_in]
+        stamps = sorted({at for at, _ in per_event})
         pattern = classify(stamps)
-        unexplained = sum(1 for r in readings if r.at >= now - RECENT and explained_by(r, host, pattern.kind, notes) is None)
+        # Every count here is in events: an event is unexplained while any process in it has no known cause.
+        recent = [found_in for at, found_in in per_event if at >= now - RECENT]
+        unexplained = sum(1 for found_in in recent
+                          if any(explained_by(r, host, pattern.kind, notes) is None for r in found_in))
         last = stamps[-1].isoformat()
         ranked.append((unexplained, last, {
-            "href": host, "hostname": names.get(host), "n_60d": len(raws), "n_7d": sum(1 for t in stamps if t >= now - RECENT),
+            "href": host, "hostname": names.get(host), "n_60d": len(raws), "n_7d": len(recent),
             "pattern": pattern.kind.value, "median_minutes": pattern.median_minutes, "last_at": last,
             "unexplained_7d": unexplained,
             "has_signal": any(r.classification == TamperClassification.SIGNAL for r in readings)}))

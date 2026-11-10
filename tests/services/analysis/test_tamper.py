@@ -31,13 +31,17 @@ def _tamper(i, at, *, signal=False):
             "notifications": [{"info": info}]}
 
 
+def _inventory(conn):
+    workloads.replace_inventory(conn, [workloads.WorkloadRow(
+        href=HOST, hostname="dev", name=None, managed=1, enforcement_mode="visibility_only", visibility_level=None,
+        os_id="ubuntu-x86_64-noble", ven_version=None, ven_href=VEN, label_set=None, online=1, risk_exposure=None,
+        risk_percent=None, risk_updated_at=None, fetched_at="x")])
+
+
 def _ctx(tmp_path):
     ctx = configured_ctx(tmp_path)
     with ctx.flows().connect() as conn:
-        workloads.replace_inventory(conn, [workloads.WorkloadRow(
-            href=HOST, hostname="dev", name=None, managed=1, enforcement_mode="visibility_only", visibility_level=None,
-            os_id="ubuntu-x86_64-noble", ven_version=None, ven_href=VEN, label_set=None, online=1, risk_exposure=None,
-            risk_percent=None, risk_updated_at=None, fetched_at="x")])
+        _inventory(conn)
         start = NOW - timedelta(hours=3)
         raws = [_tamper(i, start + timedelta(minutes=10 * i), signal=i == 3) for i in range(12)]
         raws.append({"href": "/orgs/1/events/m1", "event_type": "workload.update", "severity": "info",
@@ -116,3 +120,28 @@ def test_tamper_summary_for_a_switched_pce_writes_nothing(tmp_path, monkeypatch)
         tamper_summary(ctx, NOW)
     with ctx.flows().connect() as conn:
         assert analysis.read_result(conn, "tamper") is None
+
+
+def test_summary_counts_events_and_unexplained_in_the_same_unit(tmp_path):
+    # 2026-11-10 report review: a host read "3 events in 7 days, 18 unexplained" - one counted distinct times,
+    # the other every process inside each event. Both count events.
+    ctx = configured_ctx(tmp_path)
+    at = NOW - timedelta(hours=5)
+    stamp = at.strftime("%Y-%m-%dT%H:%M:%SZ")
+    sub = {"timestamp": stamp, "tamper_type": "firewall", "process_id": 77, "kernel_functions": ["nf_tables_newrule"]}
+    raws = []
+    for i in range(3):  # two of the three share a timestamp
+        when = (at + timedelta(minutes=30 * (i // 2))).strftime("%Y-%m-%dT%H:%M:%SZ")
+        raws.append({"href": f"/orgs/1/events/s{i}", "event_type": "agent.tampering", "severity": "info", "timestamp": when,
+                     "created_by": {"ven": {"href": VEN, "hostname": "dev"}},
+                     "notifications": [{"info": {"event_classification": "signal",
+                                                 "events": [{**sub, "process_name": f"p{n}"} for n in range(6)]}}]})
+    with ctx.flows().connect() as conn:
+        _inventory(conn)
+        upsert_events(conn, [normalize_event(r) for r in raws], origin=DataOrigin.INGEST, now=NOW)
+    add_annotation(ctx, host_href=None, pattern=None, process="p0", reason="known", by="t")
+    tamper_summary(ctx, NOW)
+    with ctx.flows().connect() as conn:
+        [h] = json.loads(analysis.read_result(conn, "tamper")["result_json"])["hosts"]
+    # p0 is a known cause, but every event also holds five processes nothing explains
+    assert (h["n_60d"], h["n_7d"], h["unexplained_7d"]) == (3, 3, 3)

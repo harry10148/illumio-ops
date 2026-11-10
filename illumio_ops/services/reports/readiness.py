@@ -36,7 +36,7 @@ from illumio_ops.services.analysis.predicted_block import (
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.flowsource import UnruledLink, readiness_rows, unruled_inbound
 from illumio_ops.services.reports import flowsections
-from illumio_ops.services.reports.common import port_text, tr
+from illumio_ops.services.reports.common import port_text, rule_label, tr
 from illumio_ops.services.reports.generate import coverage_note
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
@@ -192,7 +192,7 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
             ref = predicted.rules.get(href) if predicted else None
             if ref is None:
                 return t("rpt_rdy_rule_missing", id=href.rsplit("/", 1)[-1])
-            return f"{ref.ruleset_name}: {ref.description or href.rsplit('/', 1)[-1]}"
+            return rule_label(lang, ref.ruleset_name, ref.description, href)
         groups = predicted.groups
         predicted_blocks = (TableBlock(
             title=t("rpt_rdy_tbl_predicted"),

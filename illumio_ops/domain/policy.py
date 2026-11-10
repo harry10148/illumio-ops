@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from illumio_ops.domain.rule_schedule import strip_notes
 from illumio_ops.domain.values import RuleAction, parse_draft_policy_decision
 
 ActorKind = Literal["label", "label_group", "ip_list", "workload", "all_workloads", "virtual_service", "other"]
@@ -78,7 +79,8 @@ def _rule(raw: Mapping[str, Any], rule_type: RuleAction, rs: Mapping[str, Any],
     return RuleRef(
         href=str(raw["href"]), rule_type=rule_type, enabled=bool(raw.get("enabled", True)),
         ruleset_name=str(rs.get("name") or ""), ruleset_href=str(rs.get("href") or ""),
-        description=raw.get("description") or None,
+        # without the note illumio-ops writes there to mark its own schedule: that is not what the rule is called
+        description=strip_notes(str(raw.get("description") or "")) or None,
         consumers=tuple(_actor(a, labels, names) for a in raw.get("consumers") or ()),
         providers=tuple(_actor(a, labels, names) for a in raw.get("providers") or ()),
         services=tuple(_service(s, names) for s in raw.get("ingress_services") or ()))
