@@ -17,6 +17,7 @@ const CHECK_KEYS: Record<string, string> = {
 };
 type AlertRule = RuleListItem["rule"];
 const SEP = "; ";
+const ANY = new Set(["", "*", "any", "all"]);
 
 function ports(list: PortProto[] | undefined): string {
   return (list ?? []).map((p) => {
@@ -74,8 +75,9 @@ export function conditionSummary(rule: AlertRule): string {
   switch (rule.type) {
     case "event": {
       const parts = [rule.event_types.join(", ")];
-      if (rule.status && rule.status !== "*") parts.push(`${t("rsum_status")} ${rule.status}`);
-      if (rule.event_severity && rule.event_severity !== "*") parts.push(`${t("rsum_event_severity")} ${rule.event_severity}`);
+      // "", "*", "any" and "all" match every value (domain/alertrules.py _ANY): not a condition, so not printed
+      if (!ANY.has(rule.status)) parts.push(`${t("rsum_status")} ${rule.status}`);
+      if (!ANY.has(rule.event_severity)) parts.push(`${t("rsum_event_severity")} ${rule.event_severity}`);
       for (const [path, pattern] of Object.entries(rule.match_fields ?? {})) parts.push(`${path} = ${pattern}`);
       parts.push(rule.threshold === "count"
         ? t("rsum_event_count", { n: String(rule.threshold_count), minutes: String(rule.window_minutes) })

@@ -395,4 +395,6 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 
 /* Alert rule list: a rule's condition and exclusion in words. The line wraps (a long one takes more rows, it is
    never cut) and keeps a readable width so the other columns do not collapse. */
-.rule-words { min-width: 12rem; max-width: 26rem; white-space: normal; overflow-wrap: anywhere; }
+.rule-words { min-width: 11rem; max-width: 26rem; white-space: normal; overflow-wrap: anywhere; }
+.rule-words[data-role=rule-condition] { min-width: 16rem; }
+[data-role=rule-list] th, [data-role=rule-list] td:nth-child(2) { white-space: nowrap; }  /* short headers and the type stay on one line */
