@@ -392,3 +392,7 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .lat-initiators { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); align-items: start; }
 .lat-initiators .wrap-any { overflow-wrap: anywhere; }
 @media (max-width: 900px) { .lat-initiators { grid-template-columns: minmax(0, 1fr); } }
+
+/* Alert rule list: a rule's condition and exclusion in words. The line wraps (a long one takes more rows, it is
+   never cut) and keeps a readable width so the other columns do not collapse. */
+.rule-words { min-width: 12rem; max-width: 26rem; white-space: normal; overflow-wrap: anywhere; }

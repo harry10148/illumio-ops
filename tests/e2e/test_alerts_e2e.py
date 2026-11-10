@@ -223,7 +223,7 @@ def test_lateral_alert_marked_known_then_removed(context, live_app):
     form.locator("input[name=known_reason]").fill("Nightly backup host")
     form.get_by_label("Every detection of this kind about this host (or account)").check()
     form.get_by_role("button", name="Mark known").click()
-    expect(form.locator(".form-ok")).to_have_text("Marked known.")
+    expect(form.locator(".form-ok")).to_have_text("Marked known; this alert now counts as handled.")
     page.click(".sidenav .nav-item[data-nav='/system']")
     page.click(".subnav >> a[href=\"/system/lateral\"]")
     known = page.locator("[data-role=known-detections]")
@@ -502,3 +502,54 @@ def test_rules_page_holds_resets_evaluates_and_keeps(context, live_app):
         assert live_app.ctx.settings.current().alerts.retention_days == 0
     finally:
         live_app.ctx.scheduler = None
+
+
+def _traffic_rule(live_app):
+    rule = {"id": "c" * 32, "name": "RDP blocked", "pack_key": None, "enabled": True, "notify": True,
+            "severity": "high", "cooldown_minutes": 0, "throttle": None, "type": "traffic",
+            "window_minutes": 60, "threshold_connections": 25,
+            "condition": {"decisions": ["blocked"], "ports": [{"port": 3389, "proto": 6}],
+                          "dst": {"labels": [{"key": "env", "values": ["Prod", "DR"]}]},
+                          "src_exclude": {"labels": [{"key": "app", "values": ["Jumpbox"]}]},
+                          "exclude_ports": [{"port": 22, "proto": 6}]}}
+    ctx = live_app.ctx
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["alerts"]["rules"].append(rule))
+
+
+def test_rule_list_states_condition_and_exclusion_and_filters_by_type(context, live_app):
+    """6.5.0 B6 (UI spec §4.9): each rule's condition and exclusion in a line of words, and a filter by type."""
+    _traffic_rule(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alert-rules")
+    table = page.locator("[data-role=rule-list]")
+    row = table.locator(f"tr[data-rule-id='{'c' * 32}']")
+    cond = row.locator("[data-role=rule-condition]").inner_text()
+    assert "Blocked" in cond and "3389" in cond and "env = Prod or DR" in cond
+    assert "25 connections in 60 minutes" in cond
+    excl = row.locator("[data-role=rule-exclusion]").inner_text()
+    assert "app = Jumpbox" in excl and "22" in excl
+    # a rule with nothing excluded says so; a system rule names what it watches
+    system = table.locator("tr[data-rule-type=system]").first
+    assert system.locator("[data-role=rule-exclusion]").inner_text() == "None"
+    assert system.locator("[data-role=rule-condition]").inner_text().strip()
+    total = table.locator("tbody tr").count()
+    page.select_option("[data-role=rule-type-filter]", "traffic")
+    expect(table.locator("tbody tr:not([data-rule-type=traffic])")).to_have_count(0)
+    shown = table.locator("tbody tr").count()
+    assert 0 < shown < total and row.count() == 1  # only traffic rules, the new one among them
+    page.select_option("[data-role=rule-type-filter]", "")
+    expect(table.locator("tbody tr")).to_have_count(total)
+
+
+def test_rule_list_with_long_conditions_fits_1280_and_760(context, narrow_context, live_app):
+    from tests.e2e.conftest import no_horizontal_overflow
+    _traffic_rule(live_app)
+    for c in (context, narrow_context):
+        page = c.new_page()
+        sign_in(page, live_app.url)
+        page.goto(f"{live_app.url}/alert-rules")
+        cell = page.locator(f"tr[data-rule-id='{'c' * 32}'] [data-role=rule-condition]")
+        cell.wait_for()
+        assert no_horizontal_overflow(page)
+        assert cell.evaluate("e => e.scrollWidth <= e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis'")

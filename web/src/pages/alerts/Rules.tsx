@@ -7,6 +7,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { STATUS_KEYS, TYPE_KEYS, word } from "./common";
+import { conditionSummary, exclusionSummary } from "./ruleSummary";
 
 type Mode = "append_missing" | "replace";
 
@@ -15,6 +16,7 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<RulesView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [confirm, setConfirm] = useState<Mode | null>(null);
+  const [typeFilter, setTypeFilter] = useState("");
   const [resetting, setResetting] = useState<string | null>(null);
   const [evaluated, setEvaluated] = useState<EvaluateRequested | null>(null);
   const [keep, setKeep] = useState("");
@@ -98,24 +100,34 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
               </p>
             )}
           </div>
+          <label className="row" data-role="rule-type-filter-row">
+            {t("rules_filter_type")}
+            <select data-role="rule-type-filter" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+              <option value="">{t("rules_filter_all")}</option>
+              {[...new Set(view.items.map((i) => i.rule.type))].map((ty) => <option key={ty} value={ty}>{word(TYPE_KEYS, ty)}</option>)}
+            </select>
+          </label>
           <div className="table-wrap">
             <table className="table" data-role="rule-list">
               <thead>
                 <tr>
-                  <th>{t("rules_col_name")}</th><th>{t("rules_col_type")}</th><th>{t("rules_col_enabled")}</th>
+                  <th>{t("rules_col_name")}</th><th>{t("rules_col_type")}</th>
+                  <th>{t("rules_col_condition")}</th><th>{t("rules_col_exclusion")}</th><th>{t("rules_col_enabled")}</th>
                   <th>{t("rules_col_notify")}</th><th>{t("rules_col_last")}</th>
                   <th className="wb-num">{t("rules_col_7d")}</th><th className="wb-num">{t("rules_col_known")}</th>
                   <th>{t("rules_col_status")}</th>
                 </tr>
               </thead>
               <tbody>
-                {view.items.map((item) => {
+                {view.items.filter((item) => !typeFilter || item.rule.type === typeFilter).map((item) => {
                   const s = item.summary;
                   const held = (s?.suppressed_cooldown ?? 0) + (s?.suppressed_throttle ?? 0);
                   return (
-                    <tr key={item.rule.id} data-rule-id={item.rule.id}>
+                    <tr key={item.rule.id} data-rule-id={item.rule.id} data-rule-type={item.rule.type}>
                       <td><Link to={`/alerts/rules/${item.rule.id}`}>{item.display_name}</Link></td>
                       <td>{word(TYPE_KEYS, item.rule.type)}</td>
+                      <td className="rule-words" data-role="rule-condition">{conditionSummary(item.rule)}</td>
+                      <td className="rule-words" data-role="rule-exclusion">{exclusionSummary(item.rule) || t("rules_no_exclusion")}</td>
                       <td>
                         <input type="checkbox" aria-label={t("rules_col_enabled")} checked={item.rule.enabled}
                                onChange={() => void toggle(item, "enabled")} />
