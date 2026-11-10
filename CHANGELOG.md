@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.4.5] - 2026-11-11
+
+Corrections from the 2026-11-10 audit of the code, the documents and the reports.
+
+### Fixed
+
+- Policy diff report: "last changed by" was a dash on every row. The PCE names a changed object under
+  `resource_changes[].resource.<type>.href`; the report read a place the PCE never fills. It now reads the PCE's
+  shape, a rule's event also counts for its ruleset, and a change with no event in the period says so.
+- Audit report, failed sign-ins: the PCE records no user for a failed API request. The row says "not recorded by the
+  PCE" (a user name the event does carry is shown) and gives the API called. An event type no user made (VEN
+  tampering) says so in place of a dash. The findings name five users and count the rest.
+- Policy resolver report: a rule that produced no row is named with the side that has no address (source,
+  destination, both, or never in the same scope), in a finding and in the JSON file (`no_address_rules`).
+- VEN status report: tampering events and unexplained ones are counted in the same unit; the report states findings
+  (VENs not reporting, unexplained tampering, policy sync problems, Idle hosts that did not pass compatibility).
+- Unmanaged endpoints report: findings ordered by severity, public sources first; 100.64.0.0/10 is "shared address
+  space", no longer "private".
+- Rule hit count report: rule names no longer carry the schedule marker. Lateral posture findings name hosts, not
+  hrefs. Sync state, event status and tamper pattern read as words; a rule with no description is named by ruleset
+  and rule id.
+- zh_TW: Allowed/Blocked, Selective/Visibility Only and VEN are written as the PCE console writes them; four
+  sentences that guessed a cause now state what was seen.
+- `rollback.sh` no longer stops when the v6 unit is already gone. `install.sh --upgrade-from --port N` applies the
+  port to the migrated settings, and says so when existing settings keep theirs.
+
+### Changed
+
+- Documents: the index and the REST reference describe v6 (the reference is generated from the API contracts); 5.x
+  pages moved to `docs/legacy-5.x/`.
+- Internal: services no longer import jobs and jobs no longer import web (checked by the layering gate).
+
 ## [6.4.4] - 2026-11-09
 
 ### Fixed
