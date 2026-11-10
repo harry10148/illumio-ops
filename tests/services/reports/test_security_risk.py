@@ -90,8 +90,9 @@ def test_maturity_from_inventory_and_connections(ctx):
 def test_zero_user_coverage_says_so(ctx):
     _write(ctx, [flow(port=443)])
     doc = _build(ctx)
-    assert not any("user" in t.title.lower() for t in _tables(doc, "users"))
-    assert "0.0%" in _texts(doc, "users")
+    # 6.6.0: no flow names a user or a process — the section is left out and one data note says so
+    assert "users" not in {s.id for s in doc.sections}
+    assert sum("names the initiating user or process" in q for q in doc.data_quality) == 1
 
 
 def test_users_ranked_when_present(ctx):
@@ -129,7 +130,10 @@ def test_key_findings_critical_high_only(ctx):
 def test_ransomware_summary(tmp_path):
     a = configured_ctx(tmp_path / "a")
     _write(a, [flow(port=443)])
-    assert "not been computed" in _texts(_build(a), "ransomware")
+    doc = _build(a)  # 6.6.0: not computed yet — no section, no number, one data note
+    assert "ransomware" not in {s.id for s in doc.sections}
+    assert "ransomware_protected_pct" not in {k.key for k in doc.kpis}
+    assert sum("ransomware analysis has not been computed" in q for q in doc.data_quality) == 1
     b = configured_ctx(tmp_path / "b")
     _write(b, [flow(port=443)])
     with b.flows().connect() as conn:

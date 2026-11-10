@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from illumio_ops.domain.report import TableBlock, TextBlock
+from illumio_ops.domain.report import TableBlock
 from illumio_ops.domain.values import Language, ReportType, Severity
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.reports.render_html import render_html
@@ -122,8 +122,9 @@ def test_versions_and_os(ctx):
 def test_tamper_section_from_analysis(tmp_path):
     a = configured_ctx(tmp_path / "a")
     _inventory(a, [host("on")])
-    texts = " ".join(p for b in _section(_build(a), "tamper").blocks if isinstance(b, TextBlock) for p in b.paragraphs)
-    assert "not been computed" in texts
+    doc = _build(a)  # 6.6.0: not computed yet — no section, no number, one data note
+    assert "tamper" not in {s.id for s in doc.sections} and "unexplained_tamper" not in _kpi(doc)
+    assert sum("tamper analysis has not been computed" in q for q in doc.data_quality) == 1
     b = configured_ctx(tmp_path / "b")
     _inventory(b, [host("on")])
     with b.flows().connect() as conn:
@@ -139,7 +140,7 @@ def test_all_kpis_rendered(ctx):
     _inventory(ctx, [host("on")])
     doc = _build(ctx)
     html = render_html(doc, tz=UTC)
-    assert len(doc.kpis) >= 8 and all(k.label in html for k in doc.kpis)
+    assert len(doc.kpis) >= 7 and all(k.label in html for k in doc.kpis)  # the tamper number needs its analysis
 
 
 def test_zh_tw_builds(ctx):

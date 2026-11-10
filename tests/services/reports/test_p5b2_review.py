@@ -170,8 +170,9 @@ def test_org_summary_bounded_to_the_periods(ctx):
         conn.execute("INSERT INTO org_risk_snapshot_daily (day, summary_json) VALUES ('2026-09-01', ?)",
                      (json.dumps({"ransomware": {"ransomware_protection_coverage_percent": 42.0}}),))
         conn.commit()
-    k = _kpi(_build(ctx, ReportType.RANSOMWARE))["org_percent"]
-    assert k.value is None and k.previous is None and "2026-09-01" in k.note
+    doc = _build(ctx, ReportType.RANSOMWARE)
+    # 6.6.0: a figure the PCE gave only outside the period is not a number here; a data note says when the last was
+    assert "org_percent" not in _kpi(doc) and sum("2026-09-01" in q for q in doc.data_quality) == 1
 
 
 # 12: the audit trend counts local days, across a DST change too

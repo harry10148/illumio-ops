@@ -49,6 +49,7 @@ from illumio_ops.services.reports.generate import (
     previous_period,
     traffic_covered,
 )
+from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.store.flowdb import analysis
 
@@ -175,14 +176,15 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         maturity=(no_flows if not totals.flows else maturity_note() if score.grade else t("rpt_sec_maturity_none")),
         enforced_hosts_pct=None if hosts else t("rpt_sec_no_hosts"),
         critical_high_findings=None if totals.flows else no_flows,
-        ransomware_protected_pct=None if rw_counts else t("rpt_sec_rw_no_data"),
         lateral_detections=t("rpt_sec_detections_all_hosts"))
     percent = {"enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
     higher = {"maturity", "enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k],
                      previous=before[k] if before is not None and k in before else None,
                      unit="percent" if k in percent else "count", better="higher" if k in higher else "lower",
-                     note=notes.get(k)) for k, label in _KPI_KEYS.items())
+                     note=notes.get(k)) for k, label in _KPI_KEYS.items()
+                 # a number another analysis has not produced is left out; the data notes say why (6.6.0)
+                 if not (k == "ransomware_protected_pct" and values[k] is None))
 
     # ── how the maturity score is worked out ────────────────────────────────
     def got(part: str) -> str:
@@ -291,11 +293,13 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                        else t("rpt_sec_pb_rule_unlabeled", service=r[1])) for r in pb_base.rows)})
 
     # ── ransomware ──────────────────────────────────────────────────────────
-    rw_blocks: tuple[TableBlock | TextBlock, ...]
+    # A part that rests on another analysis is left out until that analysis has a result; each gets one data note.
+    missing: list[str] = []
+    rw_blocks: tuple[TableBlock | TextBlock, ...] = ()
     if rw is None:
-        rw_blocks = (TextBlock(paragraphs=(t("rpt_sec_rw_not_computed"),)),)
+        missing.append(hint(lang, "rpt_hint_pending_sec_rw"))
     elif rw.get("unsupported"):
-        rw_blocks = (TextBlock(paragraphs=(t("rpt_sec_rw_unsupported"),)),)
+        missing.append(hint(lang, "rpt_hint_unsupported_sec_rw"))
     else:
         scope = {h.href for h in hosts if h.href} if cond is not None else None
         priority = [r for r in rw.get("priority") or () if scope is None or r.get("host") in scope]
@@ -311,7 +315,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                        for r in priority[:RANSOMWARE_TOP]),
             total_rows=len(priority), empty_text=t("rpt_sec_rw_none"),
             limit_note=t("rpt_limit_top_n", n=RANSOMWARE_TOP) if len(priority) > RANSOMWARE_TOP else None),)
-    rw_blocks = (*rw_blocks, TextBlock(paragraphs=(t("rpt_sec_rw_see"),)))
+    if rw_blocks:
+        rw_blocks = (*rw_blocks, TextBlock(paragraphs=(t("rpt_sec_rw_see"),)))
 
     # ── users and processes ─────────────────────────────────────────────────
     fc = field_coverage(inp.ctx, spec)
@@ -327,22 +332,23 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
             columns=(Column(key="user", label=t("rpt_col_user")),
                      Column(key="n", label=t("rpt_col_distinct_destinations"), kind="number"))))
     else:
-        user_blocks.append(TextBlock(paragraphs=(t("rpt_sec_no_users"),)))
+        missing.append(hint(lang, "rpt_hint_pending_sec_no_users" if fc.initiator_process
+                            else "rpt_hint_pending_sec_no_users_processes"))
     if fc.initiator_process:
         user_blocks.append(flowsections.ranking(
             inp, title=t("rpt_sec_tbl_processes"), metric=SegmentMetric.CONNECTIONS, limit=TOP,
             group_by=(GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS),), skip_empty=True,
             columns=(Column(key="process", label=t("rpt_col_process")),
                      Column(key="n", label=t("rpt_col_connections"), kind="number"))))
-    else:
-        user_blocks.append(TextBlock(paragraphs=(t("rpt_sec_no_processes"),)))
+    elif fc.initiator_user:
+        missing.append(hint(lang, "rpt_hint_pending_sec_no_processes"))
 
     # ── lateral movement ────────────────────────────────────────────────────
     exposure = json.loads(exposure_row["result_json"]) if exposure_row is not None else None
     lateral_lines = [t("rpt_sec_lateral_detections", n=values["lateral_detections"],
                        high=sum(h for _, h in detections.values()))]
     if exposure is None:
-        lateral_lines.append(t("rpt_lat_not_computed"))
+        missing.append(hint(lang, "rpt_hint_pending_sec_exposure"))
     else:
         lateral_lines.append(t(
             "rpt_sec_lateral_exposure",
@@ -359,8 +365,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_security_risk"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
         findings=findings.as_findings(fired, lang, limit=KEY_FINDINGS),
-        data_quality=(*quality, *flowsections.no_links_note(inp)),
-        sections=(
+        data_quality=(*quality, *missing, *flowsections.no_links_note(inp)),
+        sections=tuple(s for s in (
             Section(id="how", title=t("rpt_sec_sec_how"), intro=t("rpt_sec_how_intro"),
                     blocks=(parts_table, grades_table)),
             Section(id="coverage", title=t("rpt_sec_sec_coverage"), intro=t("rpt_sec_coverage_intro"),
@@ -373,7 +379,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                     blocks=(enforcement,)),
             Section(id="pb", title=t("rpt_sec_sec_pb"), intro=t("rpt_sec_pb_intro"), blocks=(pb,),
                     workbench_link=link(PB_ONLY, by_app_dst, by_service)),
-            Section(id="ransomware", title=t("rpt_sec_sec_ransomware"), blocks=rw_blocks),
+            Section(id="ransomware", title=t("rpt_sec_sec_ransomware"), blocks=rw_blocks) if rw_blocks else None,
+            None if not (fc.initiator_user or fc.initiator_process) else
             Section(id="users", title=t("rpt_sec_sec_users"), blocks=tuple(user_blocks),
                     workbench_link=(
                         link((), GroupBy(dimension=SegmentDimension.INITIATOR_USER), metric=SegmentMetric.DISTINCT_DST)
@@ -383,4 +390,4 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
             Section(id="lateral", title=t("rpt_sec_sec_lateral"), blocks=(TextBlock(paragraphs=tuple(lateral_lines)),)),
             Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
                     blocks=(findings.outcomes_table(_by_category(outcomes), lang, title=t("rpt_sec_tbl_findings"),
-                                                    evaluated=bool(totals.flows)),))))
+                                                    evaluated=bool(totals.flows)),))) if s is not None))

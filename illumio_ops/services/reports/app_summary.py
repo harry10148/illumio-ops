@@ -33,6 +33,7 @@ from illumio_ops.services.reports.generate import (
     previous_period,
     traffic_covered,
 )
+from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.registry import BuildInput
 
 TOP = 30
@@ -124,9 +125,10 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
                            ("intra_connections", "rpt_app_kpi_intra"), ("allowed_pct", "rpt_sec_kpi_allowed_pct"),
                            ("pb_flows", "rpt_sec_kpi_pb_flows"))),
         Kpi(key="hosts", label=t("rpt_app_kpi_hosts"), value=len(hosts), previous=None),
-        Kpi(key="enforced_hosts_pct", label=t("rpt_sec_kpi_enforced_hosts"), unit="percent", better="higher",
-            value=round(100 * (modes["full"] + modes["selective"]) / len(hosts), 1) if hosts else None, previous=None,
-            note=None if hosts else t("rpt_app_no_hosts")),
+        # a share of no hosts is not a number: left out, and the data notes say the app has no managed host (6.6.0)
+        *((Kpi(key="enforced_hosts_pct", label=t("rpt_sec_kpi_enforced_hosts"), unit="percent", better="higher",
+               value=round(100 * (modes["full"] + modes["selective"]) / len(hosts), 1), previous=None),)
+          if hosts else ()),
     )
 
     def peer_ranking(title_key: str, side: str, dim: SegmentDimension, *, uncovered: bool = False,
@@ -176,7 +178,8 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
         report_type=inp.params.report_type, lang=lang, title=title, period_start=inp.start, period_end=inp.end,
         generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
         findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
-        data_quality=(*quality, *flowsections.no_links_note(inp)),
+        data_quality=(*quality, *(() if hosts else (hint(lang, "rpt_hint_pending_app_hosts", app=app_name),)),
+                      *flowsections.no_links_note(inp)),
         sections=(
             Section(id="inbound", title=t("rpt_app_sec_inbound"), intro=t("rpt_app_inbound_intro"),
                     blocks=(peer_ranking("rpt_app_tbl_inbound", "inbound", SegmentDimension.SRC_LABEL),),

@@ -24,6 +24,7 @@ from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.analysis.tamper import list_annotations
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import sync_state_name, tamper_pattern_name, tr
+from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
@@ -134,9 +135,10 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         "lost_48h": counts["lost_48h"], "long_offline": counts["long_offline"], "status_unknown": counts["unknown"],
         "sync_problems": len(trouble), "unexplained_tamper": unexplained if tamper is not None else None}
     before = previous_values(inp)
+    # the tampering number and section come from the tamper analysis: left out until it has run (6.6.0)
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=(before or {}).get(k),
-                     better="higher" if k in ("managed", "online") else "lower",
-                     note=t("rpt_lat_not_computed") if values[k] is None else None) for k, label in _KPI_KEYS.items())
+                     better="higher" if k in ("managed", "online") else "lower")
+                 for k, label in _KPI_KEYS.items() if values[k] is not None)
 
     def stamp(value: str | None) -> str | None:
         return value or None  # time columns: the renderers show it in the display zone; missing stays blank
@@ -232,7 +234,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
 
     tamper_blocks: tuple[TableBlock | TextBlock, ...]
     if tamper is None:
-        tamper_blocks = (TextBlock(paragraphs=(t("rpt_ven_tamper_not_computed"),)),)
+        tamper_blocks = ()
     else:
         notes = list_annotations(inp.ctx)
         tamper_blocks = (TableBlock(
@@ -286,7 +288,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ven_status"), period_start=inp.start,
         period_end=inp.end, generated_at=now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(found),
-        data_quality=tuple(quality),
+        data_quality=(*quality, *(() if tamper is not None else (hint(lang, "rpt_hint_pending_ven_tamper"),))),
         sections=(Section(id="online", title=t("rpt_ven_sec_online"), intro=t("rpt_ven_online_intro"),
                           blocks=(online_table, compat_table)),
                   Section(id="offline", title=t("rpt_ven_sec_offline"), intro=t("rpt_ven_offline_intro"),
@@ -294,5 +296,5 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                   Section(id="sync", title=t("rpt_ven_sec_sync"), intro=t("rpt_ven_sync_intro"), blocks=(sync_table,)),
                   Section(id="versions", title=t("rpt_ven_sec_versions"), blocks=(versions, systems)),
                   Section(id="modes", title=t("rpt_sec_sec_enforcement"), blocks=(modes,)),
-                  Section(id="tamper", title=t("rpt_ven_sec_tamper"), intro=t("rpt_ven_tamper_intro"),
-                          blocks=tamper_blocks)))
+                  *((Section(id="tamper", title=t("rpt_ven_sec_tamper"), intro=t("rpt_ven_tamper_intro"),
+                             blocks=tamper_blocks),) if tamper is not None else ())))

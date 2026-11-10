@@ -14,7 +14,7 @@ from illumio_ops.services.reports import policy_usage, ransomware_report, visibi
 from illumio_ops.services.reports import readiness as readiness_report
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.workbench import FlowRequest
-from illumio_ops.store.flowdb import workloads
+from illumio_ops.store.flowdb import analysis, workloads
 from tests.services.collect.conftest import configured_ctx
 from tests.services.reports.test_policy_usage import usage
 from tests.services.reports.test_readiness import summary
@@ -42,7 +42,12 @@ def ctx(tmp_path, monkeypatch):
     monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage())
     monkeypatch.setattr(ransomware_report, "host_ransomware", lambda ctx, href, **kw: HostRansomware.model_construct(
         breakdown=None, allow_rules={}, allow_status={}))
-    return configured_ctx(tmp_path)
+    c = configured_ctx(tmp_path)
+    with c.flows().connect() as conn:  # a ransomware report with no analysis result is its title only (6.6.0)
+        analysis.write_result(conn, "ransomware", params={}, at=NOW, result={
+            "unsupported": False, "priority": [], "safe_to_block": [], "suspicious": [], "hosts": []})
+        conn.commit()
+    return c
 
 
 def _build(ctx, rt):
