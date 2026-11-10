@@ -142,7 +142,10 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language) -> str:
     if not t.rows:
         return (head + limit + '<div class="report-table-panel report-table-panel--empty" data-empty="true">'
                 f'<span class="empty-text">{_esc(t.empty_text)}</span></div>')
-    shown = t.rows[:HTML_ROW_CAP]
+    shown = t.rows[:HTML_ROW_CAP if t.html_rows is None else min(HTML_ROW_CAP, t.html_rows)]
+    if not shown:  # every row is in the XLSX only: the builder's sentence and where to find them
+        return (head + limit + f'<p class="note" data-role="xlsx-only">{_esc(t.html_note or "")} '
+                f'{_esc(tr(lang, "rpt_rows_in_sheet", total=len(t.rows), sheet=sheet))}</p>')
     wide = len(t.columns) >= WIDE_COLUMNS
     panel = ("report-table-panel" + (" report-table-panel--wide report-table-panel--landscape" if wide else "")
              + (" report-table-panel--long" if len(shown) > LONG_TABLE_ROWS else ""))
@@ -157,7 +160,9 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language) -> str:
         for n, row in enumerate(shown))
     cap = ""
     if len(t.rows) > len(shown):
-        cap = f'<p class="note">{_esc(tr(lang, "rpt_rows_capped", shown=len(shown), total=len(t.rows), sheet=sheet))}</p>'
+        said = f"{t.html_note} " if t.html_note and t.html_rows is not None else ""
+        cap = (f'<p class="note">{_esc(said)}'
+               f'{_esc(tr(lang, "rpt_rows_capped", shown=len(shown), total=len(t.rows), sheet=sheet))}</p>')
     table = (f'<div class="{panel}"><div class="report-table-wrap"><table class="report-table'
              f'{" report-table--interactive" if len(t.columns) >= 2 else ""}" data-column-count="{len(t.columns)}">'
              f"<colgroup>{cols}</colgroup><thead><tr>{ths}</tr></thead><tbody>{body}</tbody></table></div></div>")

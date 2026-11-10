@@ -71,6 +71,10 @@ class TableBlock(_Model):
     total_rows: int  # rows that exist; more than len(rows) when the builder's read was itself limited
     empty_text: str  # what an empty table says (why there is nothing), never a blank panel
     limit_note: str | None = None  # the builder's own read limit, when it hit it
+    # Rows the HTML prints (the first N, 0: none); the XLSX always holds them all. None: the renderer's own cap.
+    # html_note says, in the builder's words, what the rows left out of the HTML are.
+    html_rows: int | None = Field(default=None, ge=0)
+    html_note: str | None = None
 
     @model_validator(mode="after")
     def _shape(self) -> TableBlock:

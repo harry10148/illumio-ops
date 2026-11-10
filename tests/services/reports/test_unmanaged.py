@@ -145,3 +145,16 @@ def test_shared_address_space_is_not_called_private(tmp_path):
                     "192.168.1.9": "Private"}
     kpi = next(k for k in doc.kpis if k.key == "private")
     assert kpi.value == 3 and kpi.label == "Non-public addresses"
+
+
+def test_the_long_lists_are_counted_in_the_html_and_whole_in_the_xlsx(ctx):
+    """6.6.0 Task 5 (.106: an 18,000-pixel page): the list of every address and of every public one are sorted by
+    the sections above them; the HTML gives the count and the first public ones, the tables keep every row."""
+    from illumio_ops.services.reports.render_html import render_html
+    _rollup(ctx, [("2026-10-21", f"ip:8.8.{i}.1", "/orgs/1/workloads/a", 443, "allowed", 1) for i in range(30)])
+    doc = build_unmanaged(_inp(ctx))
+    every, public = _table(doc, "all"), _table(doc, "public")
+    assert len(every.rows) >= 30 and every.html_rows == 0 and len(public.rows) >= 30 and public.html_rows == 20
+    html = render_html(doc, tz=UTC)
+    assert f"{len(every.rows)} unmanaged addresses are not listed row by row" in html
+    assert sum(f"8.8.{i}.1<" in html for i in range(30)) <= 20  # at most the listed public ones

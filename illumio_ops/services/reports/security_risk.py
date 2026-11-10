@@ -54,7 +54,7 @@ from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.store.flowdb import analysis
 
 TOP = 20
-RANSOMWARE_TOP = 10
+RANSOMWARE_TOP = 5  # a summary: the ransomware report holds the list
 KEY_FINDINGS = 5
 APP = "app"  # the app label key
 UNCOVERED = (PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.BLOCKED)

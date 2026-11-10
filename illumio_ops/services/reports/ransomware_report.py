@@ -200,9 +200,10 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     every = [(h, s) for h in ranked for s in h.get("services") or ()]
     # A service that takes nothing off the host's score (contribution 0) is one of hundreds of identical rows: only
     # the ones that do are listed, and the rest are counted (6.6.0).
-    services = [(h, s) for h, s in every if isinstance(s.get("contribution"), (int, float)) and s["contribution"] > 0]
-    if not services:
-        services = every[:0]
+    def lowers(s: Mapping[str, Any]) -> bool:
+        return isinstance(s.get("contribution"), (int, float)) and s["contribution"] > 0
+    lowering = sum(1 for _, s in every if lowers(s))
+    services = sorted(every, key=lambda hs: not lowers(hs[1]))  # stable: the ones that lower a score first
     service_table = TableBlock(
         title=t("rpt_rw_tbl_services"),
         columns=(Column(key="host", label=t("rpt_col_host")), Column(key="service", label=t("rpt_col_name")),
@@ -217,10 +218,11 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                     pct(100 * s["coverage"]) if isinstance(s.get("coverage"), (int, float)) else "—",
                     f"{s['contribution']:.1f}" if isinstance(s.get("contribution"), (int, float)) else "—")
                    for h, s in services),
-        total_rows=len(services),
-        empty_text=t("rpt_rw_none_contributing", n=len(every)) if every else t("rpt_rw_none_hosts"),
-        limit_note=(t("rpt_rw_services_rest", n=len(every) - len(services))
-                    if services and len(every) > len(services) else None))
+        total_rows=len(services), empty_text=t("rpt_rw_none_hosts"),
+        # the HTML prints the rows that lower a score; every row is in the XLSX
+        html_rows=lowering if lowering < len(services) else None,
+        html_note=(t("rpt_rw_services_rest", n=len(services) - lowering) if lowering
+                   else t("rpt_rw_none_contributing", n=len(services))) if lowering < len(services) else None)
 
     # ── allow rules behind the deductions, for the top hosts of the fix-first list ─────
     top_hosts: list[str] = list(dict.fromkeys(str(r.get("host")) for r in lists["priority"] if r.get("host")))

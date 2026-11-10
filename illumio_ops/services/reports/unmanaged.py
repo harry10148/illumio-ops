@@ -30,6 +30,7 @@ from illumio_ops.services.reports.generate import (
 from illumio_ops.services.reports.registry import BuildInput
 
 ROW_LIMIT = 100_000
+PUBLIC_HTML_ROWS = 20  # public addresses the HTML lists (by managed hosts reached); the XLSX has them all
 CANDIDATE_MIN_PEERS = 3
 TOP_PORTS = 3
 DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
@@ -141,8 +142,11 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
                 e.last_day)
 
     shown = ordered[:ROW_LIMIT]
+    # The whole list and the public one run to thousands of rows that the sections above already sort: the HTML gives
+    # their counts and the XLSX holds every row (6.6.0).
     all_table = TableBlock(title=t("rpt_unm_tbl_all"), columns=columns, rows=tuple(row(e) for e in shown),
-                           total_rows=len(ordered), empty_text=t("rpt_unm_none"),
+                           total_rows=len(ordered), empty_text=t("rpt_unm_none"), html_rows=0,
+                           html_note=t("rpt_unm_all_in_xlsx", n=f"{len(ordered):,}"),
                            limit_note=t("rpt_limit_top", shown=f"{len(shown):,}", total=f"{len(ordered):,}")
                            if len(ordered) > len(shown) else None)
     candidates = [e for e in ordered if not is_public(e.address) and e.peers >= CANDIDATE_MIN_PEERS]
@@ -159,7 +163,8 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
         total_rows=len(admin_eps), empty_text=t("rpt_unm_admin_none"))
     public = [e for e in ordered if is_public(e.address)]
     public_table = TableBlock(title=t("rpt_unm_tbl_public"), columns=columns, rows=tuple(row(e) for e in public),
-                              total_rows=len(public), empty_text=t("rpt_unm_public_none"))
+                              total_rows=len(public), empty_text=t("rpt_unm_public_none"), html_rows=PUBLIC_HTML_ROWS,
+                              html_note=t("rpt_unm_public_top", n=PUBLIC_HTML_ROWS))
     # an internet source first, then by managed hosts reached: the findings run from the highest severity down
     flagged = sorted(admin_eps, key=lambda e: (not is_public(e.address), -e.admin_peers, e.key))[:5]
     findings = tuple(Finding(severity=Severity.MEDIUM if not is_public(e.address) else Severity.HIGH,

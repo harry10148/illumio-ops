@@ -34,6 +34,7 @@ from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.store.flowdb.db import db_time
 
 ROW_LIMIT = 100_000
+FINDING_PAIRS = 3  # connections a finding names; the rest are counted
 ADMIN_ROW_LIMIT = 5_000
 TOP = 20
 DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
@@ -92,18 +93,29 @@ class _Builder:
                 Column(key="decision", label=self.t("rpt_col_last_decision")))
 
     def findings(self, admin_rows: Sequence[sqlite3.Row]) -> tuple[Finding, ...]:
-        """New management connections into critical assets first, then from unmanaged sources (at most 5)."""
-        out = []
+        """New management connections into critical assets first, then from unmanaged sources: one finding per
+        service of each kind (at most 5), with how many connections and up to FINDING_PAIRS of them named — a
+        finding per connection filled the summary with five lines about the same port (6.6.0)."""
+        groups: dict[tuple[int, int, int], list[sqlite3.Row]] = {}
         for r in admin_rows:
             dst = self.lc.hosts.get(r["dst_key"])
             if dst is not None and dst.critical:
-                out.append((0, Severity.HIGH, r, "rpt_new_why_critical"))
+                groups.setdefault((0, r["port"], r["proto"]), []).append(r)
             elif str(r["src_key"]).startswith("ip:"):
-                out.append((1, Severity.MEDIUM, r, "rpt_new_why_unmanaged"))
-        out.sort(key=lambda x: (x[0], x[2]["first_seen"]))
-        return tuple(Finding(severity=sev, title=self.t("rpt_new_finding_title", service=port_text(r["port"], r["proto"]),
-                                                         src=self.name(r["src_key"]), dst=self.name(r["dst_key"])),
-                             why=self.t(why), action=self.t("rpt_new_action")) for _, sev, r, why in out[:5])
+                groups.setdefault((1, r["port"], r["proto"]), []).append(r)
+        ordered = sorted(groups.items(), key=lambda kv: (kv[0][0], -len(kv[1]), kv[0][1], kv[0][2]))
+        out = []
+        for (rank, port, proto), rows in ordered[:5]:
+            rows = sorted(rows, key=lambda r: r["first_seen"])
+            pairs = "; ".join(f"{self.name(r['src_key'])} → {self.name(r['dst_key'])}" for r in rows[:FINDING_PAIRS])
+            more = len(rows) - FINDING_PAIRS
+            out.append(Finding(
+                severity=Severity.HIGH if rank == 0 else Severity.MEDIUM,
+                title=self.t("rpt_new_finding_service", n=len(rows), service=port_text(port, proto)),
+                why=self.t("rpt_new_why_critical" if rank == 0 else "rpt_new_why_unmanaged") + " "
+                + (self.t("rpt_new_pairs_more", pairs=pairs, n=more) if more > 0 else self.t("rpt_new_pairs", pairs=pairs)),
+                action=self.t("rpt_new_action")))
+        return tuple(out)
 
     def limit_note(self, shown: int, total: int) -> str | None:
         return self.t("rpt_limit_earliest", shown=f"{shown:,}", total=f"{total:,}") if total > shown else None

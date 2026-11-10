@@ -269,15 +269,23 @@ def test_full_host_gap_not_explained_as_selective(ctx):
     assert "move it to Full" not in text and "PCE console" in text
 
 
-def test_services_that_take_nothing_off_a_score_are_counted_not_listed(ctx):
-    """6.6.0 Task 5 (.106: 200 rows, every one 0.0): the per-service table lists the services that lower a score."""
+def test_services_that_take_nothing_off_a_score_are_left_to_the_xlsx(ctx):
+    """6.6.0 Task 5 (.106: 200 rows, every one 0.0): the HTML prints the services that lower a score; the table —
+    and so the XLSX — still holds every row."""
+    from illumio_ops.services.reports.render_html import render_html
     lowering = {**svc("SMB", 445), "contribution": 12.5}
     _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [item("a", "SMB", 445)], "safe_to_block": [],
-                  "suspicious": [], "hosts": [hostrow("a", computed=5.0, services=[lowering, svc("RDP", 3389),
+                  "suspicious": [], "hosts": [hostrow("a", computed=5.0, services=[svc("RDP", 3389), lowering,
                                                                                     svc("WinRM", 5985)])]})
-    table = _tables(_build(ctx), "hosts")[1]
-    assert [r[1] for r in table.rows] == ["SMB"] and "other 2 contribute 0" in table.limit_note
+    doc = _build(ctx)
+    table = _tables(doc, "hosts")[1]
+    assert [r[1] for r in table.rows] == ["SMB", "RDP", "WinRM"] and table.html_rows == 1
+    html = render_html(doc, tz=UTC)
+    assert "the other 2 contribute 0" in html and "5985/TCP" not in html  # the row is in the XLSX only
     _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [item("a", "SMB", 445)], "safe_to_block": [],
                   "suspicious": [], "hosts": [hostrow("a", computed=5.0, services=[svc("RDP", 3389)])]})
-    table = _tables(_build(ctx), "hosts")[1]
-    assert table.rows == () and "None of the 1 services" in table.empty_text
+    doc = _build(ctx)
+    table = _tables(doc, "hosts")[1]
+    assert len(table.rows) == 1 and table.html_rows == 0
+    html = render_html(doc, tz=UTC)
+    assert "None of the 1 services" in html and 'data-role="xlsx-only"' in html

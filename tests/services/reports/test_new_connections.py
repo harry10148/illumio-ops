@@ -117,7 +117,9 @@ def test_index_exists_after_migration(ctx):
 def test_findings_critical_first_then_unmanaged(ctx):
     f = build_new_connections(_inp(ctx)).findings
     assert [x.severity.value for x in f] == ["high", "medium"]
-    assert "3389/TCP" in f[0].title and "fin-db-01" in f[0].title and "10.9.9.9" in f[1].title
+    # 6.6.0: one finding per service and kind, counting its connections and naming them in the evidence
+    assert f[0].title == "1 new 3389/TCP management connection(s)" and "fin-db-01" in f[0].why
+    assert "10.9.9.9" in f[1].why
 
 
 def _covered(ctx, start, end):
