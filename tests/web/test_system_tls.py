@@ -1,7 +1,7 @@
-from illumio_ops.web import tls
+from illumio_ops import tls
+from tests.test_tls import _sign_with_own_ca
 
 from .conftest import LOCAL, csrf, login, post
-from .test_tls import _sign_with_own_ca
 
 
 def _status(client):

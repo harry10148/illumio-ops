@@ -8,8 +8,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
+from illumio_ops import tls
 from illumio_ops.settings.schema import default_settings
-from illumio_ops.web import tls
 from tests.settings.conftest import HASH, KEY
 
 

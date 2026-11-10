@@ -10,8 +10,8 @@ from flask import Blueprint
 from flask_limiter import Limiter
 from pydantic import BaseModel, Field
 
+from illumio_ops import tls
 from illumio_ops.services.context import AppContext
-from illumio_ops.web import tls
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
 

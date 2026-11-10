@@ -76,12 +76,12 @@ def test_injected_update_and_delete_are_caught(tmp_path):
 
 
 def test_unregistered_table_write_is_caught(tmp_path):
-    root = _tree(tmp_path, "jobs/health.py", 'SQL = "INSERT INTO mystery (x) VALUES (1)"\n')
+    root = _tree(tmp_path, "store/job_health.py", 'SQL = "INSERT INTO mystery (x) VALUES (1)"\n')
     assert "unregistered" in find_foreign_writers(iter_modules(root))[0]
 
 
 def test_owner_upsert_is_clean(tmp_path):
-    root = _tree(tmp_path, "jobs/health.py",
+    root = _tree(tmp_path, "store/job_health.py",
                  'SQL = ("INSERT INTO job_health (job_id) VALUES (?) "\n'
                  '       "ON CONFLICT(job_id) DO UPDATE SET runs = runs + 1")\n')
     assert find_foreign_writers(iter_modules(root)) == []

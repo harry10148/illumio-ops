@@ -9,10 +9,10 @@ from pydantic import BaseModel
 
 import illumio_ops
 from illumio_ops.domain.values import CollectionMode
-from illumio_ops.jobs.health import list_health
 from illumio_ops.services.context import AppContext
 from illumio_ops.store import alerts as alert_store
 from illumio_ops.store.flowdb import ingest_state
+from illumio_ops.store.job_health import list_health
 
 UNPROCESSED_DAYS = 7  # the alerts page's default period
 TRAFFIC_JOB = "collect_traffic"

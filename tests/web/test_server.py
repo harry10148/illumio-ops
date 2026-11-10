@@ -7,9 +7,9 @@ import time
 import pytest
 from flask import Flask
 
-from illumio_ops.web import tls
+from illumio_ops import tls
 from illumio_ops.web.server import serve
-from tests.web.test_tls import _tls
+from tests.test_tls import _tls
 
 
 def _free_port() -> int:

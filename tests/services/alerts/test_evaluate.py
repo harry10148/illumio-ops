@@ -549,7 +549,7 @@ def test_probe_only_run_does_not_skip_gaps(ctx):
 
 
 def test_job_failing_uses_consecutive(ctx):
-    from illumio_ops.jobs.health import record_finish, record_start
+    from illumio_ops.store.job_health import record_finish, record_start
     evaluate_system(ctx, now=NOW)
     with ctx.db() as conn:
         record_start(conn, "collect_traffic", NOW)

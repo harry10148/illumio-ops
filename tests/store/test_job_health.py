@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
-from illumio_ops.jobs.health import list_health, record_finish, record_start
 from illumio_ops.store.db import connect, migrate
+from illumio_ops.store.job_health import list_health, record_finish, record_start
 
 T0 = datetime(2026, 10, 24, 1, 0, tzinfo=UTC)
 
@@ -44,7 +44,7 @@ def test_list_health_orders_by_job_id(tmp_path):
 def test_consecutive_failures_reset_on_success(tmp_path):
     from datetime import UTC, datetime
 
-    from illumio_ops.jobs.health import list_health, record_finish, record_start
+    from illumio_ops.store.job_health import list_health, record_finish, record_start
     from tests.web.conftest import make_ctx
     ctx = make_ctx(tmp_path)
     now = datetime(2026, 10, 26, tzinfo=UTC)

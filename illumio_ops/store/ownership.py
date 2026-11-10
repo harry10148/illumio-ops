@@ -5,7 +5,7 @@ from __future__ import annotations
 
 TABLE_OWNERS: dict[str, str] = {
     # data/app.sqlite
-    "job_health": "illumio_ops.jobs.health",
+    "job_health": "illumio_ops.store.job_health",
     "pce_probe": "illumio_ops.services.pce_health",
     "tamper_annotations": "illumio_ops.store.annotations",
     "detection_annotations": "illumio_ops.store.detection_annotations",

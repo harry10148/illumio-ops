@@ -18,13 +18,13 @@ from illumio_ops.domain.values import (
     SegmentView,
     VisibilityLevel,
 )
-from illumio_ops.jobs.health import list_health
 from illumio_ops.services import pce_health
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import aggregate_flows, field_coverage
 from illumio_ops.store.flowdb import analysis, ingest_state
 from illumio_ops.store.flowdb.analysis import FocusWrite
+from illumio_ops.store.job_health import list_health
 
 KIND = "focus"
 BLIND = frozenset({VisibilityLevel.FLOW_DROPS.value, VisibilityLevel.FLOW_OFF.value})

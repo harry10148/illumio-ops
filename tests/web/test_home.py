@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from illumio_ops.jobs.health import record_finish, record_start
+from illumio_ops.store.job_health import record_finish, record_start
 
 from .conftest import LOCAL, login
 

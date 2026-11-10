@@ -12,12 +12,12 @@ from illumio_ops.domain.alerting import (
     SourceFact,
     SystemFacts,
 )
-from illumio_ops.jobs.health import list_health
 from illumio_ops.services import pce_health
 from illumio_ops.services.collect.status import collection_status
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.siem.status import siem_status
 from illumio_ops.store.flowdb import ingest_state
+from illumio_ops.store.job_health import list_health
 
 # A probe older than this is not news: the probe job runs every 5 minutes.
 PROBE_FRESH = timedelta(minutes=15)

@@ -1,12 +1,12 @@
 import responses
 
-from illumio_ops.jobs.health import list_health
 from illumio_ops.jobs.scheduler import (
     apply_schedule,
     build_scheduler,
     instrument,
     job_intervals,
 )
+from illumio_ops.store.job_health import list_health
 from tests.web.conftest import make_ctx
 
 

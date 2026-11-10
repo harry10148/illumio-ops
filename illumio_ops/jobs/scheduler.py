@@ -10,7 +10,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from loguru import logger
 
 from illumio_ops.domain.values import SystemCheck
-from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services import pce_health
 from illumio_ops.services.alerts.dispatch import run_dispatch
@@ -44,7 +43,8 @@ from illumio_ops.services.rule_schedules import tick as rule_schedule_tick
 from illumio_ops.services.siem.dispatch import run_siem
 from illumio_ops.services.siem.dlq import run_dlq_retention
 from illumio_ops.settings.schema import Settings
-from illumio_ops.web.tls import ensure_self_signed
+from illumio_ops.store.job_health import record_finish, record_start
+from illumio_ops.tls import ensure_self_signed
 
 PCE_PROBE_SECONDS = 300
 TLS_RENEW_SECONDS = 86400

@@ -19,7 +19,8 @@ LAYER_RULES: dict[str, frozenset[str]] = {
     "store": frozenset({"services", "web", "jobs"}),
     "pce": frozenset({"services", "web", "jobs"}),
     "settings": frozenset({"services", "web", "jobs"}),
-    "services": frozenset({"web"}),
+    "services": frozenset({"web", "jobs"}),  # a service is called by a job, never the other way round
+    "jobs": frozenset({"web"}),
 }
 
 
@@ -45,7 +46,7 @@ def test_no_layer_violations():
 
 def _pkg(tmp_path: Path, rel: str, src: str) -> Path:
     root = tmp_path / "illumio_ops"
-    for d in ("", "domain", "store", "services", "web"):
+    for d in ("", "domain", "store", "services", "web", "jobs"):
         (root / d).mkdir(parents=True, exist_ok=True)
         (root / d / "__init__.py").touch()
     (root / rel).write_text(src, encoding="utf-8")
@@ -66,3 +67,10 @@ def test_injected_relative_and_from_imports_are_caught(tmp_path):
 def test_allowed_direction_is_clean(tmp_path):
     root = _pkg(tmp_path, "web/ok.py", "from illumio_ops.services import x\nfrom illumio_ops.domain import y\n")
     assert find_layer_violations(iter_modules(root)) == []
+
+
+def test_injected_service_to_job_and_job_to_web_imports_are_caught(tmp_path):
+    root = _pkg(tmp_path, "services/bad.py", "from illumio_ops.jobs import health\n")
+    (root / "jobs" / "bad.py").write_text("from illumio_ops.web.tls import x\n", encoding="utf-8")
+    v = find_layer_violations(iter_modules(root))
+    assert any("services imports illumio_ops.jobs" in s for s in v) and any("jobs imports illumio_ops.web" in s for s in v)

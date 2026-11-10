@@ -23,7 +23,7 @@ from illumio_ops.settings.secrets import (
 from illumio_ops.settings.store import SettingsInvalid, SettingsStore
 from illumio_ops.store.db import connect, migrate, pending_migrations
 from illumio_ops.store.flowdb.db import MIGRATIONS_PACKAGE as FLOW_MIGRATIONS
-from illumio_ops.web.tls import build_ssl_context, cert_info, ensure_self_signed
+from illumio_ops.tls import build_ssl_context, cert_info, ensure_self_signed
 
 EXIT_LOCKED = 75   # EX_TEMPFAIL: another instance holds the lock
 EXIT_CONFIG = 78   # EX_CONFIG: settings or TLS material unusable

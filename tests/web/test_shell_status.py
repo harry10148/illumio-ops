@@ -3,9 +3,9 @@ from datetime import UTC, datetime, timedelta
 
 from illumio_ops.domain.alerting import Confidence, Trigger
 from illumio_ops.domain.values import AlertRuleType, Severity
-from illumio_ops.jobs.health import record_finish, record_start
 from illumio_ops.services import shell
 from illumio_ops.store import alerts as store
+from illumio_ops.store.job_health import record_finish, record_start
 
 from .conftest import LOCAL, login
 

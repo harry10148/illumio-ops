@@ -6,11 +6,11 @@ from datetime import datetime
 from flask import Blueprint
 from pydantic import BaseModel
 
-from illumio_ops.jobs.health import list_health
 from illumio_ops.jobs.scheduler import job_intervals
 from illumio_ops.services import home
 from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.home import FocusView
+from illumio_ops.store.job_health import list_health
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
 
