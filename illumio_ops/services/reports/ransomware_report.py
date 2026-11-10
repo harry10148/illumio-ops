@@ -25,6 +25,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.values import Severity
 from illumio_ops.services.analysis.ransomware import host_ransomware
 from illumio_ops.services.reports import reads
+from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.common import port_text, rule_label, severity_name, tr
 from illumio_ops.services.reports.generate import previous_period
 from illumio_ops.services.reports.history import previous_values
@@ -91,7 +92,6 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         computed_at, run_error = reads.analysis_state(conn, "ransomware")
     result: dict[str, Any] | None = json.loads(row["result_json"]) if row is not None else None
     status = None if result is None else "unsupported" if result.get("unsupported") else "ok"
-    missing = t("rpt_rw_not_computed") if status is None else t("rpt_rw_unsupported")
     hosts: list[dict[str, Any]] = list((result or {}).get("hosts") or ())
     lists = {key: list((result or {}).get(key) or ()) for _, key, *_ in _LISTS}
     # The organisation summary of the period (its latest day), and of the period before: never an older reading.
@@ -106,15 +106,22 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         "safe_to_block": len(lists["safe_to_block"]), "suspicious": len(lists["suspicious"]),
         "contradictions": sum(1 for h in hosts if h.get("contradiction"))}
     ok = status == "ok"
-    kpis = tuple(Kpi(key=k, label=t(label), value=(values[k] if ok or (k == "org_percent" and values[k] is not None)
-                                                   else None),
+    # Unprotected services nothing sorts: no traffic is kept for them (lightweight mode), so the three lists — which
+    # sort by who used the port — stay empty. They are then shown as one list and counted as one number (6.6.0).
+    unsorted_rows = [(h, s) for h in hosts for s in h.get("services") or () if _open(s) and s.get("traffic") == "unknown"]
+    sorted_any = any(_open(s) and s.get("traffic") != "unknown" for h in hosts for s in h.get("services") or ())
+    one_list = ok and bool(unsorted_rows) and not sorted_any and not any(lists.values())
+    values["unprotected"] = len(unsorted_rows)
+    shown = (("rated_hosts", "org_percent", "unprotected", "contradictions") if one_list else tuple(_KPI_KEYS))
+    labels = {**_KPI_KEYS, "unprotected": "rpt_rw_kpi_unprotected"}
+    # A number that is not there is left out (6.6.0): the analysis not run or not supported takes all but the PCE's
+    # own organisation figure; that figure is left out when the PCE gave none for the period.
+    kpis = tuple(Kpi(key=k, label=t(labels[k]), value=values[k],
                      previous=org_before if k == "org_percent" else (before or {}).get(k),
                      unit="percent" if k == "org_percent" else "count",
                      better="higher" if k in ("org_percent", "rated_hosts") else "lower",
-                     note=(t("rpt_rw_org_last_known", day=org_last) if k == "org_percent" and org_last
-                           else t("rpt_rw_org_missing") if k == "org_percent" and values[k] is None
-                           else None if ok or k == "org_percent" else missing))
-                 for k, label in _KPI_KEYS.items())
+                     note=t("rpt_rw_org_last_known", day=org_last) if k == "org_percent" and org_last else None)
+                 for k in shown if values[k] is not None and (ok or k == "org_percent"))
 
     def name(r: Mapping[str, Any]) -> str:
         return str(r.get("hostname") or str(r.get("host") or r.get("href") or "").rsplit("/", 1)[-1])
@@ -129,10 +136,21 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
             rows=tuple((name(r), r.get("name"), port_text(r.get("port"), int(r.get("proto") or 0)),
                         severity_name(lang, str(r.get("severity") or "").lower()), r.get("recent_sources"))
                        for r in items[:LIST_ROWS]),
-            total_rows=len(items), empty_text=t(empty) if ok else missing,
+            total_rows=len(items), empty_text=t(empty),
             limit_note=t("rpt_limit_top_n", n=LIST_ROWS) if len(items) > LIST_ROWS else None)
     list_sections = tuple(Section(id=sid, title=t(title), intro=t(intro), blocks=(list_table(key, t(title), empty),))
                           for sid, key, title, intro, empty in _LISTS)
+
+    unprotected_table = TableBlock(
+        title=t("rpt_rw_sec_unprotected"),
+        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="service", label=t("rpt_col_name")),
+                 Column(key="port", label=t("rpt_col_service")), Column(key="severity", label=t("rpt_col_severity"))),
+        rows=tuple((name(h), s.get("name"), port_text(s.get("port"), int(s.get("proto") or 0)),
+                    severity_name(lang, str(s.get("severity") or "").lower())) for h, s in unsorted_rows[:LIST_ROWS]),
+        total_rows=len(unsorted_rows), empty_text="",
+        limit_note=t("rpt_limit_top_n", n=LIST_ROWS) if len(unsorted_rows) > LIST_ROWS else None)
+    unprotected_section = Section(id="unprotected", title=t("rpt_rw_sec_unprotected"),
+                                  intro=t("rpt_rw_unprotected_intro"), blocks=(unprotected_table,))
 
     # ── hosts, ranked by the computed share; contradictions last and flagged ─────
     def pct(v: Any) -> str:
@@ -179,7 +197,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                     exposure(h.get("pce_exposure")),
                     sum(1 for s in h.get("services") or () if _open(s)),
                     t("rpt_rw_contradiction_yes") if h.get("contradiction") else "", explain(h)) for h in ranked),
-        total_rows=len(ranked), empty_text=t("rpt_rw_none_hosts") if ok else missing)
+        total_rows=len(ranked), empty_text=t("rpt_rw_none_hosts"))
     services = [(h, s) for h in ranked for s in h.get("services") or ()]
     service_table = TableBlock(
         title=t("rpt_rw_tbl_services"),
@@ -195,7 +213,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                     pct(100 * s["coverage"]) if isinstance(s.get("coverage"), (int, float)) else "—",
                     f"{s['contribution']:.1f}" if isinstance(s.get("contribution"), (int, float)) else "—")
                    for h, s in services),
-        total_rows=len(services), empty_text=t("rpt_rw_none_hosts") if ok else missing)
+        total_rows=len(services), empty_text=t("rpt_rw_none_hosts"))
 
     # ── allow rules behind the deductions, for the top hosts of the fix-first list ─────
     top_hosts: list[str] = list(dict.fromkeys(str(r.get("host")) for r in lists["priority"] if r.get("host")))
@@ -222,7 +240,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         columns=(Column(key="host", label=t("rpt_col_host")), Column(key="port", label=t("rpt_col_service")),
                  Column(key="rules", label=t("rpt_rw_col_rules"))),
         rows=tuple(allow_rows), total_rows=len(allow_rows),
-        empty_text=t("rpt_rw_none_allow") if ok else missing,
+        empty_text=t("rpt_rw_none_allow"),
         limit_note=t("rpt_rw_allow_top", n=ALLOW_HOSTS) if len(top_hosts) > ALLOW_HOSTS else None)
 
     # ── trend ───────────────────────────────────────────────────────────────
@@ -235,13 +253,24 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                      empty_text=t("rpt_rw_none_trend"))
 
     quality = [t("rpt_rw_quality_source"), t("rpt_rw_quality_approx")]
+    if org_now is None:
+        quality.append(hint(lang, "rpt_hint_pending_rw_org", day=org_last) if org_last
+                       else hint(lang, "rpt_hint_pending_rw_org_none"))
+    if not ok:  # nothing was computed: the title, the reason, and nothing dressed up as a result
+        quality.append(hint(lang, "rpt_hint_pending_rw_analysis") if status is None
+                       else hint(lang, "rpt_hint_unsupported_rw"))
+        if run_error:
+            quality.append(t("rpt_quality_analysis_failed", error=run_error[:200]))
+        return ReportDocument(
+            report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ransomware"), period_start=inp.start,
+            period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=(),
+            data_quality=tuple(quality), sections=())
     if computed_at:
         quality.append(t("rpt_quality_analysis_at", at=fmt_time(computed_at, inp.tz)))
     if run_error:
         quality.append(t("rpt_quality_analysis_failed", error=run_error[:200]))
     if values["contradictions"]:
         quality.append(t("rpt_rw_quality_contradictions", n=values["contradictions"]))
-    blocks_missing: Sequence[TextBlock] = () if ok else (TextBlock(paragraphs=(missing,)),)
     terms = TableBlock(
         title=t("rpt_rw_tbl_terms"),
         columns=(Column(key="term", label=t("rpt_rw_col_term")), Column(key="means", label=t("rpt_rdy_col_means")),
@@ -251,8 +280,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     if ok and lists["priority"]:
         findings.append(Finding(severity=Severity.HIGH, title=t("rpt_rw_finding_priority", n=len(lists["priority"])),
                                 why=t("rpt_rw_finding_priority_why"), action=t("rpt_rw_finding_priority_action")))
-    unsorted = sum(1 for h in hosts for s in h.get("services") or ()
-                   if _open(s) and s.get("traffic") == "unknown")
+    unsorted = len(unsorted_rows)
     if ok and unsorted:  # lightweight mode keeps no traffic: the lists stay empty, the services do not go away
         findings.append(Finding(severity=Severity.MEDIUM, title=t("rpt_rw_finding_unsorted", n=unsorted),
                                 why=t("rpt_rw_finding_unsorted_why"), action=t("rpt_rw_finding_unsorted_action")))
@@ -264,7 +292,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(findings),
         data_quality=tuple(quality),
         sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rw_how_intro"), blocks=(terms,)),
-                  *(s.model_copy(update={"blocks": (*blocks_missing, *s.blocks)}) for s in list_sections),
+                  *((unprotected_section,) if one_list else list_sections),
                   Section(id="hosts", title=t("rpt_rw_sec_hosts"), intro=t("rpt_rw_hosts_intro"),
                           blocks=(host_table, service_table)),
                   Section(id="allow", title=t("rpt_rw_sec_allow"), intro=t("rpt_rw_allow_intro"), blocks=(allow_table,)),

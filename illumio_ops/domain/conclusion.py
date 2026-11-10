@@ -54,6 +54,11 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
 # PCE takes away (6.6.0: such a report still reads from its title to its end). The first form is the full sentence.
 CONCLUSIONS: Mapping[ReportType, tuple[tuple[tuple[str, ...], str], ...]] = {
     **{t: ((CONCLUSION_KPIS[t], CONCLUSION_KEYS[t]),) for t in CONCLUSION_KEYS},
+    ReportType.RANSOMWARE: (
+        (CONCLUSION_KPIS[ReportType.RANSOMWARE], CONCLUSION_KEYS[ReportType.RANSOMWARE]),
+        (("rated_hosts", "unprotected"), "rpt_conclusion_ransomware_unsorted"),  # no kept traffic to sort by
+        ((), "rpt_conclusion_ransomware_none"),  # the analysis not run, or the PCE gives no rating
+    ),
     ReportType.LATERAL_POSTURE: (
         (CONCLUSION_KPIS[ReportType.LATERAL_POSTURE], CONCLUSION_KEYS[ReportType.LATERAL_POSTURE]),
         (("pivots", "cross_env", "new_detections"), "rpt_conclusion_lateral_posture_no_assets"),  # none chosen

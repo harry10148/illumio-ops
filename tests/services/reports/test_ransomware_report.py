@@ -144,9 +144,35 @@ def test_trend_from_snapshots(ctx):
 
 
 def test_not_computed_and_unsupported_say_so(tmp_path, ctx):
-    assert "not been computed" in _texts(_build(ctx))
+    """6.6.0: nothing computed — the report is its title and the reason, not six panels repeating it; the two
+    reasons are worded apart."""
+    from illumio_ops.domain.conclusion import incomplete
+    doc = _build(ctx)
+    assert doc.sections == () and [k.key for k in doc.kpis if k.value is None] == []
+    assert sum("has not been computed" in q for q in doc.data_quality) == 1 and not incomplete(doc)
     _result(ctx, {"unsupported": True})
-    assert "does not provide" in _texts(_build(ctx))
+    doc = _build(ctx)
+    assert doc.sections == () and sum("gives no ransomware risk rating" in q for q in doc.data_quality) == 1
+    assert not any("has not been computed" in q for q in doc.data_quality)
+
+
+def test_without_kept_traffic_the_unprotected_services_are_one_list(ctx):
+    """6.6.0 (.135, lightweight mode): no traffic sorts the unprotected services, so the three lists were three empty
+    panels and three zeros. They are one list and one number; with traffic the three lists are back."""
+    from illumio_ops.domain.conclusion import incomplete
+    unknown = {**svc("SMB", 445), "traffic": "unknown"}
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": [hostrow("a", computed=5.0, services=[unknown, {**svc("RDP", 3389), "traffic": "unknown"}]),
+                            hostrow("b", computed=90.0, services=[svc("RDP", 3389, state="protected_closed", coverage=1.0)])]})
+    doc = _build(ctx)
+    ids = [s.id for s in doc.sections]
+    assert "unprotected" in ids and not {"priority", "safe", "suspicious"} & set(ids)
+    assert [r[:3] for r in _tables(doc, "unprotected")[0].rows] == [("a", "SMB", "445/TCP"), ("a", "RDP", "3389/TCP")]
+    keys = {k.key: k.value for k in doc.kpis}
+    assert keys["unprotected"] == 2 and not {"priority", "safe_to_block", "suspicious"} & set(keys)
+    assert not incomplete(doc)
+    _std(ctx)
+    assert {"priority", "safe", "suspicious"} <= {s.id for s in _build(ctx).sections}
 
 
 def test_zh_tw_builds(ctx):
