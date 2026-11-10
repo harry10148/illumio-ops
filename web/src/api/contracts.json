@@ -19267,8 +19267,37 @@
             "type": "object"
           },
           "PullInfo": {
-            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "description": "What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing\nsilent).",
             "properties": {
+              "archive_days": {
+                "default": 0,
+                "title": "Archive Days",
+                "type": "integer"
+              },
+              "archive_first": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive First"
+              },
+              "archive_last": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive Last"
+              },
               "capped": {
                 "title": "Capped",
                 "type": "boolean"
@@ -19278,6 +19307,14 @@
                 "title": "End",
                 "type": "string"
               },
+              "missing_days": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Missing Days",
+                "type": "array"
+              },
               "read_at": {
                 "format": "date-time",
                 "title": "Read At",
@@ -19286,6 +19323,15 @@
               "rows": {
                 "title": "Rows",
                 "type": "integer"
+              },
+              "source": {
+                "default": "pce",
+                "enum": [
+                  "pce",
+                  "archive"
+                ],
+                "title": "Source",
+                "type": "string"
               },
               "start": {
                 "format": "date-time",
@@ -19307,6 +19353,11 @@
                   }
                 ],
                 "title": "Unread From"
+              },
+              "unreadable": {
+                "default": 0,
+                "title": "Unreadable",
+                "type": "integer"
               }
             },
             "required": [
@@ -25814,8 +25865,37 @@
             "type": "object"
           },
           "PullInfo": {
-            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "description": "What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing\nsilent).",
             "properties": {
+              "archive_days": {
+                "default": 0,
+                "title": "Archive Days",
+                "type": "integer"
+              },
+              "archive_first": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive First"
+              },
+              "archive_last": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive Last"
+              },
               "capped": {
                 "title": "Capped",
                 "type": "boolean"
@@ -25825,6 +25905,14 @@
                 "title": "End",
                 "type": "string"
               },
+              "missing_days": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Missing Days",
+                "type": "array"
+              },
               "read_at": {
                 "format": "date-time",
                 "title": "Read At",
@@ -25833,6 +25921,15 @@
               "rows": {
                 "title": "Rows",
                 "type": "integer"
+              },
+              "source": {
+                "default": "pce",
+                "enum": [
+                  "pce",
+                  "archive"
+                ],
+                "title": "Source",
+                "type": "string"
               },
               "start": {
                 "format": "date-time",
@@ -25854,6 +25951,11 @@
                   }
                 ],
                 "title": "Unread From"
+              },
+              "unreadable": {
+                "default": 0,
+                "title": "Unreadable",
+                "type": "integer"
               }
             },
             "required": [
@@ -26945,8 +27047,37 @@
             "type": "object"
           },
           "PullInfo": {
-            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "description": "What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing\nsilent).",
             "properties": {
+              "archive_days": {
+                "default": 0,
+                "title": "Archive Days",
+                "type": "integer"
+              },
+              "archive_first": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive First"
+              },
+              "archive_last": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive Last"
+              },
               "capped": {
                 "title": "Capped",
                 "type": "boolean"
@@ -26956,6 +27087,14 @@
                 "title": "End",
                 "type": "string"
               },
+              "missing_days": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Missing Days",
+                "type": "array"
+              },
               "read_at": {
                 "format": "date-time",
                 "title": "Read At",
@@ -26964,6 +27103,15 @@
               "rows": {
                 "title": "Rows",
                 "type": "integer"
+              },
+              "source": {
+                "default": "pce",
+                "enum": [
+                  "pce",
+                  "archive"
+                ],
+                "title": "Source",
+                "type": "string"
               },
               "start": {
                 "format": "date-time",
@@ -26985,6 +27133,11 @@
                   }
                 ],
                 "title": "Unread From"
+              },
+              "unreadable": {
+                "default": 0,
+                "title": "Unreadable",
+                "type": "integer"
               }
             },
             "required": [
@@ -27583,8 +27736,37 @@
             "type": "object"
           },
           "PullInfo": {
-            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "description": "What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing\nsilent).",
             "properties": {
+              "archive_days": {
+                "default": 0,
+                "title": "Archive Days",
+                "type": "integer"
+              },
+              "archive_first": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive First"
+              },
+              "archive_last": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive Last"
+              },
               "capped": {
                 "title": "Capped",
                 "type": "boolean"
@@ -27594,6 +27776,14 @@
                 "title": "End",
                 "type": "string"
               },
+              "missing_days": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Missing Days",
+                "type": "array"
+              },
               "read_at": {
                 "format": "date-time",
                 "title": "Read At",
@@ -27602,6 +27792,15 @@
               "rows": {
                 "title": "Rows",
                 "type": "integer"
+              },
+              "source": {
+                "default": "pce",
+                "enum": [
+                  "pce",
+                  "archive"
+                ],
+                "title": "Source",
+                "type": "string"
               },
               "start": {
                 "format": "date-time",
@@ -27623,6 +27822,11 @@
                   }
                 ],
                 "title": "Unread From"
+              },
+              "unreadable": {
+                "default": 0,
+                "title": "Unreadable",
+                "type": "integer"
               }
             },
             "required": [
@@ -28856,8 +29060,37 @@
             "type": "object"
           },
           "PullInfo": {
-            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "description": "What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing\nsilent).",
             "properties": {
+              "archive_days": {
+                "default": 0,
+                "title": "Archive Days",
+                "type": "integer"
+              },
+              "archive_first": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive First"
+              },
+              "archive_last": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive Last"
+              },
               "capped": {
                 "title": "Capped",
                 "type": "boolean"
@@ -28867,6 +29100,14 @@
                 "title": "End",
                 "type": "string"
               },
+              "missing_days": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Missing Days",
+                "type": "array"
+              },
               "read_at": {
                 "format": "date-time",
                 "title": "Read At",
@@ -28875,6 +29116,15 @@
               "rows": {
                 "title": "Rows",
                 "type": "integer"
+              },
+              "source": {
+                "default": "pce",
+                "enum": [
+                  "pce",
+                  "archive"
+                ],
+                "title": "Source",
+                "type": "string"
               },
               "start": {
                 "format": "date-time",
@@ -28896,6 +29146,11 @@
                   }
                 ],
                 "title": "Unread From"
+              },
+              "unreadable": {
+                "default": 0,
+                "title": "Unreadable",
+                "type": "integer"
               }
             },
             "required": [
@@ -46252,8 +46507,37 @@
             "type": "object"
           },
           "PullInfo": {
-            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "description": "What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing\nsilent).",
             "properties": {
+              "archive_days": {
+                "default": 0,
+                "title": "Archive Days",
+                "type": "integer"
+              },
+              "archive_first": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive First"
+              },
+              "archive_last": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive Last"
+              },
               "capped": {
                 "title": "Capped",
                 "type": "boolean"
@@ -46263,6 +46547,14 @@
                 "title": "End",
                 "type": "string"
               },
+              "missing_days": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Missing Days",
+                "type": "array"
+              },
               "read_at": {
                 "format": "date-time",
                 "title": "Read At",
@@ -46271,6 +46563,15 @@
               "rows": {
                 "title": "Rows",
                 "type": "integer"
+              },
+              "source": {
+                "default": "pce",
+                "enum": [
+                  "pce",
+                  "archive"
+                ],
+                "title": "Source",
+                "type": "string"
               },
               "start": {
                 "format": "date-time",
@@ -46292,6 +46593,11 @@
                   }
                 ],
                 "title": "Unread From"
+              },
+              "unreadable": {
+                "default": 0,
+                "title": "Unreadable",
+                "type": "integer"
               }
             },
             "required": [
@@ -50335,8 +50641,37 @@
             "type": "object"
           },
           "PullInfo": {
-            "description": "What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).",
+            "description": "What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing\nsilent).",
             "properties": {
+              "archive_days": {
+                "default": 0,
+                "title": "Archive Days",
+                "type": "integer"
+              },
+              "archive_first": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive First"
+              },
+              "archive_last": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Archive Last"
+              },
               "capped": {
                 "title": "Capped",
                 "type": "boolean"
@@ -50346,6 +50681,14 @@
                 "title": "End",
                 "type": "string"
               },
+              "missing_days": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Missing Days",
+                "type": "array"
+              },
               "read_at": {
                 "format": "date-time",
                 "title": "Read At",
@@ -50354,6 +50697,15 @@
               "rows": {
                 "title": "Rows",
                 "type": "integer"
+              },
+              "source": {
+                "default": "pce",
+                "enum": [
+                  "pce",
+                  "archive"
+                ],
+                "title": "Source",
+                "type": "string"
               },
               "start": {
                 "format": "date-time",
@@ -50375,6 +50727,11 @@
                   }
                 ],
                 "title": "Unread From"
+              },
+              "unreadable": {
+                "default": 0,
+                "title": "Unreadable",
+                "type": "integer"
               }
             },
             "required": [

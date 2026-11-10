@@ -81,8 +81,24 @@ function Coverage({ result, bytes }: { result: SegmentResult; bytes: boolean }) 
 
 export function Pulled({ info }: { info: PullInfo }) {
   const lang = useLang();
+  if (info.source === "archive") {
+    // Read from the archive files, not the PCE: which days, and what the archive does not hold of the period.
+    const missing = info.missing_days ?? [];
+    const unreadable = info.unreadable ?? 0;
+    return (
+      <div className="stack" data-role="pulled" data-source="archive">
+        <p className="hint">{t("wb_archived", { start: formatTime(info.start, lang), end: formatTime(info.end, lang),
+          first: info.archive_first ?? "—", last: info.archive_last ?? "—", days: String(info.archive_days ?? 0),
+          rows: info.rows.toLocaleString(), at: formatTime(info.read_at, lang) })}</p>
+        {missing.length > 0 && <p className="notice" data-role="archive-missing">{t("wb_archived_missing",
+          { n: String(missing.length), days: missing.join(", ") })}</p>}
+        {unreadable > 0 && <p className="notice">{t("wb_archived_unreadable", { n: unreadable.toLocaleString() })}</p>}
+        {info.capped && info.unread_from && <p className="notice">{t("wb_archived_capped", { from: formatTime(info.unread_from, lang) })}</p>}
+      </div>
+    );
+  }
   return (
-    <div className="stack" data-role="pulled">
+    <div className="stack" data-role="pulled" data-source="pce">
       <p className="hint">{t("wb_pulled", { start: formatTime(info.start, lang), end: formatTime(info.end, lang),
         rows: info.rows.toLocaleString(), at: formatTime(info.read_at, lang) })}</p>
       {info.capped && info.unread_from && <p className="notice">{t("wb_pulled_capped", { from: formatTime(info.unread_from, lang) })}</p>}

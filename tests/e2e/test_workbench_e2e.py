@@ -219,3 +219,31 @@ def test_a_pick_keeps_the_label_group_a_side_holds(context, live_app):
     page.wait_for_selector("[data-chip^='dst:h:']")
     expect(page.locator(f"[data-chip='dst:g:{group}']")).to_contain_text("Dev estate")
     expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(1)
+
+
+def test_archived_period_says_it_came_from_the_archive(context, live_app):
+    """6.5.0 B1: an answer read from the archive says so — which days were read and which the archive lacks —
+    in place of the "read from the PCE" line."""
+    alert_id = _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+
+    def with_archive(route):
+        answer = route.fetch()
+        body = answer.json()
+        body["data"]["pulled"] = {
+            "source": "archive", "start": "2026-09-20T00:00:00Z", "end": "2026-09-23T00:00:00Z", "rows": 1234,
+            "capped": False, "unread_from": None, "truncated_windows": 0, "read_at": "2026-10-30T12:00:00Z",
+            "archive_days": 2, "archive_first": "2026-09-20", "archive_last": "2026-09-22",
+            "missing_days": ["2026-09-21"], "unreadable": 0}
+        route.fulfill(response=answer, json=body)
+    page.route("**/api/workbench/run", with_archive)
+    page.goto(f"{live_app.url}/alerts/{alert_id}")
+    page.click("[data-role=open-workbench]")
+    note = page.locator("[data-role=pulled][data-source=archive]")
+    note.wait_for()
+    text = note.inner_text()
+    assert "read from the archive, not from the PCE" in text and "2026-09-20 to 2026-09-22" in text
+    assert "1,234 rows" in text
+    assert "no file for these 1 day(s)" in note.locator("[data-role=archive-missing]").inner_text()
+    assert "2026-09-21" in note.locator("[data-role=archive-missing]").inner_text()

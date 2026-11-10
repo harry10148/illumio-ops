@@ -126,3 +126,76 @@ def test_pull_shares_the_interactive_lock(ctx, pulls):
         assert not done.wait(0.5) and pulls["opened"] == []
     assert done.wait(5) and len(pulls["opened"]) == 1
     t.join(5)
+
+
+# ── a period older than the kept traffic, with the archive on (6.5.0 B1) ────
+
+@pytest.fixture
+def archive(monkeypatch):
+    """A fake archive: `earliest` is where its first day starts; reading it is recorded."""
+    from contextlib import contextmanager
+
+    from illumio_ops.services import archive_read
+    log = {"earliest": None, "read": [], "closed": 0, "missing": [], "days": ["2026-10-01", "2026-10-02"]}
+    monkeypatch.setattr(archive_read, "earliest",
+                        lambda ctx, kind, now: log["earliest"] or archive_read.floors(ctx, now)[kind])
+
+    @contextmanager
+    def fake_period(ctx, *, start, end, now=None, kinds=("flows", "events")):
+        log["read"].append((start, end, kinds))
+        try:
+            yield archive_read.ArchiveResult(ctx=ctx, archived_days={"flows": log["days"]},
+                                             missing_days={"flows": log["missing"]}, rows=7, unreadable=1,
+                                             unread_from=None)
+        finally:
+            log["closed"] += 1
+    monkeypatch.setattr(archive_read, "archive_period", fake_period)
+    return log
+
+
+def _full(tmp_path):
+    return configured_ctx(tmp_path, mode="full", archive={"enabled": True, "retention_days": 0})
+
+
+OLD = NOW - timedelta(days=40)
+
+
+def test_period_before_retention_is_read_from_the_archive_not_the_pce(tmp_path, pulls, archive):
+    c = _full(tmp_path)
+    archive["earliest"] = OLD - timedelta(days=5)
+    _, info = _ctx_for(c, OLD, OLD + timedelta(days=2), now=NOW)
+    assert pulls["opened"] == [] and [k for _, _, k in archive["read"]] == [("flows",)]
+    assert info.source == "archive" and info.rows == 7 and info.unreadable == 1
+    assert (info.archive_first, info.archive_last, info.archive_days) == ("2026-10-01", "2026-10-02", 2)
+    assert info.missing_days == []
+    _ctx_for(c, OLD, OLD + timedelta(days=2), now=NOW + timedelta(minutes=1))  # held like a pull: read once
+    assert len(archive["read"]) == 1 and archive["closed"] == 0
+    workbench_store.drop()
+    assert archive["closed"] == 1
+
+
+def test_archive_days_missing_are_said_not_taken_as_complete(tmp_path, pulls, archive):
+    c = _full(tmp_path)
+    archive["earliest"], archive["missing"] = OLD - timedelta(days=5), ["2026-09-21"]
+    _, info = _ctx_for(c, OLD, OLD + timedelta(days=2), now=NOW)
+    assert info.source == "archive" and info.missing_days == ["2026-09-21"]
+
+
+def test_archive_that_does_not_reach_the_period_leaves_the_pce_pull(tmp_path, pulls, archive):
+    c = _full(tmp_path)
+    archive["earliest"] = OLD + timedelta(days=1)  # starts after the period does
+    _, info = _ctx_for(c, OLD, OLD + timedelta(days=2), now=NOW)
+    assert archive["read"] == [] and len(pulls["opened"]) == 1 and info.source == "pce"
+
+
+def test_archive_off_leaves_the_pce_pull(tmp_path, pulls, archive):
+    c = configured_ctx(tmp_path, mode="full")
+    archive["earliest"] = OLD - timedelta(days=5)
+    _, info = _ctx_for(c, OLD, OLD + timedelta(days=2), now=NOW)
+    assert archive["read"] == [] and len(pulls["opened"]) == 1 and info.source == "pce"
+
+
+def test_lightweight_mode_never_reads_the_archive(ctx, pulls, archive):
+    archive["earliest"] = OLD - timedelta(days=5)
+    _, info = _ctx_for(ctx, OLD, OLD + timedelta(days=2), now=NOW)
+    assert archive["read"] == [] and info.source == "pce"

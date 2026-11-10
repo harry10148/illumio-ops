@@ -1170,19 +1170,26 @@ key: string
 name: string
 }
 /**
- * What was read from the PCE for this answer: said on the page (anti-goal: nothing silent).
+ * What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing
+ * silent).
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "PullInfo".
  */
 export interface PullInfo {
+archive_days?: number
+archive_first?: (string | null)
+archive_last?: (string | null)
 capped: boolean
 end: string
+missing_days?: string[]
 read_at: string
 rows: number
+source?: ("pce" | "archive")
 start: string
 truncated_windows: number
 unread_from: (string | null)
+unreadable?: number
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema

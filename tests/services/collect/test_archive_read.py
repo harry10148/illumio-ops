@@ -81,3 +81,27 @@ def test_a_line_from_an_older_schema_loads_with_the_columns_it_has(tmp_path):
         fh.write("".join(json.dumps(r) + "\n" for r in rows))
     with archive_period(ctx, start=NOW - timedelta(days=13), end=NOW, now=NOW) as res:
         assert res.rows == 1 and res.unreadable == 0
+
+
+def test_workbench_answers_an_archived_period_from_the_files_not_the_pce(tmp_path, monkeypatch):
+    """6.5.0 B1: the workbench asked for a period the store no longer keeps reads the archive (it pulled the
+    period from the PCE again, although the files were on disk). Its rows are the archive's rows."""
+    from illumio_ops.domain.values import SegmentView
+    from illumio_ops.services import workbench, workbench_store
+
+    def no_pce(*a, **kw):
+        raise AssertionError("the PCE was asked for an archived period")
+    ctx = _setup(tmp_path, [12, 10, 3, 2])
+    monkeypatch.setattr(workbench_store, "open_period", no_pce)
+    workbench_store.drop()
+    try:
+        req = workbench.FlowRequest(mode="flows", start=NOW - timedelta(days=12, hours=1),
+                                    end=NOW - timedelta(days=9), view=SegmentView.DETAIL)
+        got = workbench.run(ctx, req, now=NOW)
+        assert got.pulled is not None and got.pulled.source == "archive"
+        assert got.pulled.archive_days == 2 and got.pulled.rows == 2
+        # the days in between were never collected in this fixture: no file, and said
+        assert got.pulled.missing_days == ["2026-10-13", "2026-10-15"]
+        assert len(got.result.detail) == 2
+    finally:
+        workbench_store.drop()
