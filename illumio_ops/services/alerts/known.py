@@ -55,7 +55,8 @@ def list_known(ctx: AppContext) -> KnownList:
 
 
 def mark_known(ctx: AppContext, alert_id: int, body: KnownMark, *, by: str) -> KnownList | None:
-    """None: no such alert of the current PCE. NotLateralAlert: the alert is not about a detection."""
+    """None: no such alert of the current PCE. NotLateralAlert: the alert is not about a detection. The marked alert
+    itself becomes grouped under the new mark."""
     url, org = _pce(ctx)
     with ctx.db() as conn:
         row = alert_store.get_alert(conn, alert_id, pce_url=url, org_id=org)
@@ -64,9 +65,13 @@ def mark_known(ctx: AppContext, alert_id: int, body: KnownMark, *, by: str) -> K
         params = json.loads(row["params_json"])
         if row["rule_type"] != AlertRuleType.LATERAL.value or not params.get("detector") or not params.get("account"):
             raise NotLateralAlert
-        store.add(conn, pce_url=url, org_id=org, detector=str(params["detector"]), subject_key=str(params["account"]),
-                  fingerprint=row["subject_key"] if body.scope == "detection" else None, reason=body.reason,
-                  created_by=by, at=datetime.now(UTC))
+        mark = store.add(conn, pce_url=url, org_id=org, detector=str(params["detector"]),
+                         subject_key=str(params["account"]),
+                         fingerprint=row["subject_key"] if body.scope == "detection" else None, reason=body.reason,
+                         created_by=by, at=datetime.now(UTC))
+        # The alert the operator judged is handled by that judgement (UI spec §5.1: unhandled = not marked known);
+        # only this one: other alerts already raised were not looked at.
+        alert_store.set_grouped(conn, alert_id, mark, pce_url=url, org_id=org)
     return list_known(ctx)
 
 

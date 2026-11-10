@@ -181,3 +181,26 @@ def test_detail_says_what_to_do_next(client, ctx):
     a = seed(ctx)
     d = get(client, f"/api/alerts/{a}").get_json()["data"]
     assert len(d["next_steps"]) == 1 and "retention" in d["next_steps"][0]
+
+
+def test_marking_known_handles_the_marked_alert_too(client, ctx):
+    """6.5.0 B5 (UI spec §5.1: unhandled = not marked known): the alert the operator marked leaves the unhandled
+    count at once — it stayed there, and only later alerts about the detection were grouped."""
+    login(client)
+    a, b = _lateral(ctx), _lateral(ctx)
+    url, org = ctx.settings.current().pce.url, ctx.settings.current().pce.org_id
+
+    def state():
+        with ctx.db() as conn:
+            return {r["id"]: r["grouped_annotation"] for r in conn.execute("SELECT id, grouped_annotation FROM alerts")}
+    assert state() == {a: None, b: None}
+    r = post(client, f"/api/alerts/{a}/known", {"scope": "detection", "reason": "backup host"})
+    assert r.status_code == 200
+    [mark] = r.get_json()["data"]["items"]
+    assert state() == {a: mark["id"], b: None}  # the marked one only: the other alert was not what the operator judged
+    detail = get(client, f"/api/alerts/{a}").get_json()["data"]
+    assert detail["grouped"] is True
+    with ctx.db() as conn:
+        _, total = store.list_alerts(conn, pce_url=url, org_id=org, since=NOW - timedelta(days=1), ungrouped_only=True,
+                                     limit=10, offset=0)
+    assert total == 1

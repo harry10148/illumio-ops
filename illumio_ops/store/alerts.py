@@ -81,6 +81,13 @@ def _where(*, pce_url: str, org_id: str, since: datetime, rule_types: Sequence[s
     return " AND ".join(clauses), params
 
 
+def set_grouped(conn: sqlite3.Connection, alert_id: int, annotation_id: int, *, pce_url: str, org_id: str) -> None:
+    """An alert an operator marked known: grouped under that mark from now on (an alert already grouped keeps the
+    mark that grouped it)."""
+    conn.execute("UPDATE alerts SET grouped_annotation = ? WHERE id = ? AND pce_url = ? AND org_id = ? "
+                 "AND grouped_annotation IS NULL", (annotation_id, alert_id, pce_url, org_id))
+
+
 def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime, rule_type: str | None = None,
                 severity: str | None = None, rule_id: str | None = None, rule_types: Sequence[str] | None = None,
                 detectors_in: Sequence[str] | None = None, detectors_not_in: Sequence[str] | None = None,
