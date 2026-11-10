@@ -30,6 +30,7 @@ from illumio_ops.services.reports.generate import previous_period
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
+from illumio_ops.services.reports.visibility import visibility_sections
 from illumio_ops.store.flowdb import analysis, ransomware
 from illumio_ops.store.flowdb.db import db_day
 
@@ -267,4 +268,5 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                   Section(id="hosts", title=t("rpt_rw_sec_hosts"), intro=t("rpt_rw_hosts_intro"),
                           blocks=(host_table, service_table)),
                   Section(id="allow", title=t("rpt_rw_sec_allow"), intro=t("rpt_rw_allow_intro"), blocks=(allow_table,)),
-                  Section(id="trend", title=t("rpt_rw_sec_trend"), intro=t("rpt_rw_trend_intro"), blocks=(trend,))))
+                  Section(id="trend", title=t("rpt_rw_sec_trend"), intro=t("rpt_rw_trend_intro"), blocks=(trend,)),
+                  *visibility_sections(inp)))

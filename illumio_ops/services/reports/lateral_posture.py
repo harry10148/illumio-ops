@@ -38,6 +38,7 @@ from illumio_ops.services.reports.generate import (
     traffic_covered,
 )
 from illumio_ops.services.reports.registry import BuildInput
+from illumio_ops.services.reports.visibility import visibility_sections
 from illumio_ops.store.flowdb import analysis
 from illumio_ops.store.flowdb.db import db_day
 
@@ -411,5 +412,6 @@ def build_lateral_posture(inp: BuildInput) -> ReportDocument:
         findings=_findings(focus, b.lc.hosts, inp.lang), data_quality=b.quality(exposure_row),
         sections=(b.exposure_section(exposure, snaps), b.assets_section(exposure), b.reach_section(exposure),
                   b.pivots_section(exposure), b.detections_section(counts, rows, total),
-                  b.cross_env_section(exposure), b.initiators_section(), b.directory_section()))
+                  b.cross_env_section(exposure), b.initiators_section(), b.directory_section(),
+                  *visibility_sections(inp)))
 

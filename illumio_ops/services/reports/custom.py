@@ -34,6 +34,7 @@ from illumio_ops.services.reports.flowsections import DECISION_KEYS
 from illumio_ops.services.reports.generate import coverage_note
 from illumio_ops.services.reports.registry import BuildInput, ReportFailed
 from illumio_ops.services.reports.render_html import fmt_time
+from illumio_ops.services.reports.visibility import visibility_sections
 
 DIM_KEYS = {d: f"wb_dim_{d.value}" for d in SegmentDimension}
 METRIC_KEYS = {"flows": "wb_metric_flows", "connections": "wb_metric_connections", "distinct_dst": "wb_metric_distinct_dst",
@@ -149,5 +150,6 @@ def build_custom(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=ReportType.CUSTOM, lang=inp.lang, title=rep.name, period_start=inp.start, period_end=inp.end,
         generated_at=inp.now, pce_label=inp.pce_label, kpis=(), findings=(), data_quality=quality,
-        sections=sections or (Section(id="empty", title=rep.name, blocks=(TextBlock(paragraphs=(
-            tr(inp.lang, "rpt_cust_empty"),)),)),))
+        sections=(*(sections or (Section(id="empty", title=rep.name, blocks=(TextBlock(paragraphs=(
+            tr(inp.lang, "rpt_cust_empty"),)),)),)),
+                  *(visibility_sections(inp) if any(sec.segment.mode == "flows" for sec in rep.sections) else ())))

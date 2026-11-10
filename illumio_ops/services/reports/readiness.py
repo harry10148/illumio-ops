@@ -40,6 +40,7 @@ from illumio_ops.services.reports.common import port_text, rule_label, tr
 from illumio_ops.services.reports.generate import coverage_note
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
+from illumio_ops.services.reports.visibility import visibility_sections
 
 APP = "app"
 PREDICTED_ROWS = 50
@@ -258,4 +259,4 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                   Section(id="next", title=t("rpt_rdy_sec_next"), intro=t("rpt_rdy_next_intro"), blocks=(next_steps,)),
                   Section(id="scores", title=t("rpt_rdy_sec_scores"), intro=t("rpt_rdy_scores_intro"), blocks=(scores,)),
                   Section(id="predicted", title=t("rpt_rdy_sec_predicted"), intro=t("rpt_rdy_predicted_intro"),
-                          blocks=predicted_blocks)))
+                          blocks=predicted_blocks), *visibility_sections(inp)))

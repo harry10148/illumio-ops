@@ -25,6 +25,7 @@ from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.reports.common import port_text, tr
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
+from illumio_ops.services.reports.visibility import visibility_sections
 
 ROWS = 200
 _KPI_KEYS = {"rules": "rpt_pu_kpi_rules", "used": "rpt_pu_kpi_used", "unused": "rpt_pu_kpi_unused",
@@ -178,4 +179,4 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
                           blocks=(disabled_table,)),
                   Section(id="deny", title=t("rpt_pu_sec_deny"), intro=t("rpt_pu_deny_intro"), blocks=(deny_table,)),
                   Section(id="no_rule", title=t("rpt_pu_sec_no_rule"), intro=t("rpt_pu_no_rule_intro"),
-                          blocks=(no_rule_table,))))
+                          blocks=(no_rule_table,)), *visibility_sections(inp)))
