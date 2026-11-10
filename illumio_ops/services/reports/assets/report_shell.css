@@ -1181,6 +1181,19 @@ figure.chart-static figcaption {
   margin: 12mm 11mm 12mm;
 }
 
+/* 6.6.0: a share column draws its number with a bar of that length; two narrow tables share a row. */
+.report-table td.share { white-space: nowrap; }
+.report-table td.share .share-num { display: inline-block; min-width: 3.6em; text-align: right; margin-right: 8px;
+  font-variant-numeric: tabular-nums; }
+.share-bar { width: 72px; height: 8px; vertical-align: middle; border: 0; border-radius: 4px; overflow: hidden;
+  background: var(--line-soft); appearance: none; -webkit-appearance: none; }
+.share-bar::-webkit-progress-bar { background: var(--line-soft); border-radius: 4px; }
+.share-bar::-webkit-progress-value { background: var(--accent-fg); border-radius: 4px; }
+.share-bar::-moz-progress-bar { background: var(--accent-fg); border-radius: 4px; }
+.table-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.table-pair > div { min-width: 0; }
+@media (max-width: 900px) { .table-pair { grid-template-columns: minmax(0, 1fr); } }
+
 @media print {
   :root {
     --fs-micro: 6.5pt;

@@ -4,6 +4,7 @@ escaped here; truncation follows the rules in domain.report and is always stated
 from __future__ import annotations
 
 import html
+import re
 from datetime import datetime, tzinfo
 from functools import cache
 from importlib import resources
@@ -128,12 +129,51 @@ def _kpi(k: Kpi, lang: Language) -> str:
             f'<div class="kpi-trend">{_esc(kpi_trend(k, lang))}</div></div>')
 
 
+def _share_cell(col: Column, value: Cell, tz: tzinfo | None) -> str:
+    """A share as its number and a bar of that length (a <progress>, so no inline style)."""
+    text = cell_text(col, value, tz)
+    m = _SHARE.match(text)
+    if not m:
+        return f"<td>{_esc(text)}</td>"
+    return (f'<td class="share"><span class="share-num">{_esc(text)}</span>'
+            f'<progress class="share-bar" max="100" value="{float(m.group(1)):g}" aria-hidden="true"></progress></td>')
+
+
 def _cell(col: Column, value: Cell, tz: tzinfo | None, lang: Language) -> str:
     text = cell_text(col, value, tz)
     if len(text) > CELL_SOFT_MAX:
         cut = _esc(text[:CELL_SOFT_MAX])
         return f'{cut}<span class="note">{_esc(tr(lang, "rpt_cell_cut", n=len(text)))}</span>'
     return _esc(text)
+
+
+_SHARE = re.compile(r"^(\d{1,3}(?:\.\d+)?)%$")
+SAME_ON_EVERY_ROW = frozenset({"action"})  # columns said once above the table when every row says the same
+
+
+def _share_columns(t: TableBlock, tz: tzinfo | None) -> set[int]:
+    """Columns whose every filled cell is a share between 0% and 100%: drawn with a bar beside the number."""
+    out = set()
+    for i, c in enumerate(t.columns):
+        cells = [cell_text(c, r[i], tz) for r in t.rows]
+        filled = [x for x in cells if x not in ("", "—")]
+        if filled and all((m := _SHARE.match(x)) and float(m.group(1)) <= 100 for x in filled):
+            out.add(i)
+    return out
+
+
+def _said_once(t: TableBlock, tz: tzinfo | None) -> dict[int, str]:
+    """Column -> its text, for the SAME_ON_EVERY_ROW columns that repeat one sentence on every row (two rows or
+    more): the HTML says it once above the table. The XLSX keeps the column."""
+    if len(t.rows) < 2 or len(t.columns) < 3:
+        return {}
+    out = {}
+    for i, c in enumerate(t.columns):
+        if c.key in SAME_ON_EVERY_ROW:
+            texts = {cell_text(c, r[i], tz) for r in t.rows}
+            if len(texts) == 1 and next(iter(texts)).strip():
+                out[i] = next(iter(texts))
+    return out
 
 
 def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language) -> str:
@@ -146,6 +186,15 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language) -> str:
     if not shown:  # every row is in the XLSX only: the builder's sentence and where to find them
         return (head + limit + f'<p class="note" data-role="xlsx-only">{_esc(t.html_note or "")} '
                 f'{_esc(tr(lang, "rpt_rows_in_sheet", total=len(t.rows), sheet=sheet))}</p>')
+    once = _said_once(t, tz)
+    if once:  # the sentence every row repeats, said once; the column is left out of the HTML table
+        head += "".join(f'<p class="note" data-role="said-once"><strong>{_esc(t.columns[i].label)}</strong> '
+                        f"{_esc(text)}</p>" for i, text in once.items())
+        keep = [i for i in range(len(t.columns)) if i not in once]
+        t = t.model_copy(update={"columns": tuple(t.columns[i] for i in keep),
+                                 "rows": tuple(tuple(r[i] for i in keep) for r in t.rows)})
+        shown = t.rows[:len(shown)]
+    shares = _share_columns(t, tz)
     wide = len(t.columns) >= WIDE_COLUMNS
     panel = ("report-table-panel" + (" report-table-panel--wide report-table-panel--landscape" if wide else "")
              + (" report-table-panel--long" if len(shown) > LONG_TABLE_ROWS else ""))
@@ -155,7 +204,8 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language) -> str:
                   f'<span class="th-label">{_esc(c.label)}</span></th>' for i, c in enumerate(t.columns))
     body = "".join(
         f'<tr data-row="{n}">' + "".join(
-            f'<td{" class=\"num\"" if i in numeric else ""}>{_cell(c, row[i], tz, lang)}</td>'
+            (_share_cell(c, row[i], tz) if i in shares else
+             f'<td{" class=\"num\"" if i in numeric else ""}>{_cell(c, row[i], tz, lang)}</td>')
             for i, c in enumerate(t.columns)) + "</tr>"
         for n, row in enumerate(shown))
     cap = ""
@@ -179,11 +229,30 @@ def _bars(b: BarBlock, lang: Language) -> str:
     return head + bar_svg(points) + note
 
 
+NARROW_COLUMNS = 3  # a table this narrow takes half the page at most
+
+
+def _narrow(block: object) -> bool:
+    return isinstance(block, TableBlock) and bool(block.rows) and len(block.columns) <= NARROW_COLUMNS
+
+
 def _section_body(s: Section, names: dict[int, str], tz: tzinfo | None, lang: Language) -> str:
     parts = [f'<p class="section-intro">{_esc(s.intro)}</p>'] if s.intro else []
     if s.workbench_link:
         parts.append(f'<p class="section-link"><a href="{_esc(s.workbench_link)}">{_esc(tr(lang, "rpt_open_in_workbench"))}</a></p>')
-    for block in s.blocks:
+    blocks = list(s.blocks)
+    i = 0
+    while i < len(blocks):
+        block = blocks[i]
+        nxt = blocks[i + 1] if i + 1 < len(blocks) else None
+        if _narrow(block) and _narrow(nxt):  # two narrow tables share a row (one column when the page is narrow)
+            assert isinstance(block, TableBlock) and isinstance(nxt, TableBlock)
+            parts.append('<div class="table-pair">'
+                         f"<div>{_table(block, names[id(block)], tz, lang)}</div>"
+                         f"<div>{_table(nxt, names[id(nxt)], tz, lang)}</div></div>")
+            i += 2
+            continue
+        i += 1
         if isinstance(block, TableBlock):
             parts.append(_table(block, names[id(block)], tz, lang))
         elif isinstance(block, BarBlock):
