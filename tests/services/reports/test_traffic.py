@@ -77,7 +77,25 @@ def test_findings_from_rules(ctx):
     _write(ctx, [flow(port=5900)])
     doc = _build(ctx)
     assert doc.findings[0].title == "Ransomware Risk Port (High)" and "1 allowed flows" in doc.findings[0].why
-    assert any("B002" in str(r[0]) for r in _table(doc, "findings").rows)
+    # 6.6.0: in the summary, not repeated at the end
+    assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
+
+
+def test_closing_rules_list_only_what_the_summary_does_not_show(ctx):
+    """6.6.0 Task 5: the summary shows the first five rules that fired; the closing section repeated them all."""
+    from illumio_ops.services.reports import traffic as mod
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["reports"]["rule_thresholds"].update(
+        unmanaged_connection=1, lateral_outbound_dst=1, cross_env_connection=1, discovery_protocol=1, pb_lateral=1))
+    _write(ctx, [flow(port=5900), flow(port=445, src_env="Dev", dst_env="Prod"), flow(port=1433, unmanaged_src=True),
+                 flow(port=22, decision="potentially_blocked"), flow(port=137, proto=17), flow(port=23, decision="blocked"),
+                 flow(src="jump", dst="t1", port=22), flow(src="jump", dst="t2", port=22)])
+    doc = _build(ctx)
+    assert len(doc.findings) == mod.KEY_FINDINGS
+    closing = _section(doc, "findings")
+    rows = _table(doc, "findings").rows
+    assert rows and "already show 5" in closing.intro
+    shown = {f.title for f in doc.findings}
+    assert not {r[1] for r in rows} & shown
 
 
 def test_rule_error_shown_as_not_evaluated(ctx, monkeypatch):

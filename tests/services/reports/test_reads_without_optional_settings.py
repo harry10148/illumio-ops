@@ -120,3 +120,17 @@ def test_a_section_that_holds_nothing_becomes_a_line_at_the_end():
     assert out.sections[-1].blocks[0].paragraphs == ("Disappeared connections: No connection disappeared.",)
     assert [s.id for s in finish(doc(none)).sections] == ["none"]
     assert [s.id for s in finish(doc(full)).sections] == ["full"]
+
+
+def test_a_column_blank_on_every_row_is_not_printed():
+    """6.6.0 Task 5: lateral posture printed 113 rows with two columns that never held a value."""
+    from illumio_ops.domain.report import Column, ReportDocument, Section, TableBlock
+    cols = (Column(key="a", label="A"), Column(key="b", label="B"), Column(key="c", label="C"))
+    table = TableBlock(title="t", columns=cols, rows=(("x", "", 0), ("y", None, 2)), total_rows=2, empty_text="-")
+    blank = TableBlock(title="u", columns=cols[:2], rows=(("", None),), total_rows=1, empty_text="-")
+    doc = ReportDocument(report_type=ReportType.TRAFFIC, lang=Language.EN, title="T", period_start=START,
+                         period_end=END, generated_at=NOW, pce_label="pce", kpis=(), findings=(), data_quality=(),
+                         sections=(Section(id="s", title="S", blocks=(table, blank)),))
+    out = finish(doc).sections[0].blocks
+    assert [c.key for c in out[0].columns] == ["a", "c"] and out[0].rows == (("x", 0), ("y", 2))  # 0 is a value
+    assert out[1] == blank  # nothing left to print: left as it was

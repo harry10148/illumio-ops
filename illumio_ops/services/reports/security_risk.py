@@ -388,6 +388,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                         link((), GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS)) if fc.initiator_process
                         else None)),
             Section(id="lateral", title=t("rpt_sec_sec_lateral"), blocks=(TextBlock(paragraphs=tuple(lateral_lines)),)),
-            Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                    blocks=(findings.outcomes_table(_by_category(outcomes), lang, title=t("rpt_sec_tbl_findings"),
-                                                    evaluated=bool(totals.flows)),))) if s is not None))
+            *findings.rest_sections(_by_category(outcomes), lang, summary=fired, limit=KEY_FINDINGS,
+                                    title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
+                                    table_title=t("rpt_sec_tbl_findings"), evaluated=bool(totals.flows)))
+            if s is not None))

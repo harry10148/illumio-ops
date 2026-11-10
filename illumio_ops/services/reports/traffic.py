@@ -173,6 +173,6 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
                           workbench_link=link(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST,
                                               metric=SegmentMetric.BYTES) if fc.bytes else None),
                   Section(id="unmanaged", title=t("rpt_trf_sec_unmanaged"), blocks=(unmanaged,)),
-                  Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                          blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings"),
-                                                    evaluated=bool(totals.flows)),))))
+                  *findings.rest_sections(outcomes, lang, summary=outcomes, limit=KEY_FINDINGS,
+                                          title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
+                                          table_title=t("rpt_trf_tbl_findings"), evaluated=bool(totals.flows))))

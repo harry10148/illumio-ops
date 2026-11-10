@@ -268,7 +268,8 @@ def test_every_rule_rendered(ctx):
             ctx=ctx, params=ReportParams(report_type=ReportType.SECURITY_RISK), start=START, end=END, lang=lang,
             tz=UTC, now=NOW, pce_label="pce"))
         rows = next(s for s in doc.sections if s.id == "findings").blocks[0].rows
-        assert {r[0] for r in rows} == {r.rule_id for r in RULES}
+        # 6.6.0: the closing table lists the rules the summary's findings do not already show
+        assert len({r[0] for r in rows}) + len(doc.findings) == len(RULES)
 
 
 def test_injected_missing_key_is_caught(ctx, monkeypatch):

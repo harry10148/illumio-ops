@@ -180,6 +180,6 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
             Section(id="services", title=t("rpt_inv_sec_services"), intro=t("rpt_inv_services_intro"),
                     blocks=(provided,)),
             Section(id="unmanaged", title=t("rpt_inv_sec_unmanaged"), blocks=(unmanaged,)),
-            Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                    blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings"),
-                                                    evaluated=bool(totals)),))))
+            *findings.rest_sections(outcomes, lang, summary=outcomes, limit=KEY_FINDINGS,
+                                    title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
+                                    table_title=t("rpt_trf_tbl_findings"), evaluated=bool(totals))))

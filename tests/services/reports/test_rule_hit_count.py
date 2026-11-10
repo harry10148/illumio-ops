@@ -94,7 +94,9 @@ def test_pending_points_to_policy_usage(ctx, monkeypatch):
     monkeypatch.setattr(rule_hit_count, "fetch_pending", lambda client, *, deadline: [item])
     doc = _build(ctx)
     text = " ".join(p for b in _section(doc, "pending").blocks if isinstance(b, TextBlock) for p in b.paragraphs)
-    assert "Policy usage" in text and _table(doc, "pending").rows[0][1] == "New"
+    # 6.6.0: the list is the policy usage report's; here a count and where to find it, not the same table again
+    assert "1" in text and "Policy usage" in text
+    assert not [b for b in _section(doc, "pending").blocks if isinstance(b, TableBlock)]
 
 
 def test_unparsed_rows_disclosed(ctx, monkeypatch):

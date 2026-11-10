@@ -267,3 +267,17 @@ def test_full_host_gap_not_explained_as_selective(ctx):
                                     services=[svc("RDP", 3389, state="protected_closed")])]})
     text = _tables(_build(ctx), "hosts")[0].rows[0][-1]
     assert "move it to Full" not in text and "PCE console" in text
+
+
+def test_services_that_take_nothing_off_a_score_are_counted_not_listed(ctx):
+    """6.6.0 Task 5 (.106: 200 rows, every one 0.0): the per-service table lists the services that lower a score."""
+    lowering = {**svc("SMB", 445), "contribution": 12.5}
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [item("a", "SMB", 445)], "safe_to_block": [],
+                  "suspicious": [], "hosts": [hostrow("a", computed=5.0, services=[lowering, svc("RDP", 3389),
+                                                                                    svc("WinRM", 5985)])]})
+    table = _tables(_build(ctx), "hosts")[1]
+    assert [r[1] for r in table.rows] == ["SMB"] and "other 2 contribute 0" in table.limit_note
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [item("a", "SMB", 445)], "safe_to_block": [],
+                  "suspicious": [], "hosts": [hostrow("a", computed=5.0, services=[svc("RDP", 3389)])]})
+    table = _tables(_build(ctx), "hosts")[1]
+    assert table.rows == () and "None of the 1 services" in table.empty_text

@@ -5,7 +5,7 @@ score contradicts its own services is flagged and left out of the ranking."""
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from datetime import date, timedelta
 from typing import Any
 
@@ -20,14 +20,13 @@ from illumio_ops.domain.report import (
     ReportDocument,
     Section,
     TableBlock,
-    TextBlock,
 )
 from illumio_ops.domain.values import Severity
 from illumio_ops.services.analysis.ransomware import host_ransomware
 from illumio_ops.services.reports import reads
-from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.common import port_text, rule_label, severity_name, tr
 from illumio_ops.services.reports.generate import previous_period
+from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
@@ -198,7 +197,12 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                     sum(1 for s in h.get("services") or () if _open(s)),
                     t("rpt_rw_contradiction_yes") if h.get("contradiction") else "", explain(h)) for h in ranked),
         total_rows=len(ranked), empty_text=t("rpt_rw_none_hosts"))
-    services = [(h, s) for h in ranked for s in h.get("services") or ()]
+    every = [(h, s) for h in ranked for s in h.get("services") or ()]
+    # A service that takes nothing off the host's score (contribution 0) is one of hundreds of identical rows: only
+    # the ones that do are listed, and the rest are counted (6.6.0).
+    services = [(h, s) for h, s in every if isinstance(s.get("contribution"), (int, float)) and s["contribution"] > 0]
+    if not services:
+        services = every[:0]
     service_table = TableBlock(
         title=t("rpt_rw_tbl_services"),
         columns=(Column(key="host", label=t("rpt_col_host")), Column(key="service", label=t("rpt_col_name")),
@@ -213,7 +217,10 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                     pct(100 * s["coverage"]) if isinstance(s.get("coverage"), (int, float)) else "—",
                     f"{s['contribution']:.1f}" if isinstance(s.get("contribution"), (int, float)) else "—")
                    for h, s in services),
-        total_rows=len(services), empty_text=t("rpt_rw_none_hosts"))
+        total_rows=len(services),
+        empty_text=t("rpt_rw_none_contributing", n=len(every)) if every else t("rpt_rw_none_hosts"),
+        limit_note=(t("rpt_rw_services_rest", n=len(every) - len(services))
+                    if services and len(every) > len(services) else None))
 
     # ── allow rules behind the deductions, for the top hosts of the fix-first list ─────
     top_hosts: list[str] = list(dict.fromkeys(str(r.get("host")) for r in lists["priority"] if r.get("host")))

@@ -106,9 +106,12 @@ def test_hosts_of_the_app(ctx):
 def test_findings_only_this_app(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="Other", port=5900), flow(src_app="Web", dst_app="Finance", port=443)])
     doc = _build(ctx, _app("Finance"))
-    assert not any(r[0] == "B002" for r in _table(doc, "findings").rows)
+    assert not any("Ransomware Risk Port" in f.title for f in doc.findings)
     _write(ctx, [flow(src_app="Finance", dst_app="Other", port=5900)])
-    assert any(r[0] == "B002" for r in _table(_build(ctx, _app("Finance")), "findings").rows)
+    doc = _build(ctx, _app("Finance"))
+    assert any("Ransomware Risk Port" in f.title for f in doc.findings)
+    # 6.6.0: a rule the summary's findings already show is not listed again at the end
+    assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
 
 
 def test_zh_tw_builds(ctx):

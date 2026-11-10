@@ -89,7 +89,9 @@ def test_unmanaged_into_apps(ctx):
 def test_findings_section(ctx):
     _write(ctx, [flow(port=5900)])
     doc = _build(ctx)
-    assert any(r[0] == "B002" for r in _tables(doc, "findings")[0].rows) and doc.findings
+    assert any("Ransomware Risk Port" in f.title for f in doc.findings)
+    # 6.6.0: already in the summary, not repeated at the end
+    assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
 
 
 def test_zh_tw_builds(ctx):

@@ -37,7 +37,13 @@ from illumio_ops.domain.findings_rules import (
     RuleOutcome,
     ranked,
 )
-from illumio_ops.domain.report import Column, Finding, TableBlock, techniques_text
+from illumio_ops.domain.report import (
+    Column,
+    Finding,
+    Section,
+    TableBlock,
+    techniques_text,
+)
 from illumio_ops.domain.values import Language, PortClass, Severity
 from illumio_ops.services import flowsource
 from illumio_ops.services.analysis.context import load_lateral_context
@@ -379,6 +385,20 @@ def as_findings(outcomes: list[RuleOutcome], lang: Language, *, limit: int) -> t
                          why=tr(lang, o.desc_key, **_params(o)), action=tr(lang, o.rec_key, **_params(o)),
                          techniques=BY_ID[o.rule_id].techniques)
                  for o in outcomes if o.severity is not None)[:limit]
+
+
+def rest_sections(outcomes: list[RuleOutcome], lang: Language, *, summary: list[RuleOutcome], limit: int, title: str,
+                  intro: str, table_title: str, evaluated: bool = True) -> tuple[Section, ...]:
+    """The closing "rules" section: the rules the summary's findings (as_findings(summary, limit)) do not already
+    show — it repeated all of them (6.6.0). Nothing when every rule that fired is in the summary; the section stays
+    when the rules did not run, to say so."""
+    shown = {o.rule_id for o in [o for o in summary if o.severity is not None][:limit]}
+    rest = [o for o in outcomes if o.rule_id not in shown]
+    if outcomes and not rest:
+        return ()
+    note = tr(lang, "rpt_rules_rest_intro", n=len(shown)) if shown else ""
+    return (Section(id="findings", title=title, intro=f"{intro} {note}".strip(),
+                    blocks=(outcomes_table(rest, lang, title=table_title, evaluated=evaluated),)),)
 
 
 def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str, evaluated: bool = True) -> TableBlock:

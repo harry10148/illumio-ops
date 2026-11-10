@@ -199,9 +199,9 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
                              limit=UNCOVERED_TOP)),
                     workbench_link=peer_link("inbound", SegmentDimension.SRC_LABEL, uncovered=True,
                                              limit=UNCOVERED_TOP)),
-            Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_app_findings_intro"),
-                    blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings"),
-                                                    evaluated=bool(flows)),))))
+            *findings.rest_sections(outcomes, lang, summary=outcomes, limit=KEY_FINDINGS,
+                                    title=t("rpt_trf_sec_findings"), intro=t("rpt_app_findings_intro"),
+                                    table_title=t("rpt_trf_tbl_findings"), evaluated=bool(flows))))
 
 
 def _kpi_values(parts: dict[str, FlowTotals], decisions: dict[str, tuple[int, int]]) -> dict[str, float | int]:

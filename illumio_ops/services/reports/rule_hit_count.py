@@ -136,16 +136,10 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
         total_rows=len(no_record), empty_text=t("rpt_rhc_none_no_record"), limit_note=limit(len(no_record)))
 
     if pending:
+        # the list itself is the policy usage report's (6.6.0: the same table was printed in both)
         pending_blocks: tuple[TextBlock | TableBlock, ...] = (
-            TextBlock(paragraphs=(t("rpt_rhc_pending_some", n=len(pending)),)),
-            TableBlock(title=t("rpt_pu_tbl_pending"),
-                       columns=(Column(key="kind", label=t("rpt_pu_col_kind")),
-                                Column(key="name", label=t("rpt_col_name")),
-                                Column(key="change", label=t("rpt_pu_col_change")),
-                                Column(key="at", label=t("rpt_pu_col_updated"))),
-                       rows=tuple((p.kind, p.name or p.href.rsplit("/", 1)[-1], p.update_type or "—",
-                                   fmt_time(p.updated_at, inp.tz) if p.updated_at else "—") for p in pending),
-                       total_rows=len(pending), empty_text=""))
+            TextBlock(paragraphs=(t("rpt_rhc_pending_some", n=len(pending)),
+                                  t("rpt_rhc_pending_see", report=t("rpt_title_policy_usage")))),)
     else:
         pending_blocks = (TextBlock(paragraphs=(t("rpt_rhc_pending_none"),)),)
 

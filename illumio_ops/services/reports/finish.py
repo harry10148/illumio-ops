@@ -2,6 +2,7 @@
 - a section that was computed and holds nothing (every block an empty table or an empty chart) no longer takes a
   panel of its own: it becomes one line — its title and what its empty table said — in a closing section "Nothing
   to show this period", so a reader still sees it was looked at;
+- a table column that is blank on every row is not printed;
 - one data note when none of the key numbers has a previous period to compare with (it replaces the "No previous
   period" line that sat under every number);
 - a data note said twice is said once.
@@ -41,7 +42,21 @@ def _line(section: Section) -> str:
     return f"{section.title}: {said}" if said else section.title
 
 
+def _without_empty_columns(block: Block) -> Block:
+    """A table's columns that hold a value in at least one row (a column blank on every row is not printed); a
+    table with no rows, or whose every column is blank, is left as it is."""
+    if not isinstance(block, TableBlock) or not block.rows:
+        return block
+    keep = [i for i in range(len(block.columns)) if any(r[i] not in (None, "") for r in block.rows)]
+    if not keep or len(keep) == len(block.columns):
+        return block
+    return block.model_copy(update={"columns": tuple(block.columns[i] for i in keep),
+                                    "rows": tuple(tuple(r[i] for i in keep) for r in block.rows)})
+
+
 def finish(doc: ReportDocument) -> ReportDocument:
+    doc = doc.model_copy(update={"sections": tuple(
+        s.model_copy(update={"blocks": tuple(_without_empty_columns(b) for b in s.blocks)}) for s in doc.sections)})
     notes = list(dict.fromkeys(doc.data_quality))
     valued = [k for k in doc.kpis if k.value is not None]
     if valued and all(k.previous is None for k in valued):
