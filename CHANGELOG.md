@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.5.0] - 2026-11-11
+
+What the specification asked for and the 2026-11-10 audit found missing.
+
+### Added
+
+- Workbench: a period older than the kept traffic is read from the archive when the archive is on and reaches the
+  period's start, with no request to the PCE. The page says the data came from the archive, which days were read
+  and which days the archive has no file for. Lightweight mode, and an archive that does not reach the period, read
+  the PCE as before. Alert detection does not read the archive.
+- Reports: sections of the traffic, security risk, network inventory, app summary and audit reports that are an
+  analysis segment carry an "Open in the workbench" link with the same filter, grouping and metric the section ran.
+  Without a GUI external address no link is drawn and the report says why. Reports computed by their own analysis
+  have no segment to link.
+- Lateral movement: who initiates management-port connections — initiating users, initiating processes and system
+  accounts, by distinct destination hosts — on the lateral movement page and in the lateral posture report, from one
+  computation. Each says how many management-port flow records carry a user or a process, and where a ranking's
+  read stopped. Lightweight mode says the rankings need kept traffic.
+- Reports: readiness, ransomware, lateral posture, policy usage and custom reports with a traffic section list the
+  managed hosts whose VEN reports blocked traffic only, or none, and say the numbers about them are incomplete.
+- Alert rules: the rule list states each rule's condition and exclusion in a line of words and filters by type.
+
+### Fixed
+
+- Alerts: marking an alert known handles that alert too (it stayed in the unhandled count; only later alerts about
+  the detection were grouped).
+
 ## [6.4.5] - 2026-11-11
 
 Corrections from the 2026-11-10 audit of the code, the documents and the reports.
