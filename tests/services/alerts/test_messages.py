@@ -62,7 +62,7 @@ def test_time_in_display_timezone():
 def test_zh_tw_and_en_rendered():
     zh = render([view()], ChannelKind.LINE, lang=Language.ZH_TW, tz=UTC, console_url=None)
     en = render([view()], ChannelKind.LINE, lang=Language.EN, tz=UTC, console_url=None)
-    assert "Agent 遭竄改" in zh.text and "web-01 發生 agent.tampering（3 筆）" in zh.text
+    assert "VEN 遭竄改" in zh.text and "web-01 發生 agent.tampering（3 筆）" in zh.text
     assert "agent.tampering on web-01 (3)" in en.text
 
 

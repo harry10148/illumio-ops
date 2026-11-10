@@ -14,13 +14,14 @@ BANNED = {
     r"可能被擋|potentially[_ ]blocked|Potentially blocked": "Potentially Blocked",
     r"\bblocked\b|\bBlock\b": "Blocked（判定）或「擋下」（動作）",
     r"\ballowed\b|\bAllow\b|\ballow\b": "Allowed（判定）或「規則允許」",
+    r"^允許$|^被擋$|^被擋（|允許$(?<=Deny Rule 允許)": "判定值寫 Allowed／Blocked；中文只用在動作（「擋下」「允許」）",
     # enforcement modes and states
-    r"\bfull\b|\bselective\b|\bidle\b|visibility[_ ]only|完全強制|僅可見|閒置|test 模式|測試模式": "Full／Selective／Idle／Visibility Only",
+    r"\bfull\b|\bselective\b|\bidle\b|visibility[_ ]only|完全強制|選擇性強制|僅可見|僅可視|閒置|test 模式|測試模式": "Full／Selective／Idle／Visibility Only",
     r"\benforce[ds]?\b|\benforcement\b|\bEnforcement\b": "強制",
     # objects and products
     r"\bworkloads?\b|\bWorkloads\b|工作負載": "主機（一般）或 Workload（PCE 物件）",
     r"\blabels?\b|標籤": "Label",
-    r"\bagent\b": "VEN",
+    r"\bagent\b|(?<!Lost )\bAgent\b": "VEN（PCE 的事件名 Lost Agent 除外）",
     r"規則集|\brule-?sets?\b": "Ruleset",
     r"\bdeny 規則|\bdeny rules?\b|拒絕規則|\boverride deny\b": "Deny Rule／Override Deny",
     r"\bboundary\b|enforcement boundary": "Deny Rule 或「邊界」",
@@ -31,6 +32,8 @@ BANNED = {
     r"草稿|已佈署|佈署": "Draft／Active／Provision",
     r"可見度": "Visibility",
     r"連接埠|(?<!主)埠": "port",
+    # a sentence states what was observed or a fixed rule, never a guess at the cause (user 2026-11-03)
+    r"多半|可能代表|攻擊者已|人或腳本": "只寫觀察到的事實或固定規則，不寫推論",
 }
 
 
