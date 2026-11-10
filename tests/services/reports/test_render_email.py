@@ -24,8 +24,9 @@ def test_subject_counts_findings():
 
 def test_four_kpis_with_previous_or_none():
     r = render_email(make_doc(kpis=KPIS), tz=UTC)
-    for text in ("Pivot hosts", "▲ 3", "No previous period", "no critical assets", "Unchanged"):
+    for text in ("Pivot hosts", "▲ 3", "no critical assets", "Unchanged"):
         assert text in r.text and text in r.html
+    assert "No previous period" not in r.text and "No previous period" not in r.html
 
 
 def test_findings_with_why_and_action():
@@ -60,4 +61,4 @@ def test_html_escapes_and_uses_shell_colours_only():
 
 def test_zh_tw_body():
     r = render_email(make_doc(lang=Language.ZH_TW, kpis=KPIS), tz=UTC)
-    assert "無上期資料" in r.text and "［illumio-ops］" in r.subject
+    assert "無上期資料" not in r.text and "［illumio-ops］" in r.subject

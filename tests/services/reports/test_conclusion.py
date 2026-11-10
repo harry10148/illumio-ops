@@ -6,7 +6,12 @@ from datetime import UTC
 
 import pytest
 
-from illumio_ops.domain.conclusion import CONCLUSION_KEYS, CONCLUSION_KPIS, conclusion
+from illumio_ops.domain.conclusion import (
+    CONCLUSION_KEYS,
+    CONCLUSION_KPIS,
+    CONCLUSIONS,
+    conclusion,
+)
 from illumio_ops.domain.report import Kpi, ReportDocument
 from illumio_ops.domain.values import Language, ReportType
 from illumio_ops.i18n import dictionary, translate
@@ -40,6 +45,29 @@ def test_placeholders_match_declared_kpis(report_type):
     for lang in Language:
         found = set(PH.findall(dictionary(lang)[CONCLUSION_KEYS[report_type]]))
         assert found == set(CONCLUSION_KPIS[report_type]), (report_type, lang)
+        for keys, template in CONCLUSIONS[report_type]:  # every sentence form names exactly its own numbers
+            assert set(PH.findall(dictionary(lang)[template])) == set(keys), (report_type, template, lang)
+
+
+def test_a_sentence_form_without_the_missing_number_is_used(monkeypatch):
+    """6.6.0 Task 1: a report type has an ordered list of sentence forms; the first whose numbers are all there
+    is used, so a number that an unset optional setting leaves out does not turn the sentence into "could not be
+    computed". Only when no form applies is the sentence the incomplete one."""
+    from illumio_ops.domain import conclusion as mod
+    forms = ((("flows", "connections", "sources", "destinations"), "rpt_conclusion_traffic"),
+             (("flows", "connections"), "rpt_conclusion_test_short"))
+    monkeypatch.setattr(mod, "CONCLUSIONS", {**mod.CONCLUSIONS, ReportType.TRAFFIC: forms})
+    used = []
+
+    def tr(key, params):
+        used.append((key, params))
+        return key
+    full = [Kpi(key=k, label=k, value=1, previous=None) for k in ("flows", "connections", "sources", "destinations")]
+    assert conclusion(_doc(full), tr) == "rpt_conclusion_traffic"
+    assert conclusion(_doc(full[:2]), tr) == "rpt_conclusion_test_short" and used[-1][1] == {"flows": "1", "connections": "1"}
+    none = [full[0], Kpi(key="connections", label="Connections", value=None, previous=None, note="why")]
+    assert conclusion(_doc(none), tr) == "rpt_conclusion_incomplete"
+    assert mod.incomplete(_doc(none)) and not mod.incomplete(_doc(full[:2]))
 
 
 @pytest.mark.parametrize("report_type", [t for t in ReportType if t is not ReportType.CUSTOM])

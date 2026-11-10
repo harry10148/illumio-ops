@@ -105,11 +105,10 @@ def cell_text(col: Column, value: Cell, tz: tzinfo | None) -> str:
 
 
 def kpi_trend(k: Kpi, lang: Language) -> str:
-    """'▲ 2 vs previous period', 'unchanged', or 'No previous period' (never a percentage from nothing)."""
-    if k.value is None:
+    """'▲ 2 vs previous period' or 'unchanged'; nothing without a previous period (the data notes say once that
+    the report has none to compare with — finish.py — never a percentage from nothing)."""
+    if k.value is None or k.previous is None:
         return ""
-    if k.previous is None:
-        return tr(lang, "rpt_kpi_no_previous")
     delta = k.value - k.previous
     if delta == 0:
         return tr(lang, "rpt_kpi_flat")

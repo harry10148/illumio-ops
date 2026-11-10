@@ -38,10 +38,11 @@ def test_kpi_without_value_is_not_zero():
     assert ">0<" not in kpi_html and "no critical assets set" in kpi_html
 
 
-def test_kpi_previous_none_says_no_previous():
+def test_kpi_without_a_previous_period_prints_nothing_under_the_number():
+    """6.6.0 Task 1: "No previous period" under every number was noise; the data notes say it once."""
     k = Kpi(key="k", label="Pivots", value=4, previous=None)
     out = render_html(make_doc(kpis=(k,)), tz=UTC)
-    assert "No previous period" in out
+    assert "No previous period" not in out
 
 
 def test_kpi_previous_delta_shown():

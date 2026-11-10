@@ -1,6 +1,6 @@
 """The one sentence a report opens with (UI redesign spec §6.5, §8): a fixed template per report type whose every
-placeholder is one of that report's own key numbers (Kpi.key). A number the report could not compute makes the
-sentence say which and why, never a 0. Custom reports have no key numbers: their sentence counts their sections."""
+placeholder is one of that report's own key numbers (Kpi.key). A type may have shorter forms for when a number is
+not there (CONCLUSIONS); when no form applies the sentence says which numbers are missing and why, never a 0. Custom reports have no key numbers: their sentence counts their sections."""
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -49,6 +49,23 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
 }
 
 
+# The sentence forms of each type, in order: the first whose numbers the report all has (a value, not None) is the
+# one used. A later form leaves out a number an unset optional setting, an analysis not yet run, or an unsupported
+# PCE takes away (6.6.0: such a report still reads from its title to its end). The first form is the full sentence.
+CONCLUSIONS: Mapping[ReportType, tuple[tuple[tuple[str, ...], str], ...]] = {
+    t: ((CONCLUSION_KPIS[t], CONCLUSION_KEYS[t]),) for t in CONCLUSION_KEYS}
+
+
+def _form(doc: ReportDocument) -> tuple[tuple[str, ...], str] | None:
+    have = {k.key for k in doc.kpis if k.value is not None}
+    return next((form for form in CONCLUSIONS[doc.report_type] if set(form[0]) <= have), None)
+
+
+def incomplete(doc: ReportDocument) -> bool:
+    """No sentence form applies: the report could not compute the numbers even its shortest sentence needs."""
+    return doc.report_type is not ReportType.CUSTOM and _form(doc) is None
+
+
 def _value(k: Kpi) -> str:
     v = k.value
     assert v is not None
@@ -61,14 +78,15 @@ def conclusion(doc: ReportDocument, tr: Translate, *, tz: tzinfo | None = None) 
     if doc.report_type is ReportType.CUSTOM:
         return tr(CONCLUSION_KEYS[ReportType.CUSTOM], {"sections": f"{len(doc.sections):,}",
                                                       "period": period_text(doc.period_start, doc.period_end, tz)})
-    wanted = CONCLUSION_KPIS[doc.report_type]
     kpis = {k.key: k for k in doc.kpis}
-    missing = [kpis[w] for w in wanted if w in kpis and kpis[w].value is None]
-    absent = [w for w in wanted if w not in kpis]
-    if missing or absent:
+    form = _form(doc)
+    if form is None:
+        wanted = CONCLUSIONS[doc.report_type][0][0]
+        missing = [kpis[w] for w in wanted if w in kpis and kpis[w].value is None]
+        absent = [w for w in wanted if w not in kpis]
         names = "、" if doc.lang.value == "zh_TW" else ", "
         reasons = [k.note.rstrip("。.") for k in missing if k.note]  # the sentence closes after the brackets
         return tr("rpt_conclusion_incomplete", {"title": doc.title,
                                                 "missing": names.join([k.label for k in missing] + absent),
                                                 "reasons": names.join(dict.fromkeys(reasons)) or "—"})
-    return tr(CONCLUSION_KEYS[doc.report_type], {w: _value(kpis[w]) for w in wanted})
+    return tr(form[1], {w: _value(kpis[w]) for w in form[0]})

@@ -40,6 +40,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import store_coverage
 from illumio_ops.services.ondemand import OnDemandFailed, OnDemandResult, pull_period
 from illumio_ops.services.reports.deliver import deliver, gui_link
+from illumio_ops.services.reports.finish import finish
 from illumio_ops.services.reports.registry import (
     RHC_UNAVAILABLE,
     BuildInput,
@@ -413,6 +414,7 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
                                            pce_label=row.pce_label))
         if fdb.generation != generation:
             raise _Fail("rpt_err_pce_switched")
+        doc = finish(doc)
         doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id),
                                      "conclusion": conclusion(doc, lambda key, p: translate(doc.lang, key, p), tz=tz)})
         files = _write(out_dir, doc, row.id, params.formats, tz)
