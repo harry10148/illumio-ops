@@ -1,6 +1,6 @@
 ---
 title: v6 安裝、升級與回退
-last_verified: 2026-11-06
+last_verified: 2026-11-10
 verified_against:
   - scripts/install.sh
   - scripts/rollback.sh
@@ -9,6 +9,9 @@ verified_against:
   - scripts/uninstall.sh
   - illumio_ops/migrate/v6.py
   - illumio_ops/rescue.py
+  - illumio_ops/web/auth.py
+  - illumio_ops/settings/secrets.py
+  - illumio_ops/migrate/v5.py
   - illumio_ops/migrate/v5_write.py
   - illumio_ops/migrate/v5_handover.py
 ---
@@ -44,10 +47,21 @@ sudo systemctl enable --now illumio-ops
 - `preflight.sh` 會說明 `install.sh` 在這個目錄會做什麼（全新安裝、從 5.x 升級、升級已安裝的 v6），並檢查架構、glibc、
   systemd、磁碟空間、安裝包是否完整與 port。有 FAIL 時先處理再安裝；`--prefix`、`--port` 與 `install.sh` 相同。
 - 安裝程式只安裝，不會啟動服務。
-- 啟動後開 `https://<主機>:5001/`，以預設帳號登入並立刻改密碼，接著到「系統 › PCE 連線」填入 PCE。
+- 啟動後開 `https://<主機>:5001/`，依下一小節登入，接著到「系統 › PCE 連線」填入 PCE。
 - 可用的選項：
   - `--prefix`、`--service-name`、`--port`：改安裝位置、服務名稱與 port。
   - `--no-systemd`：以目前使用者安裝，只供驗證。
+
+### 首次登入
+
+- 全新安裝時，安裝程式會建立 `config/settings.json`，管理者帳號是 `illumio`，密碼是預設的 `illumio`。v6 只有這一個帳號。
+- 全新安裝不會強制改密碼。只要是用預設密碼登入，每一頁上方都會顯示「您正使用預設密碼登入。」與「立即變更」連結，
+  改掉之前不會消失。請登入後立刻到「系統 › 安全」變更。
+- 新密碼長度 12 到 512 個字元。改完後，其他已登入的連線都會被登出。
+- 帳號名稱也在「系統 › 安全」變更，需要輸入目前的密碼。
+- 從 5.x 升級時不使用預設帳號：帳號與密碼沿用 5.x 的（5.x 沒有設密碼時才是預設密碼）。5.x 標記為「必須改密碼」的，
+  升級後登入只會看到改密碼的畫面，改完才能使用其他功能。
+- 忘記密碼時用救援指令 `reset-password`，見第 6 節。
 
 ## 3. 從 5.x 升級
 

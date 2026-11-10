@@ -1,85 +1,41 @@
 ---
-title: illumio-ops 文件總目錄
-audience: [operator, developer, api, security]
-version: 5.0.0
-last_verified: 2026-09-02
+title: illumio-ops v6 文件總目錄
+last_verified: 2026-11-10
 verified_against:
-  - docs/guide/installation.md
-  - docs/guide/configuration.md
-  - docs/guide/gui-tour.md
-  - docs/guide/monitoring-alerts.md
-  - docs/guide/reports.md
-  - docs/guide/siem.md
-  - docs/guide/automation.md
-  - docs/guide/cache-maintenance.md
-  - docs/guide/troubleshooting.md
-  - docs/handover/architecture.md
-  - docs/handover/development.md
-  - docs/handover/pce-domain-notes.md
-  - docs/reference/cli.md
-  - docs/reference/rest-api.md
-  - docs/reference/glossary.md
+  - docs/guide/v6-installation.md
+  - docs/guide/v6-siem-east-west.md
+  - docs/reference/v6-rest-api.md
+  - CHANGELOG.md
 ---
 
-> 這裡是文件總目錄。
-> 最後校驗 **2026-07-17**
+# illumio-ops v6 文件總目錄
 
-# illumio-ops 文件總目錄
+這裡列的是 v6 的文件。v6 只有網頁介面；目前版本與各版變更見根目錄的 [CHANGELOG.md](../CHANGELOG.md)，
+總覽與快速上手見 [README_zh.md](../README_zh.md)（英文版 [README.md](../README.md)）。
 
-從專案根目錄的 **`README.md`**（**`README_zh.md`**）開始看總覽、架構圖與快速上手。
-2026-07 文件重整後，`docs/` 底下全面改為**繁體中文單語**（僅 repo 根的 `README.md`／`README_zh.md`
-仍維持中英成對）。以下三區涵蓋全部文件。
+## v6 文件
 
-## 操作（`guide/`，9 篇）
+| 文件 | 內容 | 給誰看 |
+|---|---|---|
+| [guide/v6-installation.md](guide/v6-installation.md) | 硬體建議、全新安裝、首次登入、從 5.x 升級、v6 升級、回退、救援指令、移除 | 安裝與維運人員 |
+| [guide/v6-siem-east-west.md](guide/v6-siem-east-west.md) | SIEM 轉送送什麼、不送什麼，以及在 SIEM 裡看東西向連線的做法 | 已有 SIEM 的客戶 |
+| [reference/v6-rest-api.md](reference/v6-rest-api.md) | 網頁介面使用的每一個 API 操作（由 API 契約產生） | 整合與開發人員 |
 
-面向操作員：安裝、設定、日常操作與排錯。
+介面上每一頁的操作說明寫在介面本身，沒有另外的操作手冊。
 
-| 文件 | 一句話說明 |
-|---|---|
-| [安裝與部署](guide/installation.md) | 從原始碼或離線安裝包安裝、systemd 服務化部署、升級與解除安裝。 |
-| [設定參照](guide/configuration.md) | `config/config.json` 每個鍵的權威參照，以 pydantic schema 為 ground truth。 |
-| [Web GUI 導覽](guide/gui-tour.md) | 五區 23 路由的 SPA 導覽（v3）：登入、首頁、調查、政策、報表、系統；舊六區路由自動轉址。 |
-| [監控規則、告警與事件規則](guide/monitoring-alerts.md) | 即時監控規則引擎、B/L/R 報表安全規則引擎與事件處理管線的差異與設定方式。 |
-| [報表家族](guide/reports.md) | 9 種報表的業務用途、關鍵欄位、CLI／GUI／排程三種產生方式。 |
-| [SIEM 轉送](guide/siem.md) | 把 audit events 與 traffic 摘要轉送到 syslog／Splunk HEC／JSON sink，含 DLQ 重送與清除。 |
-| [自動化：規則排程、隔離操作與背景 Job](guide/automation.md) | 會主動改變 PCE 狀態的自動化能力：Rule Scheduler 與隔離操作。 |
-| [pce_cache 維運與容量規劃](guide/cache-maintenance.md) | 選用的本機 SQLite 鏡像維運、保留策略與容量估算。 |
-| [故障排除](guide/troubleshooting.md) | 症狀導向排錯 runbook：現象、判讀依據、可執行的處置指令。 |
+## 5.x 文件
 
-## 接手開發（`handover/`，3 篇）
+5.x 的文件整批放在 [legacy-5.x/](legacy-5.x/)，內容描述的是 5.x 的程式（`src/`、`config/config.json`、命令列工具），
+**不適用 v6**，只供仍在執行 5.x 或要對照舊行為時查閱：
 
-面向新加入的開發者：零背景接手 codebase 所需的架構、開發流程與踩坑知識。
+- `legacy-5.x/guide/`：安裝、設定、介面導覽、監控告警、報表、SIEM、自動化、快取維護、疑難排解。
+- `legacy-5.x/reference/`：命令列、REST API、詞彙表、流量計量、Graylog 儀表板。
+- `legacy-5.x/handover/`：架構、開發流程、PCE 領域筆記。
+- `legacy-5.x/_meta/`：2026-07 文件重整的稽核紀錄與事件參考資料。
 
-| 文件 | 一句話說明 |
-|---|---|
-| [架構導覽與模組地圖](handover/architecture.md) | 資料從哪裡進、在哪裡算、從哪裡出；`src/` 各頂層模組職責與關鍵設計決策。 |
-| [開發流程與慣習](handover/development.md) | 開發環境建置、測試與 CI 守門、i18n 鍵值合約、常見斷鏈坑、發版流程。 |
-| [PCE domain 須知（vendor 事實集）](handover/pce-domain-notes.md) | 無法從程式碼反推、踩過坑才知道的 Illumio PCE vendor 知識。 |
+其中 `legacy-5.x/handover/pce-domain-notes.md` 與 `legacy-5.x/reference/traffic-metrics.md` 記錄的 PCE 行為
+（policy 模型、流量欄位語意、API 實測）與 illumio-ops 的版本無關，但文中對應的程式路徑是 5.x 的。
 
-## 參考（`reference/`，5 篇）
+## 其他
 
-| 文件 | 一句話說明 |
-|---|---|
-| [CLI 參考手冊](reference/cli.md) | `illumio-ops` 完整命令樹：13 個頂層子命令的旗標、範例與行為。 |
-| [REST API 參考](reference/rest-api.md) | Web GUI 背後 Flask 應用的完整 JSON API 端點清單。 |
-| [詞彙表](reference/glossary.md) | Illumio 產品術語中英對照；決策/狀態類術語刻意不強譯，與產品 UI 一致。 |
-| [流量指標定義](reference/traffic-metrics.md) | 報表與 GUI 中各流量指標的計算口徑與資料來源。 |
-| [Graylog 儀表板與告警設計](reference/graylog-dashboards.md) | Illumio 直送／轉送與 FortiGate 日誌在 Graylog 上能做出什麼儀表板與告警，以及轉送待補的欄位。 |
-
-## 文件如何保鮮
-
-每篇文件的 frontmatter 都帶 `last_verified` / `verified_against`。2026-07 文件重整後，`docs/`
-語意改為**繁中單語**：不再要求每篇 `.md` 都有 `_zh.md` 對應檔，`--bilingual` 檢查改為只驗證 repo
-根的 `README.md`／`README_zh.md` 是否成對存在（詳見 `docs/handover/development.md` §2.4）。
-
-建議提交文件變更前執行：
-
-```bash
-python scripts/docs_check.py --all --exclude 'superpowers/**' --exclude 'ux-review*'
-```
-
-`docs/superpowers/` 底下是計畫／規格文件，本來就沒有 frontmatter，用 `--exclude` 排除；本機工作目錄
-若殘留舊的 `docs/ux-review-2026-05-14/`（已 gitignore、非追蹤檔案，`docs_check` 仍會掃到磁碟上的檔案）
-也一併排除。已實測此指令在 2026-07 文件重整（刪除舊雙語檔、改寫 INDEX）後對 `docs/` 其餘部分回傳
-exit 0（links／frontmatter／bilingual 檢查全過）。連結正確性另有 CI 硬閘門
-`python scripts/check_doc_links.py` 把關，範圍涵蓋整個 repo，不受 `--exclude` 限制。
+- `docs/superpowers/`：設計文件（specs）與實作計畫（plans），是開發過程的紀錄，不是使用手冊。

@@ -120,7 +120,7 @@ verified_against:
 
 ## 相關文件
 
-- [文件總覽 INDEX](../INDEX.md) — 全部文件地圖
+- [文件總覽 INDEX](../../INDEX.md) — 全部文件地圖
 - [PCE domain 須知](../handover/pce-domain-notes.md) — vendor 事實查證來源
 - [開發流程](../handover/development.md) — i18n 鍵值約定與新增字串流程
 - [Web GUI 導覽](../guide/gui-tour.md) — 本表多數術語的實際呈現介面

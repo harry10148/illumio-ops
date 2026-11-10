@@ -216,4 +216,4 @@ daemon 啟動時由 `src/scheduler/__init__.py:build_scheduler` 註冊。每個 
 
 - PCE API 與 policy 模型的 vendor 事實（值域、限流、版本門檻）：[pce-domain-notes.md](pce-domain-notes.md)
 - 開發流程與測試守門：[development.md](development.md)
-- 日常操作與 GUI 功能：見 [docs/guide/ 系列](../INDEX.md)。
+- 日常操作與 GUI 功能：見 [docs/guide/ 系列](../guide/)。
