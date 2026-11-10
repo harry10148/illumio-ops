@@ -6,17 +6,18 @@ The part itself is left out of the report (no key number, no section, no column)
 only trace, one per missing thing. A thing that was computed and came out 0 is not a hint: it is shown as 0."""
 from __future__ import annotations
 
-from typing import Literal
-
 from illumio_ops.domain.values import Language
 from illumio_ops.services.reports.common import tr
 
-Kind = Literal["unset", "pending", "unsupported"]
+KINDS = ("rpt_hint_unset_", "rpt_hint_pending_", "rpt_hint_unsupported_")
 
 
-def hint(lang: Language, kind: Kind, what: str, **params: object) -> str:
-    """The data note for one missing thing: message key rpt_hint_<kind>_<what>."""
-    return tr(lang, f"rpt_hint_{kind}_{what}", **params)
+def hint(lang: Language, key: str, **params: object) -> str:
+    """The data note for one missing thing. The key names its reason: rpt_hint_unset_*, rpt_hint_pending_* or
+    rpt_hint_unsupported_* (written out at the call, so the dictionary checks see it)."""
+    if not key.startswith(KINDS):
+        raise ValueError("a hint key says why the part is missing")
+    return tr(lang, key, **params)
 
 
 def once(*lines: str) -> tuple[str, ...]:

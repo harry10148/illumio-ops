@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from illumio_ops.domain.conclusion import incomplete
 from illumio_ops.domain.flows import normalize_flow
 from illumio_ops.domain.report import BarBlock, TableBlock, TextBlock
 from illumio_ops.domain.values import DataOrigin, Language, ReportType
@@ -135,10 +136,26 @@ def test_no_critical_assets_says_so(tmp_path):
     _hosts(c)
     _exposure(c, assets=False)
     doc = build_lateral_posture(_inp(c))
-    k = {x.key: x for x in doc.kpis}
-    assert k["assets_reachable"].value is None and "critical" in (k["assets_reachable"].note or "").lower()
-    assets = next(b for b in _section(doc, "assets").blocks if isinstance(b, TableBlock))
-    assert assets.rows == () and "critical" in assets.empty_text.lower()
+    # 6.6.0: with no critical asset chosen, the number, the section and the column that need one are not there;
+    # one data note says what is missing, what choosing them would add and where
+    assert "assets_reachable" not in {x.key for x in doc.kpis}
+    assert "assets" not in {s.id for s in doc.sections}
+    detail = [b for b in _section(doc, "detections").blocks if isinstance(b, TableBlock)][1]
+    assert "critical" not in {c.key for c in detail.columns}
+    notes = [q for q in doc.data_quality if "critical asset" in q.lower()]
+    assert len(notes) == 1 and "Lateral movement settings" in notes[0]
+    assert not incomplete(doc)
+
+
+def test_admin_groups_unset_or_stale_is_said(tmp_path):
+    c = configured_ctx(tmp_path)
+    _hosts(c)
+    doc = build_lateral_posture(_inp(c))
+    assert sum("admin group" in q.lower() for q in doc.data_quality) == 1
+    c.settings.update(c.settings.current().revision,
+                      lambda d: d["lateral"].update(admin_groups=[{"key": "role", "value": "NoSuchLabel"}]))
+    stale = [q for q in build_lateral_posture(_inp(c)).data_quality if "admin group" in q.lower()]
+    assert len(stale) == 1 and "role=NoSuchLabel" in stale[0]
 
 
 def test_cut_sentence_names_hosts_and_numbers(ctx):
@@ -155,11 +172,13 @@ def test_cross_env_limit_disclosed(ctx):
 
 
 def test_no_exposure_result_yet(ctx):
+    """6.6.0: before the first exposure computation the sections and numbers that come from it are not there (they
+    were five panels reading "not been computed"); one data note says so, and the sentence is still a sentence."""
     doc = build_lateral_posture(_inp(ctx))
-    for sid in ("exposure", "assets", "reach", "pivots", "cross_env"):
-        texts = _texts(doc.model_copy(update={"sections": (_section(doc, sid),)}))
-        assert "not been computed" in texts
-    assert {k.key: k for k in doc.kpis}["pivots"].value is None
+    assert {s.id for s in doc.sections} == {"detections", "initiators", "directory"}
+    assert {k.key for k in doc.kpis} == {"new_detections"}
+    assert sum("not been computed" in q for q in doc.data_quality) == 1
+    assert not incomplete(doc)
 
 
 def test_stale_exposure_in_data_quality(ctx):

@@ -83,7 +83,9 @@ def test_no_key_number_is_blank(bare, rt):
 @pytest.mark.parametrize("rt", TYPES)
 def test_no_section_is_an_empty_shell(bare, rt):
     doc = _doc(bare, rt)
-    assert [s.id for s in doc.sections if holds_nothing(s)] == []
+    shells = [s.id for s in doc.sections if holds_nothing(s)]
+    # a report with nothing at all to show keeps its sections, each saying why it is empty (finish.py)
+    assert shells == [] or len(shells) == len(doc.sections)
 
 
 @pytest.mark.parametrize("rt", TYPES)

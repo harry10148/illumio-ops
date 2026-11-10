@@ -53,7 +53,13 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
 # one used. A later form leaves out a number an unset optional setting, an analysis not yet run, or an unsupported
 # PCE takes away (6.6.0: such a report still reads from its title to its end). The first form is the full sentence.
 CONCLUSIONS: Mapping[ReportType, tuple[tuple[tuple[str, ...], str], ...]] = {
-    t: ((CONCLUSION_KPIS[t], CONCLUSION_KEYS[t]),) for t in CONCLUSION_KEYS}
+    **{t: ((CONCLUSION_KPIS[t], CONCLUSION_KEYS[t]),) for t in CONCLUSION_KEYS},
+    ReportType.LATERAL_POSTURE: (
+        (CONCLUSION_KPIS[ReportType.LATERAL_POSTURE], CONCLUSION_KEYS[ReportType.LATERAL_POSTURE]),
+        (("pivots", "cross_env", "new_detections"), "rpt_conclusion_lateral_posture_no_assets"),  # none chosen
+        (("new_detections",), "rpt_conclusion_lateral_posture_detections"),  # the exposure not computed yet
+    ),
+}
 
 
 def _form(doc: ReportDocument) -> tuple[tuple[str, ...], str] | None:

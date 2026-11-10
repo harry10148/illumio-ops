@@ -37,6 +37,7 @@ from illumio_ops.services.reports.generate import (
     previous_period,
     traffic_covered,
 )
+from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.visibility import visibility_sections
 from illumio_ops.store.flowdb import analysis
@@ -95,9 +96,6 @@ class _Builder:
     def name(self, key: str) -> str:
         return host_name(self.lc.hosts, key, self.lang)
 
-    def not_computed(self, title: str) -> TableBlock:
-        return TableBlock(title=title, columns=(Column(key="x", label=title),), rows=(), total_rows=0,
-                          empty_text=self.t("rpt_lat_not_computed"))
 
     # ── key metrics ──────────────────────────────────────────────────────────
     def kpis(self, exposure: Mapping[str, Any] | None, snaps: Sequence[tuple[str, dict[str, Any]]],
@@ -114,31 +112,30 @@ class _Builder:
                        "cross_env_edges": exposure.get("cross_env_total")}
             note = self.t("rpt_lat_kpi_from_current")
 
-        def metric(key: str, metric_key: str, label_key: str, *, extra_note: str | None = None,
-                   unset: bool = False) -> Kpi:
-            if unset:
-                return Kpi(key=key, label=self.t(label_key), value=None, previous=None, better="lower",
-                           note=self.t("rpt_lat_no_critical_assets"))
+        def metric(key: str, metric_key: str, label_key: str) -> tuple[Kpi, ...]:
+            """Nothing when the number is not there (6.6.0): an exposure not computed yet, or — for the reachable
+            assets — no critical asset chosen. The data notes say which (quality)."""
             value = None if current is None else current.get(metric_key)
+            if value is None:
+                return ()
             prev = None if previous is None else previous.get(metric_key)
-            return Kpi(key=key, label=self.t(label_key), value=value, previous=prev, better="lower",
-                       note=extra_note if value is not None else self.t("rpt_lat_not_computed"))
+            return (Kpi(key=key, label=self.t(label_key), value=value, previous=prev, better="lower", note=note),)
 
         return (
-            metric("assets_reachable", "assets_reachable_now", "rpt_lat_kpi_assets_reachable", extra_note=note,
-                   unset=not self.critical_set),
-            metric("pivots", "pivots_now", "rpt_lat_kpi_pivots", extra_note=note),
+            *(metric("assets_reachable", "assets_reachable_now", "rpt_lat_kpi_assets_reachable")
+              if self.critical_set else ()),
+            *metric("pivots", "pivots_now", "rpt_lat_kpi_pivots"),
             Kpi(key="new_detections", label=self.t("rpt_lat_kpi_new_detections"), value=detections_now,
                 previous=detections_before, better="lower"),
-            metric("cross_env", "cross_env_edges", "rpt_lat_kpi_cross_env", extra_note=note),
+            *metric("cross_env", "cross_env_edges", "rpt_lat_kpi_cross_env"),
         )
 
     # ── sections ─────────────────────────────────────────────────────────────
     def exposure_section(self, exposure: Mapping[str, Any] | None,
-                         snaps: Sequence[tuple[str, dict[str, Any]]]) -> Section:
+                         snaps: Sequence[tuple[str, dict[str, Any]]]) -> Section | None:
         title = self.t("rpt_lat_sec_exposure")
         if exposure is None:
-            return Section(id="exposure", title=title, blocks=(self.not_computed(title),))
+            return None
         hosts = exposure.get("hosts") or ()
         rows = (
             (self.t("rpt_lat_row_hosts"), exposure.get("nodes"), exposure.get("nodes")),
@@ -162,10 +159,10 @@ class _Builder:
                              - datetime.fromisoformat(exposure["observation_from"])).days)
         return Section(id="exposure", title=title, intro=intro, blocks=(table, trend))
 
-    def assets_section(self, exposure: Mapping[str, Any] | None) -> Section:
+    def assets_section(self, exposure: Mapping[str, Any] | None) -> Section | None:
         title = self.t("rpt_lat_sec_assets")
-        if exposure is None:
-            return Section(id="assets", title=title, blocks=(self.not_computed(title),))
+        if exposure is None or not self.critical_set:  # no asset chosen: the section has no subject
+            return None
         rows = []
         for a in sorted(exposure.get("assets") or (), key=lambda a: (-a.get("sources_now", 0), a["key"])):
             path = min(a.get("paths") or [[]], key=len)
@@ -175,7 +172,7 @@ class _Builder:
                                     before=c["before"], after=c["after"]) for c in a.get("cuts") or ())
             rows.append((self.name(a["key"]), a.get("sources_now"), a.get("sources_enforced"),
                          " → ".join(self.name(k) for k in path), cuts or self.t("rpt_lat_no_cut")))
-        empty = self.t("rpt_lat_assets_none" if self.critical_set else "rpt_lat_no_critical_assets")
+        empty = self.t("rpt_lat_assets_none")
         table = TableBlock(title=title, columns=(
             Column(key="asset", label=self.t("rpt_col_asset"), kind="host"),
             Column(key="now", label=self.t("rpt_col_sources_now"), kind="number"),
@@ -185,10 +182,10 @@ class _Builder:
             rows=tuple(rows), total_rows=len(rows), empty_text=empty)
         return Section(id="assets", title=title, intro=self.t("rpt_lat_assets_intro"), blocks=(table,))
 
-    def reach_section(self, exposure: Mapping[str, Any] | None) -> Section:
+    def reach_section(self, exposure: Mapping[str, Any] | None) -> Section | None:
         title = self.t("rpt_lat_sec_reach")
         if exposure is None:
-            return Section(id="reach", title=title, blocks=(self.not_computed(title),))
+            return None
         hosts = sorted(exposure.get("hosts") or (), key=lambda h: (-h.get("reach_now", 0), h["key"]))
         shown = [h for h in hosts if h.get("reach_now")]
         rows = tuple((self.name(h["key"]), h.get("reach_now"), h.get("reach_enforced"),
@@ -203,10 +200,10 @@ class _Builder:
         return Section(id="reach", title=title, intro=self.t("rpt_lat_reach_intro", hops=exposure.get("hops")),
                        blocks=(table,))
 
-    def pivots_section(self, exposure: Mapping[str, Any] | None) -> Section:
+    def pivots_section(self, exposure: Mapping[str, Any] | None) -> Section | None:
         title = self.t("rpt_lat_sec_pivots")
         if exposure is None:
-            return Section(id="pivots", title=title, blocks=(self.not_computed(title),))
+            return None
         pivots = sorted((h for h in exposure.get("hosts") or () if h.get("pivot_now")),
                         key=lambda h: (-h.get("reach_now", 0), h["key"]))
         rows = tuple((self.name(h["key"]), h.get("reach_now"),
@@ -235,20 +232,21 @@ class _Builder:
             Column(key="last", label=self.t("rpt_col_last_seen"), kind="time"),
             Column(key="occurrences", label=self.t("rpt_col_occurrences"), kind="number"),
             Column(key="late", label=self.t("rpt_col_late")),
-            Column(key="critical", label=self.t("rpt_col_critical_asset"))),
+            *((Column(key="critical", label=self.t("rpt_col_critical_asset")),) if self.critical_set else ())),
             rows=tuple((severity_name(self.lang, r["severity"]), detector_name(self.lang, r["detector"]),
                         self.name(r["subject_key"]), r["first_seen"], r["last_seen"], r["occurrences"],
-                        self.t("rpt_yes") if r["late"] else "", self.t("rpt_yes") if r["critical_asset"] else "")
+                        self.t("rpt_yes") if r["late"] else "",
+                        *((self.t("rpt_yes") if r["critical_asset"] else "",) if self.critical_set else ()))
                        for r in rows),
             total_rows=total, empty_text=self.t("rpt_lat_detections_none"),
             limit_note=self.t("rpt_limit_top", shown=len(rows), total=total) if total > len(rows) else None)
         return Section(id="detections", title=title, intro=self.t("rpt_lat_detections_intro"),
                        blocks=(count_table, detail))
 
-    def cross_env_section(self, exposure: Mapping[str, Any] | None) -> Section:
+    def cross_env_section(self, exposure: Mapping[str, Any] | None) -> Section | None:
         title = self.t("rpt_lat_sec_cross_env")
         if exposure is None:
-            return Section(id="cross_env", title=title, blocks=(self.not_computed(title),))
+            return None
         edges = exposure.get("cross_env") or ()
         total = int(exposure.get("cross_env_total") or len(edges))
         rows = tuple((self.name(e["src"]), e.get("src_env"), self.name(e["dst"]), e.get("dst_env"),
@@ -373,8 +371,15 @@ class _Builder:
         inp, lc = self.inp, self.lc
         lines = list(coverage_note(inp.ctx, inp.start, inp.end, self.lang, now=inp.now, tz=inp.tz))
         lines.append(self.t("rpt_quality_utc_days"))
+        if not self.critical_set:
+            lines.append(hint(self.lang, "rpt_hint_unset_critical_assets"))
+        stale_admin = [f"{k}={v}" for which, k, v in lc.stale if which == "admin_groups"]
+        if stale_admin:
+            lines.append(hint(self.lang, "rpt_hint_unset_admin_groups_stale", labels=", ".join(stale_admin)))
+        elif not lc.settings.admin_groups:
+            lines.append(hint(self.lang, "rpt_hint_unset_admin_groups"))
         if exposure_row is None:
-            lines.append(self.t("rpt_lat_not_computed"))
+            lines.append(hint(self.lang, "rpt_hint_pending_exposure"))
         else:
             computed = datetime.fromisoformat(exposure_row["computed_at"])
             age_hours = (inp.now - computed).total_seconds() / 3600
@@ -415,8 +420,8 @@ def build_lateral_posture(inp: BuildInput) -> ReportDocument:
         period_start=inp.start, period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label,
         kpis=b.kpis(exposure, snaps, sum(n for n, _ in counts.values()), before_count),
         findings=_findings(focus, b.lc.hosts, inp.lang), data_quality=b.quality(exposure_row),
-        sections=(b.exposure_section(exposure, snaps), b.assets_section(exposure), b.reach_section(exposure),
-                  b.pivots_section(exposure), b.detections_section(counts, rows, total),
-                  b.cross_env_section(exposure), b.initiators_section(), b.directory_section(),
-                  *visibility_sections(inp)))
+        sections=tuple(s for s in (
+            b.exposure_section(exposure, snaps), b.assets_section(exposure), b.reach_section(exposure),
+            b.pivots_section(exposure), b.detections_section(counts, rows, total), b.cross_env_section(exposure),
+            b.initiators_section(), b.directory_section(), *visibility_sections(inp)) if s is not None))
 
