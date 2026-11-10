@@ -82,7 +82,7 @@ def test_top_level_flag_counts_summarized_and_not_expanded(ctx, monkeypatch):
     assert {k.key: k.value for k in doc.kpis}["not_expanded"] == 1 and doc.findings
 
 
-@pytest.mark.parametrize(("lang", "words"), [(Language.ZH_TW, "解析不到位址 2 條"), (Language.EN, "resolving to no address: 2")])
+@pytest.mark.parametrize(("lang", "words"), [(Language.ZH_TW, "沒有位址可展開 2 條"), (Language.EN, "no address to expand: 2")])
 def test_rules_without_addresses_are_in_the_sentence_and_the_files(ctx, monkeypatch, lang, words):
     """lab .106 2026-11-03: "2 rules in force expanded into 0 rows; 0 could not be expanded" — the reader needs the
     number that makes it add up."""
@@ -93,3 +93,29 @@ def test_rules_without_addresses_are_in_the_sentence_and_the_files(ctx, monkeypa
     from illumio_ops.domain.conclusion import conclusion
     from illumio_ops.i18n import translate
     assert words in conclusion(doc, lambda key, params: translate(lang, key, params))
+
+
+def test_rules_without_addresses_are_named_with_the_empty_side(ctx, monkeypatch):
+    """lab .106 run 146: 0 rows and "2 resolving to no address", with nothing saying which rules or why. Both were
+    Quarantine deny rules whose label no host carried. Each is named with the side that has no address; past
+    NO_ADDRESS_NAMED the rest are counted. The files carry all of them."""
+    rules = [("Quarantine", f"/orgs/1/sec_policy/active/rule_sets/100/deny_rules/{i}", side)
+             for i, side in enumerate(["providers", "consumers", "both", "scope", "providers", "providers", "providers"])]
+    monkeypatch.setattr(report, "resolve", lambda ctx, **kw: _resolved(rows=[], per_ruleset={"Quarantine": 0},
+                                                                       rule_count=7, rules_no_address=7, no_address=rules))
+    doc = _build(ctx)
+    f = next(x for x in doc.findings if "no address" in x.title)
+    assert f.title == "7 rules produced no row: no address to expand"
+    assert f.why.startswith("Quarantine: deny_rules/0 (destination has no address), deny_rules/1 (source has no address), "
+                            "deny_rules/2 (neither side has an address), "
+                            "deny_rules/3 (source and destination are never in the same scope), ")
+    assert f.why.endswith("and 2 more.")
+    assert doc.export.meta["no_address_rules"].count("deny_rules/") == 7
+    assert "deny_rules/6 (providers)" in doc.export.meta["no_address_rules"]
+    zh = _build(ctx, Language.ZH_TW)
+    assert any("目的端沒有位址" in x.why and "其餘 2 條" in x.why for x in zh.findings)
+
+
+def test_no_rule_without_addresses_no_finding(ctx):
+    doc = _build(ctx)
+    assert not any("no address" in x.title for x in doc.findings) and doc.export.meta["no_address_rules"] == ""

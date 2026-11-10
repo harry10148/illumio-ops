@@ -34,9 +34,17 @@ COLUMN_GUIDE = ("ruleset_name, rule_href, action (allow / deny / override_deny),
                 "src_kind and dst_kind (label, label_group, ip_list, workload, all_workloads, ip_address, any), service_name, truncated (src / dst: "
                 "that side is a summary; total_row_cap: rows left out; not_expanded: the rule could not be expanded)")
 BROAD_EXAMPLE = "All Workloads → All Workloads"
+NO_ADDRESS_NAMED = 5  # rules without addresses a finding names; the rest are counted, the files carry all
+_SIDE_KEYS = {"consumers": "rpt_prs_side_consumers", "providers": "rpt_prs_side_providers", "both": "rpt_prs_side_both",
+              "scope": "rpt_prs_side_scope"}
 _KPI_KEYS = {"rulesets": "rpt_prs_kpi_rulesets", "rules": "rpt_prs_kpi_rules", "rows": "rpt_prs_kpi_rows",
              "capped": "rpt_prs_kpi_capped", "omitted": "rpt_prs_kpi_omitted", "not_expanded": "rpt_prs_kpi_not_expanded",
              "no_address": "rpt_prs_kpi_no_address"}
+
+
+def _rule_ref(href: str) -> str:
+    """sec_rules/12 or deny_rules/12: the rule within its ruleset, as the PCE's href ends."""
+    return "/".join(href.rsplit("/", 2)[-2:])
 
 
 def build_policy_resolver(inp: BuildInput) -> ReportDocument:
@@ -69,6 +77,16 @@ def build_policy_resolver(inp: BuildInput) -> ReportDocument:
     if r.rules_capped:
         findings.append(Finding(severity=Severity.LOW, title=t("rpt_prs_finding_capped", n=r.rules_capped),
                                 why=t("rpt_prs_finding_capped_why"), action=t("rpt_prs_finding_capped_action")))
+    if r.no_address:
+        named = ", ".join(f"{_rule_ref(rule)} ({t(_SIDE_KEYS[side]) if side in _SIDE_KEYS else side})"
+                          for _, rule, side in r.no_address[:NO_ADDRESS_NAMED])
+        by_set = sorted({rs for rs, _, _ in r.no_address[:NO_ADDRESS_NAMED]})
+        more = len(r.no_address) - NO_ADDRESS_NAMED
+        findings.append(Finding(
+            severity=Severity.LOW, title=t("rpt_prs_finding_no_address", n=len(r.no_address)),
+            why=t("rpt_prs_finding_no_address_why", rulesets=", ".join(by_set), rules=named)
+            + (t("rpt_prs_finding_no_address_more", n=more) if more > 0 else t("rpt_prs_finding_no_address_end")),
+            action=t("rpt_prs_finding_no_address_action")))
     quality = [t("rpt_prs_quality_live", at=fmt_time(r.computed_at.isoformat(), inp.tz))]
     if r.rows_omitted:
         quality.append(t("rpt_prs_quality_omitted", n=f"{r.rows_omitted:,}", cap=f"{MAX_TOTAL_ROWS:,}"))
@@ -83,6 +101,9 @@ def build_policy_resolver(inp: BuildInput) -> ReportDocument:
                               "row_cap": MAX_TOTAL_ROWS, "rows_omitted": r.rows_omitted,
                               "rules_summarized": r.rules_capped, "rules_not_expanded": len(r.not_expanded),
                               "rules_no_address": r.rules_no_address,
+                              # which rules and which side (consumers / providers / both / scope), data not prose
+                              "no_address_rules": "; ".join(f"{rs} {_rule_ref(rule)} ({side})"
+                                                            for rs, rule, side in r.no_address),
                               "truncated_rulesets": ", ".join(r.truncated_rulesets)})
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_policy_resolver"), period_start=inp.start,

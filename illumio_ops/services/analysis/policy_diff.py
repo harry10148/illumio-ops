@@ -1,11 +1,13 @@
 """Policy diff (spec §6.5 policy_diff, P5c-3): what the Draft changes against the active policy, read live from the
 PCE, each change attributed to the newest event in the store that names it. Events name the Draft href they changed
-(resource_changes[].href, lab 2026-10-30); 5.x matched names, which a rename or a shared name defeats.
+(resource_changes[].resource.<type>.href, lab 2026-11-11); 5.x matched names, which a rename or a shared name defeats.
 
 A failed read raises: an empty side would read as everything added or removed."""
 from __future__ import annotations
 
+import re
 import time
+from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -38,6 +40,7 @@ OBJECTS = (("ip_lists", "ip_list", ("ip_ranges", "fqdns", "description")),
            ("services", "service", ("service_ports", "windows_services", "description")),
            ("label_groups", "label_group", ("labels", "sub_groups", "description")))
 COMPARED_PENDING = frozenset({"rule_sets", "ip_lists", "services", "label_groups"})
+_RULE_OF_SET = re.compile(r"^(.*/rule_sets/[^/]+)/(?:sec_rules|deny_rules)/[^/]+$")
 POLICY_EVENTS = tuple(f"{family}.{verb}" for family in ("rule_set", "sec_rule", "deny_rule", "ip_list", "service",
                                                           "label_group")
                       for verb in ("create", "update", "delete"))
@@ -67,14 +70,27 @@ def _names(ctx: AppContext, client: Any, deadline: float) -> dict[str, str]:
     return names
 
 
+def _event_hrefs(raw: Mapping[str, Any]) -> Iterator[str]:
+    """The policy objects an event changed. The PCE puts each under resource_changes[].resource.<type>.href
+    (lab 26.2); a rule's event also counts for its rule set, whose rule count it changed."""
+    for rc in raw.get("resource_changes") or []:
+        resource = rc.get("resource") if isinstance(rc, Mapping) else None
+        for obj in resource.values() if isinstance(resource, Mapping) else ():
+            href = obj.get("href") if isinstance(obj, Mapping) else None
+            if isinstance(href, str) and href:
+                yield href
+                parent = _RULE_OF_SET.match(href)
+                if parent:
+                    yield parent.group(1)
+
+
 def _attribution(ctx: AppContext, start: datetime, end: datetime, now: datetime,
                  wanted: set[str]) -> tuple[dict[str, Attribution], bool]:
     q = event_detail(ctx, EventSegment(filter=EventFilter(start=start, end=end, event_types=POLICY_EVENTS),
                                        view=SegmentView.DETAIL, limit=EVENT_LIMIT), now=now)
     out: dict[str, Attribution] = {}
     for row in q.rows:  # newest first: the first event naming a href is its latest
-        for rc in row.raw.get("resource_changes") or []:
-            href = rc.get("href") if isinstance(rc, dict) else None
+        for href in _event_hrefs(row.raw):
             if href in wanted and href not in out:
                 out[href] = Attribution(actor=row.created_by_name or row.created_by_kind or "—", at=row.timestamp,
                                         event_type=row.event_type)

@@ -111,3 +111,11 @@ def test_attribution_limited_disclosed(ctx, monkeypatch):
 
 def test_zh_tw_builds(ctx):
     assert _build(ctx, lang=Language.ZH_TW).title
+
+
+@pytest.mark.parametrize("lang,text", [(Language.EN, "No event in the period"), (Language.ZH_TW, "期間內沒有事件")])
+def test_change_without_an_event_says_so(ctx, lang, text):
+    """A change no collected event names (made before the period, or before collection) reads as that, not a dash."""
+    rows = {r[0]: r[-1] for r in _table(_build(ctx, lang), "rule_sets").rows}
+    assert rows["tedt"] == text
+    assert rows["Quarantine"].startswith("admin@lab (")

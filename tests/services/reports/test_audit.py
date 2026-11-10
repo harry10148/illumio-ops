@@ -222,3 +222,29 @@ def test_agent_event_status_reads_as_words(ctx):
     for lang, ok, failed in ((Language.EN, "Success", "Failure"), (Language.ZH_TW, "成功", "失敗")):
         status = {r[1]: r[3] for r in _tables(_build(ctx, lang), "agent")[0].rows}
         assert status == {"agent.tampering": ok, "agent.suspend": failed, "agent.clone_detected": "pending"}
+
+
+def test_failed_sign_in_user_is_read_from_the_event_or_said_to_be_absent(ctx):
+    """The lab PCE (26.2, 2026-11-11) sends request.authentication_failed as created_by system with no user name
+    anywhere, only the address and the API called: the row says so and shows the API. A name the event does carry
+    (the user name supplied at sign-in) is read."""
+    note = {"notification_type": "request.authentication_failed",
+            "info": {"api_endpoint": "/api/v2/noop", "api_method": "GET", "src_ip": "192.0.2.7"}}
+    supplied = {"notification_type": "user.login_failed", "info": {"associated_user": {"supplied_username": "eve@lab"}}}
+    _write(ctx, [event("request.authentication_failed", D, system=True, status="failure",
+                       extra={"notifications": [note]}),
+                 event("request.authentication_failed", D + timedelta(minutes=1), system=True, status="failure",
+                       extra={"notifications": [supplied]})])
+    table = _tables(_build(ctx), "users")[1]
+    assert [c.key for c in table.columns] == ["at", "user", "ip", "api"]
+    assert [r[1:] for r in table.rows] == [("eve@lab", "—", "—"), ("Not recorded by the PCE", "192.0.2.7", "GET /api/v2/noop")]
+    zh = _tables(_build(ctx, Language.ZH_TW), "users")[1]
+    assert zh.rows[1][1] == "PCE 未記錄"
+
+
+def test_event_type_no_user_made_says_so(ctx):
+    """agent.tampering comes from the VEN: its users cell reads as that, not a dash."""
+    _write(ctx, [event("agent.tampering", D, system=True)])
+    doc = _build(ctx)
+    assert _tables(doc, "attention")[0].rows[0][3] == "None (not made by a user)"
+    assert "None (not made by a user)" in doc.findings[0].why

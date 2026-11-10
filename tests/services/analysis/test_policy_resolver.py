@@ -75,4 +75,5 @@ def test_a_rule_resolving_to_no_address_is_counted(ctx, monkeypatch):
                         [{"href": WEB, "key": "role"}, {"href": DB, "key": "role"}, {"href": empty, "key": "app"}])
     r = policy_resolver.resolve(ctx)
     assert r.rule_count == 2 and r.rules_no_address == 1 and r.per_ruleset == {"Web": 2}
+    assert r.no_address == [("Web", f"{A}/rule_sets/1/sec_rules/2", "providers")]
     assert not any(x.get("truncated") for x in r.rows)

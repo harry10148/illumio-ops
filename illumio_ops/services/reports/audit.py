@@ -95,6 +95,23 @@ def _actor(r: EventRow) -> str | None:
     return r.created_by_name if r.created_by_kind in USER_KINDS and (r.created_by_name or "").strip() else None
 
 
+def _attempted_user(r: EventRow) -> str | None:
+    """Who a failed sign-in was for: the event's own user, else the user name supplied at sign-in
+    (notifications[].info.associated_user). The PCE records neither for a failed API request."""
+    if (name := _actor(r)):
+        return name
+    for m in _walk(r.raw.get("notifications")):
+        supplied = m.get("supplied_username")
+        if isinstance(supplied, str) and supplied.strip():
+            return supplied
+    return None
+
+
+def _api_call(raw: Mapping[str, Any]) -> str | None:
+    endpoint = _first(raw, "api_endpoint")
+    return " ".join(str(v) for v in (_first(raw, "api_method"), endpoint) if v) if endpoint else None
+
+
 def brute_force(by_ip: Mapping[str, list[datetime]]) -> list[tuple[str, int, int, datetime, datetime]]:
     """(source address, most failures in any 30 minutes, failures, first, last) for addresses with at least
     BRUTE_MIN in one such window, worst first."""
@@ -135,6 +152,7 @@ def build_audit(inp: BuildInput) -> ReportDocument:
 
     # ── attention ───────────────────────────────────────────────────────────
     actors = {k: [f"{name} ({n})" for name, n in v] for k, v in counts.type_users.items()}
+    no_user = t("rpt_aud_no_user")  # every event of the type came from the system or a VEN
     risky = sorted(((k, risk_of(k), n) for k, n in counts.by_type.items() if risk_of(k) is not None),
                    key=lambda x: (SEVERITY_RANK[x[1]], -x[2], x[0]))  # type: ignore[index]
     attention = TableBlock(
@@ -142,11 +160,11 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         columns=(Column(key="type", label=t("rpt_aud_col_type")), Column(key="risk", label=t("rpt_aud_col_risk")),
                  Column(key="n", label=t("rpt_aud_col_events"), kind="number"),
                  Column(key="actors", label=t("rpt_aud_col_top_actors"))),
-        rows=tuple((k, severity_name(lang, s.value), n, ", ".join(actors.get(k, ())) or "—")
+        rows=tuple((k, severity_name(lang, s.value), n, ", ".join(actors.get(k, ())) or no_user)
                    for k, s, n in risky if s is not None),
         total_rows=len(risky), empty_text=t("rpt_aud_none_attention") if counts.total else none)
     findings = tuple(Finding(severity=s, title=t("rpt_aud_finding_title", type=k, n=f"{n:,}"),
-                             why=t("rpt_aud_finding_why", actors=", ".join(actors.get(k, ())) or "—"),
+                             why=t("rpt_aud_finding_why", actors=", ".join(actors.get(k, ())) or no_user),
                              action=t(_ACTION_KEYS[s])) for k, s, n in risky[:ATTENTION_FINDINGS] if s is not None)
 
     # ── event types and trend ───────────────────────────────────────────────
@@ -180,9 +198,9 @@ def build_audit(inp: BuildInput) -> ReportDocument:
     failed_table = TableBlock(
         title=t("rpt_aud_tbl_failed"),
         columns=(Column(key="at", label=t("rpt_aud_col_time"), kind="time"), Column(key="user", label=t("rpt_col_user")),
-                 Column(key="ip", label=t("rpt_aud_col_source_ip"))),
-        rows=tuple((r.timestamp.isoformat(), r.created_by_name or "—", str(_first(r.raw, "src_ip") or "—"))
-                   for r in failed),
+                 Column(key="ip", label=t("rpt_aud_col_source_ip")), Column(key="api", label=t("rpt_aud_col_api"))),
+        rows=tuple((r.timestamp.isoformat(), _attempted_user(r) or t("rpt_aud_user_not_recorded"),
+                    str(_first(r.raw, "src_ip") or "—"), _api_call(r.raw) or "—") for r in failed),
         total_rows=now_v["auth_failed"], empty_text=t("rpt_aud_none_failed") if counts.total else none,
         limit_note=t("rpt_aud_newest_n", n=FAILED_ROWS) if failed_more else None)
 

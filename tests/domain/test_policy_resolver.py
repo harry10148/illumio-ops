@@ -1,6 +1,8 @@
 """Policy resolver core (P5c-4), the 5.x tests (tests/test_policy_resolver_core.py) carried over unchanged."""
 from __future__ import annotations
 
+import pytest
+
 from illumio_ops.domain.policy_resolver import resolve_ruleset
 
 # Shared synthetic lookups -------------------------------------------------
@@ -667,7 +669,22 @@ def test_known_but_empty_is_not_an_issue():
         _ruleset([_rule([L("/l/empty")], [L("/l/db")])]), limit=None, label_to_ips=L2IP, iplist_to_cidrs={},
         label_group_to_labels={}, workload_to_ips=W2IP, label_keys=keys, known={**KNOWN, "label": set(keys)})
     assert rows == [] and issues == []
-    assert no_address == ["/r/1"]  # lab .106 2026-11-03: "2 rules expanded into 0 rows; 0 not expanded" read as a contradiction
+    # lab .106 2026-11-03: "2 rules expanded into 0 rows; 0 not expanded" read as a contradiction
+    assert no_address == [("/r/1", "consumers")]
+
+
+@pytest.mark.parametrize(("cons", "prov", "scopes", "side"), [
+    ([L("/l/web")], [L("/l/empty")], None, "providers"),  # lab .106 run 146: the Quarantine label held no host
+    ([L("/l/empty")], [L("/l/empty")], None, "both"),
+    # each side has hosts, never in the same scope: web is only in Prod's half that db's Dev half never meets
+    ([{"workload": {"href": "/wl/1"}}], [{"workload": {"href": "/wl/2"}}], [[L("/l/prod")], [L("/l/dev")]], "scope"),
+])
+def test_a_rule_without_addresses_names_the_empty_side(cons, prov, scopes, side):
+    keys = {**KEYS, "/l/empty": "app"}
+    _, _, issues, no_address = resolve_ruleset_within(
+        _ruleset([_rule(cons, prov)], scopes=scopes), limit=None, label_to_ips=L2IP, iplist_to_cidrs={},
+        label_group_to_labels={}, workload_to_ips=W2IP, label_keys=keys, known={**KNOWN, "label": set(keys)})
+    assert issues == [] and no_address == [("/r/1", side)]
 
 
 def test_a_rule_with_addresses_in_one_scope_is_not_counted_as_without():

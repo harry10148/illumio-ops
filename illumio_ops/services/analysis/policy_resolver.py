@@ -41,6 +41,7 @@ class Resolved(BaseModel):
     rows_omitted: int
     not_expanded: list[tuple[str, str, str]]  # (ruleset, rule href, reason): disclosed, never dropped or widened
     rules_no_address: int  # rules whose sides resolve to no address (no host carries their labels): no rows
+    no_address: list[tuple[str, str, str]] = []  # those rules: (ruleset, rule href, side — see resolve_ruleset_within)
     computed_at: datetime
 
 
@@ -83,7 +84,7 @@ def resolve(ctx: AppContext, *, now: datetime | None = None) -> Resolved:
     rule_count = 0
     capped: set[str] = set()
     not_expanded: list[tuple[str, str, str]] = []
-    no_address = 0
+    no_address: list[tuple[str, str, str]] = []
     for rs in rule_sets:
         name = str(rs.get("name") or rs.get("href") or "ruleset")
         if rs.get("enabled", True):
@@ -93,7 +94,7 @@ def resolve(ctx: AppContext, *, now: datetime | None = None) -> Resolved:
                                                         **lookups)
         capped.update(r["rule_href"] for r in kept if r.get("truncated"))
         per[name] = per.get(name, 0) + len(kept)
-        no_address += len(empty)
+        no_address.extend((name, rule, side) for rule, side in empty)
         rows.extend(kept)
         for rule, reason in issues:
             not_expanded.append((name, rule, reason))
@@ -103,4 +104,5 @@ def resolve(ctx: AppContext, *, now: datetime | None = None) -> Resolved:
             truncated.append(name)
             rows.append(_notice(name, left_out))
     return Resolved(rows=rows, per_ruleset=per, rule_count=rule_count, rules_capped=len(capped),
-                    truncated_rulesets=truncated, rows_omitted=omitted, not_expanded=not_expanded, rules_no_address=no_address, computed_at=at)
+                    truncated_rulesets=truncated, rows_omitted=omitted, not_expanded=not_expanded, rules_no_address=len(no_address), no_address=no_address,
+                    computed_at=at)

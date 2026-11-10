@@ -239,16 +239,18 @@ def resolve_ruleset_within(
     label_keys: dict[str, str] | None = None,
     known: dict[str, set[str]] | None = None,
     ip_to_subnet: dict[str, str] | None = None,
-) -> tuple[list[dict[str, Any]], int, list[tuple[str, str]], list[str]]:
+) -> tuple[list[dict[str, Any]], int, list[tuple[str, str]], list[tuple[str, str]]]:
     """(rows, omitted, not_expanded, no_address). At most `limit` rows: a rule that would pass it is counted, never built
     (security review). not_expanded: (rule href, reason) for a rule that cannot be expanded faithfully — a
     reference the PCE does not hold, or providers resolved as virtual services (their services come from the virtual
     service) — disclosed by the caller, never dropped or widened (final review #4, #5). Each scope is expanded on
-    its own and the rows merged (final review #2). Disabled rulesets and rules are skipped. no_address: rule hrefs
-    whose sides resolve to no address in every scope (e.g. a label no host carries): no rows, and nothing wrong."""
+    its own and the rows merged (final review #2). Disabled rulesets and rules are skipped. no_address: (rule href,
+    side) for a rule with no row because a side resolves to no address in every scope (e.g. a label no host carries):
+    nothing wrong. side: consumers / providers / both, or scope when each side has addresses but never in the same
+    scope."""
     omitted = 0
     issues: list[tuple[str, str]] = []
-    no_address: list[str] = []
+    no_address: list[tuple[str, str]] = []
     if not ruleset.get("enabled", True):
         return [], 0, issues, no_address
     lk: Lookups = {"label_to_ips": label_to_ips, "iplist_to_cidrs": iplist_to_cidrs,
@@ -278,13 +280,14 @@ def resolve_ruleset_within(
                 continue
             svcs = _services(rule, service_to_ports, service_to_names)
             subnet_sides = set(rule.get("use_workload_subnets") or [])
-            addressed = False
+            addressed = src_seen = dst_seen = False
             for scope_ips in (scope_sets if scope_sets is not None else [None]):
                 cons_scope = None if rule.get("unscoped_consumers") else scope_ips
                 srcs, src_kind = _side_ips(rule.get("consumers") or [], lk, scope_ips=cons_scope,
                                            subnets="consumers" in subnet_sides)
                 dsts, dst_kind = _side_ips(rule.get("providers") or [], lk, scope_ips=scope_ips,
                                            subnets="providers" in subnet_sides)
+                src_seen, dst_seen = src_seen or bool(srcs), dst_seen or bool(dsts)
                 if not srcs or not dsts:  # nothing in this scope (or a side resolves to no address)
                     continue
                 addressed = True
@@ -308,7 +311,8 @@ def resolve_ruleset_within(
                                 row["truncated"] = truncated
                             rows.append(row)
             if not addressed:
-                no_address.append(rule_href)
+                no_address.append((rule_href, "scope" if src_seen and dst_seen else "consumers" if dst_seen
+                                   else "providers" if src_seen else "both"))
     return rows, omitted, issues, no_address
 
 

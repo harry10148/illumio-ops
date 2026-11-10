@@ -77,7 +77,7 @@ def build_policy_diff(inp: BuildInput) -> ReportDocument:
 
     def who(c: Change) -> str:
         a = diff.attribution.get(draft_href(c.href))
-        return f"{a.actor} ({fmt_time(a.at.isoformat(), inp.tz)})" if a else "—"
+        return f"{a.actor} ({fmt_time(a.at.isoformat(), inp.tz)})" if a else t("rpt_pdf_who_none")
 
     def label(mapping: dict[str, str], key: str) -> str:
         return t(mapping[key]) if key in mapping else key

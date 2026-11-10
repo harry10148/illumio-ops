@@ -51,8 +51,25 @@ def pce(monkeypatch):
 
 
 def _changed(href, at, user, etype="sec_rule.create"):
+    # The PCE's shape (lab 26.2, 2026-11): the href sits under resource.<type>, never beside change_type.
     return event(etype, at, user=user, extra={"resource_changes": [
-        {"resource_type": etype.split(".")[0], "href": href, "change_type": "create", "changes": {}}]})
+        {"uuid": "u", "resource": {_resource_type(href): {"href": href, "name": "x"}}, "change_type": "create",
+         "changes": {}}]})
+
+
+def _resource_type(href):
+    return "sec_rule" if "/sec_rules/" in href else "deny_rule" if "/deny_rules/" in href else "rule_set"
+
+
+def test_attribution_of_a_rule_set_counts_its_rules(ctx, pce):
+    """A rule set whose rule count changed has no event of its own: the PCE logs the rule's (lab: a
+    rule_set.update naming a sec_rule). The newest event on the rule set or any rule in it attributes it."""
+    _write(ctx, [_changed(f"{D}/rule_sets/1", datetime(2026, 10, 5, tzinfo=UTC), "creator", "rule_set.create"),
+                 _changed(f"{D}/rule_sets/1/sec_rules/2", datetime(2026, 10, 27, 8, tzinfo=UTC), "editor",
+                          "rule_set.update")])
+    d = policy_diff.policy_diff(ctx, start=START, end=END, now=NOW)
+    assert d.attribution[f"{D}/rule_sets/1"].actor == "editor"
+    assert d.attribution[f"{D}/rule_sets/1/sec_rules/2"].actor == "editor"
 
 
 def test_changes_found(ctx, pce):
