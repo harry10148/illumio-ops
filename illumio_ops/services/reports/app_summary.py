@@ -137,6 +137,12 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
             group_by=(GroupBy(dimension=dim, label_key=APP), GroupBy(dimension=SegmentDimension.SERVICE)),
             columns=(Column(key="peer", label=t("rpt_col_peer_app")), Column(key="service", label=t("rpt_col_service")),
                      Column(key="n", label=t("rpt_col_connections"), kind="number")))
+
+    def peer_link(side: str, dim: SegmentDimension, *, uncovered: bool = False, limit: int = TOP) -> str | None:
+        """peer_ranking's segment, opened in the workbench."""
+        return flowsections.link(
+            inp, spec=sides[side], decisions=UNCOVERED if uncovered else (), metric=SegmentMetric.CONNECTIONS,
+            limit=limit, group_by=(GroupBy(dimension=dim, label_key=APP), GroupBy(dimension=SegmentDimension.SERVICE)))
     intra = flowsections.ranking(
         inp, title=t("rpt_app_tbl_intra"), spec=sides["intra"], metric=SegmentMetric.CONNECTIONS, limit=TOP,
         group_by=(GroupBy(dimension=SegmentDimension.SERVICE),),
@@ -169,20 +175,27 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=title, period_start=inp.start, period_end=inp.end,
         generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS), data_quality=quality,
+        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
+        data_quality=(*quality, *flowsections.no_links_note(inp)),
         sections=(
             Section(id="inbound", title=t("rpt_app_sec_inbound"), intro=t("rpt_app_inbound_intro"),
-                    blocks=(peer_ranking("rpt_app_tbl_inbound", "inbound", SegmentDimension.SRC_LABEL),)),
+                    blocks=(peer_ranking("rpt_app_tbl_inbound", "inbound", SegmentDimension.SRC_LABEL),),
+                    workbench_link=peer_link("inbound", SegmentDimension.SRC_LABEL)),
             Section(id="outbound", title=t("rpt_app_sec_outbound"), intro=t("rpt_app_outbound_intro"),
-                    blocks=(peer_ranking("rpt_app_tbl_outbound", "outbound", SegmentDimension.DST_LABEL),)),
-            Section(id="intra", title=t("rpt_app_sec_intra"), blocks=(intra,)),
+                    blocks=(peer_ranking("rpt_app_tbl_outbound", "outbound", SegmentDimension.DST_LABEL),),
+                    workbench_link=peer_link("outbound", SegmentDimension.DST_LABEL)),
+            Section(id="intra", title=t("rpt_app_sec_intra"), blocks=(intra,),
+                    workbench_link=flowsections.link(inp, spec=sides["intra"], metric=SegmentMetric.CONNECTIONS,
+                                                     limit=TOP, group_by=(GroupBy(dimension=SegmentDimension.SERVICE),))),
             Section(id="impact", title=t("rpt_app_sec_impact"), blocks=(impact, impact_text)),
             Section(id="hosts", title=t("rpt_app_sec_hosts"), intro=t("rpt_app_hosts_intro"), blocks=(host_table,)),
             Section(id="uncovered", title=t("rpt_sec_sec_uncovered"), blocks=(
                 peer_ranking("rpt_app_tbl_uncovered_in", "inbound", SegmentDimension.SRC_LABEL, uncovered=True,
                              limit=UNCOVERED_TOP),
                 peer_ranking("rpt_app_tbl_uncovered_out", "outbound", SegmentDimension.DST_LABEL, uncovered=True,
-                             limit=UNCOVERED_TOP))),
+                             limit=UNCOVERED_TOP)),
+                    workbench_link=peer_link("inbound", SegmentDimension.SRC_LABEL, uncovered=True,
+                                             limit=UNCOVERED_TOP)),
             Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_app_findings_intro"),
                     blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings"),
                                                     evaluated=bool(flows)),))))

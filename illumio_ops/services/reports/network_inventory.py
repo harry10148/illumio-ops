@@ -165,13 +165,18 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_network_inventory"),
         period_start=inp.start, period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS), data_quality=quality,
+        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
+        data_quality=(*quality, *flowsections.no_links_note(inp)),
         sections=(
             Section(id="hygiene", title=t("rpt_inv_sec_hygiene"), intro=t("rpt_inv_hygiene_intro", keys=", ".join(keys)),
                     blocks=(hygiene, TextBlock(paragraphs=(t("rpt_inv_unlabeled_flows",
                                                              n=f"{mix.unlabeled_app_flows:,}"),)),
                             conflicts, TextBlock(paragraphs=(t("rpt_inv_conflicts_note"),)))),
-            Section(id="dependencies", title=t("rpt_inv_sec_dependencies"), blocks=(pairs, env_text)),
+            Section(id="dependencies", title=t("rpt_inv_sec_dependencies"), blocks=(pairs, env_text),
+                    workbench_link=flowsections.link(
+                        inp, metric=SegmentMetric.CONNECTIONS, limit=TOP,
+                        group_by=(GroupBy(dimension=SegmentDimension.SRC_LABEL, label_key=APP),
+                                  GroupBy(dimension=SegmentDimension.DST_LABEL, label_key=APP)))),
             Section(id="services", title=t("rpt_inv_sec_services"), intro=t("rpt_inv_services_intro"),
                     blocks=(provided,)),
             Section(id="unmanaged", title=t("rpt_inv_sec_unmanaged"), blocks=(unmanaged,)),

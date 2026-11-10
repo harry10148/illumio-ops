@@ -84,6 +84,13 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
             inp, title=title, group_by=(GroupBy(dimension=dim, label_key=label_key),),
             metric=SegmentMetric.CONNECTIONS, limit=TOP,
             columns=(Column(key="key", label=label), Column(key="n", label=t("rpt_col_connections"), kind="number")))
+
+    def link(*dims: SegmentDimension, metric: SegmentMetric = SegmentMetric.CONNECTIONS,
+             label_key: str | None = None) -> str | None:
+        """The section's first ranking, opened in the workbench (the segment ranking() runs)."""
+        return flowsections.link(inp, metric=metric, limit=TOP, group_by=tuple(
+            GroupBy(dimension=d, label_key=label_key if d in (SegmentDimension.SRC_LABEL, SegmentDimension.DST_LABEL)
+                    else None) for d in dims))
     labels = tuple(ranking(t(title, key=k), dim, t(col, key=k), label_key=k) for title, col, dim, k in (
         ("rpt_trf_tbl_src_label", "rpt_col_src_label", SegmentDimension.SRC_LABEL, "app"),
         ("rpt_trf_tbl_dst_label", "rpt_col_dst_label", SegmentDimension.DST_LABEL, "app"),
@@ -154,12 +161,17 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_traffic"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS), data_quality=quality,
+        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
+        data_quality=(*quality, *flowsections.no_links_note(inp)),
         sections=(Section(id="decisions", title=t("rpt_trf_sec_decisions"), intro=t("rpt_trf_decisions_intro"),
                           blocks=(decisions,)),
-                  Section(id="labels", title=t("rpt_trf_sec_labels"), blocks=labels),
-                  Section(id="services", title=t("rpt_trf_sec_services"), blocks=(services, protocols)),
-                  Section(id="bytes", title=t("rpt_trf_sec_bytes"), intro=bytes_intro, blocks=bytes_blocks),
+                  Section(id="labels", title=t("rpt_trf_sec_labels"), blocks=labels,
+                          workbench_link=link(SegmentDimension.SRC_LABEL, label_key=APP)),
+                  Section(id="services", title=t("rpt_trf_sec_services"), blocks=(services, protocols),
+                          workbench_link=link(SegmentDimension.SERVICE)),
+                  Section(id="bytes", title=t("rpt_trf_sec_bytes"), intro=bytes_intro, blocks=bytes_blocks,
+                          workbench_link=link(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST,
+                                              metric=SegmentMetric.BYTES) if fc.bytes else None),
                   Section(id="unmanaged", title=t("rpt_trf_sec_unmanaged"), blocks=(unmanaged,)),
                   Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
                           blocks=(findings.outcomes_table(outcomes, lang, title=t("rpt_trf_tbl_findings"),

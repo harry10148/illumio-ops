@@ -232,6 +232,14 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
             columns=(Column(key="src", label=t("rpt_col_src_label", key="app")),
                      Column(key="second", label=second_label),
                      Column(key="n", label=t("rpt_col_connections"), kind="number")))
+
+    def link(decisions: tuple[PolicyDecision, ...], *group_by: GroupBy,
+             metric: SegmentMetric = SegmentMetric.CONNECTIONS) -> str | None:
+        """A section's ranking opened in the workbench: the segment flowsections.ranking runs for it."""
+        return flowsections.link(inp, decisions=decisions, metric=metric, limit=TOP, group_by=group_by)
+    by_app_src = GroupBy(dimension=SegmentDimension.SRC_LABEL, label_key=APP)
+    by_app_dst = GroupBy(dimension=SegmentDimension.DST_LABEL, label_key=APP)
+    by_service = GroupBy(dimension=SegmentDimension.SERVICE)
     no_label = t("rpt_no_label")
     uncovered_base = two_labels(t("rpt_sec_tbl_uncovered"), UNCOVERED,
                                 GroupBy(dimension=SegmentDimension.DST_LABEL, label_key=APP),
@@ -350,20 +358,28 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_security_risk"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(fired, lang, limit=KEY_FINDINGS), data_quality=quality,
+        findings=findings.as_findings(fired, lang, limit=KEY_FINDINGS),
+        data_quality=(*quality, *flowsections.no_links_note(inp)),
         sections=(
             Section(id="how", title=t("rpt_sec_sec_how"), intro=t("rpt_sec_how_intro"),
                     blocks=(parts_table, grades_table)),
             Section(id="coverage", title=t("rpt_sec_sec_coverage"), intro=t("rpt_sec_coverage_intro"),
                     blocks=(coverage, direction)),
             Section(id="uncovered", title=t("rpt_sec_sec_uncovered"), intro=t("rpt_sec_uncovered_intro"),
-                    blocks=(uncovered,)),
-            Section(id="ports", title=t("rpt_sec_sec_ports"), blocks=(port_gaps,)),
+                    blocks=(uncovered,), workbench_link=link(UNCOVERED, by_app_src, by_app_dst)),
+            Section(id="ports", title=t("rpt_sec_sec_ports"), blocks=(port_gaps,),
+                    workbench_link=link(UNCOVERED, by_service)),
             Section(id="enforcement", title=t("rpt_sec_sec_enforcement"), intro=t("rpt_sec_enforcement_intro"),
                     blocks=(enforcement,)),
-            Section(id="pb", title=t("rpt_sec_sec_pb"), intro=t("rpt_sec_pb_intro"), blocks=(pb,)),
+            Section(id="pb", title=t("rpt_sec_sec_pb"), intro=t("rpt_sec_pb_intro"), blocks=(pb,),
+                    workbench_link=link(PB_ONLY, by_app_dst, by_service)),
             Section(id="ransomware", title=t("rpt_sec_sec_ransomware"), blocks=rw_blocks),
-            Section(id="users", title=t("rpt_sec_sec_users"), blocks=tuple(user_blocks)),
+            Section(id="users", title=t("rpt_sec_sec_users"), blocks=tuple(user_blocks),
+                    workbench_link=(
+                        link((), GroupBy(dimension=SegmentDimension.INITIATOR_USER), metric=SegmentMetric.DISTINCT_DST)
+                        if fc.initiator_user else
+                        link((), GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS)) if fc.initiator_process
+                        else None)),
             Section(id="lateral", title=t("rpt_sec_sec_lateral"), blocks=(TextBlock(paragraphs=tuple(lateral_lines)),)),
             Section(id="findings", title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
                     blocks=(findings.outcomes_table(_by_category(outcomes), lang, title=t("rpt_sec_tbl_findings"),

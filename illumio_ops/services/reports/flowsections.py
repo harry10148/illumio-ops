@@ -5,6 +5,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
+from urllib.parse import urlencode
+
+from pydantic import ValidationError
 
 from illumio_ops.domain.filter import (
     EndpointFilter,
@@ -30,6 +33,7 @@ from illumio_ops.services.flowsource import AggRow, FieldCoverage
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports.common import host_name, port_text, tr
 from illumio_ops.services.reports.registry import BuildInput
+from illumio_ops.services.workbench import FlowRequest
 from illumio_ops.store.flowdb import policy_objects
 
 DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
@@ -77,6 +81,47 @@ def _names(inp: BuildInput, rows: Sequence[AggRow], group_by: Sequence[GroupBy])
     return display_names(inp.ctx, keys, lang=inp.lang)
 
 
+def segment(inp: BuildInput, *, group_by: Sequence[GroupBy], metric: SegmentMetric,
+            decisions: Sequence[PolicyDecision] = (), limit: int = 20,
+            spec: FilterSpec | None = None) -> FlowSegment | None:
+    """The analysis segment a ranking runs: the report's window and filter (or `spec`), narrowed to `decisions`.
+    None when the two share no decision."""
+    base: FilterSpec | None = spec or window(inp)
+    if decisions and base is not None:
+        base = narrowed(base, decisions)
+    if base is None:
+        return None
+    return FlowSegment(filter=base, group_by=tuple(group_by), metric=metric, view=SegmentView.RANKING, limit=limit)
+
+
+def workbench_link(inp: BuildInput, seg: FlowSegment | None) -> str | None:
+    """A section's segment opened in the workbench (spec §6.5.5: every section computed from traffic links to
+    it): the same filter, grouping and metric, nothing composed apart. None without a GUI address, without a
+    segment, or when the workbench cannot take the period (longer than its 30 days)."""
+    base = inp.ctx.settings.current().reports.gui_external_url
+    if not base or seg is None:
+        return None
+    condition = FlowCondition(**{name: getattr(seg.filter, name) for name in FlowCondition.model_fields})
+    try:
+        req = FlowRequest(mode="flows", start=seg.filter.start, end=seg.filter.end, view=seg.view,
+                          group_by=seg.group_by, metric=seg.metric, limit=seg.limit, condition=condition)
+    except (ValidationError, ValueError):
+        return None
+    return f"{base.rstrip('/')}/investigate?{urlencode({'q': req.model_dump_json(exclude_none=True)})}"
+
+
+def no_links_note(inp: BuildInput) -> tuple[str, ...]:
+    """Why the sections carry no workbench link: the GUI's external address is not set (spec §6.5.5)."""
+    return () if inp.ctx.settings.current().reports.gui_external_url else (tr(inp.lang, "rpt_cust_no_links"),)
+
+
+def link(inp: BuildInput, *, group_by: Sequence[GroupBy], metric: SegmentMetric,
+         decisions: Sequence[PolicyDecision] = (), limit: int = 20, spec: FilterSpec | None = None) -> str | None:
+    """workbench_link of the segment ranking() runs for the same arguments."""
+    return workbench_link(inp, segment(inp, group_by=group_by, metric=metric, decisions=decisions, limit=limit,
+                                       spec=spec))
+
+
 def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric: SegmentMetric,
             columns: Sequence[Column], decisions: Sequence[PolicyDecision] = (), limit: int = 20,
             spec: FilterSpec | None = None, skip_empty: bool = False) -> TableBlock:
@@ -85,13 +130,10 @@ def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric:
     `decisions` narrows it (see narrowed). skip_empty: flows without the grouped field (no user, no
     process) are not ranked as a "(none)" row."""
     empty = tr(inp.lang, "rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_no_flows")
-    base: FilterSpec | None = spec or window(inp)
-    if decisions and base is not None:
-        base = narrowed(base, decisions)
-    if base is None:
+    seg = segment(inp, group_by=group_by, metric=metric, decisions=decisions, spec=spec,
+                  limit=limit + 1 if skip_empty else limit)
+    if seg is None:
         return TableBlock(title=title, columns=tuple(columns), rows=(), total_rows=0, empty_text=empty)
-    seg = FlowSegment(filter=base, group_by=tuple(group_by), metric=metric,
-                      view=SegmentView.RANKING, limit=limit + 1 if skip_empty else limit)
     result = run_segment(inp.ctx, seg, now=inp.now)
     rows_in = result.ranking or []
     limit_hit = result.limit_hit

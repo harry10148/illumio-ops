@@ -8,6 +8,9 @@ from collections import Counter
 from collections.abc import Iterator, Mapping
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import urlencode
+
+from pydantic import ValidationError
 
 from illumio_ops.domain.audit import (
     AGENT_SECURITY,
@@ -44,6 +47,7 @@ from illumio_ops.services.eventsource import (
 from illumio_ops.services.reports.common import event_status_name, severity_name, tr
 from illumio_ops.services.reports.generate import previous_period
 from illumio_ops.services.reports.registry import BuildInput
+from illumio_ops.services.workbench import EventRequest
 
 TOP = 20
 ATTENTION_FINDINGS = 5
@@ -51,6 +55,7 @@ USERS_NAMED = 5
 FAILED_ROWS = 30
 BRUTE_WINDOW = timedelta(minutes=30)
 BRUTE_MIN = 5
+WORKBENCH_LIMIT = 1_000  # the most rows a workbench request takes
 DETAIL_ROWS = 1_000  # newest rows per detail table (an event segment's limit); more are disclosed
 _KPI_KEYS = {"total": "rpt_aud_kpi_total", "high_risk": "rpt_aud_kpi_high_risk", "auth_failed": "rpt_aud_kpi_auth_failed",
              "authz_denied": "rpt_aud_kpi_authz_denied", "policy_provisions": "rpt_aud_kpi_provisions",
@@ -149,6 +154,19 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         q = event_detail(inp.ctx, EventSegment(filter=EventFilter(start=inp.start, end=last, event_types=types),
                                                view=SegmentView.DETAIL, limit=limit), now=inp.now)
         return q.rows, q.limit_hit
+
+    def link(types: tuple[str, ...], limit: int) -> str | None:
+        """detail()'s segment for these event types, opened in the workbench; None without a GUI address or
+        when the workbench cannot take the period."""
+        base = inp.ctx.settings.current().reports.gui_external_url
+        if not base:
+            return None
+        try:
+            req = EventRequest(mode="events", start=inp.start, end=last, view=SegmentView.DETAIL,
+                               limit=min(limit, WORKBENCH_LIMIT), event_types=types)
+        except (ValidationError, ValueError):
+            return None
+        return f"{base.rstrip('/')}/investigate?{urlencode({'q': req.model_dump_json(exclude_none=True)})}"
 
     # ── attention ───────────────────────────────────────────────────────────
     actors = {k: [f"{name} ({n})" for name, n in v] for k, v in counts.type_users.items()}
@@ -270,7 +288,8 @@ def build_audit(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_audit"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=findings,
-        data_quality=tuple(quality),
+        data_quality=(*quality, *(() if inp.ctx.settings.current().reports.gui_external_url
+                                  else (t("rpt_cust_no_links"),))),
         sections=(Section(id="attention", title=t("rpt_aud_sec_attention"), intro=t("rpt_aud_attention_intro"),
                           blocks=(attention,)),
                   Section(id="types", title=t("rpt_aud_sec_types"), blocks=(type_table, trend)),
@@ -280,8 +299,10 @@ def build_audit(inp: BuildInput) -> ReportDocument:
                           intro=t("rpt_aud_failed_change_intro", minutes=FAILED_THEN_CHANGE_MINUTES,
                                   failures=", ".join(SIGN_IN_FAILURES), changes=", ".join(HIGH_RISK_CHANGES)),
                           blocks=(chain,)),
-                  Section(id="policy", title=t("rpt_aud_sec_policy"), blocks=(policy,)),
+                  Section(id="policy", title=t("rpt_aud_sec_policy"), blocks=(policy,),
+                          workbench_link=link((PROVISION,), DETAIL_ROWS)),
                   Section(id="agent", title=t("rpt_aud_sec_agent"),
-                          blocks=(agent, TextBlock(paragraphs=(t("rpt_aud_agent_see"),)))),
+                          blocks=(agent, TextBlock(paragraphs=(t("rpt_aud_agent_see"),))),
+                          workbench_link=link(AGENT_SECURITY, DETAIL_ROWS)),
                   Section(id="brute_force", title=t("rpt_aud_sec_brute"), intro=t("rpt_aud_brute_intro"),
-                          blocks=(brute,))))
+                          blocks=(brute,), workbench_link=link((AUTH_FAILED,), DETAIL_ROWS))))
