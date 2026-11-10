@@ -208,9 +208,9 @@ def _rule_schedules(v5_root: Path, read: Callable[[Path], str]) -> dict[str, Any
 
 
 def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Language.EN,
-            original_root: Path | None = None) -> list[str]:
+            original_root: Path | None = None, port: int | None = None) -> list[str]:
     """Write v6 at root from the stopped 5.x at v5_root (moved there from original_root, when given); returns what the
-    handover did, one line each."""
+    handover did, one line each. port: where v6 listens (5.x kept its port outside its settings, so none carries)."""
     paths = InstallPaths(root)
     if paths.settings_file.exists():
         raise AlreadyInstalled(str(paths.settings_file))
@@ -225,6 +225,8 @@ def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Langua
     for d in (paths.config_dir, paths.data_dir, root / "logs"):
         d.mkdir(parents=True, exist_ok=True)
     s, skipped = _copy_tls(v5_root, paths, result.settings, original_root or v5_root)
+    if port is not None:
+        s = s.model_copy(update={"web": s.web.model_copy(update={"port": port})})
     store = SettingsStore(paths.settings_file)
     store.create(s)
     schedules, schedule_items = v5_rule_schedules.convert(_rule_schedules(v5_root, read),

@@ -32,7 +32,8 @@ cp -a "$HERE/rollback/." "$KEEP/" || die "could not read the backups in $HERE/ro
 
 if (( ! NO_SYSTEMD )); then
     echo "==> Stopping and disabling v6 ($SERVICE)"
-    systemctl stop "$SERVICE" || die "could not stop $SERVICE; nothing else was changed"
+    # A v6 unit that is gone or was never installed is no reason to stay off 5.x: only a v6 that still runs is.
+    systemctl stop "$SERVICE" || echo "    (could not stop $SERVICE: continuing if it is not running)"
     if systemctl is-active --quiet "$SERVICE"; then
         die "$SERVICE is still running; nothing else was changed"
     fi

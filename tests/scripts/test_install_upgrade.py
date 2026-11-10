@@ -98,3 +98,56 @@ def test_upgrade_in_place_moves_5x_aside_and_rollback_brings_it_back(bundle, v5)
 def test_a_directory_that_is_not_5x_is_refused(bundle, tmp_path):
     r = _install(bundle, "--upgrade-from", tmp_path, "--prefix", tmp_path / "v6", "--report-only")
     assert r.returncode != 0 and "not an illumio-ops 5.x installation" in r.stderr
+
+
+def test_upgrade_with_a_port_writes_it_and_names_it(bundle, v5):
+    r = _install(bundle, "--prefix", v5, "--accept-report", "--port", "8443")
+    assert r.returncode == 0, r.stderr
+    assert json.loads((v5 / "config" / "settings.json").read_text())["web"]["port"] == 8443
+    assert "https://<this host>:8443/" in r.stdout and ":5001/" not in r.stdout
+
+
+def test_install_over_kept_settings_names_the_port_they_hold(bundle, v5):
+    assert _install(bundle, "--prefix", v5, "--accept-report", "--port", "8443").returncode == 0
+    again = _install(bundle, "--prefix", v5, "--accept-report")  # v6 over v6: the settings stay, and so does the port
+    assert again.returncode == 0, again.stderr
+    assert "https://<this host>:8443/" in again.stdout and ":5001/" not in again.stdout
+
+
+def test_rollback_restores_5x_when_the_v6_unit_is_not_there(bundle, v5, tmp_path):
+    assert _install(bundle, "--prefix", v5, "--accept-report").returncode == 0
+    env_file = v5 / "rollback" / "rollback.env"
+    env_file.write_text(env_file.read_text().replace("NO_SYSTEMD=1", "NO_SYSTEMD=0")
+                        .replace("SERVICE=illumio-ops\n", "SERVICE=illumio-ops-test-absent\n"))
+    assert "NO_SYSTEMD=0" in env_file.read_text() and "SERVICE=illumio-ops-test-absent" in env_file.read_text()
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    calls = tmp_path / "systemctl.calls"
+    # As systemd answers for a unit it does not have: stop fails (5), is-active says inactive (3).
+    (fake / "systemctl").write_text(f'#!/bin/sh\necho "$@" >> {calls}\ncase "$1" in stop) exit 5 ;; is-active) exit 3 ;; '
+                                    'disable) exit 1 ;; esac\nexit 0\n')
+    (fake / "id").write_text('#!/bin/sh\n[ "$1" = -u ] && { echo 0; exit 0; }\nexec /usr/bin/id "$@"\n')
+    for f in fake.iterdir():
+        f.chmod(0o755)
+    back = subprocess.run(["bash", str(v5 / "rollback.sh")], capture_output=True, text=True, timeout=60, check=False,
+                          env={**os.environ, "PATH": f"{fake}:{os.environ['PATH']}"})
+    assert back.returncode == 0, back.stderr
+    assert (v5 / "illumio-ops.py").is_file() and not (v5 / "config" / "settings.json").exists()
+    assert "stop illumio-ops-test-absent" in calls.read_text()
+
+
+def test_rollback_changes_nothing_while_v6_is_still_running(bundle, v5, tmp_path):
+    assert _install(bundle, "--prefix", v5, "--accept-report").returncode == 0
+    env_file = v5 / "rollback" / "rollback.env"
+    env_file.write_text(env_file.read_text().replace("NO_SYSTEMD=1", "NO_SYSTEMD=0")
+                        .replace("SERVICE=illumio-ops\n", "SERVICE=illumio-ops-test-absent\n"))
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (fake / "systemctl").write_text('#!/bin/sh\ncase "$1" in stop) exit 1 ;; is-active) exit 0 ;; esac\nexit 0\n')
+    (fake / "id").write_text('#!/bin/sh\n[ "$1" = -u ] && { echo 0; exit 0; }\nexec /usr/bin/id "$@"\n')
+    for f in fake.iterdir():
+        f.chmod(0o755)
+    back = subprocess.run(["bash", str(v5 / "rollback.sh")], capture_output=True, text=True, timeout=60, check=False,
+                          env={**os.environ, "PATH": f"{fake}:{os.environ['PATH']}"})
+    assert back.returncode != 0 and "still running" in back.stderr
+    assert (v5 / "config" / "settings.json").is_file() and not (v5 / "illumio-ops.py").exists()

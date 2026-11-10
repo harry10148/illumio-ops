@@ -39,11 +39,15 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--write", action="store_true", help="write the v6 settings and handover into --root")
     ap.add_argument("--root", type=Path, help="the new v6 root (with --write)")
     ap.add_argument("--original-root", type=Path, help="where 5.x ran, when it has been moved to --from (with --write)")
+    ap.add_argument("--port", type=int, default=None, help="the port v6 listens on (with --write; default 5001)")
     ap.add_argument("--lang", choices=[lang.value for lang in Language], default="en")
     args = ap.parse_args(argv)
     lang = Language(args.lang)
     if args.write and args.root is None:
         sys.stderr.write("--write needs --root\n")
+        return EX_USAGE
+    if args.port is not None and not 1 <= args.port <= 65535:
+        sys.stderr.write("--port must be 1-65535\n")
         return EX_USAGE
     try:
         raw = read_v5(args.source)
@@ -64,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         lines = upgrade(args.source, args.root, now=datetime.now(UTC).replace(microsecond=0), lang=lang,
-                        original_root=args.original_root)
+                        original_root=args.original_root, port=args.port)
     except AlreadyInstalled as exc:
         sys.stderr.write(f"{exc} already exists; nothing was changed\n")
         return EX_CANTCREAT

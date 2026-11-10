@@ -28,6 +28,7 @@ set -euo pipefail
 PREFIX=/opt/illumio-ops
 SERVICE=illumio-ops
 PORT=5001
+PORT_GIVEN=0
 NO_SYSTEMD=0
 PRINT_UNIT=0
 SERVICE_USER=illumio-ops
@@ -44,7 +45,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --prefix) PREFIX="${2:?}"; shift 2 ;;
         --service-name) SERVICE="${2:?}"; shift 2 ;;
-        --port) PORT="${2:?}"; shift 2 ;;
+        --port) PORT="${2:?}"; PORT_GIVEN=1; shift 2 ;;
         --no-systemd) NO_SYSTEMD=1; shift ;;
         --print-unit) PRINT_UNIT=1; shift ;;
         --upgrade-from) UPGRADE_FROM="${2:?}"; shift 2 ;;
@@ -96,6 +97,22 @@ fi
 if [[ -n "$UPGRADE_FROM" && "$PREFIX" != "$UPGRADE_FROM" && ( -e "$PREFIX/illumio_ops" || -e "$PREFIX/config/settings.json" ) ]]; then
     die "$PREFIX already holds an illumio-ops v6 installation; nothing was changed"
 fi
+# The address to open, with the port the settings in PREFIX hold: settings that were already there keep theirs,
+# whatever --port said.
+say_url() {
+    local port
+    port="$("$PREFIX/python/bin/python3" -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["web"]["port"])' \
+        "$PREFIX/config/settings.json" 2>/dev/null)" || port=""
+    if [[ -z "$port" ]]; then
+        echo "    then open https://<this host>:<the port in $PREFIX/config/settings.json>/"
+        return 0
+    fi
+    echo "    then open https://<this host>:${port}/"
+    if (( PORT_GIVEN )) && [[ "$port" != "$PORT" ]]; then
+        echo "    (--port $PORT was not applied: the settings in $PREFIX were already there and keep port $port)"
+    fi
+}
+
 for need in python wheels illumio_ops requirements.lock illumio-ops.service.in rollback.sh restore-previous.sh uninstall.sh; do
     [[ -e "$BUNDLE_DIR/$need" ]] || die "bundle is incomplete: $need is missing next to install.sh"
 done
@@ -225,6 +242,7 @@ if (( V6_UPGRADE )); then
     install_program
     if (( NO_SYSTEMD )); then
         echo "==> Upgraded to $NEW_VERSION (no systemd)."
+        say_url
         exit 0
     fi
     render_unit > "$UNIT"  # the unit of this version (its directives may have changed)
@@ -344,7 +362,8 @@ if [[ -n "$UPGRADE_FROM" ]]; then
     MOVED=()
     [[ "$V5_NOW" != "$UPGRADE_FROM" ]] && MOVED=(--original-root "$UPGRADE_FROM")
     echo "==> Writing the v6 settings and continuing where 5.x stopped"
-    "${PY[@]}" -m illumio_ops.migrate --from "$V5_NOW" --write --root "$PREFIX" --lang "$REPORT_LANG" "${MOVED[@]}" \
+    "${PY[@]}" -m illumio_ops.migrate --from "$V5_NOW" --write --root "$PREFIX" --lang "$REPORT_LANG" \
+        --port "$PORT" "${MOVED[@]}" \
         || die "the upgrade did not complete; $PREFIX/rollback.sh brings 5.x back"
     RUN=()
 elif (( KEPT )); then
@@ -356,6 +375,7 @@ fi
 if (( NO_SYSTEMD )); then
     (( ${#RUN[@]} )) && "${RUN[@]}"
     echo "==> Done (no systemd). Run: env PYTHONPATH=$PREFIX $PREFIX/python/bin/python3 -m illumio_ops serve --root $PREFIX"
+    say_url
     exit 0
 fi
 
@@ -370,4 +390,4 @@ chmod 644 "/etc/systemd/system/${SERVICE}.service"
 systemctl daemon-reload
 echo "==> Installed. The service is NOT started. Start it with:"
 echo "    systemctl enable --now ${SERVICE}"
-echo "    then open https://<this host>:${PORT}/"
+say_url

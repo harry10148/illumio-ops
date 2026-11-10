@@ -29,7 +29,8 @@ continue where 5.x stopped), and `rollback.sh` to go back. 5.x documentation is 
 ## Development
 
 ```
-python3.12 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.lock -r requirements-dev.txt
+python3.12 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.lock
+.venv/bin/pip install -r requirements-dev.txt
 npm ci --prefix web
 bash scripts/gen_contracts.sh && npm --prefix web run build
 .venv/bin/python -m pytest tests -n auto --dist loadfile
