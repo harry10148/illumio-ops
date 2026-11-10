@@ -274,9 +274,9 @@ def test_initiator_rankings_and_their_coverage(context, live_app):
     card.locator("[data-role=init-users] tbody tr").first.wait_for()
     assert card.locator("[data-role=init-users] tbody tr").first.inner_text().split() == ["corp\\alice", "2"]
     assert "root" in card.locator("[data-role=init-system]").inner_text()
-    assert "No management-port connection names a process." in card.locator("[data-role=init-processes]").inner_text()
+    assert "No management-port flow record names a process." in card.locator("[data-role=init-processes]").inner_text()
     cov = card.locator("[data-role=initiators-coverage]").inner_text()
-    assert "connections in the last" in cov and "5;" in cov and "4 (80.0%)" in cov and "0 (0.0%)" in cov
+    assert "flow records in the last" in cov and "5;" in cov and "4 (80.0%)" in cov and "0 (0.0%)" in cov
 
 
 def test_initiators_basic_mode_says_what_it_needs(context, live_app):

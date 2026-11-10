@@ -492,16 +492,20 @@ function Initiators() {
   }, []);
   const r = view?.result;
   const share = (n: number, d: number): string => (d ? `${(100 * n / d).toFixed(1)}%` : "0.0%");
-  const table = (role: string, title: string, col: string, rows: Initiator[], none: string, more: number | undefined) => (
+  // A read that stopped at its limit: more rows exist, uncounted; for the system accounts the accounts past it were
+  // not checked, so an empty table says "none among the first N", never "none".
+  const table = (role: string, title: string, col: string, rows: Initiator[], none: string, more: number | undefined,
+                 capped: number | undefined, cappedKey: string, noneCapped?: string) => (
     <div className="stack" data-role={role}>
       <h3>{title}</h3>
-      {rows.length === 0 ? <p className="muted">{none}</p> : (
+      {rows.length === 0 ? <p className="muted">{capped && noneCapped ? t(noneCapped, { n: String(capped) }) : none}</p> : (
         <table className="table">
           <thead><tr><th>{col}</th><th className="num">{t("lat_init_col_dst")}</th></tr></thead>
           <tbody>{rows.map((x) => <tr key={x.name}><td className="wrap-any">{x.name}</td><td className="num">{x.destinations.toLocaleString()}</td></tr>)}</tbody>
         </table>
       )}
       {more ? <p className="hint">{t("lat_init_more", { n: String(more) })}</p> : null}
+      {capped && !(rows.length === 0 && noneCapped) ? <p className="hint" data-role="init-capped">{t(cappedKey, { n: String(capped) })}</p> : null}
     </div>
   );
   return (
@@ -514,12 +518,13 @@ function Initiators() {
       {r && (
         <>
           <p className="hint" data-role="initiators-coverage">{t("lat_init_coverage", { days: String(view.days),
-            total: r.connections.toLocaleString(), user: r.with_user.toLocaleString(), user_pct: share(r.with_user, r.connections),
-            process: r.with_process.toLocaleString(), process_pct: share(r.with_process, r.connections) })}</p>
+            total: r.flows.toLocaleString(), user: r.with_user.toLocaleString(), user_pct: share(r.with_user, r.flows),
+            process: r.with_process.toLocaleString(), process_pct: share(r.with_process, r.flows) })}</p>
           <div className="lat-initiators">
-            {table("init-users", t("lat_init_users"), t("lat_init_col_user"), r.users, t("lat_init_none_users"), r.more.users)}
-            {table("init-processes", t("lat_init_processes"), t("lat_init_col_process"), r.processes, t("lat_init_none_processes"), r.more.processes)}
-            {table("init-system", t("lat_init_system"), t("lat_init_col_user"), r.system_accounts, t("lat_init_none_system"), r.more.system_accounts)}
+            {table("init-users", t("lat_init_users"), t("lat_init_col_user"), r.users, t("lat_init_none_users"), r.more.users, r.capped.users, "lat_init_capped")}
+            {table("init-processes", t("lat_init_processes"), t("lat_init_col_process"), r.processes, t("lat_init_none_processes"), r.more.processes, r.capped.processes, "lat_init_capped")}
+            {table("init-system", t("lat_init_system"), t("lat_init_col_user"), r.system_accounts, t("lat_init_none_system"), r.more.system_accounts, r.capped.system_accounts,
+              "lat_init_capped_system", "lat_init_none_system_capped")}
           </div>
         </>
       )}

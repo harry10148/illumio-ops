@@ -26298,14 +26298,21 @@
           },
           "LateralDefaults": {
             "properties": {
-              "connections": {
-                "title": "Connections",
-                "type": "integer"
+              "capped": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "title": "Capped",
+                "type": "object"
               },
               "end": {
                 "format": "date-time",
                 "title": "End",
                 "type": "string"
+              },
+              "flows": {
+                "title": "Flows",
+                "type": "integer"
               },
               "more": {
                 "additionalProperties": {
@@ -26356,7 +26363,8 @@
               "processes",
               "system_accounts",
               "more",
-              "connections",
+              "capped",
+              "flows",
               "with_user",
               "with_process"
             ],

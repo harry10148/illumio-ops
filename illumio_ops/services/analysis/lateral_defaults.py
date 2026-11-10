@@ -19,7 +19,10 @@ from illumio_ops.services.analysis.segments import run_segment
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import field_coverage
 
-TOP = 10  # rows each ranking shows; the segment reads up to its own limit and says when there are more
+TOP = 10  # rows each ranking shows
+# Accounts read to find the system accounts among them: the segment's own 50 would miss one ranked lower, and the
+# page would then say there is none. Past this many the result says the rest were not checked.
+SYSTEM_SCAN = 1000
 
 
 class Initiator(BaseModel):
@@ -33,10 +36,12 @@ class LateralDefaults(BaseModel):
     users: list[Initiator]            # initiating users, system accounts left out
     processes: list[Initiator]        # initiating processes
     system_accounts: list[Initiator]  # the operating-system accounts among the initiating users
-    more: dict[str, int]              # ranking -> rows beyond TOP that are not shown
-    connections: int                  # management-port connections in the period
-    with_user: int                    # of those, connections that name the initiating user
-    with_process: int                 # of those, connections that name the initiating process
+    more: dict[str, int]              # ranking -> rows read beyond TOP that are not shown
+    capped: dict[str, int]            # ranking -> the rows its read stopped at: there are more, uncounted (and for
+    #                                   system_accounts, accounts past it were not checked)
+    flows: int                        # management-port flow records in the period
+    with_user: int                    # of those, records that name the initiating user
+    with_process: int                 # of those, records that name the initiating process
 
 
 def lateral_defaults(ctx: AppContext, *, start: datetime, end: datetime, now: datetime) -> LateralDefaults:
@@ -45,16 +50,22 @@ def lateral_defaults(ctx: AppContext, *, start: datetime, end: datetime, now: da
                   for port, proto in dict.fromkeys((e.port, e.proto) for e in lc.admin_ports.entries))
     segs = lateral_default_segments(ports, start=start, end=end)
 
-    def named(key: str) -> list[Initiator]:
-        rows = run_segment(ctx, segs[key], now=now).ranking or []
-        return [Initiator(name=str(r.keys[0]), destinations=r.value) for r in rows if r.keys[0] not in (None, "")]
+    capped: dict[str, int] = {}
 
-    users = named("admin_initiator_users")
-    processes = named("admin_initiator_processes")
-    system = [r for r in named("system_accounts_on_admin") if is_system_account(r.name)]
+    def named(name: str, key: str, limit: int | None = None) -> list[Initiator]:
+        seg = segs[key] if limit is None else segs[key].model_copy(update={"limit": limit})
+        result = run_segment(ctx, seg, now=now)
+        if result.limit_hit:
+            capped[name] = seg.limit
+        return [Initiator(name=str(r.keys[0]), destinations=r.value) for r in result.ranking or []
+                if r.keys[0] not in (None, "")]
+
+    users = named("users", "admin_initiator_users")
+    processes = named("processes", "admin_initiator_processes")
+    system = [r for r in named("system_accounts", "system_accounts_on_admin", SYSTEM_SCAN) if is_system_account(r.name)]
     fc = field_coverage(ctx, FilterSpec(start=start, end=end, ports=ports))
     shown = {"users": users, "processes": processes, "system_accounts": system}
     return LateralDefaults(start=start, end=end, users=users[:TOP], processes=processes[:TOP],
                            system_accounts=system[:TOP],
-                           more={k: len(v) - TOP for k, v in shown.items() if len(v) > TOP},
-                           connections=fc.total, with_user=fc.initiator_user, with_process=fc.initiator_process)
+                           more={k: len(v) - TOP for k, v in shown.items() if len(v) > TOP}, capped=capped,
+                           flows=fc.total, with_user=fc.initiator_user, with_process=fc.initiator_process)

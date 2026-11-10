@@ -296,7 +296,8 @@ def test_initiators_section_is_the_pages_ranking(ctx, monkeypatch):
         asked.append((start, end))
         return LateralDefaults(start=start, end=end, users=[Initiator(name="corp\\alice", destinations=7)],
                                processes=[], system_accounts=[Initiator(name="root", destinations=2)],
-                               more={"users": 3}, connections=200, with_user=50, with_process=0)
+                               more={"users": 3}, capped={"processes": 50, "system_accounts": 1000}, flows=200,
+                               with_user=50, with_process=0)
     monkeypatch.setattr(lateral_posture, "lateral_defaults", fake)
     assert lateral_posture.lateral_defaults is fake and mod.lateral_defaults is not fake
     doc = build_lateral_posture(_inp(ctx))
@@ -306,4 +307,6 @@ def test_initiators_section_is_the_pages_ranking(ctx, monkeypatch):
     tables = [b for b in sec.blocks if isinstance(b, TableBlock)]
     assert [t.rows for t in tables] == [(("corp\\alice", 7),), (), (("root", 2),)]
     assert tables[0].total_rows == 4 and tables[0].limit_note  # three more exist and the table says so
-    assert tables[1].empty_text == "No management-port connection names a process."
+    assert tables[1].empty_text == "No management-port flow record names a process."
+    # a read that stopped at its limit never reads as "none" or as the whole list
+    assert "first 50" in tables[1].limit_note and "first 1000 accounts" in tables[2].limit_note

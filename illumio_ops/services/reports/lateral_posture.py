@@ -331,20 +331,25 @@ class _Builder:
         d = lateral_defaults(inp.ctx, start=inp.start, end=inp.end, now=inp.now)
 
         def share(n: int) -> str:
-            return f"{n:,} ({100 * n / d.connections:.1f}%)" if d.connections else "0 (0.0%)"
+            return f"{n:,} ({100 * n / d.flows:.1f}%)" if d.flows else "0 (0.0%)"
 
         def table(key: str, title_key: str, col_key: str, rows: Sequence[Initiator], none_key: str) -> TableBlock:
-            more = d.more.get(key, 0)
+            more, capped = d.more.get(key, 0), d.capped.get(key)
+            notes = [self.t("rpt_limit_top_n", n=len(rows))] if more else []
+            if capped:  # the read stopped there: more exist, uncounted (system accounts: not checked past it)
+                notes.append(self.t("rpt_lat_init_capped_system" if key == "system_accounts" else "rpt_lat_init_capped",
+                                    n=capped))
             return TableBlock(
                 title=self.t(title_key),
                 columns=(Column(key="name", label=self.t(col_key)),
                          Column(key="n", label=self.t("rpt_col_distinct_destinations"), kind="number")),
                 rows=tuple((r.name, r.destinations) for r in rows), total_rows=len(rows) + more,
-                empty_text=self.t(none_key),
-                limit_note=self.t("rpt_limit_top_n", n=len(rows)) if more else None)
+                empty_text=(self.t("rpt_lat_init_none_system_capped", n=capped)
+                            if capped and key == "system_accounts" else self.t(none_key)),
+                limit_note=" ".join(notes) or None)
         return Section(
             id="initiators", title=self.t("rpt_lat_sec_initiators"),
-            intro=self.t("rpt_lat_initiators_intro", total=f"{d.connections:,}", user=share(d.with_user),
+            intro=self.t("rpt_lat_initiators_intro", total=f"{d.flows:,}", user=share(d.with_user),
                          process=share(d.with_process)),
             blocks=(table("users", "rpt_lat_tbl_init_users", "rpt_col_user", d.users, "rpt_lat_init_none_users"),
                     table("processes", "rpt_lat_tbl_init_processes", "rpt_col_process", d.processes,

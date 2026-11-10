@@ -36,7 +36,8 @@ def test_three_rankings_from_management_port_traffic(ctx):
     assert users == [("corp\\alice", 2), ("corp\\bob", 1)]  # by distinct destination hosts; system accounts left out
     assert [(r.name, r.destinations) for r in d.system_accounts] == [("root", 1)]
     assert d.processes == []
-    assert (d.connections, d.with_user, d.with_process) == (5, 4, 0)  # 8443 is not counted
+    assert (d.flows, d.with_user, d.with_process) == (5, 4, 0)  # flow records; 8443 is not counted
+    assert d.capped == {}
 
 
 def test_the_segments_are_the_domain_defaults(ctx, monkeypatch):
@@ -51,3 +52,19 @@ def test_the_segments_are_the_domain_defaults(ctx, monkeypatch):
     monkeypatch.setattr(lateral_defaults, "lateral_default_segments", spy)
     lateral_defaults.lateral_defaults(ctx, start=START, end=END, now=NOW)
     assert seen == [{"start": START, "end": END}]
+
+
+def test_a_read_that_stopped_at_its_limit_is_said(ctx, monkeypatch):
+    """With more initiators than a ranking reads, the rest are neither counted nor checked: the result says where
+    each read stopped, so the page never states "no system account" about accounts it did not look at. The system
+    accounts are looked for among SYSTEM_SCAN accounts, not the ranking's 50."""
+    from illumio_ops.services.analysis.segments import SegmentResult
+    asked = []
+
+    def fake(c, seg, **kw):
+        asked.append(seg.limit)
+        return SegmentResult.model_construct(ranking=[], limit_hit=True)
+    monkeypatch.setattr(lateral_defaults, "run_segment", fake)
+    d = lateral_defaults.lateral_defaults(ctx, start=START, end=END, now=NOW)
+    assert asked == [50, 50, lateral_defaults.SYSTEM_SCAN]
+    assert d.capped == {"users": 50, "processes": 50, "system_accounts": lateral_defaults.SYSTEM_SCAN}

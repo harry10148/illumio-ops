@@ -70,7 +70,7 @@ def test_initiators_signed_in_and_by_mode(client, ctx):
     assert client.get("/api/lateral/initiators", environ_overrides=LOCAL).status_code == 401
     login(client)
     got = client.get("/api/lateral/initiators", environ_overrides=LOCAL).get_json()["data"]
-    assert got["state"] == "ok" and got["result"]["users"] == [] and got["result"]["connections"] == 0
+    assert got["state"] == "ok" and got["result"]["users"] == [] and got["result"]["flows"] == 0
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="lightweight"))
     got = client.get("/api/lateral/initiators", environ_overrides=LOCAL).get_json()["data"]
     assert got["state"] == "lightweight" and got["result"] is None

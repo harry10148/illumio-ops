@@ -21,7 +21,9 @@ const SEP = "; ";
 function ports(list: PortProto[] | undefined): string {
   return (list ?? []).map((p) => {
     const range = p.to_port != null ? `${p.port}-${p.to_port}` : p.port != null && p.port >= 0 ? String(p.port) : "";
-    const proto = p.proto === 17 ? "udp" : p.proto === 6 || p.proto == null ? "tcp" : t("rsum_proto", { n: String(p.proto) });
+    // no protocol on the rule: every protocol matches (domain/filter.py), so the port stands alone
+    if (p.proto == null) return range;
+    const proto = p.proto === 17 ? "udp" : p.proto === 6 ? "tcp" : t("rsum_proto", { n: String(p.proto) });
     return range ? `${range}/${proto}` : proto;
   }).join(", ");
 }

@@ -1787,8 +1787,11 @@ name: string
  * via the `definition` "LateralDefaults".
  */
 export interface LateralDefaults {
-connections: number
+capped: {
+[k: string]: number
+}
 end: string
+flows: number
 more: {
 [k: string]: number
 }
