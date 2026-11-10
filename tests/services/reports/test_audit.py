@@ -199,3 +199,16 @@ def test_brute_force_reads_the_address_where_the_pce_puts_it(ctx):
     doc = _build(ctx)
     assert [r[0] for r in _tables(doc, "brute_force")[0].rows] == ["198.51.100.4"]
     assert _kpi(doc)["source_ips"] == 1
+
+
+def test_failed_then_change_names_five_users_and_counts_the_rest(ctx):
+    """Seven users in the finding: five are named and the other two are counted, never dropped without a word."""
+    records = []
+    for i in range(7):
+        records += [event("request.authentication_failed", D + timedelta(minutes=3), user=f"u{i}", ip=f"10.1.1.{i}",
+                          status="failure"),
+                    event("api_key.create", D + timedelta(minutes=10), user=f"u{i}", ip=f"10.1.1.{i}")]
+    _write(ctx, records)
+    why = _build(ctx, Language.ZH_TW).findings[0].why
+    assert all(f"u{i}" in why for i in range(5)) and "u5" not in why and "另有 2 位" in why
+    assert "2 more" in _build(ctx, Language.EN).findings[0].why

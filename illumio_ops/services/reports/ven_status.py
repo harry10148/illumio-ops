@@ -12,12 +12,14 @@ from typing import Any
 
 from illumio_ops.domain.report import (
     Column,
+    Finding,
     Kpi,
     ReportDocument,
     Section,
     TableBlock,
     TextBlock,
 )
+from illumio_ops.domain.values import SEVERITY_ORDER, Severity
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.analysis.tamper import list_annotations
 from illumio_ops.services.reports import reads
@@ -260,9 +262,30 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         quality.append(t("rpt_quality_analysis_failed", error=run_error[:200]))
     if counts["unknown"]:
         quality.append(t("rpt_ven_quality_unknown", n=counts["unknown"]))
+    # Each finding counts the rows of a table below; none of them means the report says nothing needs action.
+    found: list[Finding] = []
+    if offline:
+        found.append(Finding(
+            severity=Severity.HIGH if counts["long_offline"] else Severity.MEDIUM,
+            title=t("rpt_ven_find_offline_title", n=f"{len(offline):,}"),
+            why=t("rpt_ven_find_offline_why", d1=counts["lost_24h"], d2=counts["lost_48h"], old=counts["long_offline"]),
+            action=t("rpt_ven_find_offline_action")))
+    if unexplained:
+        found.append(Finding(severity=Severity.HIGH, title=t("rpt_ven_find_tamper_title", n=f"{unexplained:,}"),
+                             why=t("rpt_ven_find_tamper_why"), action=t("rpt_ven_find_tamper_action")))
+    if trouble:
+        found.append(Finding(severity=Severity.MEDIUM, title=t("rpt_ven_find_sync_title", n=f"{len(trouble):,}"),
+                             why=t("rpt_ven_find_sync_why"), action=t("rpt_ven_find_sync_action")))
+    not_passed = compat_counts["warn"] + compat_counts["fail"]
+    if not_passed:
+        found.append(Finding(
+            severity=Severity.MEDIUM, title=t("rpt_ven_find_compat_title", n=f"{not_passed:,}"),
+            why=t("rpt_ven_find_compat_why", warn=compat_counts["warn"], fail=compat_counts["fail"]),
+            action=t("rpt_ven_find_compat_action")))
+    found.sort(key=lambda f: -SEVERITY_ORDER.index(f.severity))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ven_status"), period_start=inp.start,
-        period_end=inp.end, generated_at=now, pce_label=inp.pce_label, kpis=kpis, findings=(),
+        period_end=inp.end, generated_at=now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(found),
         data_quality=tuple(quality),
         sections=(Section(id="online", title=t("rpt_ven_sec_online"), intro=t("rpt_ven_online_intro"),
                           blocks=(online_table, compat_table)),

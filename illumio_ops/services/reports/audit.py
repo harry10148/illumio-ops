@@ -47,6 +47,7 @@ from illumio_ops.services.reports.registry import BuildInput
 
 TOP = 20
 ATTENTION_FINDINGS = 5
+USERS_NAMED = 5
 FAILED_ROWS = 30
 BRUTE_WINDOW = timedelta(minutes=30)
 BRUTE_MIN = 5
@@ -238,8 +239,11 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         limit_note=t("rpt_aud_newest_n", n=DETAIL_ROWS) if chained_total > len(chained) else None)
     if chained:
         who = sorted({c.user for c in chained})
+        named = ", ".join(who[:USERS_NAMED])
+        if len(who) > USERS_NAMED:
+            named = t("rpt_aud_users_more", users=named, n=len(who) - USERS_NAMED)
         findings = (Finding(severity=Severity.HIGH, title=t("rpt_aud_failed_change_title", n=f"{chained_total:,}"),
-                            why=t("rpt_aud_failed_change_why", users=", ".join(who[:5]),
+                            why=t("rpt_aud_failed_change_why", users=named,
                                   minutes=FAILED_THEN_CHANGE_MINUTES),
                             action=t("rpt_aud_failed_change_action")), *findings)[:ATTENTION_FINDINGS]
 

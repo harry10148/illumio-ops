@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from illumio_ops.domain.report import TableBlock, TextBlock
-from illumio_ops.domain.values import Language, ReportType
+from illumio_ops.domain.values import Language, ReportType, Severity
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.reports.render_html import render_html
 from illumio_ops.store.flowdb import analysis, labels, ven_compat, workloads
@@ -212,3 +212,36 @@ def test_compat_issues_beyond_three_are_counted(ctx):
     row = dict(zip([c.key for c in _table(_build(ctx), "online").columns], _table(_build(ctx), "online").rows[0],
                    strict=True))
     assert row["compat"] == "Warning (a, b, c +2)"
+
+
+def test_findings_count_what_the_tables_list(ctx):
+    """Each finding's number is the row count of a table in the same report."""
+    _inventory(ctx, [host("on"), host("d1", online=0, hb=timedelta(hours=5)),
+                     host("old", online=0, hb=timedelta(days=9)), host("stale", fw=0),
+                     host("idle", mode="idle", compat=("yellow", ("ipv4_forwarding_enabled",), NOW.isoformat()))])
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "tamper", params={}, at=NOW, result={"unmatched": 0, "hosts": [
+            {"href": "/orgs/1/workloads/on", "hostname": "on", "n_60d": 12, "n_7d": 3, "pattern": "periodic",
+             "median_minutes": 10.0, "last_at": NOW.isoformat(), "unexplained_7d": 2, "has_signal": True},
+            {"href": "/orgs/1/workloads/stale", "hostname": "stale", "n_60d": 4, "n_7d": 0, "pattern": "sporadic",
+             "median_minutes": None, "last_at": NOW.isoformat(), "unexplained_7d": 0, "has_signal": False}]})
+        conn.commit()
+    doc = _build(ctx)
+    titles = [f.title for f in doc.findings]
+    assert len(doc.findings) == 4
+    assert titles[0].startswith(f"{_table(doc, 'offline').total_rows} ")
+    assert doc.findings[0].severity is Severity.HIGH  # one of them has been silent for more than 48 hours
+    assert any(t.startswith("1 ") and "tampering" in t for t in titles)
+    assert any(t.startswith(f"{_table(doc, 'sync').total_rows} ") and "policy" in t for t in titles)
+    assert any(t.startswith("1 ") and "compatibility" in t for t in titles)
+
+
+def test_no_findings_when_nothing_needs_action(ctx):
+    _inventory(ctx, [host("on"), host("new", hb=None, status=None, sync=None, fw=None)])
+    assert _build(ctx).findings == ()
+
+
+def test_offline_under_48_hours_is_medium(ctx):
+    _inventory(ctx, [host("on"), host("d1", online=0, hb=timedelta(hours=5))])
+    (finding,) = _build(ctx, Language.ZH_TW).findings
+    assert finding.severity is Severity.MEDIUM and finding.title.startswith("1 ")
