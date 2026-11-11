@@ -192,12 +192,17 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         if v is None or not totals.flows:
             return t("rpt_sec_part_no_data")
         return t("rpt_sec_part_got", got=f"{MATURITY_WEIGHTS[part] * v:.0f}", weight=MATURITY_WEIGHTS[part])
+    def reached(part: str) -> str:
+        """The part's share of its full marks (drawn as a bar); a dash without data."""
+        v = score.parts.get(part)
+        return "—" if v is None or not totals.flows else f"{100 * v:.1f}%"
     parts_table = TableBlock(
         title=t("rpt_sec_tbl_parts"),
         columns=(Column(key="part", label=t("rpt_sec_col_part")), Column(key="measures", label=t("rpt_rdy_col_measures")),
                  Column(key="full", label=t("rpt_rdy_col_full_marks")), Column(key="points", label=t("rpt_rdy_col_points")),
-                 Column(key="now", label=t("rpt_sec_col_this_period"))),
-        rows=tuple((t(_PART_KEYS[k]), t(_PART_MEASURES[k]), t(_PART_FULL[k]), str(w), got(k))
+                 Column(key="now", label=t("rpt_sec_col_this_period")),
+                 Column(key="share", label=t("rpt_sec_col_part_share"))),
+        rows=tuple((t(_PART_KEYS[k]), t(_PART_MEASURES[k]), t(_PART_FULL[k]), str(w), got(k), reached(k))
                    for k, w in MATURITY_WEIGHTS.items()),
         total_rows=len(MATURITY_WEIGHTS), empty_text="")
     grades_table = TableBlock(

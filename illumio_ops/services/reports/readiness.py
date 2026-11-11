@@ -174,11 +174,18 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                  Column(key="score", label=t("rpt_rdy_col_score"), kind="number"),
                  Column(key="grade", label=t("rpt_rdy_col_grade")),
                  Column(key="explain", label=t("rpt_rdy_col_explain")),
-                 *(Column(key=k, label=t(_FACTOR_KEYS[k])) for k in WEIGHTS),
-                 Column(key="modes", label=t("rpt_rdy_col_modes")), Column(key="advice", label=t("rpt_col_action"))),
+                 Column(key="advice", label=t("rpt_col_action"))),
         # whole points, as the explanation says them
-        rows=tuple((name(k), round(r.score) if r.score is not None else None, r.grade or "—", explain(r),
-                    *(pct(r.parts[f]) for f in WEIGHTS), modes(m), advice(r)) for k, r, m in scored),
+        rows=tuple((name(k), round(r.score) if r.score is not None else None, r.grade or "—", explain(r), advice(r))
+                   for k, r, m in scored),
+        total_rows=len(scored), empty_text=no_data)
+    # What each verdict rests on, in a table of its own: one of eleven columns was unreadable (6.6.0 Task 6).
+    basis = TableBlock(
+        title=t("rpt_rdy_tbl_basis"),
+        columns=(Column(key="app", label=t("rpt_col_app_env")),
+                 *(Column(key=k, label=t(_FACTOR_KEYS[k])) for k in WEIGHTS),
+                 Column(key="modes", label=t("rpt_rdy_col_modes"))),
+        rows=tuple((name(k), *(pct(r.parts[f]) for f in WEIGHTS), modes(m)) for k, r, m in scored),
         total_rows=len(scored), empty_text=no_data)
 
     predicted_blocks: tuple[TableBlock | TextBlock, ...]
@@ -257,6 +264,6 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
         data_quality=quality,
         sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rdy_how_intro"), blocks=(factors, grades)),
                   Section(id="next", title=t("rpt_rdy_sec_next"), intro=t("rpt_rdy_next_intro"), blocks=(next_steps,)),
-                  Section(id="scores", title=t("rpt_rdy_sec_scores"), intro=t("rpt_rdy_scores_intro"), blocks=(scores,)),
+                  Section(id="scores", title=t("rpt_rdy_sec_scores"), intro=t("rpt_rdy_scores_intro"), blocks=(scores, basis)),
                   Section(id="predicted", title=t("rpt_rdy_sec_predicted"), intro=t("rpt_rdy_predicted_intro"),
                           blocks=predicted_blocks), *visibility_sections(inp)))

@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from illumio_ops.domain.report import (
+    BarBlock,
     Cell,
     Column,
     Kpi,
@@ -21,6 +22,7 @@ from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.flowsource import (
     FlowTotals,
     VolumeRow,
+    connections_by_day,
     field_coverage,
     flow_totals,
     traffic_volume,
@@ -78,6 +80,16 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
         rows=tuple((t(DECISION_KEYS.get(d.decision, "decision_unknown")), d.flows, d.connections, d.into_managed,
                     pct(d.into_managed, d.flows)) for d in totals.by_decision),
         total_rows=len(totals.by_decision), empty_text=no_flows)
+
+    # PCE's own "unknown": said under the table, with how many, so the row is not read as a fault of this product
+    unknown = next((d.flows for d in totals.by_decision if d.decision == "unknown"), 0)
+    decision_blocks: tuple[TableBlock | TextBlock | BarBlock, ...] = (decisions,)
+    if unknown:
+        decision_blocks += (TextBlock(paragraphs=(t("rpt_trf_unknown_note", n=f"{unknown:,}"),)),)
+    by_day = connections_by_day(inp.ctx, spec) if totals.flows else {}
+    if len(by_day) > 1:  # a period seen on one day only has no trend to draw
+        decision_blocks += (BarBlock(title=t("rpt_trf_bar_daily"), points=tuple((d[5:], n) for d, n in by_day.items()),
+                                     empty_text=no_flows),)
 
     def ranking(title: str, dim: SegmentDimension, label: str, *, label_key: str | None = None) -> TableBlock:
         return flowsections.ranking(
@@ -164,7 +176,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
         findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
         data_quality=(*quality, *flowsections.no_links_note(inp)),
         sections=(Section(id="decisions", title=t("rpt_trf_sec_decisions"), intro=t("rpt_trf_decisions_intro"),
-                          blocks=(decisions,)),
+                          blocks=decision_blocks),
                   Section(id="labels", title=t("rpt_trf_sec_labels"), blocks=labels,
                           workbench_link=link(SegmentDimension.SRC_LABEL, label_key=APP)),
                   Section(id="services", title=t("rpt_trf_sec_services"), blocks=(services, protocols),

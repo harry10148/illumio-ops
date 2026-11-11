@@ -137,8 +137,10 @@ def test_readiness_source_filter_keeps_destination_hosts(ctx):
     _inventory(ctx, [("w1", "Web", "full"), ("d1", "DB", "full")])
     write_flows(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
     cond = FlowCondition(src=EndpointFilter(labels=(LabelCond(key="app", values=("Web",)),)))
-    rows = {r[0]: r for r in _tables(_build(ctx, ReportType.READINESS, cond=cond), "scores")[0].rows}
-    assert rows["DB (Dev)"][6] == "100.0%" and rows["Web (Dev)"][1] is None  # Web has no traffic into it here
+    doc = _build(ctx, ReportType.READINESS, cond=cond)
+    rows = {r[0]: r for r in _tables(doc, "scores")[0].rows}
+    basis = {r[0]: r for r in _tables(doc, "scores")[1].rows}  # 6.6.0: the factor shares are a table of their own
+    assert basis["DB (Dev)"][3] == "100.0%" and rows["Web (Dev)"][1] is None  # Web has no traffic into it here
 
 
 # 9: the predicted blocks counted are the ones into managed hosts, as the scores

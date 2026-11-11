@@ -488,6 +488,22 @@ class DecisionTotals(BaseModel):
     from_managed: int  # flows whose source is a managed host
 
 
+def connections_by_day(ctx: AppContext, spec: FilterSpec) -> dict[str, int]:
+    """UTC day (of a record's last detection) -> connections, over the primary rows a filter matches: the same rows
+    flow_totals counts, so the days add up to its connections."""
+    fdb, gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = to_sql(spec, wide=wide_window(conn, spec))
+        rows = conn.execute("SELECT substr(f.last_detected, 1, 10), SUM(f.num_connections) FROM flows f "
+                            f"WHERE {where} GROUP BY 1 ORDER BY 1", params).fetchall()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return {str(day): int(n or 0) for day, n in rows}
+
+
 class FlowTotals(BaseModel):
     """A period's totals over the primary rows a filter matches (flows = connection records)."""
     flows: int

@@ -172,3 +172,26 @@ def test_bandwidth_and_bytes_per_connection(ctx):
     assert [r[:2] for r in apps.rows] == [("Web", "DB"), ("Batch", "DB")]  # no row for a pair without byte data
     text = " ".join(p for b in sec.blocks if isinstance(b, TextBlock) for p in b.paragraphs)
     assert "2 of 2" in text and "lower bound" in text and "highest here: 1.398 Mbps" in text
+
+
+def test_unknown_decisions_are_explained_and_days_are_drawn(ctx):
+    """6.6.0 Task 6: the Unknown row says what it is and how many; a period seen on more than one day draws its
+    connections per day, which add up to the total."""
+    from datetime import timedelta
+    from illumio_ops.domain.report import BarBlock
+    a, b = flow(port=443, conns=3), flow(port=22, decision="unknown", conns=2)
+    object.__setattr__(b, "last_detected", b.last_detected + timedelta(days=1))
+    _write(ctx, [a, b])
+    doc = _build(ctx)
+    sec = _section(doc, "decisions")
+    words = " ".join(p for blk in sec.blocks if isinstance(blk, TextBlock) for p in blk.paragraphs)
+    assert "reported the decision of 1 flow records as Unknown" in words
+    bars = next(blk for blk in sec.blocks if isinstance(blk, BarBlock))
+    assert [v for _, v in bars.points] == [3, 2] and sum(v for _, v in bars.points) == 5
+
+
+def test_one_day_of_traffic_draws_no_trend_and_no_unknown_note(ctx):
+    from illumio_ops.domain.report import BarBlock
+    _write(ctx, [flow(port=443)])
+    sec = _section(_build(ctx), "decisions")
+    assert not [b for b in sec.blocks if isinstance(b, (BarBlock, TextBlock))]

@@ -173,3 +173,51 @@ def test_findings_show_mitre_chips_without_external_links():
     out = _first_page(findings=(Finding(severity=Severity.HIGH, title="SMB", why="w", action="a",
                                         techniques=(("T1021.002", "SMB/Windows Admin Shares"),)),))
     assert re.search(r'<span class="mitre-chip" title="SMB/Windows Admin Shares">T1021\.002</span>', out)
+
+
+# ── 6.6.0 Task 6: presentation ───────────────────────────────────────────────
+
+def _cols(*keys):
+    from illumio_ops.domain.report import Column
+    return tuple(Column(key=k, label=k.title()) for k in keys)
+
+
+def _tbl(columns, rows, title="T"):
+    from illumio_ops.domain.report import TableBlock
+    return TableBlock(title=title, columns=columns, rows=tuple(rows), total_rows=len(rows), empty_text="-")
+
+
+def test_a_share_column_draws_a_bar_of_its_length():
+    t = _tbl(_cols("app", "share", "note"), [("a", "12.5%", "x"), ("b", "100.0%", "5%"), ("c", "—", "y")])
+    out = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(t,)),)), tz=UTC)
+    bars = re.findall(r'<progress class="share-bar" max="100" value="([^"]+)"', out)
+    assert bars == ["12.5", "100"]  # the share column only: "note" mixes words and a share, a dash draws no bar
+    assert 'style="' not in out  # a report page carries no inline style
+
+
+def test_a_number_over_100_percent_is_not_a_share():
+    t = _tbl(_cols("app", "growth"), [("a", "250.0%"), ("b", "10.0%")])
+    out = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(t,)),)), tz=UTC)
+    assert "share-bar" not in out.split("</style>")[-1]
+
+
+def test_two_narrow_tables_share_a_row_and_a_wide_one_does_not():
+    narrow = _tbl(_cols("a", "b"), [("x", 1)])
+    wide = _tbl(_cols("a", "b", "c", "d"), [("x", 1, 2, 3)])
+    body = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(narrow, narrow, narrow, wide)),)),
+                       tz=UTC).split("</style>")[-1]
+    assert body.count('class="table-pair"') == 1  # the first two; the third stands alone beside a wide one
+    empty = _tbl(_cols("a", "b"), [])
+    body = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(narrow, empty)),)), tz=UTC)
+    assert 'class="table-pair"' not in body.split("</style>")[-1]
+
+
+def test_an_action_every_row_repeats_is_said_once_above_the_table():
+    same = _tbl(_cols("rule", "found", "action"), [("r1", "a", "Check the change record."),
+                                                   ("r2", "b", "Check the change record.")])
+    body = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(same,)),)), tz=UTC).split("</style>")[-1]
+    assert body.count("Check the change record.") == 1 and 'data-role="said-once"' in body
+    assert 'data-column-count="2"' in body
+    differs = _tbl(_cols("rule", "found", "action"), [("r1", "a", "Do this."), ("r2", "b", "Do that.")])
+    body = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(differs,)),)), tz=UTC).split("</style>")[-1]
+    assert 'data-role="said-once"' not in body and 'data-column-count="3"' in body

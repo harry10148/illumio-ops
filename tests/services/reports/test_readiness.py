@@ -62,6 +62,13 @@ def _table(doc, sid, i=0):
     return [b for b in _section(doc, sid).blocks if isinstance(b, TableBlock)][i]
 
 
+def _joined(doc):
+    """The verdict table and the basis table (6.6.0: one table of eleven columns, now two) as one row per app:
+    app, score, grade, explanation, the factor shares, the modes, the action."""
+    basis = {r[0]: r[1:] for r in _table(doc, "scores", 1).rows}
+    return [(*r[:4], *basis[r[0]], r[4]) for r in _table(doc, "scores").rows]
+
+
 def _texts(doc, sid):
     return " ".join(p for b in _section(doc, sid).blocks if isinstance(b, TextBlock) for p in b.paragraphs)
 
@@ -71,7 +78,7 @@ def test_inbound_only(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, conns=2),
                  flow(src_app="DB", dst_app="DB", port=5432, decision="potentially_blocked", conns=2),
                  flow(src_app="DB", dst_app="Web", port=443, conns=10)])
-    rows = {r[0]: r for r in _table(_build(ctx), "scores").rows}
+    rows = {r[0]: r for r in _joined(_build(ctx))}
     db = rows["DB (Dev)"]
     assert db[4:8] == ("50.0%", "50.0%", "—", "50.0%")  # policy, ringfence, enforcement (no hosts), staged
 
@@ -79,7 +86,7 @@ def test_inbound_only(ctx):
 def test_enforcement_from_inventory_exact_labels(ctx):
     _inventory(ctx, [("d1", "DB", "full"), ("d2", "DB", "selective"), ("x", "db", "full")])
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
-    row = {r[0]: r for r in _table(_build(ctx), "scores").rows}["DB (Dev)"]
+    row = {r[0]: r for r in _joined(_build(ctx))}["DB (Dev)"]
     assert row[6] == "75.0%" and "1 full, 1 selective" in row[9]
 
 
@@ -139,14 +146,14 @@ def test_unknown_decisions_left_out(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, conns=2),
                  flow(src_app="Web", dst_app="DB", port=5432, decision="unknown", conns=8)])
     doc = _build(ctx)
-    row = {r[0]: r for r in _table(doc, "scores").rows}["DB (Dev)"]
+    row = {r[0]: r for r in _joined(doc)}["DB (Dev)"]
     assert row[4] == "100.0%" and row[7] == "100.0%"  # policy and staged over the 2 decided connections
     assert any("80.0%" in q for q in doc.data_quality)
 
 
 def test_all_unknown_no_policy_factor(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, decision="unknown", conns=5)])
-    row = {r[0]: r for r in _table(_build(ctx), "scores").rows}["DB (Dev)"]
+    row = {r[0]: r for r in _joined(_build(ctx))}["DB (Dev)"]
     assert row[4] == "—" and row[7] == "—"
 
 
@@ -166,7 +173,7 @@ def test_each_score_says_why_and_what_fixing_it_gives(ctx):
     _inventory(ctx, [("d1", "DB", "selective")])
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, decision="potentially_blocked", conns=9),
                  flow(src_app="Web", dst_app="DB", port=5432, conns=1)])
-    row = {r[0]: r for r in _table(_build(ctx), "scores").rows}["DB (Dev)"]
+    row = {r[0]: r for r in _joined(_build(ctx))}["DB (Dev)"]
     explain = row[3]
     assert "Allowed by a rule" in explain and "points" in explain  # the factor costing most, in words
     assert "about" in explain  # what the score would be with that factor fixed
@@ -210,3 +217,13 @@ def test_next_step_and_rules_to_write_in_one_column(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, decision="potentially_blocked", conns=9)])
     table = _table(_build(ctx), "next")
     assert len(table.columns) == 3 and "Web → 5432/TCP" in table.rows[0][2]
+
+
+def test_the_verdict_and_what_it_rests_on_are_two_tables(ctx):
+    """6.6.0 Task 6: eleven columns in one table were unreadable; the factor shares are their own table."""
+    _inventory(ctx, [("d1", "DB", "full")])
+    doc = _build(ctx)
+    verdict, basis = _table(doc, "scores"), _table(doc, "scores", 1)
+    assert [c.key for c in verdict.columns] == ["app", "score", "grade", "explain", "advice"]
+    assert basis.columns[0].key == "app" and basis.columns[-1].key == "modes" and len(basis.columns) >= 4
+    assert [r[0] for r in verdict.rows] == [r[0] for r in basis.rows]
