@@ -274,6 +274,36 @@ def _update_baselines(conn: sqlite3.Connection, conn_key: str, *, log_new: bool 
     return row
 
 
+def rebuild_baselines(conn: sqlite3.Connection) -> None:
+    """The four baselines from the primary rows held, as _update_baselines would have left them: for a store whose
+    rows were loaded without upsert_flows (the archive's throwaway store). What the tables held is dropped."""
+    for table in ("connection_baseline", "user_baseline", "account_source_baseline", "process_baseline"):
+        conn.execute(f"DELETE FROM {table}")
+    conn.create_function("account_key", 1, account_key, deterministic=True)
+    span = "first_seen = MIN(first_seen, excluded.first_seen), last_seen = MAX(last_seen, excluded.last_seen)"
+    rows = "FROM flows WHERE is_primary = 1"
+    port = f"COALESCE(port, {NO_PORT})"
+    conn.execute(
+        "INSERT INTO connection_baseline (src_key, dst_key, port, proto, first_seen, last_seen, last_decision) "
+        f"SELECT src_key, dst_key, {port}, proto, first_detected, last_detected, policy_decision {rows} "
+        f"ORDER BY last_detected, id ON CONFLICT(src_key, dst_key, port, proto) DO UPDATE SET {span}, "
+        "last_decision = CASE WHEN excluded.last_seen >= last_seen THEN excluded.last_decision ELSE last_decision END")
+    users = f"{rows} AND initiator_user IS NOT NULL AND initiator_user != ''"
+    conn.execute(
+        "INSERT INTO user_baseline (initiator_user, dst_key, port, proto, first_seen, last_seen) "
+        f"SELECT initiator_user, dst_key, {port}, proto, first_detected, last_detected {users} "
+        f"ON CONFLICT(initiator_user, dst_key, port, proto) DO UPDATE SET {span}")
+    conn.execute(
+        "INSERT INTO account_source_baseline (account, src_key, first_seen, last_seen) "
+        f"SELECT account_key(initiator_user), src_key, first_detected, last_detected {users} "
+        f"ON CONFLICT(account, src_key) DO UPDATE SET {span}")
+    conn.execute(
+        "INSERT INTO process_baseline (src_key, process, first_seen, last_seen) "
+        f"SELECT src_key, initiator_process, first_detected, last_detected {rows} "
+        "AND initiator_process IS NOT NULL AND initiator_process != '' "
+        f"ON CONFLICT(src_key, process) DO UPDATE SET {span}")
+
+
 def split_unseen(conn: sqlite3.Connection, records: Sequence[FlowRecord]) -> tuple[list[FlowRecord], list[FlowRecord]]:
     """(records not stored yet, stored records with something to add). Read-only, so a caller can
     leave the unchanged ones out before it takes the write lock."""

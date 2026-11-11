@@ -131,3 +131,40 @@ def test_a_named_period_is_bounded_for_every_type(tmp_path):
     p = ReportParams(report_type=ReportType.AUDIT, period_from=(NOW - timedelta(days=60)).date(),
                      period_to=(NOW - timedelta(days=1)).date())
     assert generate.refusal(ctx.settings.current(), p, now=NOW) == "rpt_err_lookback_beyond_retention"
+
+
+def _made(ctx, **over):
+    rid = generate.enqueue(ctx, ReportParams(**{"lang": Language.EN, **over}), trigger="manual", schedule_id=None,
+                           now=NOW)
+    assert generate.run_queued(ctx, now=NOW) == rid
+    with ctx.db() as conn:
+        row = store.get(conn, rid)
+    assert row.status is ReportStatus.DONE, (row.error_key, row.error_detail)
+    html = (ctx.paths.reports_dir / str(rid) / next(f for f in row.files if f.endswith(".html"))).read_text()
+    return {k["key"]: k["value"] for k in row.kpis}, html
+
+
+def test_a_period_the_store_keeps_is_not_sent_to_the_archive_for_its_baseline(tmp_path):
+    """6.6.0 acceptance (.106): flow_days 35, baseline 30 — a weekly new-connections report starts inside what the
+    store keeps, only the baseline before it does not. It was built from a throwaway store with no baseline and said
+    0 new connections; the install's own baseline is the one to read."""
+    ctx = _ctx(tmp_path)
+    kpis, html = _made(ctx, report_type=ReportType.NEW_CONNECTIONS, lookback_days=5)
+    assert kpis["new"] == 2  # the connections of 3 and 2 days ago
+    assert "from the archive" not in html
+
+
+def test_a_new_connections_report_of_an_archived_period_has_a_baseline(tmp_path):
+    """A period the store dropped is read from the archive: the throwaway store's baseline is built from its rows."""
+    ctx = _ctx(tmp_path)
+    kpis, html = _made(ctx, report_type=ReportType.NEW_CONNECTIONS, period_from=(NOW - timedelta(days=12)).date(),
+                       period_to=(NOW - timedelta(days=9)).date())
+    assert kpis["new"] == 2  # the connections of 12 and 10 days ago
+    assert "comes from the archive" in html
+    assert "Baseline 0" not in html and "baseline: 0" not in html.lower()
+
+
+def test_a_weekly_lateral_posture_report_reads_the_store_too(tmp_path):
+    ctx = _ctx(tmp_path)
+    _, html = _made(ctx, report_type=ReportType.LATERAL_POSTURE, lookback_days=5)
+    assert "from the archive" not in html

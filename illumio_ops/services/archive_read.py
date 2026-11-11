@@ -219,6 +219,9 @@ def archive_period(ctx: AppContext, *, start: datetime, end: datetime, now: date
             if "flows" in kinds and max(start, edge["flows"]) < end:
                 flow_store.mark_rollup_days(conn, _days(max(start, edge["flows"]), end))
             flow_store.refresh_rollups(conn, at, today_every=timedelta(0))
+            if "flows" in kinds:  # rows copied and loaded as they are: the baselines are built from them here
+                with transaction(conn):
+                    flow_store.rebuild_baselines(conn)
         yield ArchiveResult(ctx=dataclasses.replace(ctx, flowdb=fdb, ondemand=True), archived_days=archived,
                             missing_days=missing, rows=total, unreadable=unreadable, unread_from=unread_from)
     finally:

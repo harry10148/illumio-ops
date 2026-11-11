@@ -216,7 +216,9 @@ def _archive_kinds(ctx: AppContext, spec: ReportSpec, inp: BuildInput, lead: tim
     edge = archive_read.floors(ctx, inp.now)
     traffic = spec.needs_traffic and (spec.needs_traffic_for is None or spec.needs_traffic_for(ctx, inp.params))
     kinds = []
-    if traffic and inp.start - lead < edge["flows"] and archive_read.earliest(ctx, "flows", inp.now) <= inp.start - lead:
+    # The period itself decides (as pulls_on_demand): a period the store keeps reads the store, whose own baseline
+    # covers the days before it. Counting the baseline's lead here sent every weekly report to a throwaway store.
+    if traffic and inp.start < edge["flows"] and archive_read.earliest(ctx, "flows", inp.now) <= inp.start - lead:
         kinds.append("flows")
     if spec.reads_events and inp.start < edge["events"] and archive_read.archive_files(ctx, "events"):
         kinds.append("events")

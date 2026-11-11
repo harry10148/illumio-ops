@@ -218,3 +218,12 @@ def test_new_connections_ondemand_compares_previous_past_baseline_days(tmp_path,
     row = _run(ctx, ReportType.NEW_CONNECTIONS, lookback=30)
     assert row.status is ReportStatus.DONE, row.error_key
     assert next(k for k in row.kpis if k["key"] == "new")["previous"] is not None
+
+
+def test_a_pulled_baseline_is_not_reported_as_zero_days(tmp_path, pce):
+    """6.6.0 acceptance (.135): a throwaway store has no collector and so no watermark; every report made from one
+    said "Baseline 0 of 30 days" beside numbers that rest on the 30 days it had just pulled."""
+    ctx = configured_ctx(tmp_path, mode="lightweight")
+    pce.rows = [raw(30, day=10), raw(31, day=24)]
+    html = _html(ctx, _run(ctx, ReportType.NEW_CONNECTIONS))
+    assert "Baseline 0" not in html and "until it is full" not in html

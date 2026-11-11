@@ -76,6 +76,9 @@ def load_lateral_context(ctx: AppContext, *, now: datetime) -> LateralContext:
         backfill = ingest_state.get(conn, IngestSource.BACKFILL)
     initial: dict[str, object] = ((backfill.progress or {}) if backfill else {}).get("initial") or {}
     watermark = traffic.watermark if traffic else None
+    # A throwaway store (an on-demand pull, the archive read back) is filled once, with no collector and so no
+    # watermark: its baseline is the stretch of coverage that reaches the end of what was loaded.
+    reaches = watermark or (max(b for _, b in ranges) if ctx.ondemand and ranges else None)
     hosts = {}
     for w in inventory:
         host_labels = sets.get(w.label_set, {}) if w.label_set is not None else {}
@@ -93,7 +96,7 @@ def load_lateral_context(ctx: AppContext, *, now: datetime) -> LateralContext:
             LATERAL_PORTS_DEFAULT, pce_admin, extra=[(e.port, e.proto, e.category) for e in lat.extra_admin_ports],
             removed=[(e.port, e.proto) for e in lat.removed_admin_ports], include_pce=lat.include_pce_admin_services),
         hosts=hosts, label_sets=sets, known_labels=known, collected=ctx.ondemand or collects(settings, IngestSource.TRAFFIC),
-        baseline_days=_baseline_days(ranges, watermark, required), baseline_required=required,
+        baseline_days=_baseline_days(ranges, reaches, required), baseline_required=required,
         baseline_backfilling=bool(initial) and not initial.get("finished"), stale=tuple(stale),  # same test as reread
         traffic_watermark=watermark, generation=gen)
 

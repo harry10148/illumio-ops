@@ -181,3 +181,18 @@ def test_repull_with_larger_counters_at_the_same_time_is_written(conn, recs, fie
     larger = (getattr(r, field) or 0) + 1000
     stats = upsert_flows(conn, [replace(r, **{field: larger})], origin=DataOrigin.INGEST, now=NOW)
     assert stats.refreshed == 1 and _rows(conn)[0][field] == larger
+
+
+def test_rebuilt_baselines_equal_the_ones_upsert_left(conn, recs):
+    """6.6.1: a store loaded without upsert_flows (the archive read back) builds its baselines from the rows; they
+    are the ones upsert_flows would have left, and whatever the tables held before is dropped."""
+    from illumio_ops.store.flowdb.flows import rebuild_baselines
+    later = [replace(r, last_detected=r.last_detected + timedelta(hours=3), policy_decision="blocked") for r in recs[:3]]
+    upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW)
+    upsert_flows(conn, later, origin=DataOrigin.INGEST, now=NOW)
+    tables = ("connection_baseline", "user_baseline", "account_source_baseline", "process_baseline")
+    held = {t: sorted(map(tuple, conn.execute(f"SELECT * FROM {t}"))) for t in tables}
+    assert all(held.values()), {t: len(v) for t, v in held.items()}  # the sample has users and processes
+    conn.execute("UPDATE connection_baseline SET first_seen = '1999-01-01T00:00:00.000+00:00'")
+    rebuild_baselines(conn)
+    assert {t: sorted(map(tuple, conn.execute(f"SELECT * FROM {t}"))) for t in tables} == held
