@@ -178,6 +178,13 @@ def alerted_devices(conn: sqlite3.Connection, *, pce_url: str, org_id: str, sinc
         (pce_url, org_id, _t(since))).fetchall()
 
 
+def devices_recorded_since(conn: sqlite3.Connection, *, pce_url: str, org_id: str) -> datetime | None:
+    """The earliest alert that has its hosts recorded: before it, "the alerts about this host" cannot be complete."""
+    row = conn.execute("SELECT MIN(a.fired_at) FROM alerts a WHERE a.pce_url = ? AND a.org_id = ? AND EXISTS "
+                       "(SELECT 1 FROM alert_devices d WHERE d.alert_id = a.id)", (pce_url, org_id)).fetchone()
+    return datetime.fromisoformat(row[0]) if row and row[0] else None
+
+
 def seen_at(conn: sqlite3.Connection) -> datetime:
     """When the alerts page was last opened (0019 gives every installation a first time)."""
     return datetime.fromisoformat(conn.execute("SELECT seen_at FROM alerts_seen WHERE id = 1").fetchone()[0])

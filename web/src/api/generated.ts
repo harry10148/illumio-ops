@@ -853,6 +853,7 @@ summary: string
  */
 export interface AlertList {
 counts: AlertCounts
+hosts_recorded_since?: (string | null)
 items: AlertItem[]
 new: number
 page: number

@@ -103,6 +103,9 @@ class AlertList(BaseModel):
     page_size: int
     counts: AlertCounts
     new: int  # in the period, fired after the time the request named (new_after); 0 when it named none
+    # Asked for one host's alerts: the earliest alert whose hosts were recorded, when that is within the period —
+    # the count before it cannot be complete. None otherwise.
+    hosts_recorded_since: datetime | None = None
 
 
 class SeenBefore(BaseModel):
@@ -256,6 +259,7 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
                                         limit=PAGE, offset=(q.page - 1) * PAGE)
         new = (store.count_new(conn, pce_url=url, org_id=org, after=q.new_after, since=since)
                if q.new_after is not None else 0)
+        recorded = store.devices_recorded_since(conn, pce_url=url, org_id=org) if q.device else None
         found = store.deliveries(conn, [r["id"] for r in rows])
         about = store.devices(conn, [r["id"] for r in rows])
         counted = store.period_counts(conn, pce_url=url, org_id=org, since=since)
@@ -266,6 +270,7 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
     names = display_names(ctx, _hrefs(rows) | {d.key for ds in about.values() for d in ds})
     return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], []), names, about.get(r["id"], ()), q.new_after)
                             for r in rows], new=new,
+                     hosts_recorded_since=recorded if recorded is not None and recorded > since else None,
                      total=total, page=q.page,
                      page_size=PAGE, counts=counts)
 
