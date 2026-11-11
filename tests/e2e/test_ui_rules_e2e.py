@@ -23,8 +23,7 @@ from tests.services.reports.test_findings import flow
 
 PATHS = ui_rules.PATHS
 
-PENDING: dict[str, str] = {
-    "cards_apart": "Task 4", "no_overlap": "Task 4", "header_one_line": "Task 4"}
+PENDING: dict[str, str] = {}  # every rule holds; a rule goes back here only with the task that will mend it
 
 WIDE = {"width": 1440, "height": 900}
 

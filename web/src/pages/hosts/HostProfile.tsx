@@ -1,6 +1,6 @@
 // Host profile (spec §6.5.3, P6b): what the store holds about one host, and its traffic and events as workbench
 // requests (the same numbers as the workbench; lightweight mode reads them from the PCE the same way).
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { createContext, type FormEvent, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
@@ -50,11 +50,18 @@ function investigate(req: Req): string {
   return `/investigate?${new URLSearchParams({ q: JSON.stringify(req) }).toString()}`;
 }
 
+/** The page says a gap in the collection once, at its head: every section below covers the same period, and the
+ * same sentence in each of them was read as noise. A section hands its sentence up; outside the page it shows it. */
+const GapsContext = createContext<((sentence: string) => void) | null>(null);
+
 /** What the numbers below do not include (a gap in the collection, a PCE answer cut at its limit): never silent. */
 function Caveats({ coverage, limitHit }: { coverage: Coverage; limitHit?: boolean }) {
+  const report = useContext(GapsContext);
+  const gaps = coverage.gaps.length > 0 ? t("wb_gaps", { n: String(coverage.gaps.length) }) : null;
+  useEffect(() => { if (gaps && report) report(gaps); }, [gaps, report]);
   return (
     <>
-      {coverage.gaps.length > 0 && <p className="notice" data-role="caveat">{t("wb_gaps", { n: String(coverage.gaps.length) })}</p>}
+      {gaps && !report && <p className="notice" data-role="caveat">{gaps}</p>}
       {coverage.truncated && <p className="notice" data-role="caveat">{t("wb_truncated")}</p>}
       {limitHit && <p className="hint" data-role="caveat">{t("wb_limit_hit")}</p>}
     </>
@@ -470,6 +477,13 @@ export function HostProfile() {
     return () => { live = false; };
   }, [profile, span]);
 
+  // one sentence about a gap, said once at the head of the page (the sections hand theirs up)
+  const [gapNotes, setGapNotes] = useState<string[]>([]);
+  useEffect(() => { setGapNotes([]); }, [profile, span]);
+  const noteGap = useCallback((sentence: string) => {
+    setGapNotes((now) => (now.includes(sentence) ? now : [...now, sentence]));
+  }, []);
+
   if (error) return <section className="page"><p className="form-error">{t(error.message_key, error.params)}</p></section>;
   if (!profile) return <section className="page"><p className="muted">{t("loading")}</p></section>;
 
@@ -482,6 +496,7 @@ export function HostProfile() {
   const mode = id?.enforcement_mode ?? null;
 
   return (
+    <GapsContext.Provider value={noteGap}>
     <section className="page" data-role="host-profile">
       <p><Link to="/hosts">{t("hosts_back_to_search")}</Link></p>
       <div className="page-head">
@@ -493,6 +508,7 @@ export function HostProfile() {
           </select>
         </label>
       </div>
+      {gapNotes.map((g) => <p key={g} className="notice" data-role="caveat">{g}</p>)}
       <div className="card stack" data-section="identity">
         {!profile.managed && <p className="notice">{t("hosts_unmanaged")}</p>}
         {profile.managed && !profile.in_inventory && <p className="notice">{t("hosts_not_in_inventory")}</p>}
@@ -547,6 +563,7 @@ export function HostProfile() {
         <Ransomware hostKey={profile.key} initial={profile.ransomware} />
       )}
     </section>
+    </GapsContext.Provider>
   );
 }
 

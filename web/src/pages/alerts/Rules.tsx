@@ -63,13 +63,26 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
     if (env.ok && env.data) { setView(env.data); setError(null); } else setError(env.error);
   }
 
+  // a column nothing fills is not drawn
+  const anyStatus = view?.items.some((i) => i.summary?.last_status) ?? false;
   return (
     <section className="page stack">
       {!embedded && <p><Link to="/">{t("alert_back")}</Link></p>}
       <div className="page-head">
         {!embedded && <h1>{t("rules_title")}</h1>}
-        <Link to="/alerts/rules/new" className="btn-primary">{t("rules_new")}</Link>
+        <div className="row" data-role="evaluate">
+          <Link to="/alerts/rules/new" className="btn-primary">{t("rules_new")}</Link>
+          <button type="button" className="btn-quiet" data-role="evaluate-now" title={t("rules_evaluate_hint")}
+                  disabled={!view} onClick={() => void evaluateNow()}>
+            {t("rules_evaluate_now")}
+          </button>
+        </div>
       </div>
+      {evaluated && (
+        <p className="notice" role="status" data-role="evaluate-requested">
+          {t("rules_evaluate_requested", { time: formatTime(evaluated.requested_at, lang) })}
+        </p>
+      )}
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {view && (
         <>
@@ -89,19 +102,6 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
               </div>
             )}
           </div>
-          <div className="card stack" data-role="evaluate">
-            <div className="row">
-              <button type="button" className="btn-quiet" data-role="evaluate-now" onClick={() => void evaluateNow()}>
-                {t("rules_evaluate_now")}
-              </button>
-              <span className="hint">{t("rules_evaluate_hint")}</span>
-            </div>
-            {evaluated && (
-              <p className="notice" role="status" data-role="evaluate-requested">
-                {t("rules_evaluate_requested", { time: formatTime(evaluated.requested_at, lang) })}
-              </p>
-            )}
-          </div>
           <label className="row" data-role="rule-type-filter-row">
             {t("rules_filter_type")}
             <select data-role="rule-type-filter" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
@@ -117,7 +117,7 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
                   <th>{t("rules_col_condition")}</th><th>{t("rules_col_exclusion")}</th><th>{t("rules_col_enabled")}</th>
                   <th>{t("rules_col_notify")}</th><th>{t("rules_col_last")}</th>
                   <th className="wb-num">{t("rules_col_7d")}</th><th className="wb-num">{t("rules_col_known")}</th>
-                  <th>{t("rules_col_status")}</th>
+                  {anyStatus && <th>{t("rules_col_status")}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -162,7 +162,7 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
                       </td>
                       <td className="wb-num" data-role="fired-7d">{s?.fired_7d ?? 0}</td>
                       <td className="wb-num" data-role="known-7d">{s?.known_7d ?? 0}</td>
-                      <td>{s?.last_status ? word(STATUS_KEYS, s.last_status) : ""}</td>
+                      {anyStatus && <td>{s?.last_status ? word(STATUS_KEYS, s.last_status) : ""}</td>}
                     </tr>
                   );
                 })}

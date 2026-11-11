@@ -67,7 +67,9 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .btn-link { border: 0; background: none; padding: 0; color: var(--text-1); font: inherit; cursor: pointer;
             text-decoration: underline; text-underline-offset: 3px; }
 .content { overflow: auto; padding: var(--space-7) var(--space-8); min-width: 0; }
-.page { max-width: 1400px; }
+/* a page is a column of blocks that keep one distance; no page has to remember it */
+.page { max-width: 1400px; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); align-content: start; }
+.page > h1, .page > .console-head, .page > .kpi-strip, .page > .subnav { margin-bottom: 0; }
 .subnav { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-6); padding-bottom: var(--space-4);
           border-bottom: 1px solid var(--line); }
 .subnav-item { padding: var(--space-2) var(--space-5); border-radius: var(--radius-m); color: var(--text-2);
@@ -114,7 +116,10 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .panel-head h2 { margin: 0; }
 .panel-meta { color: var(--text-3); font-size: var(--fs-mini); }
 .panel-body { padding: var(--space-5) var(--space-6); }
+/* a table fills its panel edge to edge; under a row of filters or actions it starts on its own line, ruled off */
 .panel-body > .table-wrap { margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-6)); }
+.panel-body > * + .table-wrap { margin-top: var(--space-5); border-top: 1px solid var(--line); }
+.panel-body > .row + .row { margin-top: var(--space-5); }
 .data-table td[data-kind="num"], .data-table th[data-kind="num"] { text-align: right; font-variant-numeric: tabular-nums; }
 .data-table td[data-kind="time"] { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-2); }
 .data-table td[data-kind="mono"] { font-family: var(--font-mono); font-size: var(--fs-mini); }
@@ -224,7 +229,12 @@ button:disabled { cursor: progress; opacity: .7; }
 .table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
 .table th, .table td { text-align: left; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
 .table th { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .08em; color: var(--text-2); font-weight: 600;
-            border-bottom-color: var(--line); }
+            border-bottom-color: var(--line); white-space: nowrap; }
+/* what a cell holds may run to more lines, in full; a time, a figure or a state never breaks */
+.table td { overflow-wrap: break-word; }
+/* a name may be one long unbroken word: it breaks where it must rather than push the page sideways */
+.table td:has(> a:only-child), .table td.wrap-any { overflow-wrap: anywhere; min-width: 9rem; }
+.table td[data-kind="num"], .table td[data-kind="time"], .table td:has(> .tag:only-child), .table td:has(> .switch) { white-space: nowrap; overflow-wrap: normal; }
 .wrap { overflow-wrap: anywhere; max-width: 48ch; }
 .nowrap { white-space: nowrap; }
 .log-message { min-width: 32ch; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--fs-mini); }
@@ -297,6 +307,7 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-st
 .btn-text { height: var(--ctl-h); padding: 0 var(--space-2); border: 0; background: none; }
 /* why an action will not do what its name says, under the action — never inside the button */
 .action-note { flex-basis: 100%; margin: 0; color: var(--text-3); font-size: var(--fs-mini); }
+.table td[data-nowrap] { white-space: nowrap; }
 /* figures and times: the reading face, digits of one width */
 .num { font-variant-numeric: tabular-nums; }
 .sentence { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; }
@@ -335,7 +346,7 @@ a.btn-primary, a.btn-quiet, a.btn-danger { text-decoration: none; }
 ul.notice { list-style: none; }
 
 /* Host profile (P6b) */
-.host-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4); }
+.host-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-6); align-items: start; }
 .host-facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
 .host-facts dt { color: var(--text-3); }
 .host-facts dd { margin: 0; }
@@ -345,11 +356,10 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 [data-role=host-profile] .card h3 { margin: 0; }
 
 /* Lateral movement (P6c) */
-[data-role=lateral] > .card, [data-role=lateral] > .lat-compare { margin-bottom: var(--space-5); }
 [data-role=lateral] .card > .row:first-child { justify-content: space-between; align-items: baseline; }
 [data-role=lateral] h3 { margin: var(--space-3) 0 0; font-size: var(--fs-ui); }
 .plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-.lat-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
+.lat-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-6); }
 .lat-paths-wrap { overflow-x: auto; }
 .lat-paths { display: block; max-width: 100%; height: auto; }
 .lat-node { fill: var(--surface-1); stroke: var(--line); }
@@ -389,6 +399,13 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 /* a row of choices is one segmented control (the same look as .seg); it wraps into rows on a narrow screen */
 .chips-row { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-strong); border-radius: var(--radius-m);
              overflow: hidden; background: var(--surface-1); }
+/* a card's first row: what it is on the left, what to do with it on the right, on one line */
+.card-head { justify-content: space-between; align-items: center; }
+.card-head h2, .card-head h3 { margin: 0; }
+/* a button is as wide as its words, never the width of the card it sits in */
+.stack > button, .stack > a.btn-primary, .stack > a.btn-quiet, .card > button { justify-self: start; }
+/* one control as wide as its choices, wherever it is put */
+.chips-row, .seg { justify-self: start; width: fit-content; max-width: 100%; }
 .chip-btn { height: 30px; padding: 0 var(--space-5); border: 0; border-right: 1px solid var(--line);
             background: none; color: var(--text-2); font-size: var(--fs-mini); white-space: nowrap; }
 .chip-btn:last-child { border-right: 0; }
@@ -427,7 +444,10 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .rpt-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-5); align-items: start; }
 .rpt-column > h2 { margin-bottom: var(--space-4); }
 .rpt-card { padding: var(--space-5) var(--space-6); }
-.rpt-card strong { font-family: var(--font-display); font-weight: 600; }
+.rpt-card strong { font-family: var(--font-ui); font-weight: 600; }
+/* every template card keeps room for three lines of description, so the cards of a row start and end level */
+.rpt-card > div:first-child > .hint { min-height: 3lh; }
+.rpt-column { gap: var(--space-6); }
 
 /* Lateral movement: the three initiator rankings side by side, one column when narrow. A long account or process
    name wraps inside its cell (never cut, never widening the page). */

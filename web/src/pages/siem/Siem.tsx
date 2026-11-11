@@ -146,7 +146,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
 
   return (
     <div className="card stack" data-role="siem-destination" data-name={d.name}>
-      <div className="row">
+      <div className="row card-head">
         <label className="check">
           <input type="checkbox" name="siem_dest_enabled" checked={d.enabled} onChange={(e) => set("enabled", e.target.checked)} />
           {t("siem_dest_enabled")}
@@ -299,10 +299,12 @@ export function Siem() {
       <h1>{t("nav_siem")}</h1>
       <p className="hint">{t("siem_intro")}</p>
       <div className="card stack">
-        <div className="row">
+        <div className="row card-head">
           <h2>{t("siem_status_title")}</h2>
-          <button type="button" className="btn-quiet" onClick={loadStatus}>{t("siem_refresh")}</button>
-          <Link to="/siem/dlq">{t("siem_dlq_title")}</Link>
+          <span className="row">
+            <Link to="/siem/dlq">{t("siem_dlq_title")}</Link>
+            <button type="button" className="btn-quiet" onClick={loadStatus}>{t("siem_refresh")}</button>
+          </span>
         </div>
         {status && !status.enabled && <p className="notice" data-role="siem-off">{t("siem_off")}</p>}
         {status && <StatusTable status={status} />}

@@ -166,6 +166,8 @@ export interface Column<R> {
   label: string;
   /** num: right-aligned figures; time: one line, digits of one width; mono: a value to copy (address, port, href). */
   kind?: "text" | "num" | "time" | "mono";
+  /** A short state or word that must not break across lines. */
+  nowrap?: boolean;
   render: (row: R) => ReactNode;
 }
 
@@ -193,7 +195,7 @@ export function DataTable<R>({ columns, rows, rowKey, empty, onRowClick, selecte
               <tr key={key} data-row={key} aria-selected={selected === key}
                   className={onRowClick ? "clickable" : undefined}
                   onClick={onRowClick ? () => onRowClick(r) : undefined}>
-                {columns.map((c) => <td key={c.key} data-kind={c.kind ?? "text"}>{c.render(r)}</td>)}
+                {columns.map((c) => <td key={c.key} data-kind={c.kind ?? "text"} data-nowrap={c.nowrap || undefined}>{c.render(r)}</td>)}
               </tr>
             );
           })}

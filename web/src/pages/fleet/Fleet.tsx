@@ -482,12 +482,12 @@ function Fleet() {
                      disabled={!chosen.has(h.key) && chosen.size >= MAX} onChange={() => toggle(h)} />) },
             { key: "host", label: t("fleet_col_host"), render: (h) => (
               <Link to={`/hosts?key=${encodeURIComponent(h.key)}`}>{hostName(h.name, h.key)}</Link>) },
-            { key: "mode", label: t("hosts_mode"), render: (h) => modeWord(h.mode) },
-            { key: "online", label: t("fleet_tally_online"), render: (h) => word(ONLINE_KEYS, h.online) },
+            { key: "mode", label: t("hosts_mode"), nowrap: true, render: (h) => modeWord(h.mode) },
+            { key: "online", label: t("fleet_tally_online"), nowrap: true, render: (h) => word(ONLINE_KEYS, h.online) },
             { key: "beat", label: t("fleet_col_heartbeat"), kind: "time", render: (h) => (h.last_heartbeat_at ? formatTime(h.last_heartbeat_at, lang) : "—") },
             { key: "sync", label: t("hosts_policy_sync"), render: (h) => (
               <span>{h.policy_sync_state ?? "—"}{h.problems.length ? ` · ${h.problems.map((p) => word(PROBLEM_KEYS, p)).join("、")}` : ""}</span>) },
-            { key: "version", label: t("fleet_tally_versions"), render: (h) => h.ven_version ?? "—" },
+            { key: "version", label: t("fleet_tally_versions"), nowrap: true, render: (h) => h.ven_version ?? "—" },
             { key: "os", label: t("fleet_tally_os"), render: (h) => h.os_id ?? "—" },
             { key: "env", label: t("fleet_col_env"), render: (h) => h.env ?? "—" },
             { key: "app", label: t("fleet_col_app"), render: (h) => h.app ?? "—" },
