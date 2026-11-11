@@ -64,7 +64,7 @@ def test_from_alert_dimensions_ranking_events(context, live_app):
     page.wait_for_selector("[data-chip^='dst:h:']")
 
     # events mode swaps the panel to event dimensions
-    page.click("text=Events")
+    page.get_by_role("button", name="Events", exact=True).click()  # the mode, not the page's purpose line that names events
     page.wait_for_selector("[data-dim=event_type]")
     assert page.locator("[data-dim=dst_host]").count() == 0
 

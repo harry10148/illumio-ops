@@ -340,7 +340,7 @@ export function RuleSchedules() {
   const o = view?.overview;
   return (
     <section className="page" data-role="rule-schedules">
-      <PageHead title={t("nav_rule_schedules")} sub={t("rs_sub")}>
+      <PageHead title={t("nav_rule_schedules")} purpose={t("purpose_rule_schedules")}>
         <Link to="/rule-schedules/rulesets" data-role="rs-browse-rulesets">{t("rs_browse_rulesets")}</Link>
         <ModeMark needs="basic" />
       </PageHead>

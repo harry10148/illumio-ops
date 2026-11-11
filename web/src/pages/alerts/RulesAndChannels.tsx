@@ -84,7 +84,7 @@ export function RulesAndChannels() {
   const pick = (next: Tab) => setParams(next === "rules" ? {} : { tab: next }, { replace: true });
   return (
     <section className="page" data-role="rules-and-channels">
-      <PageHead title={t("nav_alert_rules")} sub={t("rules_page_sub")} />
+      <PageHead title={t("nav_alert_rules")} purpose={t("purpose_alert_rules")} />
       <div className="chips-row tabs" role="tablist">
         <button type="button" role="tab" className="chip-btn" aria-pressed={tab === "rules"} aria-selected={tab === "rules"}
                 onClick={() => pick("rules")} data-tab="rules">{t("rules_tab_rules")}</button>

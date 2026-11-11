@@ -9,6 +9,7 @@ import type {
   SiemDestinationInput, SiemSettingsInput, SiemSettingsView, SiemSourceStatus, SiemStatusView, SiemTestView,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Disclosure, Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
@@ -278,7 +279,7 @@ export function Siem() {
   if (!view || !siem) {
     return (
       <section className="page">
-        <h1>{t("nav_siem")}</h1>
+        <div className="page-title"><h1>{t("nav_siem")}</h1><Purpose>{t("purpose_siem")}</Purpose></div>
         {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       </section>
     );
@@ -296,8 +297,8 @@ export function Siem() {
 
   return (
     <section className="page stack">
-      <h1>{t("nav_siem")}</h1>
-      <p className="hint">{t("siem_intro")}</p>
+      <div className="page-title"><h1>{t("nav_siem")}</h1><Purpose>{t("purpose_siem")}</Purpose></div>
+      <Disclosure><p className="hint">{t("siem_intro")}</p></Disclosure>
       <div className="card stack">
         <div className="row card-head">
           <h2>{t("siem_status_title")}</h2>

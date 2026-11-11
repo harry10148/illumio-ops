@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import { type ApiError, call } from "../../api/client";
 import type { DisplayView } from "../../api/generated";
+import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { notifyMeChanged } from "../../shell/Shell";
 import { registerNav } from "../../shell/nav";
@@ -43,7 +44,7 @@ export function Display() {
 
   return (
     <section className="page">
-      <h1>{t("nav_system_display")}</h1>
+      <div className="page-title"><h1>{t("nav_system_display")}</h1><Purpose>{t("purpose_system_display")}</Purpose></div>
       {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {view && (
         <form className="card form-grid" onSubmit={save}>

@@ -74,7 +74,7 @@ export default function LateralMovement() {
   }
 
   if (!page) {
-    return <section className="page"><PageHead title={t("nav_detect")} />
+    return <section className="page"><PageHead title={t("nav_detect")} purpose={t("purpose_detect")} />
       {error ? <p className="form-error">{t(error.message_key, error.params)}</p> : <p className="muted">{t("loading")}</p>}
     </section>;
   }
@@ -104,7 +104,7 @@ export default function LateralMovement() {
 
   return (
     <section className="page" data-role="lateral">
-      <PageHead title={t("nav_detect")} sub={t("detect_sub")} />
+      <PageHead title={t("nav_detect")} purpose={t("purpose_detect")} />
       <Surface page={page} />
       <div className="card stack" data-section="status">
         {page.state === "not_computed" && (

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { DetectorStatusView, KnownView, LabelChoice, LabelSelector, LateralSettings, LateralView, PortClass, PortEntry } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
@@ -293,7 +294,7 @@ export function Lateral() {
   if (!view || !settings) {
     return (
       <section className="page">
-        <h1>{t("nav_system_lateral")}</h1>
+        <div className="page-title"><h1>{t("nav_system_lateral")}</h1><Purpose>{t("purpose_system_lateral")}</Purpose></div>
         {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       </section>
     );
@@ -310,7 +311,7 @@ export function Lateral() {
   };
   return (
     <section className="page stack">
-      <h1>{t("nav_system_lateral")}</h1>
+      <div className="page-title"><h1>{t("nav_system_lateral")}</h1><Purpose>{t("purpose_system_lateral")}</Purpose></div>
       <div className="card" data-role="lateral-status">
         <h2>{t("lateral_status_title")}</h2>
         {!st.collected && (

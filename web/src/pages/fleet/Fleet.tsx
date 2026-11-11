@@ -10,7 +10,7 @@ import type {
   RateCheck, Tally,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { DataTable, KpiStrip, PageHead, Panel } from "../../components/ui";
+import { DataTable, Disclosure, KpiStrip, PageHead, Panel } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { word } from "../alerts/common";
@@ -411,7 +411,7 @@ function Fleet() {
   const set = (k: keyof Filter) => (v: string) => setFilter({ ...filter, [k]: v });
   return (
     <section className="page" data-role="fleet">
-      <PageHead title={t("nav_fleet")} sub={t("fleet_sub")} />
+      <PageHead title={t("nav_fleet")} purpose={t("purpose_fleet")} />
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {o && <p className="hint" data-role="fleet-fetched">{o.fetched_at ? t("fleet_inventory_at", { at: formatTime(o.fetched_at, lang) }) : t("fleet_inventory_never")}</p>}
       <KpiStrip items={[
@@ -421,7 +421,7 @@ function Fleet() {
         { key: "unknown", label: t("fleet_online_unknown"), value: o ? o.online.unknown ?? 0 : null },
         { key: "sync", label: t("fleet_kpi_sync"), value: o ? o.sync_problems : null, tone: o?.sync_problems ? "high" : "muted" },
       ]} />
-      <p className="hint">{t("fleet_online_rule")}</p>
+      <Disclosure summary={t("fleet_online_title")}><p className="hint">{t("fleet_online_rule")}</p></Disclosure>
       {o && (
         <div className="host-grid" data-role="fleet-tallies">
           <TallyTable title={t("fleet_tally_modes")} role="fleet-modes" rows={o.modes} wordOf={modeWord} />

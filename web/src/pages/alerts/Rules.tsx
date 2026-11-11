@@ -4,7 +4,7 @@ import { Link, Navigate } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { EvaluateRequested, RuleListItem, RulesView } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { Switch } from "../../components/ui";
+import { Disclosure, Switch } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { STATUS_KEYS, TYPE_KEYS, word } from "./common";
@@ -86,7 +86,7 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {view && (
         <>
-          <div className="card stack" data-role="pack">
+          <Disclosure role="pack" summary={t("rules_pack_title")} open={view.pack_missing > 0 || confirm !== null}>
             <p className="hint">{t("rules_pack_hint")}</p>
             {view.pack_missing > 0 && <p className="notice">{t("rules_pack_missing", { n: String(view.pack_missing) })}</p>}
             {confirm ? (
@@ -101,7 +101,7 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
                 <button type="button" className="btn-quiet" onClick={() => setConfirm("replace")}>{t("rules_pack_replace")}</button>
               </div>
             )}
-          </div>
+          </Disclosure>
           <label className="row" data-role="rule-type-filter-row">
             {t("rules_filter_type")}
             <select data-role="rule-type-filter" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>

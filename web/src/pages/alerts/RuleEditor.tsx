@@ -7,6 +7,7 @@ import type {
   ThresholdType,
 } from "../../api/generated";
 import { ConditionEditor, NO_CHOICES, Side } from "../../components/ConditionEditor";
+import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
@@ -102,7 +103,7 @@ export function RuleEditor() {
   if (!rule || revision === null) {
     return (
       <section className="page">
-        <h1>{t("rule_editor_title")}</h1>
+        <div className="page-title"><h1>{t("rule_editor_title")}</h1><Purpose>{t("purpose_rule_editor")}</Purpose></div>
         {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       </section>
     );
@@ -140,7 +141,7 @@ export function RuleEditor() {
   return (
     <section className="page stack">
       <p><Link to="/alerts/rules">{t("rules_back")}</Link></p>
-      <h1>{id === "new" ? t("rule_editor_new") : t("rule_editor_title")}</h1>
+      <div className="page-title"><h1>{id === "new" ? t("rule_editor_new") : t("rule_editor_title")}</h1><Purpose>{t("purpose_rule_editor")}</Purpose></div>
       <form className="card stack" onSubmit={save} data-role="rule-editor">
         {id === "new" && (
           <label>

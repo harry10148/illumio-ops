@@ -52,7 +52,7 @@ export function Rulesets() {
 
   return (
     <section className="page stack" data-role="rulesets">
-      <PageHead title={t("rsb_title")} sub={t("rsb_sub")}>
+      <PageHead title={t("rsb_title")} purpose={t("purpose_rulesets")}>
         <Link to="/rule-schedules">{t("rsb_back")}</Link>
       </PageHead>
       <form className="row" onSubmit={search}>

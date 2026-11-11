@@ -2,6 +2,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { type ApiError, call } from "../../api/client";
 import type { LogLines, LogQuery } from "../../api/generated";
+import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
@@ -41,7 +42,7 @@ export function Logs() {
 
   return (
     <section className="page stack">
-      <h1>{t("nav_system_logs")}</h1>
+      <div className="page-title"><h1>{t("nav_system_logs")}</h1><Purpose>{t("purpose_system_logs")}</Purpose></div>
       <form className="card form-grid" onSubmit={submit}>
         <label>
           {t("logs_level")}

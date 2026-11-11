@@ -8,7 +8,7 @@ import type {
   Coverage, DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostHit, HostProfile as Profile, HostRansomware, HostTamper, PullInfo, QuarantineAction, QuarantineOutcome, RankedValue, SegmentDimension,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { HostName, NeedsAdvanced, PageHead, Panel, SeverityTag } from "../../components/ui";
+import { HostName, NeedsAdvanced, PageHead, Panel, Purpose, SeverityTag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, word } from "../alerts/common";
@@ -500,7 +500,7 @@ export function HostProfile() {
     <section className="page" data-role="host-profile">
       <p><Link to="/hosts">{t("hosts_back_to_search")}</Link></p>
       <div className="page-head">
-        <h1>{seenAs ?? profile.name}</h1>
+        <div><h1>{seenAs ?? profile.name}</h1><Purpose>{t("purpose_host")}</Purpose></div>
         <label>
           {t("wb_period")}
           <select name="period" value={hours} onChange={(e) => setHours(Number(e.target.value))}>
@@ -591,7 +591,7 @@ function HostSearchPage() {
   }, [q]);
   return (
     <section className="page" data-role="host-search">
-      <PageHead title={t("nav_hosts")} sub={t("hosts_search_sub")} />
+      <PageHead title={t("nav_hosts")} purpose={t("purpose_hosts")} />
       <label className="block">
         {t("hosts_search_label")}
         <input name="host_q" value={q} maxLength={200} placeholder={t("hosts_search_placeholder")}

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { type ApiError, call } from "../../api/client";
 import type { JobView } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
@@ -53,7 +54,7 @@ export function Jobs() {
 
   return (
     <section className="page">
-      <h1>{t("nav_system_jobs")}</h1>
+      <div className="page-title"><h1>{t("nav_system_jobs")}</h1><Purpose>{t("purpose_system_jobs")}</Purpose></div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {jobs && (
         <div className="card table-wrap">

@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { type ApiError, call } from "../../api/client";
 import type { PceConnection as Conn, ProbeRun } from "../../api/generated";
 import { ProbeResults } from "../../components/ProbeResults";
+import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
@@ -149,7 +150,7 @@ export function PceConnection() {
 
   return (
     <section className="page">
-      <h1>{t("nav_system_pce")}</h1>
+      <div className="page-title"><h1>{t("nav_system_pce")}</h1><Purpose>{t("purpose_system_pce")}</Purpose></div>
       <form className="card form-grid" onSubmit={save}>
         <label>
           {t("pce_url")}

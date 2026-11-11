@@ -155,7 +155,7 @@ export function AlertsHome() {
   const categories = basic ? BASIC_CATEGORIES : ALL_CATEGORIES;
   return (
     <section className="page" data-role="alerts-home">
-      <PageHead title={t("nav_alerts")} sub={t("alerts_home_sub", { n: days })}>
+      <PageHead title={t("nav_alerts")} purpose={t("purpose_alerts")}>
         <label className="inline-label">
           {t("alerts_period")}
           <select name="days" value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }}>

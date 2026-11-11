@@ -217,16 +217,40 @@ export function DetailPane({ label, onClose, children }: { label: string; onClos
   );
 }
 
-export function PageHead({ title, sub, children }: { title: string; sub?: ReactNode; children?: ReactNode }) {
+/** What the page is for, in one sentence under its name (purpose-led UI spec §5.5). */
+export function Purpose({ children }: { children: ReactNode }) {
+  return <p className="page-sub" data-role="page-purpose">{children}</p>;
+}
+
+/** The head of every page: its name, the question it answers, and on the right the controls of the whole page. */
+export function PageHead({ title, purpose, children }: { title: string; purpose: string; children?: ReactNode }) {
   return (
     <header className="page-head console-head">
       <div>
         <h1>{title}</h1>
-        {sub && <div className="page-sub">{sub}</div>}
+        <Purpose>{purpose}</Purpose>
       </div>
       {children && <div className="page-actions">{children}</div>}
     </header>
   );
+}
+
+/** A long explanation starts closed; what changes how the numbers are read (a gap, a limit, a missing mode) is never
+ * put in one. */
+export function Disclosure({ summary, children, role, open }: {
+  summary?: string; children: ReactNode; role?: string; /** Starts open: something inside needs the reader now. */ open?: boolean;
+}) {
+  return (
+    <details className="disclosure" data-role={role} open={open || undefined}>
+      <summary>{summary ?? t("ui_what_is_this")}</summary>
+      <div className="disclosure-body">{children}</div>
+    </details>
+  );
+}
+
+/** Nothing to list: why, and where to go next. */
+export function EmptyState({ text, children }: { text: string; children?: ReactNode }) {
+  return <div className="empty-state" data-role="empty-state"><span>{text}</span>{children && <> {children}</>}</div>;
 }
 
 export function Panel({ title, meta, children, role }: { title: string; meta?: ReactNode; children: ReactNode; role?: string }) {

@@ -2,6 +2,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { type ApiError, call, setCsrfToken } from "../../api/client";
 import type { SecurityView } from "../../api/generated";
+import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { notifyMeChanged } from "../../shell/Shell";
 import { registerNav } from "../../shell/nav";
@@ -149,7 +150,7 @@ export function Security() {
 
   return (
     <section className="page stack">
-      <h1>{t("nav_system_security")}</h1>
+      <div className="page-title"><h1>{t("nav_system_security")}</h1><Purpose>{t("purpose_system_security")}</Purpose></div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {view && (
         <>

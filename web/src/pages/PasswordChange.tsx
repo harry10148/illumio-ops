@@ -36,7 +36,8 @@ export function PasswordChange({ requireOld, onChanged }: Props) {
 
   return (
     <form className="card auth-card" onSubmit={submit}>
-      <h1>{t("pw_change_title")}</h1>
+      {/* inside the Security page (the old password is asked for) this is a section, not the page */}
+      {requireOld ? <h2>{t("pw_change_title")}</h2> : <h1>{t("pw_change_title")}</h1>}
       {!requireOld && <p className="muted">{t("pw_change_intro")}</p>}
       {requireOld && (
         <label>

@@ -6,7 +6,7 @@ import type {
   AggRow, DimensionTop, EventRow, FlowRow, PeerPrecedent, PullInfo, SegmentDimension, SegmentMetric, SegmentResult, WorkbenchMeta,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { Reason } from "../../components/ui";
+import { Purpose, Reason } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { QuarantineDialog, type QuarantineHost } from "../quarantine/QuarantineDialog";
@@ -392,7 +392,7 @@ export function Workbench() {
     <section className="page wb" data-role="workbench">
       {alertId && <p><Link to={`/alerts/${alertId}`} data-role="back-to-alert">{t("wb_back_to_alert", { id: alertId })}</Link></p>}
       <div className="page-head">
-        <h1>{t("nav_workbench")}</h1>
+        <div className="page-title"><h1>{t("nav_workbench")}</h1><Purpose>{t("purpose_investigate")}</Purpose></div>
         <div className="chips-row" role="group" aria-label={t("wb_mode")}>
           <button type="button" className="chip-btn" aria-pressed={req.mode === "flows"} onClick={() => switchMode("flows")}>
             {t("wb_mode_flows")}

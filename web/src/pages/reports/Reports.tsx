@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { BulkDeleted, Catalog, CatalogEntry, FlowCondition, ReportItem, ReportPage } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { ModeMark, PageHead, Tag } from "../../components/ui";
+import { EmptyState, ModeMark, PageHead, Tag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import {
@@ -247,7 +247,9 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
     setConfirming(false);
   };
 
-  if (data.items.length === 0) return <p className="muted">{t("gui_reports_none")}</p>;
+  if (data.items.length === 0) {
+    return <EmptyState text={t("gui_reports_none")}><Link to="/reports">{t("gui_reports_none_next")}</Link></EmptyState>;
+  }
   return (
     <>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
@@ -403,7 +405,7 @@ export function Reports() {
   );
   return (
     <section className="page stack" data-role="reports-page">
-      <PageHead title={t("nav_reports")} sub={t("rpt_page_sub")} />
+      <PageHead title={t("nav_reports")} purpose={t("purpose_reports")} />
       <div className="chips-row tabs" role="tablist">
         {tabButton("templates", "rpt_tab_templates")}
         {tabButton("schedules", "gui_reports_tab_schedules")}

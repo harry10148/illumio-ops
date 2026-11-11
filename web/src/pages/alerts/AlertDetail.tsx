@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { AlertDetail as Detail, AlertEvidence, PolicyExplanation, RuleRef } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { DELIVERY_TONES, SEVERITY_KEYS, SEVERITY_TONES, deliveryText, word } from "./common";
@@ -191,7 +192,7 @@ export function AlertDetail() {
   if (!d) {
     return (
       <section className="page">
-        <h1>{t("alert_detail_title")}</h1>
+        <div className="page-title"><h1>{t("alert_detail_title")}</h1><Purpose>{t("purpose_alert_detail")}</Purpose></div>
         {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       </section>
     );
@@ -200,7 +201,7 @@ export function AlertDetail() {
     <section className="page stack" data-role="alert-detail">
       <p><Link to="/">{t("alert_back")}</Link></p>
       <div className="page-head">
-        <h1>{d.rule_name}</h1>
+        <div className="page-title"><h1>{d.rule_name}</h1><Purpose>{t("purpose_alert_detail")}</Purpose></div>
         {d.evidence_kind && (
           <Link className="btn-primary" to={`/investigate?alert=${id}`} data-role="open-workbench">{t("alert_open_workbench")}</Link>
         )}

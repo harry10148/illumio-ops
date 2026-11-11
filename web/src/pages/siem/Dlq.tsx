@@ -7,6 +7,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { DlqDetail, DlqPage, SiemSettingsView } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
@@ -79,7 +80,7 @@ export function Dlq() {
   const exportHref = `/siem/dlq/export${exportQuery ? `?${exportQuery}` : ""}`;
   return (
     <section className="page stack">
-      <h1>{t("siem_dlq_title")}</h1>
+      <div className="page-title"><h1>{t("siem_dlq_title")}</h1><Purpose>{t("purpose_siem_dlq")}</Purpose></div>
       <p className="hint">{t("siem_dlq_intro")} <Link to="/siem">{t("nav_siem")}</Link></p>
       <div className="row">
         <label>{t("siem_col_destination")}

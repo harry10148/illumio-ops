@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { type ApiError, call } from "../../api/client";
 import type { CollectionMode, CollectionSettings, CollectionStatus, SourceStatus } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { Modes } from "./Modes";
@@ -262,7 +263,7 @@ export function Collection() {
 
   return (
     <section className="page stack">
-      <h1>{t("nav_system_collection")}</h1>
+      <div className="page-title"><h1>{t("nav_system_collection")}</h1><Purpose>{t("purpose_system_collection")}</Purpose></div>
       <Modes />
       {status && (
         <div className="card" data-role="collection-status">

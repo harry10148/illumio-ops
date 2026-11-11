@@ -105,7 +105,16 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .kpi-reason { min-height: 27px; display: flex; align-items: center; }
 .kpi-delta { color: var(--text-3); font-size: var(--fs-micro); }
 .console-head { padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); margin-bottom: var(--space-6); }
-.page-sub { color: var(--text-2); font-size: var(--fs-body); margin-top: var(--space-1); }
+.page-sub { color: var(--text-2); font-size: var(--fs-body); margin: var(--space-1) 0 0; }
+/* a page's name with its purpose under it, where the page writes its own head */
+.page-title h1 { margin: 0; }
+/* a long explanation, closed until asked for */
+.disclosure > summary { cursor: pointer; color: var(--text-2); font-size: var(--fs-body); width: fit-content; }
+.disclosure > summary:hover { color: var(--text-1); }
+.disclosure[open] > summary { margin-bottom: var(--space-4); }
+.disclosure-body { display: grid; gap: var(--space-4); }
+.disclosure-body p { margin: 0; }
+.empty-state { padding: var(--space-6); border: 1px dashed var(--line-strong); border-radius: var(--radius-l); color: var(--text-2); }
 .page-actions { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
 .panel { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-l); min-width: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-5);
