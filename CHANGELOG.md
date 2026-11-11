@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.6.0] - 2026-11-11
+
+Report content: a report reads from its title to its end with no optional setting made; shorter; easier to scan.
+
+### Changed
+
+- A part of a report that an unset optional setting, an analysis not yet run, or an unsupported PCE takes away is
+  left out — its key number, its section, its table column — and one data note says what is missing, why, and for a
+  setting where to make it. Before, such parts were panels reading "not computed" and the opening sentence read
+  "could not be computed". Lateral posture (critical assets, admin groups, exposure), ransomware (no analysis: the
+  title and the reason; no kept traffic: one "unprotected services" list in place of three empty ones), security
+  risk, app summary and VEN status.
+- A section that was computed and holds nothing gives up its panel and becomes a line in a closing section "Nothing
+  to show this period". A table column blank on every row is not printed.
+- A key number with no previous period prints nothing under it; the data notes say once that there is none.
+- The closing "rules" section of the traffic, security risk, network inventory and app summary reports lists only
+  the rules the summary's findings do not already show (those five no longer appear with their rule ids).
+- Long lists: the HTML prints the rows that matter and the XLSX holds them all — the ransomware per-service table
+  (services that lower a score), the unmanaged endpoints report (the count of every address, the first 20 public
+  ones). With no XLSX made, the HTML keeps its rows. New-connection findings are one per service, with a count.
+  Rule hit count gives the number of pending items and points to the policy usage report.
+- Presentation: a share column draws a bar beside its number; two narrow tables share a row; an action every row
+  repeats is said once above the table; the readiness scores are a verdict table and a table of what each rests
+  on; each part of the maturity score shows its share of full marks; the traffic report draws connections per day
+  and says what the PCE's Unknown decision is and how many records carry it.
+
+### Fixed
+
+- Alert rules: the list no longer prints "status all; event severity all" on every event rule, and its short column
+  headers stay on one line.
+- A report with no sections printed an empty "Contents" heading; a report email with no key number printed a
+  "Key metrics" heading over nothing.
+
 ## [6.5.0] - 2026-11-11
 
 What the specification asked for and the 2026-11-10 audit found missing.

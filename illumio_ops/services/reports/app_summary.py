@@ -178,7 +178,7 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
         report_type=inp.params.report_type, lang=lang, title=title, period_start=inp.start, period_end=inp.end,
         generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
         findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
-        data_quality=(*quality, *(() if hosts else (hint(lang, "rpt_hint_pending_app_hosts", app=app_name),)),
+        data_quality=(*quality, *(() if hosts else (hint(lang, "rpt_hint_pending_app_hosts", labels=", ".join(f"{k}={v}" for k, v in conds.items())),)),
                       *flowsections.no_links_note(inp)),
         sections=(
             Section(id="inbound", title=t("rpt_app_sec_inbound"), intro=t("rpt_app_inbound_intro"),

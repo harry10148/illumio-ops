@@ -374,7 +374,9 @@ class _Builder:
         if not self.critical_set:
             lines.append(hint(self.lang, "rpt_hint_unset_critical_assets"))
         stale_admin = [f"{k}={v}" for which, k, v in lc.stale if which == "admin_groups"]
-        if stale_admin:
+        if stale_admin and len(stale_admin) < len(lc.settings.admin_groups):  # some remain: the detection runs
+            lines.append(hint(self.lang, "rpt_hint_unset_admin_groups_partly", labels=", ".join(stale_admin)))
+        elif stale_admin:
             lines.append(hint(self.lang, "rpt_hint_unset_admin_groups_stale", labels=", ".join(stale_admin)))
         elif not lc.settings.admin_groups:
             lines.append(hint(self.lang, "rpt_hint_unset_admin_groups"))

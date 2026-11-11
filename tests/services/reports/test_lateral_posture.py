@@ -329,3 +329,19 @@ def test_initiators_section_is_the_pages_ranking(ctx, monkeypatch):
     assert tables[1].empty_text == "No management-port flow record names a process."
     # a read that stopped at its limit never reads as "none" or as the whole list
     assert "first 50" in tables[1].limit_note and "first 1000 accounts" in tables[2].limit_note
+
+
+def test_admin_groups_with_one_label_gone_still_detect(tmp_path):
+    """The detector is off only when every admin-group Label is gone (services/analysis/detect.py): with one left
+    the note says the detection judges by the rest, not that it did not run."""
+    from illumio_ops.store.flowdb.labels import label_set_id
+    c = configured_ctx(tmp_path)
+    _hosts(c)
+    with c.flows().connect() as conn:  # a host carries app=Finance: that Label exists
+        conn.execute("UPDATE workloads SET label_set = ? WHERE href = ?", (label_set_id(conn, (("app", "Finance"),)), DB))
+        conn.commit()
+    c.settings.update(c.settings.current().revision, lambda d: d["lateral"].update(
+        admin_groups=[{"key": "app", "value": "Finance"}, {"key": "role", "value": "NoSuchLabel"}]))
+    notes = [q for q in build_lateral_posture(_inp(c)).data_quality if "admin group" in q.lower()]
+    assert len(notes) == 1 and "role=NoSuchLabel" in notes[0] and "app=Finance" not in notes[0]
+    assert "remaining" in notes[0] and "did not run" not in notes[0]

@@ -228,3 +228,18 @@ def test_a_report_without_sections_has_no_empty_table_of_contents():
     assert "Contents" not in out and "<ol>" not in out and "print-btn" in out
     out = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(TextBlock(paragraphs=("x",)),)),)), tz=UTC)
     assert "<ol>" in out.split("</style>")[-1]
+
+
+def test_without_an_xlsx_beside_it_the_html_keeps_its_rows():
+    """A table that leaves rows to the XLSX (html_rows) prints them when no XLSX is made, and a cut table does not
+    point at a sheet that does not exist."""
+    t = _tbl(_cols("a", "b"), [(f"row{i}", i) for i in range(3)]).model_copy(
+        update={"html_rows": 0, "html_note": "Left to the sheet."})
+    doc = make_doc(sections=(Section(id="s", title="S", blocks=(t,)),))
+    with_xlsx = render_html(doc, tz=UTC).split("</style>")[-1]
+    assert "row2" not in with_xlsx and "Left to the sheet." in with_xlsx and 'data-role="xlsx-only"' in with_xlsx
+    alone = render_html(doc, tz=UTC, xlsx=False).split("</style>")[-1]
+    assert "row2" in alone and "Left to the sheet." not in alone and "XLSX" not in alone
+    long = make_doc(sections=(Section(id="s", title="S", blocks=(_tbl(_cols("a", "b"), [(f"r{i}", i) for i in range(260)]),)),))
+    cut = render_html(long, tz=UTC, xlsx=False).split("</style>")[-1]
+    assert "no XLSX was made" in cut and "XLSX sheet" not in cut

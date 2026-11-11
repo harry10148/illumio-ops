@@ -19,6 +19,7 @@ from illumio_ops.domain.report import (
     TableBlock,
     TextBlock,
 )
+from illumio_ops.domain.values import ReportType
 from illumio_ops.services.reports.common import tr
 
 NOTHING = "nothing"  # the closing section's id
@@ -63,6 +64,8 @@ def finish(doc: ReportDocument) -> ReportDocument:
         notes.append(tr(doc.lang, "rpt_quality_no_previous"))
     kept = [s for s in doc.sections if not holds_nothing(s)]
     folded = [s for s in doc.sections if holds_nothing(s)]
+    if doc.report_type is ReportType.CUSTOM:  # the operator's own sections, counted in the sentence, each with its link
+        kept, folded = list(doc.sections), []
     if folded and kept:  # a report with nothing at all keeps its sections: each says why it is empty
         kept.append(Section(id=NOTHING, title=tr(doc.lang, "rpt_sec_nothing"), intro=tr(doc.lang, "rpt_nothing_intro"),
                             blocks=(TextBlock(paragraphs=tuple(_line(s) for s in folded)),)))

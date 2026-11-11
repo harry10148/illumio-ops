@@ -347,9 +347,9 @@ def _file_name(doc: ReportDocument, report_id: int, fmt: ReportFormat, tz: tzinf
     return f"{doc.report_type.value}-{last_day:%Y%m%d}-{report_id}.{fmt.value}"
 
 
-def _render(doc: ReportDocument, fmt: ReportFormat, tz: tzinfo | None) -> bytes:
+def _render(doc: ReportDocument, fmt: ReportFormat, tz: tzinfo | None, *, xlsx: bool = True) -> bytes:
     if fmt is ReportFormat.HTML:
-        return render_html(doc, tz=tz).encode("utf-8")
+        return render_html(doc, tz=tz, xlsx=xlsx).encode("utf-8")
     if fmt is ReportFormat.XLSX:
         return render_xlsx(doc, tz=tz)
     if doc.export is None:
@@ -374,7 +374,7 @@ def _write(out_dir: Path, doc: ReportDocument, report_id: int, formats: tuple[Re
     out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     names = []
     for fmt in formats:
-        data = _render(doc, fmt, tz)
+        data = _render(doc, fmt, tz, xlsx=ReportFormat.XLSX in formats)
         name = _file_name(doc, report_id, fmt, tz)
         part = out_dir / (name + ".part")
         fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

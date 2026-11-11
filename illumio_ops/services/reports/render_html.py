@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import re
+from contextvars import ContextVar
 from datetime import datetime, tzinfo
 from functools import cache
 from importlib import resources
@@ -147,6 +148,7 @@ def _cell(col: Column, value: Cell, tz: tzinfo | None, lang: Language) -> str:
     return _esc(text)
 
 
+_XLSX_BESIDE: ContextVar[bool] = ContextVar("xlsx_beside", default=True)  # for the length of one render_html call
 _SHARE = re.compile(r"^(\d{1,3}(?:\.\d+)?)%$")
 SAME_ON_EVERY_ROW = frozenset({"action"})  # columns said once above the table when every row says the same
 
@@ -182,7 +184,9 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language) -> str:
     if not t.rows:
         return (head + limit + '<div class="report-table-panel report-table-panel--empty" data-empty="true">'
                 f'<span class="empty-text">{_esc(t.empty_text)}</span></div>')
-    shown = t.rows[:HTML_ROW_CAP if t.html_rows is None else min(HTML_ROW_CAP, t.html_rows)]
+    beside = _XLSX_BESIDE.get()
+    own = t.html_rows if beside else None
+    shown = t.rows[:HTML_ROW_CAP if own is None else min(HTML_ROW_CAP, own)]
     if not shown:  # every row is in the XLSX only: the builder's sentence and where to find them
         return (head + limit + f'<p class="note" data-role="xlsx-only">{_esc(t.html_note or "")} '
                 f'{_esc(tr(lang, "rpt_rows_in_sheet", total=len(t.rows), sheet=sheet))}</p>')
@@ -210,9 +214,10 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language) -> str:
         for n, row in enumerate(shown))
     cap = ""
     if len(t.rows) > len(shown):
-        said = f"{t.html_note} " if t.html_note and t.html_rows is not None else ""
-        cap = (f'<p class="note">{_esc(said)}'
-               f'{_esc(tr(lang, "rpt_rows_capped", shown=len(shown), total=len(t.rows), sheet=sheet))}</p>')
+        said = f"{t.html_note} " if t.html_note and own is not None else ""
+        words = (tr(lang, "rpt_rows_capped", shown=len(shown), total=len(t.rows), sheet=sheet) if beside
+                 else tr(lang, "rpt_rows_capped_no_xlsx", shown=len(shown), total=len(t.rows)))
+        cap = f'<p class="note">{_esc(said)}{_esc(words)}</p>'
     table = (f'<div class="{panel}"><div class="report-table-wrap"><table class="report-table'
              f'{" report-table--interactive" if len(t.columns) >= 2 else ""}" data-column-count="{len(t.columns)}">'
              f"<colgroup>{cols}</colgroup><thead><tr>{ths}</tr></thead><tbody>{body}</tbody></table></div></div>")
@@ -300,7 +305,17 @@ def _top(doc: ReportDocument) -> str:
     return TOP_RULE[max((f.severity for f in doc.findings), key=SEVERITY_RANK.index)]
 
 
-def render_html(doc: ReportDocument, *, tz: tzinfo | None) -> str:
+def render_html(doc: ReportDocument, *, tz: tzinfo | None, xlsx: bool = True) -> str:
+    """xlsx: an XLSX of the same report is made beside this page. Without one, a table's html_rows is not applied
+    (its rows would be nowhere) and a cut table says only how many rows it shows."""
+    token = _XLSX_BESIDE.set(xlsx)
+    try:
+        return _render(doc, tz)
+    finally:
+        _XLSX_BESIDE.reset(token)
+
+
+def _render(doc: ReportDocument, tz: tzinfo | None) -> str:
     lang = doc.lang
     names = {id(t): n for (_, t), n in zip(doc.tables(), sheet_names([t.title for _, t in doc.tables()]),
                                             strict=True)}

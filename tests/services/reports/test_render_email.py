@@ -62,3 +62,16 @@ def test_html_escapes_and_uses_shell_colours_only():
 def test_zh_tw_body():
     r = render_email(make_doc(lang=Language.ZH_TW, kpis=KPIS), tz=UTC)
     assert "無上期資料" not in r.text and "［illumio-ops］" in r.subject
+
+
+def test_a_report_with_no_key_number_prints_no_heading_over_nothing():
+    """6.6.0: a report where nothing was computed (ransomware before its analysis) has a sentence, the reason in
+    the data notes, and no "Key metrics" heading with nothing under it."""
+    doc = make_doc(kpis=(), data_quality=("The ransomware analysis has not been computed yet.",)).model_copy(
+        update={"conclusion": "No ransomware protection analysis result for this period; the data notes say why."})
+    r = render_email(doc, tz=UTC)
+    assert "Key metrics" not in r.text and "Key metrics" not in r.html
+    for part in (r.text, r.html):
+        assert "the data notes say why" in part and "has not been computed yet" in part
+    one = render_email(make_doc(kpis=KPIS[:1]), tz=UTC)
+    assert "Key metrics" in one.text and "()" not in one.text

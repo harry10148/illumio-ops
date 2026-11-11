@@ -61,7 +61,8 @@ def render_email(doc: ReportDocument, *, tz: tzinfo | None, note: str | None = N
     lines = [f"{doc.title}  {period}", f"PCE: {doc.pce_label}", ""]
     if doc.conclusion:
         lines += [doc.conclusion, ""]
-    lines.append(tr(lang, "rpt_mail_kpis"))
+    if doc.kpis:  # a report with no key number (nothing computed) prints no heading over nothing
+        lines.append(tr(lang, "rpt_mail_kpis"))
     for k in doc.kpis[:4]:
         trend = kpi_trend(k, lang)
         extra = "; ".join(x for x in (trend, k.note or "") if x)
@@ -102,9 +103,9 @@ def render_email(doc: ReportDocument, *, tz: tzinfo | None, note: str | None = N
         f'<h2 style="margin:0 0 4px">{_e(doc.title)}</h2>'
         f'<div style="color:{t["text-3"]};font-size:12px">{_e(period)} · PCE {_e(doc.pce_label)}</div>'
         + (f'<p style="font-size:16px;font-weight:600;margin:12px 0">{_e(doc.conclusion)}</p>' if doc.conclusion else "")
-        + f'<h3>{_e(tr(lang, "rpt_mail_kpis"))}</h3>'
-        f'<table style="border-collapse:collapse;width:100%"><tr>{kpi_cells}</tr></table>'
-        f'<h3>{_e(tr(lang, "rpt_findings_title"))}</h3>{findings}'
+        + (f'<h3>{_e(tr(lang, "rpt_mail_kpis"))}</h3>'
+           f'<table style="border-collapse:collapse;width:100%"><tr>{kpi_cells}</tr></table>' if kpi_cells else "")
+        + f'<h3>{_e(tr(lang, "rpt_findings_title"))}</h3>{findings}'
         f'<p style="color:{t["text-3"]};font-size:12px;border-top:1px dashed {t["line"]};padding-top:6px">'
         f'{_e(tr(lang, "rpt_data_quality_title"))}: {_e(quality)}'
         + (f"<br>{_e(note)}" if note else "") + f"</p><p>{link}</p></div>")

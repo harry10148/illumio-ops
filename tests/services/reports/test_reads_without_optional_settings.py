@@ -134,3 +134,37 @@ def test_a_column_blank_on_every_row_is_not_printed():
     out = finish(doc).sections[0].blocks
     assert [c.key for c in out[0].columns] == ["a", "c"] and out[0].rows == (("x", 0), ("y", 2))  # 0 is a value
     assert out[1] == blank  # nothing left to print: left as it was
+
+
+def test_a_custom_report_keeps_every_section_it_was_given():
+    """The operator chose the sections and the opening sentence counts them: an empty one is not folded away."""
+    from illumio_ops.domain.report import Column, ReportDocument, Section, TableBlock
+    col = (Column(key="a", label="A"),)
+    full = Section(id="s1", title="Full", blocks=(TableBlock(title="t", columns=col, rows=(("x",),), total_rows=1,
+                                                             empty_text="-"),))
+    none = Section(id="s2", title="None", workbench_link="https://x/investigate?q=1",
+                   blocks=(TableBlock(title="t", columns=col, rows=(), total_rows=0, empty_text="Nothing matched."),))
+    doc = ReportDocument(report_type=ReportType.CUSTOM, lang=Language.EN, title="T", period_start=START, period_end=END,
+                         generated_at=NOW, pce_label="pce", kpis=(), findings=(), data_quality=(), sections=(full, none))
+    out = finish(doc)
+    assert [s.id for s in out.sections] == ["s1", "s2"] and out.sections[1].workbench_link
+
+
+OWN_ANALYSIS = [ReportType.LATERAL_POSTURE, ReportType.RANSOMWARE, ReportType.SECURITY_RISK, ReportType.VEN_STATUS]
+
+
+@pytest.fixture(scope="module")
+def full(tmp_path_factory):
+    yield from rich.ctx.__wrapped__(tmp_path_factory)
+
+
+@pytest.mark.parametrize("rt", OWN_ANALYSIS)
+def test_what_the_bare_report_leaves_out_has_a_note(bare, full, rt):
+    """Gate for the hints: every key number or section the report has with its settings and analyses, and leaves
+    out without them, is matched by a data note the full report does not carry."""
+    with_all, without = _doc(full, rt), _doc(bare, rt)
+    gone = ({k.key for k in with_all.kpis} - {k.key for k in without.kpis}) | (
+        {s.id for s in with_all.sections} - {s.id for s in without.sections} - {"nothing"})
+    said = set(without.data_quality) - set(with_all.data_quality)
+    assert gone, "the two builds do not differ: the fixture no longer exercises the hints"
+    assert said, f"{sorted(gone)} left out with no data note"
