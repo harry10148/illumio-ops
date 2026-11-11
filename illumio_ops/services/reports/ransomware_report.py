@@ -145,8 +145,8 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     # 1,808 rows in host order on the NFR PCE. Which hosts is in the hosts chapter (6.6.1).
     on_hosts: dict[tuple[str, int | None, int, str], int] = {}
     for _, s in unsorted_rows:
-        key = (str(s.get("name")), s.get("port"), int(s.get("proto") or 0), str(s.get("severity") or "").lower())
-        on_hosts[key] = on_hosts.get(key, 0) + 1
+        which = (str(s.get("name")), s.get("port"), int(s.get("proto") or 0), str(s.get("severity") or "").lower())
+        on_hosts[which] = on_hosts.get(which, 0) + 1
     by_service = sorted(on_hosts.items(), key=lambda kv: (_SEVERITY_RANK.get(kv[0][3], len(_SEVERITY_RANK)), -kv[1],
                                                           kv[0][0], str(kv[0][1]), kv[0][2]))
     unprotected_table = TableBlock(
