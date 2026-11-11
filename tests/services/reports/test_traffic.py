@@ -178,6 +178,7 @@ def test_unknown_decisions_are_explained_and_days_are_drawn(ctx):
     """6.6.0 Task 6: the Unknown row says what it is and how many; a period seen on more than one day draws its
     connections per day, which add up to the total."""
     from datetime import timedelta
+
     from illumio_ops.domain.report import BarBlock
     a, b = flow(port=443, conns=3), flow(port=22, decision="unknown", conns=2)
     object.__setattr__(b, "last_detected", b.last_detected + timedelta(days=1))
