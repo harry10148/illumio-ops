@@ -35,8 +35,18 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Install Playwright browser
-        # A clean runner has the playwright package but no browser binary.
-        run: python -m playwright install --with-deps chromium
+        # A clean runner has the playwright package but no browser binary. --with-deps also asks apt for the
+        # system libraries; when the runner cannot reach the package mirror (2026-11-11: four runs in a row failed
+        # here, "Temporary failure resolving 'azure.archive.ubuntu.com'", before any test ran) it is tried again,
+        # then the browser alone is installed: the runner image already carries Chrome's libraries, and if one is
+        # missing the browser tests say so.
+        run: |
+          for attempt in 1 2 3; do
+            python -m playwright install --with-deps chromium && exit 0
+            echo "attempt $attempt failed; waiting before the next"
+            sleep 30
+          done
+          python -m playwright install chromium
 
       - name: Security audit (pip-audit)
         run: pip-audit -r requirements.lock --strict
