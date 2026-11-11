@@ -14,12 +14,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import sync_playwright
 
 from tests.e2e import ui_rules
 
 HEIGHT = 900      # overlap and distance are measured in an ordinary window, never the stretched one
 TALLEST = 9000
+QUIET_MS = 20000  # how long a page is given to finish its requests
 
 
 def _name(path: str) -> str:
@@ -49,11 +51,15 @@ def main() -> int:
             page.set_viewport_size({"width": args.width, "height": HEIGHT})
             page.goto(base + path)
             page.wait_for_selector("main .page, main section, main h1")
-            page.wait_for_load_state("networkidle")
+            waiting = ""
+            try:
+                page.wait_for_load_state("networkidle", timeout=QUIET_MS)
+            except PlaywrightTimeout:  # basic mode asks the PCE live, and a SaaS PCE can take a minute to answer
+                waiting = "  (measured while still loading)"
             found = ui_rules.violations(page)
             broken += sum(len(v) for v in found.values())
             counts = ", ".join(f"{rule} {len(found[rule])}" for rule in ui_rules.RULES if rule in found) or "clean"
-            print(f"{path:32} {counts}")
+            print(f"{path:32} {counts}{waiting}")
             for rule, items in found.items():
                 for item in items:
                     print(f"    [{rule}] {item}")

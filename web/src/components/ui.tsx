@@ -64,7 +64,8 @@ export function Switch({ checked, onChange, label, name, disabled }: {
   }
   return (
     <button type="button" role="switch" className="switch" name={name} aria-checked={shown} aria-label={label}
-            data-state={state} disabled={disabled || busy} onClick={() => void press()} />
+            data-state={state} disabled={disabled} aria-busy={busy || undefined}
+            onClick={() => { if (!busy) void press(); }} />
   );
 }
 
@@ -240,8 +241,12 @@ export function PageHead({ title, purpose, children }: { title: string; purpose:
 export function Disclosure({ summary, children, role, open }: {
   summary?: string; children: ReactNode; role?: string; /** Starts open: something inside needs the reader now. */ open?: boolean;
 }) {
+  // opened by the page when something inside needs the reader; closed only by the reader
+  const [shown, setShown] = useState(Boolean(open));
+  useEffect(() => { if (open) setShown(true); }, [open]);
   return (
-    <details className="disclosure" data-role={role} open={open || undefined}>
+    <details className="disclosure" data-role={role} open={shown}
+             onToggle={(e) => setShown((e.currentTarget as HTMLDetailsElement).open)}>
       <summary>{summary ?? t("ui_what_is_this")}</summary>
       <div className="disclosure-body">{children}</div>
     </details>

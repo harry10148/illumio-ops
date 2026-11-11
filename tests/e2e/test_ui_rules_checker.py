@@ -25,7 +25,9 @@ BAD = {
                         "<table style='position:absolute;top:455px;left:0;width:600px'><thead><tr>"
                         "<th style='height:49px'>Host</th></tr></thead></table>"),
     "header_one_line": _main("<table><thead><tr><th style='width:30px;word-break:break-all'>Severity level</th></tr></thead></table>"),
-    "no_overflow_x": _main("<div style='width:3000px'>wide</div>"),
+    # as the console is built: the content scrolls inside <main>, the document itself never grows
+    "no_overflow_x": "<!doctype html><body style='margin:0'><main style='overflow:auto;width:800px'>"
+                     "<div style='width:3000px'>wide</div></main></body>",
     "button_font": _main("<button style='font-size:13px'>Run</button>"),
     "link_not_accent": _main(f"<a href='#' style='color:{ui_rules.ACCENT_TEXT}'>a host</a>"),
     # the report schedule row as seen on the test box: Run now, Edit and Delete with nothing between them
@@ -79,3 +81,10 @@ def test_a_dialog_over_the_page_is_not_an_overlap(context):
                            f"<div role='dialog' style='position:absolute;top:0;left:0'><button style='width:100px;height:34px;{_BTN}'>"
                            "Over</button></div>"))
     assert "no_overlap" not in ui_rules.violations(page)
+
+
+def test_a_tag_that_runs_past_what_holds_it_is_caught(context):
+    page = context.new_page()
+    page.set_content(_main("<div style='width:60px'><span class='tag' style='white-space:nowrap;display:inline-block'>"
+                           "a state far longer than its cell</span></div>"))
+    assert "tag_not_button" in ui_rules.violations(page)

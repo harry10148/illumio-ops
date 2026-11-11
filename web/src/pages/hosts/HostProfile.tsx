@@ -52,13 +52,14 @@ function investigate(req: Req): string {
 
 /** The page says a gap in the collection once, at its head: every section below covers the same period, and the
  * same sentence in each of them was read as noise. A section hands its sentence up; outside the page it shows it. */
-const GapsContext = createContext<((sentence: string) => void) | null>(null);
+const GapsContext = createContext<((sentence: string) => () => void) | null>(null);
 
 /** What the numbers below do not include (a gap in the collection, a PCE answer cut at its limit): never silent. */
 function Caveats({ coverage, limitHit }: { coverage: Coverage; limitHit?: boolean }) {
   const report = useContext(GapsContext);
   const gaps = coverage.gaps.length > 0 ? t("wb_gaps", { n: String(coverage.gaps.length) }) : null;
-  useEffect(() => { if (gaps && report) report(gaps); }, [gaps, report]);
+  // registered for as long as this section shows it: the page's sentence goes when its last section does, never before
+  useEffect(() => (gaps && report ? report(gaps) : undefined), [gaps, report]);
   return (
     <>
       {gaps && !report && <p className="notice" data-role="caveat">{gaps}</p>}
@@ -478,11 +479,12 @@ export function HostProfile() {
   }, [profile, span]);
 
   // one sentence about a gap, said once at the head of the page (the sections hand theirs up)
-  const [gapNotes, setGapNotes] = useState<string[]>([]);
-  useEffect(() => { setGapNotes([]); }, [profile, span]);
+  const [gapCounts, setGapCounts] = useState<Record<string, number>>({});
   const noteGap = useCallback((sentence: string) => {
-    setGapNotes((now) => (now.includes(sentence) ? now : [...now, sentence]));
+    setGapCounts((now) => ({ ...now, [sentence]: (now[sentence] ?? 0) + 1 }));
+    return () => setGapCounts((now) => ({ ...now, [sentence]: Math.max(0, (now[sentence] ?? 0) - 1) }));
   }, []);
+  const gapNotes = Object.keys(gapCounts).filter((g) => (gapCounts[g] ?? 0) > 0);
 
   if (error) return <section className="page"><p className="form-error">{t(error.message_key, error.params)}</p></section>;
   if (!profile) return <section className="page"><p className="muted">{t("loading")}</p></section>;

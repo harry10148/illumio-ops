@@ -63,6 +63,13 @@ def test_a_gap_in_the_collection_is_said_once_on_the_host_page(live_app, fake_pc
     said = [s.strip() for s in page.locator("[data-role=caveat]").all_inner_texts()]
     assert said and len(said) == len(set(said)), said
     assert page.locator("[data-role=caveat]").first.evaluate("(e) => !e.closest('.card, .panel')")  # at the head, not in a section
+    # it stays while the sections that have the gap are on the page: another period and back, it is still said, once
+    for hours in ("168", "24"):
+        page.select_option("select[name=period]", hours)
+        page.wait_for_load_state("networkidle")
+        expect(page.locator("[data-section=src_host]").first.locator("tbody tr, .muted").first).to_be_visible()
+        again = [s.strip() for s in page.locator("[data-role=caveat]").all_inner_texts()]
+        assert again and len(again) == len(set(again)), (hours, again)
     ctx.close()
 
 

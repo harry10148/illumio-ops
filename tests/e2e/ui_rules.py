@@ -61,7 +61,8 @@ _JS = r"""
     const cs = getComputedStyle(el), r = el.getBoundingClientRect();
     const border = Math.max(px(cs.borderTopWidth), px(cs.borderRightWidth), px(cs.borderBottomWidth), px(cs.borderLeftWidth));
     if (border > 0) add('tag_not_button', el, `border ${border}px`);
-    else if (r.height > lineHeight(cs) * 1.5 + px(cs.paddingTop) + px(cs.paddingBottom)) add('tag_not_button', el, `wraps, ${Math.round(r.height)}px tall`);
+    else if (el.matches('.tag') && r.height > lineHeight(cs) * 1.5 + px(cs.paddingTop) + px(cs.paddingBottom)) add('tag_not_button', el, `wraps, ${Math.round(r.height)}px tall`);
+    else if (el.matches('.tag') && r.right > el.parentElement.getBoundingClientRect().right + 1) add('tag_not_button', el, 'runs past what holds it');
   }
 
   // cards_apart: a card and the nearest card below it keep their distance
@@ -101,8 +102,10 @@ _JS = r"""
   }
 
   // no_overflow_x: the page never scrolls sideways
-  const de = document.documentElement;
-  if (de.scrollWidth > de.clientWidth + 1) add('no_overflow_x', de, `${de.scrollWidth} > ${de.clientWidth}`);
+  // (the console scrolls inside <main>, not the document: both are looked at)
+  for (const el of new Set([document.documentElement, root])) {
+    if (el.scrollWidth > el.clientWidth + 1) add('no_overflow_x', el, `${el.scrollWidth} > ${el.clientWidth}`);
+  }
 
   // button_font: buttons share one size (a segmented choice has its own)
   for (const el of all('button, a[class^="btn"], a[class*=" btn"]')) {

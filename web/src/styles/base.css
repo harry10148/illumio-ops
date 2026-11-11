@@ -79,9 +79,13 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 
 /* ── console building blocks (components/ui.tsx) ─────────────────────── */
 /* a state is a tag: a fill and a word, never a frame (a frame reads as something to press), always one line */
-.tag, .badge { display: inline-flex; align-items: center; gap: var(--space-1); height: 20px; padding: 0 var(--space-4);
+.tag, .badge { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 20px; padding: 0 var(--space-4);
        border: 0; border-radius: var(--radius-s); background: var(--fill); color: var(--ink);
-       font-size: var(--fs-mini); font-weight: 500; line-height: 20px; white-space: nowrap; vertical-align: middle; }
+       font-size: var(--fs-mini); font-weight: 500; line-height: 20px; vertical-align: middle; }
+.tag { height: 20px; white-space: nowrap; }
+/* the older mark also holds values and whole sentences (a label's key=value, a warning): those run to more lines */
+.badge { overflow-wrap: anywhere; }
+p.badge, div.badge { display: block; padding: var(--space-2) var(--space-4); line-height: var(--lead); }
 .reason { color: var(--text-3); font-size: var(--fs-mini); font-family: var(--font-ui); }
 .needs-advanced { display: grid; gap: var(--space-3); padding: var(--space-5) var(--space-6);
                   border: 1px dashed var(--tone-adv-border); border-radius: var(--radius-l); background: var(--tone-adv-bg); }
@@ -267,6 +271,9 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 /* beside its words: on the first line of them, however many lines they run to */
 label:has(> input[type=checkbox]) { display: flex; align-items: flex-start; gap: var(--space-4); color: var(--text-1); }
 label > input[type=checkbox] { margin-top: calc((1lh - 16px) / 2); }
+/* a radio button sits beside its words the same way */
+label:has(> input[type=radio]), label.check { display: flex; align-items: flex-start; gap: var(--space-4); color: var(--text-1); }
+input[type=radio] { flex: none; width: 16px; height: 16px; margin: calc((1lh - 16px) / 2) 0 0; padding: 0; }
 /* a switch is for what takes effect the moment it is pressed; it says whether the change was kept */
 .switch { position: relative; width: 34px; height: 20px; padding: 0; border: 1px solid var(--text-3); border-radius: 10px;
           background: var(--surface-0); vertical-align: middle; transition: background .12s; }
@@ -406,22 +413,28 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 /* Alerts home (UI redesign sample 01) */
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4);
               margin: var(--space-6) 0 var(--space-5); }
-/* a row of choices is one segmented control (the same look as .seg); it wraps into rows on a narrow screen */
-.chips-row { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+/* a row of choices: buttons make one segmented control (the same look as .seg); anything else (the weekday ticks of a
+   rule schedule) is a row of separate things */
+.chips-row { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); }
+.chips-row:has(> .chip-btn) { display: inline-flex; gap: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-m);
              overflow: hidden; background: var(--surface-1); }
 /* a card's first row: what it is on the left, what to do with it on the right, on one line */
 .card-head { justify-content: space-between; align-items: center; }
 .card-head h2, .card-head h3 { margin: 0; }
 /* a control is as wide as what it holds: a choice as its longest option, a number or a date as a number or a date */
-select { justify-self: start; max-width: 100%; }
-input[type=number], input[type=date] { justify-self: start; width: 9em; max-width: 100%; }
+/* (a length, not a share of what holds it: a share is circular where the holder is sized by its content, and the
+   longest option then sets the width of the whole form) */
+select { justify-self: start; min-width: 0; max-width: 36em; }
+@media (max-width: 560px) { select { max-width: 100%; } }
+input[type=number]:not(.narrow) { justify-self: start; width: 9em; max-width: 100%; }
+input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
 /* buttons set side by side in running content (a table cell, a line of text) keep air between them; a row with a
    gap of its own already does */
 :is(td, p, li, span, .hint) > :is(.btn-primary, .btn-quiet, .btn-danger) + :is(.btn-primary, .btn-quiet, .btn-danger) { margin-left: var(--space-3); }
 /* a button is as wide as its words, never the width of the card it sits in */
 .stack > button, .stack > a.btn-primary, .stack > a.btn-quiet, .card > button { justify-self: start; }
 /* one control as wide as its choices, wherever it is put */
-.chips-row, .seg { justify-self: start; width: fit-content; max-width: 100%; }
+.chips-row:has(> .chip-btn), .seg { justify-self: start; width: fit-content; max-width: 100%; }
 .chip-btn { height: 30px; padding: 0 var(--space-5); border: 0; border-right: 1px solid var(--line);
             background: none; color: var(--text-2); font-size: var(--fs-mini); white-space: nowrap; }
 .chip-btn:last-child { border-right: 0; }
