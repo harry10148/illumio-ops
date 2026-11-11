@@ -45,12 +45,15 @@ def test_the_fleet_action_bar_sits_above_the_table_head(live_app, fake_pce, brow
     seed_everything(live_app, fake_pce)
     ctx, page = _wide(browser, live_app)
     page.goto(f"{live_app.url}/fleet")
-    actions = page.locator("[data-role=fleet-actions] button")
-    expect(actions.first).to_be_visible()
-    head_top = page.locator("[data-role=fleet-list] thead").bounding_box()["y"]
-    for i in range(actions.count()):
-        box = actions.nth(i).bounding_box()
-        assert box["y"] + box["height"] <= head_top, (actions.nth(i).inner_text(), box, head_top)
+    expect(page.locator("[data-role=fleet-actions] button").first).to_be_visible()
+    expect(page.locator("[data-role=fleet-list] tbody tr").first).to_be_visible()
+    page.wait_for_load_state("networkidle")
+    # measured in one reading: the page above the list is still filling in while it loads (the tallies arrive after
+    # the list), and two readings a moment apart are of two different layouts (CI, 2026-11-11)
+    bottoms, head_top = page.evaluate("""() => [
+        [...document.querySelectorAll('[data-role=fleet-actions] button')].map((b) => b.getBoundingClientRect().bottom),
+        document.querySelector('[data-role=fleet-list] thead').getBoundingClientRect().top]""")
+    assert bottoms and all(bottom <= head_top for bottom in bottoms), (bottoms, head_top)
     ctx.close()
 
 
