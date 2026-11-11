@@ -322,7 +322,9 @@ def render_html(doc: ReportDocument, *, tz: tzinfo | None) -> str:
         f'<span class="toc-label">{_esc(s.title)}</span><span class="toc-dot"></span></a></li>'
         for i, s in enumerate(doc.sections))
     toc = (f'<nav class="toc" data-shell="toc"><button class="print-btn" onclick="window.print()">'
-           f'{_esc(tr(lang, "rpt_print"))}</button><h2>{_esc(tr(lang, "rpt_toc_title"))}</h2><ol>{toc_items}</ol></nav>')
+           f'{_esc(tr(lang, "rpt_print"))}</button>'
+           # a report without sections (nothing computed) has no table of contents to head
+           + (f'<h2>{_esc(tr(lang, "rpt_toc_title"))}</h2><ol>{toc_items}</ol>' if doc.sections else "") + "</nav>")
     chapters = "".join(
         f'<section class="chapter" id="{_esc(s.id)}" data-shell="detail" data-tone="neutral">'
         f'<div class="chapter-head"><span class="chapter-index">S{i + 1:02d}</span>'

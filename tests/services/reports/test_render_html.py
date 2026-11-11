@@ -221,3 +221,10 @@ def test_an_action_every_row_repeats_is_said_once_above_the_table():
     differs = _tbl(_cols("rule", "found", "action"), [("r1", "a", "Do this."), ("r2", "b", "Do that.")])
     body = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(differs,)),)), tz=UTC).split("</style>")[-1]
     assert 'data-role="said-once"' not in body and 'data-column-count="3"' in body
+
+
+def test_a_report_without_sections_has_no_empty_table_of_contents():
+    out = render_html(make_doc(sections=()), tz=UTC).split("</style>")[-1]
+    assert "Contents" not in out and "<ol>" not in out and "print-btn" in out
+    out = render_html(make_doc(sections=(Section(id="s", title="S", blocks=(TextBlock(paragraphs=("x",)),)),)), tz=UTC)
+    assert "<ol>" in out.split("</style>")[-1]

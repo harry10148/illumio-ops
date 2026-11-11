@@ -266,6 +266,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         quality.append(hint(lang, "rpt_hint_pending_rw_org", day=org_last) if org_last
                        else hint(lang, "rpt_hint_pending_rw_org_none"))
     if not ok:  # nothing was computed: the title, the reason, and nothing dressed up as a result
+        quality = quality[2:]  # the notes on how the lists and scores are made describe what is not here
         quality.append(hint(lang, "rpt_hint_pending_rw_analysis") if status is None
                        else hint(lang, "rpt_hint_unsupported_rw"))
         if run_error:
