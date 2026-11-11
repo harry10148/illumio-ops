@@ -83,6 +83,50 @@ def walk(page, base_url: str, paths=PATHS) -> dict[str, list[str]]:
     return found
 
 
+def _fleet_enforce(page):
+    page.locator("[data-role=fleet-list] tbody input[type=checkbox]").first.check()
+    page.click("[data-role=fleet-open-enforce]")
+    page.wait_for_selector("[data-role=fleet-enforce]")
+
+
+def _fleet_rate(page):
+    page.locator("[data-role=fleet-list] tbody input[type=checkbox]").first.check()
+    page.click("[data-role=fleet-open-rate]")
+    page.wait_for_selector("[data-role=fleet-rate]")
+
+
+def _quarantine(page):
+    page.click("[data-role=q-open]")
+    page.wait_for_selector("[data-role=quarantine]:not(button)")
+
+
+def _generate(page):
+    page.locator("[data-role=report-catalog] .rpt-card button").first.click()
+    page.wait_for_selector("[data-role=generate-form]")
+
+
+def _save_section(page):
+    page.click("[data-role=save-section]")
+    page.wait_for_selector("[data-role=save-section-form]")
+
+
+# what a page shows only after something is pressed: opened, never submitted
+STATES = (("/fleet", _fleet_enforce), ("/fleet", _fleet_rate), (f"/hosts?key={fleet_e2e.DB}", _quarantine),
+          ("/reports", _generate), ("/investigate", _save_section))
+
+
+def walk_states(page, base_url: str) -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    for path, opened in STATES:
+        page.goto(base_url + path)
+        page.wait_for_load_state("networkidle")
+        opened(page)
+        page.wait_for_load_state("networkidle")
+        for rule, items in ui_rules.violations(page).items():
+            found.setdefault(rule, []).extend(f"{path} after {opened.__name__}  {item}" for item in items)
+    return found
+
+
 def _report(found: dict[str, list[str]], rules) -> str:
     return "\n".join(f"[{r}] {line}" for r in rules for line in found.get(r, []))
 
@@ -99,6 +143,8 @@ def test_rules_hold_with_data(live_app, fake_pce, browser):
     page = ctx.new_page()
     sign_in(page, live_app.url)
     found = walk(page, live_app.url, (*PATHS, *extra))
+    for rule, items in walk_states(page, live_app.url).items():
+        found.setdefault(rule, []).extend(items)
     ctx.close()
     _holds(found)
     mended = [r for r in PENDING if r not in found]

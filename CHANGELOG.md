@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.7.0] - 2026-11-11
+
+The first of four stages of the purpose-led interface (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md):
+one set of presentation rules on every page. What the pages do and what they show is unchanged.
+
+### Changed
+
+- Every page says in one sentence under its name what it is for.
+- A state (severity, delivery, mode, running) is a tag with a fill and no frame, always on one line; it no longer
+  looks like a button. "Recorded only" on an alert is said in words, not as a tag.
+- Links are drawn in ink with an underline. Orange is kept for the one main action of a region and for where you are.
+- Checkboxes are drawn by the page. What takes effect the moment it is pressed (a rule's enabled and notify, a report
+  schedule's enabled) is a switch that shows whether the change was kept, and goes back with the error when it was not.
+- A choice of one among a few (alert categories, flows or events, the tabs of a page) is one segmented control. The
+  alerts page's "only unprocessed" is one of these instead of a checkbox.
+- Times, figures and host names are in the reading face with digits of one width. Monospace is kept for values to
+  copy: an address, a port, a certificate.
+- Why quarantining an Idle or Visibility Only host has no effect is written under the button, not inside it.
+- Long explanations start closed (the built-in rules of the alert rules page, the SIEM page's introduction, how the
+  VEN overview decides online and offline). What changes how numbers are read — a gap in the collection, a limit, a
+  mode that is missing — is never folded away.
+- The host page says a gap in the collection once, at its head, instead of once in every section.
+- An empty list of produced reports says where to make the first one.
+- "Evaluate now" sits beside "New rule" above the rule list instead of in a card of its own; the rule list's state
+  column is drawn only when a rule has a state.
+
+### Fixed
+
+- VEN overview: the row of actions above the host list covered the table's head by 12px.
+- The blocks of a page keep one distance; cards no longer touch (VEN overview, host page, detection page).
+- Column headings stay on one line. A long host or rule name wraps inside its cell, whole.
+- The button that opens the quarantine dialog carried the dialog's orange frame.
+- Buttons are one size wherever they sit, and as wide as their words (the detection page's were as wide as the card).
+
 ## [6.6.1] - 2026-11-11
 
 Found by generating every report on both installs after 6.6.0.
