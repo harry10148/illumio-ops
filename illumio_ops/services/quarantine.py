@@ -383,6 +383,44 @@ def remove(ctx: AppContext, keys: Sequence[str], *, by: str, now: datetime | Non
     return _change(ctx, cfg, ident, targets, None, by=by, at=at, chk=chk, create=False)
 
 
+class QuarantinedHost(BaseModel):
+    key: str
+    name: str
+    level: str
+    enforcement_mode: str | None
+    no_enforcement: bool          # Idle or Visibility Only: the label isolates nothing
+    applied_at: datetime | None   # when this tool put the label on; None: it was not this tool
+    applied_by: str | None
+
+
+class QuarantineCurrent(BaseModel):
+    items: list[QuarantinedHost]
+    write_key: bool  # whether a quarantine can be lifted from here
+
+
+def current(ctx: AppContext) -> QuarantineCurrent:
+    """The managed hosts that carry the quarantine label now, from the inventory (purpose-led UI spec §6.4), with this
+    tool's record of putting it there. Read-only: no write key is needed and the PCE is not asked."""
+    cfg = ctx.settings.current().pce
+    with ctx.flows().connect() as conn:
+        require_same_pce(conn, cfg)
+        inventory = [w for w in workloads.all_workloads(conn) if w.managed and w.label_set is not None]
+        sets = label_store.label_sets(conn, {w.label_set for w in inventory if w.label_set is not None})
+    held = [(w, level) for w in inventory if (level := sets.get(w.label_set, {}).get(KEY))]  # type: ignore[arg-type]
+    with ctx.db() as conn:
+        applied = actions.last_applied(conn, pce_url=cfg.url, org_id=cfg.org_id)
+    names = display_names(ctx, [w.href for w, _ in held])
+    items = []
+    for w, level in sorted(held, key=lambda pair: names.get(pair[0].href, pair[0].href).lower()):
+        row = applied.get(w.href)
+        items.append(QuarantinedHost(
+            key=w.href, name=names.get(w.href, w.href), level=level, enforcement_mode=w.enforcement_mode,
+            no_enforcement=w.enforcement_mode in NO_ENFORCEMENT,
+            applied_at=datetime.fromisoformat(row["at"]) if row is not None else None,
+            applied_by=row["by_user"] if row is not None else None))
+    return QuarantineCurrent(items=items, write_key=bool(cfg.write_api_key and cfg.write_api_secret))
+
+
 def history(ctx: AppContext, key: str | None = None, *, limit: int = 50) -> list[QuarantineAction]:
     pce = ctx.settings.current().pce
     with ctx.db() as conn:

@@ -10,7 +10,7 @@ verified_against:
 
 > 本頁由 `scripts/gen_api_reference.py` 從 API 契約產生，請勿手改。新增或修改操作後重新執行該腳本。
 
-這些是網頁介面自己使用的 API，共 123 個操作。每個操作的請求與回應欄位（JSON Schema）在
+這些是網頁介面自己使用的 API，共 125 個操作。每個操作的請求與回應欄位（JSON Schema）在
 `web/src/api/contracts.json`，以下只列操作、方法、路徑與模型名稱。
 
 ## 共通規則
@@ -104,6 +104,7 @@ verified_against:
 
 | 操作 | 方法 | 路徑 | 請求模型 | 回應模型 |
 |---|---|---|---|---|
+| `hosts.alerted` | GET | `/api/hosts/alerted` | — | `AlertedHosts` |
 | `hosts.profile` | GET | `/api/hosts/profile` | — | `HostProfile` |
 | `hosts.ransomware_allows` | POST | `/api/hosts/ransomware-allows` | `HostKey` | `HostRansomware` |
 | `hosts.search` | GET | `/api/hosts/search` | — | `HostSearch` |
@@ -130,6 +131,7 @@ verified_against:
 | 操作 | 方法 | 路徑 | 請求模型 | 回應模型 |
 |---|---|---|---|---|
 | `quarantine.apply` | POST | `/api/quarantine/apply` | `QuarantineApplyRequest` | `QuarantineOutcome` |
+| `quarantine.current` | GET | `/api/quarantine/current` | — | `QuarantineCurrent` |
 | `quarantine.history` | GET | `/api/quarantine/history` | — | `QuarantineHistory` |
 | `quarantine.preview` | POST | `/api/quarantine/preview` | `QuarantinePreviewRequest` | `QuarantinePreview` |
 | `quarantine.remove` | POST | `/api/quarantine/remove` | `QuarantineTargets` | `QuarantineOutcome` |

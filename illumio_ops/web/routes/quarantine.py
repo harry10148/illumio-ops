@@ -48,6 +48,7 @@ OP_PREVIEW = operation("quarantine.preview", "POST", "/api/quarantine/preview", 
 OP_APPLY = operation("quarantine.apply", "POST", "/api/quarantine/apply", QuarantineApplyRequest, QuarantineOutcome)
 OP_REMOVE = operation("quarantine.remove", "POST", "/api/quarantine/remove", QuarantineTargets, QuarantineOutcome)
 OP_HISTORY = operation("quarantine.history", "GET", "/api/quarantine/history", None, QuarantineHistory)
+OP_CURRENT = operation("quarantine.current", "GET", "/api/quarantine/current", None, quarantine.QuarantineCurrent)
 
 bp = Blueprint("quarantine", __name__)
 PCE_FAILURES = (PceCollectionIncomplete, PceTransportError, PceBudgetExhausted, OnDemandFailed)
@@ -95,6 +96,14 @@ def remove(body: QuarantineTargets) -> QuarantineOutcome:
         return quarantine.remove(get_ctx(), body.keys, by=str(current_user.get_id()))
     except HANDLED as exc:
         raise _mapped(exc) from None
+
+
+@api_route(bp, OP_CURRENT)
+def current() -> quarantine.QuarantineCurrent:
+    try:
+        return quarantine.current(get_ctx())
+    except BindingMismatch:
+        raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
 
 
 @api_route(bp, OP_HISTORY)

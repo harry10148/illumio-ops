@@ -33,6 +33,13 @@ def recent(conn: sqlite3.Connection, *, pce_url: str, org_id: str, workload_href
     return conn.execute(sql + " ORDER BY id DESC LIMIT ?", [*params, limit]).fetchall()
 
 
+def last_applied(conn: sqlite3.Connection, *, pce_url: str, org_id: str) -> dict[str, sqlite3.Row]:
+    """Per workload, the latest quarantine this tool put on it that the PCE accepted."""
+    rows = conn.execute("SELECT * FROM quarantine_actions WHERE pce_url = ? AND org_id = ? AND action = 'apply' "
+                        "AND result = 'ok' ORDER BY id", (pce_url, org_id)).fetchall()
+    return {r["workload_href"]: r for r in rows}  # the later row of a workload replaces the earlier
+
+
 def move_pce(conn: sqlite3.Connection, *, old_url: str, new_url: str, org_id: str) -> int:
     """The same PCE moved to a new address (System › PCE connection, decision D3): its rows follow it."""
     return int(conn.execute("UPDATE quarantine_actions SET pce_url = ? WHERE pce_url = ? AND org_id = ?",

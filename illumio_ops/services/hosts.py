@@ -20,6 +20,7 @@ from illumio_ops.domain.values import (
     CollectionMode,
     DetectorKind,
     Language,
+    Severity,
     TamperPattern,
 )
 from illumio_ops.i18n import translate
@@ -30,6 +31,7 @@ from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import host_addresses, workload_at
 from illumio_ops.services.reports.common import unnamed_host
+from illumio_ops.store import alerts as alert_store
 from illumio_ops.store.flowdb import analysis, capabilities, labels, workloads
 from illumio_ops.store.flowdb import flows as flows_store
 from illumio_ops.store.flowdb import ransomware as ransomware_store
@@ -272,6 +274,39 @@ class HostHit(BaseModel):
 
 class HostSearch(BaseModel):
     items: list[HostHit]
+
+
+ALERTED_LIMIT = 20
+_RANKED: tuple[Severity, ...] = (Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL)
+
+
+class AlertedHost(BaseModel):
+    key: str
+    name: str
+    managed: bool
+    alerts: int
+    highest: Severity
+    last_at: datetime
+
+
+class AlertedHosts(BaseModel):
+    items: list[AlertedHost]
+    more: int  # hosts beyond the ones listed
+
+
+def alerted(ctx: AppContext, *, days: int = 7, now: datetime | None = None) -> AlertedHosts:
+    """Where to start without a host in hand (purpose-led UI spec §6.2): the hosts the period's alerts are about, most
+    alerted first. Only alerts that recorded their hosts count (0018)."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    pce = ctx.settings.current().pce
+    with ctx.db() as conn:
+        rows = alert_store.alerted_devices(conn, pce_url=pce.url, org_id=pce.org_id, since=at - timedelta(days=days))
+    shown = rows[:ALERTED_LIMIT]
+    names = display_names(ctx, [r["key"] for r in shown])
+    return AlertedHosts(more=len(rows) - len(shown), items=[
+        AlertedHost(key=r["key"], name=names.get(r["key"], r["key"]), managed=not r["key"].startswith("ip:"),
+                    alerts=int(r["n"]), highest=_RANKED[int(r["rank"])], last_at=datetime.fromisoformat(r["last"]))
+        for r in shown])
 
 
 def search(ctx: AppContext, q: str) -> HostSearch:

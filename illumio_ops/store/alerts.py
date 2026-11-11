@@ -167,6 +167,17 @@ def period_counts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since:
     return out
 
 
+def alerted_devices(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime) -> list[sqlite3.Row]:
+    """The hosts the period's alerts are about: key, how many alerts (n), the highest severity among them (rank: 3
+    critical … 0 low) and the latest (last) — most alerted first, then most recent."""
+    return conn.execute(
+        "SELECT d.key AS key, COUNT(DISTINCT a.id) AS n, MAX(a.fired_at) AS last, "
+        "MAX(CASE a.severity WHEN 'critical' THEN 3 WHEN 'high' THEN 2 WHEN 'medium' THEN 1 ELSE 0 END) AS rank "
+        "FROM alert_devices d JOIN alerts a ON a.id = d.alert_id "
+        "WHERE a.pce_url = ? AND a.org_id = ? AND a.fired_at >= ? GROUP BY d.key ORDER BY n DESC, last DESC, d.key",
+        (pce_url, org_id, _t(since))).fetchall()
+
+
 def seen_at(conn: sqlite3.Connection) -> datetime:
     """When the alerts page was last opened (0019 gives every installation a first time)."""
     return datetime.fromisoformat(conn.execute("SELECT seen_at FROM alerts_seen WHERE id = 1").fetchone()[0])

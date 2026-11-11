@@ -1375,6 +1375,26 @@ sources_status: {
 stale: boolean
 }
 /**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertedHost".
+ */
+export interface AlertedHost {
+alerts: number
+highest: Severity
+key: string
+last_at: string
+managed: boolean
+name: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertedHosts".
+ */
+export interface AlertedHosts {
+items: AlertedHost[]
+more: number
+}
+/**
  * An operator's "known cause" for a host's or a pattern's tampering (spec §6.5.4 step 5).
  * 
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1998,6 +2018,27 @@ label_created: boolean
 label_error: (string | null)
 level: (string | null)
 results: QuarantineResult[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantinedHost".
+ */
+export interface QuarantinedHost {
+applied_at: (string | null)
+applied_by: (string | null)
+enforcement_mode: (string | null)
+key: string
+level: string
+name: string
+no_enforcement: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "QuarantineCurrent".
+ */
+export interface QuarantineCurrent {
+items: QuarantinedHost[]
+write_key: boolean
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -3626,7 +3667,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.mark_seen" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.initiators" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.mark_seen" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.alerted" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.initiators" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.current" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.condition_choices": undefined;
@@ -3669,6 +3710,7 @@ export interface Requests {
   "fleet.rate_apply": FleetKeys;
   "fleet.rate_check": FleetKeys;
   "home.focus": undefined;
+  "hosts.alerted": undefined;
   "hosts.profile": undefined;
   "hosts.ransomware_allows": HostKey;
   "hosts.search": undefined;
@@ -3680,6 +3722,7 @@ export interface Requests {
   "lateral.simulate": LateralSimulate;
   "lateral.view": undefined;
   "quarantine.apply": QuarantineApplyRequest;
+  "quarantine.current": undefined;
   "quarantine.history": undefined;
   "quarantine.preview": QuarantinePreviewRequest;
   "quarantine.remove": QuarantineTargets;
@@ -3795,6 +3838,7 @@ export interface Responses {
   "fleet.rate_apply": FleetOutcome;
   "fleet.rate_check": RateCheck;
   "home.focus": FocusView;
+  "hosts.alerted": AlertedHosts;
   "hosts.profile": HostProfile;
   "hosts.ransomware_allows": HostRansomware;
   "hosts.search": HostSearch;
@@ -3806,6 +3850,7 @@ export interface Responses {
   "lateral.simulate": DenySimulationView;
   "lateral.view": LateralPage;
   "quarantine.apply": QuarantineOutcome;
+  "quarantine.current": QuarantineCurrent;
   "quarantine.history": QuarantineHistory;
   "quarantine.preview": QuarantinePreview;
   "quarantine.remove": QuarantineOutcome;
@@ -3921,6 +3966,7 @@ export const OPERATIONS = {
   "fleet.rate_apply": { method: "POST", path: "/api/fleet/traffic-rate/apply" },
   "fleet.rate_check": { method: "POST", path: "/api/fleet/traffic-rate/check" },
   "home.focus": { method: "GET", path: "/api/home/focus" },
+  "hosts.alerted": { method: "GET", path: "/api/hosts/alerted" },
   "hosts.profile": { method: "GET", path: "/api/hosts/profile" },
   "hosts.ransomware_allows": { method: "POST", path: "/api/hosts/ransomware-allows" },
   "hosts.search": { method: "GET", path: "/api/hosts/search" },
@@ -3932,6 +3978,7 @@ export const OPERATIONS = {
   "lateral.simulate": { method: "POST", path: "/api/lateral/simulate" },
   "lateral.view": { method: "GET", path: "/api/lateral" },
   "quarantine.apply": { method: "POST", path: "/api/quarantine/apply" },
+  "quarantine.current": { method: "GET", path: "/api/quarantine/current" },
   "quarantine.history": { method: "GET", path: "/api/quarantine/history" },
   "quarantine.preview": { method: "POST", path: "/api/quarantine/preview" },
   "quarantine.remove": { method: "POST", path: "/api/quarantine/remove" },

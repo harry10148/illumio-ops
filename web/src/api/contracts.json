@@ -20508,6 +20508,82 @@
         "type": "object"
       }
     },
+    "hosts.alerted": {
+      "method": "GET",
+      "path": "/api/hosts/alerted",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "AlertedHost": {
+            "properties": {
+              "alerts": {
+                "title": "Alerts",
+                "type": "integer"
+              },
+              "highest": {
+                "$ref": "#/$defs/Severity"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "last_at": {
+                "format": "date-time",
+                "title": "Last At",
+                "type": "string"
+              },
+              "managed": {
+                "title": "Managed",
+                "type": "boolean"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "managed",
+              "alerts",
+              "highest",
+              "last_at"
+            ],
+            "title": "AlertedHost",
+            "type": "object"
+          },
+          "Severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/AlertedHost"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "more": {
+            "title": "More",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "title": "AlertedHosts",
+        "type": "object"
+      }
+    },
     "hosts.profile": {
       "method": "GET",
       "path": "/api/hosts/profile",
@@ -28632,6 +28708,99 @@
           "results"
         ],
         "title": "QuarantineOutcome",
+        "type": "object"
+      }
+    },
+    "quarantine.current": {
+      "method": "GET",
+      "path": "/api/quarantine/current",
+      "request_schema": null,
+      "response_schema": {
+        "$defs": {
+          "QuarantinedHost": {
+            "properties": {
+              "applied_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Applied At"
+              },
+              "applied_by": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Applied By"
+              },
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "level": {
+                "title": "Level",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "no_enforcement": {
+                "title": "No Enforcement",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "level",
+              "enforcement_mode",
+              "no_enforcement",
+              "applied_at",
+              "applied_by"
+            ],
+            "title": "QuarantinedHost",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/QuarantinedHost"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "write_key": {
+            "title": "Write Key",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "write_key"
+        ],
+        "title": "QuarantineCurrent",
         "type": "object"
       }
     },
