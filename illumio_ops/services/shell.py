@@ -2,7 +2,7 @@
 going, the alerts nobody has marked as known, and whether the optional write key is set."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
@@ -14,7 +14,6 @@ from illumio_ops.store import alerts as alert_store
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.job_health import list_health
 
-UNPROCESSED_DAYS = 7  # the alerts page's default period
 TRAFFIC_JOB = "collect_traffic"
 COLLECT_JOBS = (TRAFFIC_JOB, "collect_events", "collect_inventory")
 
@@ -25,7 +24,7 @@ class ShellStatus(BaseModel):
     mode: Literal["basic", "advanced"]  # basic: lightweight; advanced: alert or full (spec §5)
     collection_mode: CollectionMode
     collection: Collection
-    unprocessed_alerts: int
+    new_alerts: int  # fired since the alerts page was last opened (purpose-led UI spec §6.1)
     write_key: bool
     version: str  # the product version (5.x showed it in /api/status)
 
@@ -58,13 +57,11 @@ def _collection(ctx: AppContext, mode: CollectionMode) -> Collection:
 
 
 def status(ctx: AppContext, *, now: datetime | None = None) -> ShellStatus:
-    at = (now or datetime.now(UTC)).astimezone(UTC)
     s = ctx.settings.current()
     mode = s.collection.mode
     with ctx.db() as conn:
-        unprocessed = alert_store.count_ungrouped(conn, pce_url=s.pce.url, org_id=s.pce.org_id,
-                                                  since=at - timedelta(days=UNPROCESSED_DAYS))
+        new = alert_store.count_new(conn, pce_url=s.pce.url, org_id=s.pce.org_id, after=alert_store.seen_at(conn))
     return ShellStatus(mode="basic" if mode is CollectionMode.LIGHTWEIGHT else "advanced", collection_mode=mode,
-                       collection=_collection(ctx, mode), unprocessed_alerts=unprocessed,
+                       collection=_collection(ctx, mode), new_alerts=new,
                        write_key=bool(s.pce.write_api_key and s.pce.write_api_secret),
                        version=illumio_ops.__version__)

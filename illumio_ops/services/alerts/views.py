@@ -82,6 +82,7 @@ class AlertItem(BaseModel):
     pack_key: str | None
     devices: list[AlertDevice]  # the hosts the alert is about; none for an alert stored before they were kept
     devices_more: int           # how many more there were than are listed
+    is_new: bool                # fired after the time the request named (new_after); false when it named none
 
 
 class AlertCounts(BaseModel):
@@ -99,6 +100,11 @@ class AlertList(BaseModel):
     page: int
     page_size: int
     counts: AlertCounts
+    new: int  # in the period, fired after the time the request named (new_after); 0 when it named none
+
+
+class SeenBefore(BaseModel):
+    previous: datetime  # when the alerts page was opened before this time
 
 
 class TimelineEntry(BaseModel):
@@ -144,6 +150,10 @@ class AlertQuery(BaseModel):
     severity: Severity | None = None
     rule: str | None = Field(default=None, max_length=64)
     device: str | None = Field(default=None, max_length=256)  # only the alerts about this host (its key)
+    # What is new is measured against the time the page was opened BEFORE this visit (alerts.mark_seen answers it):
+    # the page keeps that time while it is open, so its own opening does not age the alerts it is showing.
+    new_after: datetime | None = None
+    only_new: bool = False
     page: int = Field(default=1, ge=1, le=100000)
 
 
@@ -198,7 +208,8 @@ def _devices(found: Sequence[Device], names: Mapping[str, str]) -> list[AlertDev
 
 
 def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row],
-          names: Mapping[str, str] | None = None, found: Sequence[Device] = ()) -> AlertItem:
+          names: Mapping[str, str] | None = None, found: Sequence[Device] = (),
+          new_after: datetime | None = None) -> AlertItem:
     lang = ctx.settings.current().display.language
     params = _named_params(json.loads(row["params_json"]), names or {})
     v = replace(alert_view(row), params=params)
@@ -210,7 +221,16 @@ def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row],
                      grouped=row["grouped_annotation"] is not None, deliveries=_deliveries(deliveries),
                      category=category(rule_type, params.get("detector")), src=src, dst=dst,
                      pack_key=row["pack_key"], devices=_devices(found, names or {}),
-                     devices_more=int(row["devices_more"]))
+                     devices_more=int(row["devices_more"]),
+                     is_new=new_after is not None and v.fired_at > new_after)
+
+
+def mark_seen(ctx: AppContext, *, now: datetime | None = None) -> SeenBefore:
+    """The alerts page was opened: from now on only alerts fired after this are new. Answers the time before, which
+    the page uses for as long as it stays open."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    with ctx.db() as conn:
+        return SeenBefore(previous=store.mark_seen(conn, at))
 
 
 def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) -> AlertList:
@@ -223,7 +243,10 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
                                         rule_type=q.type.value if q.type else None, rule_types=types,
                                         detectors_in=inside, detectors_not_in=outside, ungrouped_only=q.unprocessed,
                                         severity=q.severity.value if q.severity else None, rule_id=q.rule,
-                                        device=q.device, limit=PAGE, offset=(q.page - 1) * PAGE)
+                                        device=q.device, fired_after=q.new_after if q.only_new else None,
+                                        limit=PAGE, offset=(q.page - 1) * PAGE)
+        new = (store.count_new(conn, pce_url=url, org_id=org, after=q.new_after, since=since)
+               if q.new_after is not None else 0)
         found = store.deliveries(conn, [r["id"] for r in rows])
         about = store.devices(conn, [r["id"] for r in rows])
         counted = store.period_counts(conn, pce_url=url, org_id=org, since=since)
@@ -232,7 +255,8 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
         by_alert.setdefault(d["alert_id"], []).append(d)
     counts = AlertCounts(**{k: counted.get(k, 0) for k in ("critical", "high", "medium", "low", "grouped")})
     names = display_names(ctx, _hrefs(rows) | {d.key for ds in about.values() for d in ds})
-    return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], []), names, about.get(r["id"], ())) for r in rows],
+    return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], []), names, about.get(r["id"], ()), q.new_after)
+                            for r in rows], new=new,
                      total=total, page=q.page,
                      page_size=PAGE, counts=counts)
 

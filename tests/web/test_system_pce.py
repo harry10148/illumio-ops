@@ -321,7 +321,7 @@ def test_same_pce_at_a_new_address_keeps_the_data_once_verified(client, ctx):
     assert _bound(ctx).pce_url == NEW and _workload_count(ctx) == 1
     from illumio_ops.services import shell
     from illumio_ops.store import rule_schedules
-    assert shell.status(ctx).unprocessed_alerts == 1  # the alert history follows the PCE
+    assert shell.status(ctx).new_alerts == 1  # the alert history follows the PCE
     with ctx.db() as conn:
         assert len(rule_schedules.list_for(conn, pce_url=NEW, org_id="1")) == 1
 

@@ -778,6 +778,7 @@ fired_at: string
 first_seen: string
 grouped: boolean
 id: number
+is_new: boolean
 last_seen: string
 late: boolean
 next_steps: string[]
@@ -823,6 +824,7 @@ dst: (string | null)
 fired_at: string
 grouped: boolean
 id: number
+is_new: boolean
 late: boolean
 pack_key: (string | null)
 rule_id: string
@@ -840,6 +842,7 @@ summary: string
 export interface AlertList {
 counts: AlertCounts
 items: AlertItem[]
+new: number
 page: number
 page_size: number
 total: number
@@ -871,6 +874,13 @@ subject_key: string
  */
 export interface KnownList {
 items: KnownView[]
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "SeenBefore".
+ */
+export interface SeenBefore {
+previous: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -2544,7 +2554,7 @@ export interface ShellStatus {
 collection: ("ok" | "degraded" | "failing" | "not_started")
 collection_mode: CollectionMode
 mode: ("basic" | "advanced")
-unprocessed_alerts: number
+new_alerts: number
 version: string
 write_key: boolean
 }
@@ -3616,7 +3626,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.initiators" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.mark_seen" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.initiators" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.condition_choices": undefined;
@@ -3637,6 +3647,7 @@ export interface Requests {
   "alerts.get": undefined;
   "alerts.list": undefined;
   "alerts.mark_known": KnownMark;
+  "alerts.mark_seen": undefined;
   "alerts.note_add": NoteAdd;
   "auth.csrf": undefined;
   "auth.login": LoginRequest;
@@ -3762,6 +3773,7 @@ export interface Responses {
   "alerts.get": AlertDetail;
   "alerts.list": AlertList;
   "alerts.mark_known": KnownList;
+  "alerts.mark_seen": SeenBefore;
   "alerts.note_add": AlertDetail;
   "auth.csrf": CsrfToken;
   "auth.login": LoginResult;
@@ -3887,6 +3899,7 @@ export const OPERATIONS = {
   "alerts.get": { method: "GET", path: "/api/alerts/<int:alert_id>" },
   "alerts.list": { method: "GET", path: "/api/alerts" },
   "alerts.mark_known": { method: "POST", path: "/api/alerts/<int:alert_id>/known" },
+  "alerts.mark_seen": { method: "POST", path: "/api/alerts/seen" },
   "alerts.note_add": { method: "POST", path: "/api/alerts/<int:alert_id>/notes" },
   "auth.csrf": { method: "GET", path: "/api/auth/csrf" },
   "auth.login": { method: "POST", path: "/api/auth/login" },

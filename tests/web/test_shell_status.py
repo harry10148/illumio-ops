@@ -46,13 +46,25 @@ def test_status_advanced_for_alert_and_full(ctx):
     assert shell.status(ctx, now=NOW).mode == "advanced"
 
 
-def test_unprocessed_counts_ungrouped_last_7_days(ctx):
+def test_new_alerts_are_those_fired_since_the_alerts_page_was_last_opened(ctx):
+    """New replaces unprocessed (purpose-led UI spec §6.1): nothing has to be marked, opening the page is enough. A
+    grouped alert is new like any other; another PCE's is not this one's."""
+    with ctx.db() as conn:
+        assert store.mark_seen(conn, NOW - timedelta(hours=4)) is not None  # an installation starts with one
     _alert(ctx, at=NOW - timedelta(hours=1))
-    _alert(ctx, at=NOW - timedelta(days=6))
     _alert(ctx, at=NOW - timedelta(hours=2), grouped=7)
-    _alert(ctx, at=NOW - timedelta(days=8))
+    _alert(ctx, at=NOW - timedelta(days=6))       # before the page was last opened
     _alert(ctx, at=NOW - timedelta(hours=3), pce_url="https://other.example:8443")
-    assert shell.status(ctx, now=NOW).unprocessed_alerts == 2
+    assert shell.status(ctx, now=NOW).new_alerts == 2
+    with ctx.db() as conn:
+        assert store.mark_seen(conn, NOW) == NOW - timedelta(hours=4)  # answers when it was seen before
+        assert store.seen_at(conn) == NOW
+    assert shell.status(ctx, now=NOW).new_alerts == 0
+
+
+def test_an_upgrade_does_not_call_the_whole_history_new(ctx):
+    _alert(ctx, at=NOW - timedelta(days=3))  # NOW is in the past: stored before this database was made
+    assert shell.status(ctx).new_alerts == 0
 
 
 def test_collection_not_started(ctx):
@@ -90,7 +102,7 @@ def test_route_requires_login_and_answers(client):
     assert client.get("/api/shell/status", environ_overrides=LOCAL).status_code == 401
     login(client)
     data = client.get("/api/shell/status", environ_overrides=LOCAL).get_json()["data"]
-    assert set(data) == {"mode", "collection_mode", "collection", "unprocessed_alerts", "write_key", "version"}
+    assert set(data) == {"mode", "collection_mode", "collection", "new_alerts", "write_key", "version"}
 
 
 def test_rule_summary_counts_known(ctx):

@@ -98,7 +98,7 @@ def test_a_segment_is_chosen_from_the_keyboard_and_shows_where_the_focus_is(cont
     alerts_e2e.seed(live_app.ctx)
     page = context.new_page()
     sign_in(page, live_app.url)
-    choice = page.locator("[data-role=alert-unprocessed] button[data-value=all]")
+    choice = page.locator("[data-role=alert-seen] button[data-value=new]")
     expect(choice).to_have_attribute("aria-pressed", "false")
     choice.focus()
     page.keyboard.press("Tab")

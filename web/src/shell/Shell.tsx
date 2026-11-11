@@ -43,12 +43,16 @@ function StatusLine({ status }: { status: ShellStatus | null }) {
 
 function Item({ item, status, onPick }: { item: NavItem; status: ShellStatus | null; onPick: () => void }) {
   const dimmed = item.needs === "advanced" && status?.mode === "basic";
-  const count = item.badge === "unprocessed" ? status?.unprocessed_alerts ?? 0 : 0;
+  const count = item.badge === "new" ? status?.new_alerts ?? 0 : 0;
   return (
     <NavLink to={item.to ?? item.path} end={item.path === "/"} className="nav-item" onClick={onPick}
              data-dimmed={dimmed || undefined} data-nav={item.path}>
       <span>{t(item.labelKey)}{dimmed && <span className="nav-mark" title={t("needs_advanced_title")}> ◆</span>}</span>
-      {count > 0 && <span className="nav-badge num" aria-label={t("shell_unprocessed", { n: String(count) })}>{count}</span>}
+      {count > 0 && (
+        <span className="nav-badge num" data-role="nav-new" aria-label={t("nav_alerts_new_label", { n: String(count) })}>
+          {t("nav_alerts_new", { n: String(count) })}
+        </span>
+      )}
     </NavLink>
   );
 }

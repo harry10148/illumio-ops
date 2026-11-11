@@ -14,6 +14,7 @@ from illumio_ops.services.alerts.views import (
     AlertList,
     AlertQuery,
     ExplainRequest,
+    SeenBefore,
 )
 from illumio_ops.services.analysis.explain import PolicyExplanation
 from illumio_ops.web.auth import get_ctx
@@ -27,6 +28,7 @@ class NoteAdd(BaseModel):
 OP_LIST = operation("alerts.list", "GET", "/api/alerts", None, AlertList)
 OP_GET = operation("alerts.get", "GET", "/api/alerts/<int:alert_id>", None, AlertDetail)
 OP_EVIDENCE = operation("alerts.evidence", "GET", "/api/alerts/<int:alert_id>/evidence", None, AlertEvidence)
+OP_SEEN = operation("alerts.mark_seen", "POST", "/api/alerts/seen", None, SeenBefore)
 OP_NOTE = operation("alerts.note_add", "POST", "/api/alerts/<int:alert_id>/notes", NoteAdd, AlertDetail)
 OP_KNOWN = operation("alerts.mark_known", "POST", "/api/alerts/<int:alert_id>/known", KnownMark, KnownList)
 OP_EXPLAIN = operation("alerts.explain", "POST", "/api/alerts/<int:alert_id>/explain", ExplainRequest,
@@ -48,6 +50,11 @@ def list_alerts() -> AlertList:
         raise ApiFailure(400, "invalid_input", "err_invalid_input",
                          field=".".join(str(p) for p in errs[0]["loc"]) if errs else None) from None
     return views.list_alerts(get_ctx(), q)
+
+
+@api_route(bp, OP_SEEN)
+def mark_seen() -> SeenBefore:
+    return views.mark_seen(get_ctx())
 
 
 @api_route(bp, OP_GET)

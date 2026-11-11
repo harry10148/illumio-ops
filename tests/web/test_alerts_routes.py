@@ -232,3 +232,27 @@ def test_an_alert_lists_its_hosts_by_name_and_can_be_found_by_one(client, ctx):
     only = get(client, "/api/alerts?days=3650&device=ip:10.0.0.9").get_json()["data"]
     assert [i["id"] for i in only["items"]] == [about] and only["total"] == 1
     assert get(client, f"/api/alerts/{about}").get_json()["data"]["devices"][0]["key"] == w
+
+
+# ── new since the alerts page was last opened (purpose-led UI spec §6.1) ──
+
+def test_the_list_marks_what_is_new_against_the_time_it_is_given(client, ctx):
+    old = seed(ctx, at=NOW - timedelta(hours=5))
+    new = seed(ctx, at=NOW - timedelta(hours=1))
+    login(client)
+    after = (NOW - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
+    data = get(client, f"/api/alerts?days=3650&new_after={after}").get_json()["data"]
+    assert {i["id"]: i["is_new"] for i in data["items"]} == {old: False, new: True} and data["new"] == 1
+    only = get(client, f"/api/alerts?days=3650&new_after={after}&only_new=true").get_json()["data"]
+    assert [i["id"] for i in only["items"]] == [new] and only["total"] == 1
+    plain = get(client, "/api/alerts?days=3650").get_json()["data"]
+    assert not any(i["is_new"] for i in plain["items"]) and plain["new"] == 0
+
+
+def test_opening_the_alerts_page_answers_when_it_was_last_opened(client, ctx):
+    login(client)
+    token = csrf(client)
+    first = post(client, "/api/alerts/seen", {}, token).get_json()["data"]["previous"]
+    second = post(client, "/api/alerts/seen", {}, token).get_json()["data"]["previous"]
+    assert first < second  # the second call is told the time of the first
+    assert client.post("/api/alerts/seen", json={}, environ_overrides=LOCAL).status_code in (400, 403)  # needs the token

@@ -106,7 +106,7 @@ def backfill_devices(conn: sqlite3.Connection) -> int:
 def _where(*, pce_url: str, org_id: str, since: datetime, rule_types: Sequence[str] | None = None,
            severity: str | None = None, rule_id: str | None = None, detectors_in: Sequence[str] | None = None,
            detectors_not_in: Sequence[str] | None = None, ungrouped_only: bool = False,
-           device: str | None = None) -> tuple[str, list[Any]]:
+           device: str | None = None, fired_after: datetime | None = None) -> tuple[str, list[Any]]:
     clauses, params = ["pce_url = ?", "org_id = ?", "fired_at >= ?"], [pce_url, org_id, _t(since)]
     for column, value in (("severity", severity), ("rule_id", rule_id)):
         if value:
@@ -127,6 +127,9 @@ def _where(*, pce_url: str, org_id: str, since: datetime, rule_types: Sequence[s
     if device:
         clauses.append("id IN (SELECT alert_id FROM alert_devices WHERE key = ?)")
         params.append(device)
+    if fired_after is not None:
+        clauses.append("fired_at > ?")
+        params.append(_t(fired_after))
     return " AND ".join(clauses), params
 
 
@@ -140,14 +143,14 @@ def set_grouped(conn: sqlite3.Connection, alert_id: int, annotation_id: int, *, 
 def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime, rule_type: str | None = None,
                 severity: str | None = None, rule_id: str | None = None, rule_types: Sequence[str] | None = None,
                 detectors_in: Sequence[str] | None = None, detectors_not_in: Sequence[str] | None = None,
-                ungrouped_only: bool = False, device: str | None = None, limit: int,
-                offset: int) -> tuple[list[sqlite3.Row], int]:
+                ungrouped_only: bool = False, device: str | None = None, fired_after: datetime | None = None,
+                limit: int, offset: int) -> tuple[list[sqlite3.Row], int]:
     """rule_types / detectors_in / detectors_not_in: a category's filter (domain/alertcategory.py); detectors are the
     lateral alert's `detector` parameter. device: only the alerts about this host (its key)."""
     types = rule_types if rule_types else ((rule_type,) if rule_type else None)
     where, params = _where(pce_url=pce_url, org_id=org_id, since=since, rule_types=types, severity=severity,
                            rule_id=rule_id, detectors_in=detectors_in, detectors_not_in=detectors_not_in,
-                           ungrouped_only=ungrouped_only, device=device)
+                           ungrouped_only=ungrouped_only, device=device, fired_after=fired_after)
     rows = conn.execute(f"SELECT * FROM alerts WHERE {where} ORDER BY fired_at DESC, id DESC LIMIT ? OFFSET ?",
                         [*params, limit, offset]).fetchall()
     total = conn.execute(f"SELECT COUNT(*) FROM alerts WHERE {where}", params).fetchone()[0]
@@ -162,6 +165,26 @@ def period_counts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since:
     out["grouped"] = int(conn.execute(f"SELECT COUNT(*) FROM alerts WHERE {where} AND grouped_annotation IS NOT NULL",
                                       params).fetchone()[0])
     return out
+
+
+def seen_at(conn: sqlite3.Connection) -> datetime:
+    """When the alerts page was last opened (0019 gives every installation a first time)."""
+    return datetime.fromisoformat(conn.execute("SELECT seen_at FROM alerts_seen WHERE id = 1").fetchone()[0])
+
+
+def mark_seen(conn: sqlite3.Connection, at: datetime) -> datetime:
+    """The alerts page was opened at `at`; answers when it was opened before."""
+    before = seen_at(conn)
+    with conn:
+        conn.execute("UPDATE alerts_seen SET seen_at = ? WHERE id = 1", (_t(at),))
+    return before
+
+
+def count_new(conn: sqlite3.Connection, *, pce_url: str, org_id: str, after: datetime, since: datetime | None = None) -> int:
+    """Alerts fired after `after` (and, when given, since `since`): what the page has not shown yet."""
+    row = conn.execute("SELECT COUNT(*) FROM alerts WHERE pce_url = ? AND org_id = ? AND fired_at > ? AND fired_at >= ?",
+                       (pce_url, org_id, _t(after), _t(since) if since else "")).fetchone()
+    return int(row[0])
 
 
 def count_ungrouped(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime) -> int:

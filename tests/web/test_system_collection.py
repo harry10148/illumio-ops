@@ -214,7 +214,7 @@ def test_clearing_collected_data_keeps_settings_alerts_and_reports(client, ctx):
     assert "flows" in data["cleared"] and data["archive_moved_to"].startswith("previous-")
     assert _events(ctx) == 0
     assert ctx.settings.current().model_dump() == before
-    assert shell.status(ctx).unprocessed_alerts == 1
+    assert shell.status(ctx).new_alerts == 1
 
 
 def test_clearing_while_a_reader_holds_the_store_says_so(client, ctx, monkeypatch):

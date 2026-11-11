@@ -119,6 +119,7 @@ function Username({ view, onChanged }: { view: SecurityView; onChanged: () => vo
         {error?.field === "current_password" && <span className="field-error">{t(error.message_key, error.params)}</span>}
       </label>
       <p className="hint">{t("security_username_hint")}</p>
+      <p className="hint">{t("security_shared_seen")}</p>
       {error && error.field !== "username" && error.field !== "current_password" && (
         <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>
       )}

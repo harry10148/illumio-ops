@@ -13780,6 +13780,10 @@
             "title": "Id",
             "type": "integer"
           },
+          "is_new": {
+            "title": "Is New",
+            "type": "boolean"
+          },
           "last_seen": {
             "format": "date-time",
             "title": "Last Seen",
@@ -13882,6 +13886,7 @@
           "pack_key",
           "devices",
           "devices_more",
+          "is_new",
           "params",
           "facts",
           "confidence",
@@ -14034,6 +14039,10 @@
                 "title": "Id",
                 "type": "integer"
               },
+              "is_new": {
+                "title": "Is New",
+                "type": "boolean"
+              },
               "late": {
                 "title": "Late",
                 "type": "boolean"
@@ -14101,7 +14110,8 @@
               "dst",
               "pack_key",
               "devices",
-              "devices_more"
+              "devices_more",
+              "is_new"
             ],
             "title": "AlertItem",
             "type": "object"
@@ -14188,6 +14198,10 @@
             "title": "Items",
             "type": "array"
           },
+          "new": {
+            "title": "New",
+            "type": "integer"
+          },
           "page": {
             "title": "Page",
             "type": "integer"
@@ -14206,7 +14220,8 @@
           "total",
           "page",
           "page_size",
-          "counts"
+          "counts",
+          "new"
         ],
         "title": "AlertList",
         "type": "object"
@@ -14306,6 +14321,25 @@
           "items"
         ],
         "title": "KnownList",
+        "type": "object"
+      }
+    },
+    "alerts.mark_seen": {
+      "method": "POST",
+      "path": "/api/alerts/seen",
+      "request_schema": null,
+      "response_schema": {
+        "properties": {
+          "previous": {
+            "format": "date-time",
+            "title": "Previous",
+            "type": "string"
+          }
+        },
+        "required": [
+          "previous"
+        ],
+        "title": "SeenBefore",
         "type": "object"
       }
     },
@@ -14660,6 +14694,10 @@
             "title": "Id",
             "type": "integer"
           },
+          "is_new": {
+            "title": "Is New",
+            "type": "boolean"
+          },
           "last_seen": {
             "format": "date-time",
             "title": "Last Seen",
@@ -14762,6 +14800,7 @@
           "pack_key",
           "devices",
           "devices_more",
+          "is_new",
           "params",
           "facts",
           "confidence",
@@ -38439,8 +38478,8 @@
             "title": "Mode",
             "type": "string"
           },
-          "unprocessed_alerts": {
-            "title": "Unprocessed Alerts",
+          "new_alerts": {
+            "title": "New Alerts",
             "type": "integer"
           },
           "version": {
@@ -38456,7 +38495,7 @@
           "mode",
           "collection_mode",
           "collection",
-          "unprocessed_alerts",
+          "new_alerts",
           "write_key",
           "version"
         ],

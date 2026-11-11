@@ -6,6 +6,12 @@ import { call } from "../api/client";
 import type { ShellStatus } from "../api/generated";
 
 const REFRESH_MS = 60_000;
+const CHANGED = "shell-status-changed";
+
+/** Something the frame shows has just changed (the alerts page was opened): read the status again now. */
+export function notifyShellStatus(): void {
+  window.dispatchEvent(new Event(CHANGED));
+}
 
 export const ShellStatusContext = createContext<ShellStatus | null>(null);
 
@@ -29,9 +35,11 @@ export function useShellStatusPoll(): ShellStatus | null {
     };
     load();
     const timer = window.setInterval(load, REFRESH_MS);
+    window.addEventListener(CHANGED, load);
     return () => {
       live = false;
       window.clearInterval(timer);
+      window.removeEventListener(CHANGED, load);
     };
   }, []);
   return status;

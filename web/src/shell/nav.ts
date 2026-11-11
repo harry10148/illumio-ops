@@ -16,8 +16,8 @@ export interface NavItem {
   hidden?: boolean;
   /** Needs advanced mode (alert or full collection): in basic mode the item is dimmed and marked, never removed. */
   needs?: "advanced";
-  /** A count shown next to the label. */
-  badge?: "unprocessed";
+  /** A count shown next to the label: the alerts fired since the alerts page was last opened. */
+  badge?: "new";
   /** Where the item leads when it is not the page's own path (a section whose first page is elsewhere). */
   to?: string;
 }

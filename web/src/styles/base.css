@@ -324,6 +324,11 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-st
 /* why an action will not do what its name says, under the action — never inside the button */
 .action-note { flex-basis: 100%; margin: 0; color: var(--text-3); font-size: var(--fs-mini); }
 .table td[data-nowrap] { white-space: nowrap; }
+/* an alert fired since the page was last opened */
+.new-dot { display: inline-block; width: 7px; height: 7px; margin-right: var(--space-3); border-radius: 50%; background: var(--accent-fg); vertical-align: 1px; }
+.nav-badge[data-role=nav-new] { border: 0; background: var(--accent-fg); color: var(--accent-on); }
+/* what the page's data says, in one sentence under its purpose */
+.page-conclusion { margin: 0; padding: var(--space-5) var(--space-6); background: var(--surface-2); border-radius: var(--radius-l); font-size: 15px; }
 /* figures and times: the reading face, digits of one width */
 .num { font-variant-numeric: tabular-nums; }
 .sentence { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; }

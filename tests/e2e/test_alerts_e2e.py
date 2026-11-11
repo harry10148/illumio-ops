@@ -553,3 +553,70 @@ def test_rule_list_with_long_conditions_fits_1280_and_760(context, narrow_contex
         cell.wait_for()
         assert no_horizontal_overflow(page)
         assert cell.evaluate("e => e.scrollWidth <= e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis'")
+
+
+# ── new since the alerts page was last opened (purpose-led UI spec §6.1) ──
+
+def _seen_now(ctx):
+    with ctx.db() as conn:
+        store.mark_seen(conn, datetime.now(UTC))
+
+
+def test_alerts_are_new_until_the_alerts_page_has_been_opened(context, live_app):
+    seed(live_app.ctx)
+    seed(live_app.ctx)
+    page = context.new_page()
+    sign_in(page, live_app.url)  # signing in lands on the alerts page: the two above are seen
+    page.goto(f"{live_app.url}/system/jobs")
+    expect(page.locator("[data-role=nav-new]")).to_have_count(0)
+    seed(live_app.ctx)  # fired after the page was last opened
+    page.goto(f"{live_app.url}/system/jobs")  # anywhere but the alerts page: the count is owed
+    expect(page.locator("[data-role=nav-new]")).to_have_text("New 1")
+    page.goto(f"{live_app.url}/")
+    rows = page.locator("[data-role=alert-list] tbody tr")
+    expect(rows).to_have_count(3)
+    expect(page.locator("[data-role=alert-list] [data-new]")).to_have_count(1)
+    expect(page.locator("[data-role=page-conclusion]")).to_have_text(
+        "3 alerts in the last 7 days: 3 High. 1 new since this page was last opened.")
+    expect(page.locator("[data-role=nav-new]")).to_have_count(0)  # opening the page is having seen them
+    # the page keeps its own measure while it is open: asking for the new ones does not find them already aged
+    page.click("[data-role=alert-seen] button[data-value=new]")
+    expect(rows).to_have_count(1)
+    expect(page.locator("[data-role=alert-list] [data-new]")).to_have_count(1)
+    page.goto(f"{live_app.url}/system/jobs")
+    page.goto(f"{live_app.url}/")
+    expect(rows).to_have_count(3)
+    expect(page.locator("[data-role=alert-list] [data-new]")).to_have_count(0)
+    expect(page.locator("[data-role=page-conclusion]")).to_have_text("3 alerts in the last 7 days: 3 High.")
+
+
+def test_a_second_tab_does_not_age_the_list_of_the_first(context, live_app):
+    _seen_now(live_app.ctx)
+    seed(live_app.ctx)
+    first = context.new_page()
+    sign_in(first, live_app.url)
+    expect(first.locator("[data-role=alert-list] [data-new]")).to_have_count(1)
+    second = context.new_page()
+    second.goto(f"{live_app.url}/")
+    expect(second.locator("[data-role=alert-list] tbody tr")).to_have_count(1)
+    first.click("[data-role=alert-seen] button[data-value=new]")
+    expect(first.locator("[data-role=alert-list] [data-new]")).to_have_count(1)
+
+
+def test_opening_one_alert_from_a_link_leaves_the_rest_new(context, live_app):
+    _seen_now(live_app.ctx)
+    a = seed(live_app.ctx)
+    page = context.new_page()
+    sign_in(page, live_app.url)  # lands on the alerts page: sign in elsewhere first would be the honest path, so reset
+    _seen_now(live_app.ctx)
+    b = seed(live_app.ctx)
+    page.goto(f"{live_app.url}/alerts/{a}")
+    expect(page.locator("[data-role=alert-detail]")).to_be_visible()
+    expect(page.locator("[data-role=nav-new]")).to_have_text("New 1")
+    assert b
+
+
+def test_no_alerts_is_said_in_a_sentence(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    expect(page.locator("[data-role=page-conclusion]")).to_have_text("No alerts in the last 7 days.")
