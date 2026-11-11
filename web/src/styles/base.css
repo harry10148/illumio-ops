@@ -415,6 +415,9 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 /* a control is as wide as what it holds: a choice as its longest option, a number or a date as a number or a date */
 select { justify-self: start; max-width: 100%; }
 input[type=number], input[type=date] { justify-self: start; width: 9em; max-width: 100%; }
+/* buttons set side by side in running content (a table cell, a line of text) keep air between them; a row with a
+   gap of its own already does */
+:is(td, p, li, span, .hint) > :is(.btn-primary, .btn-quiet, .btn-danger) + :is(.btn-primary, .btn-quiet, .btn-danger) { margin-left: var(--space-3); }
 /* a button is as wide as its words, never the width of the card it sits in */
 .stack > button, .stack > a.btn-primary, .stack > a.btn-quiet, .card > button { justify-self: start; }
 /* one control as wide as its choices, wherever it is put */

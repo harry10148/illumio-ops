@@ -6,7 +6,7 @@ violations(page) runs one script in the page and answers, per rule, what breaks 
 from __future__ import annotations
 
 RULES: tuple[str, ...] = ("one_primary", "styled_checkbox", "tag_not_button", "cards_apart", "no_overlap",
-                          "header_one_line", "no_overflow_x", "button_font", "link_not_accent")
+                          "header_one_line", "no_overflow_x", "button_font", "link_not_accent", "buttons_apart")
 
 # every page the navigation reaches, and the rule editor
 PATHS: tuple[str, ...] = (
@@ -115,6 +115,18 @@ _JS = r"""
   for (const el of all('a')) {
     if (/(^|\s)btn/.test(typeof el.className === 'string' ? el.className : '')) continue;
     if (getComputedStyle(el).color === ACCENT_TEXT) add('link_not_accent', el, 'drawn in the accent colour');
+  }
+
+  // buttons_apart: two buttons side by side have air between them (the segments of one control are one control)
+  const framed = (el) => { const cs = getComputedStyle(el); return px(cs.borderTopWidth) > 0 || !['rgba(0, 0, 0, 0)', 'transparent'].includes(cs.backgroundColor); };
+  for (const a of all('button, a[class^="btn"], a[class*=" btn"]')) {
+    const b = a.nextElementSibling;
+    if (!b || !b.matches('button, a[class^="btn"], a[class*=" btn"]') || !shown(b)) continue;
+    if (a.closest('[data-seg], .chips-row, .seg') || !framed(a) || !framed(b)) continue;
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    if (Math.abs(ra.top - rb.top) > ra.height / 2) continue;   // on different lines
+    const gap = rb.left - ra.right;
+    if (gap < 4) add('buttons_apart', a, `${Math.round(gap * 10) / 10}px from "${(b.innerText || '').trim().slice(0, 20)}"`);
   }
 
   for (const k of Object.keys(out)) out[k] = [...new Set(out[k])].slice(0, MOST);

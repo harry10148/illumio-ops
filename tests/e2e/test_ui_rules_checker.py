@@ -28,6 +28,9 @@ BAD = {
     "no_overflow_x": _main("<div style='width:3000px'>wide</div>"),
     "button_font": _main("<button style='font-size:13px'>Run</button>"),
     "link_not_accent": _main(f"<a href='#' style='color:{ui_rules.ACCENT_TEXT}'>a host</a>"),
+    # the report schedule row as seen on the test box: Run now, Edit and Delete with nothing between them
+    "buttons_apart": _main(f"<td><button style='border:1px solid #999;{_BTN}'>Run now</button>"
+                           f"<button style='border:1px solid #999;{_BTN}'>Edit</button></td>"),
 }
 
 GOOD = {
@@ -44,6 +47,10 @@ GOOD = {
     "no_overflow_x": _main("<div style='max-width:100%'>fits</div>"),
     "button_font": _main(f"<button style='{_BTN}'>Run</button><div data-seg><button style='font-size:12px'>All</button></div>"),
     "link_not_accent": _main("<a href='#' style='color:rgb(49, 54, 56)'>a host</a>"),
+    "buttons_apart": _main(f"<td><button style='border:1px solid #999;{_BTN}'>Run now</button>"
+                           f"<button style='border:1px solid #999;margin-left:6px;{_BTN}'>Edit</button></td>"
+                           f"<div data-seg><button style='border:1px solid #999;{_BTN}'>All</button>"
+                           f"<button style='border:1px solid #999;{_BTN}'>New</button></div>"),
 }
 
 

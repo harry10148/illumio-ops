@@ -311,7 +311,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                   {r.error_key && <div className="hint">{t(r.error_key)}</div>}
                   {r.error_detail && <div className="hint">{r.error_detail}</div>}
                 </td>
-                <td>
+                <td className="nowrap">
                   {r.files.map((f) => (
                     <div key={f}>
                       <a href={`/reports/files/${r.id}/${encodeURIComponent(f)}`} download>{f.split(".").pop()?.toUpperCase()}</a>
@@ -330,7 +330,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                   {r.email_detail && <div className="hint">{r.email_detail}</div>}
                 </td>
                 <td>
-                  <button type="button" className="btn-quiet" disabled={r.status === "running"}
+                  <button type="button" className="btn-danger" disabled={r.status === "running"}
                     onClick={() => void remove(r.id)}>{t("gui_reports_delete")}</button>
                 </td>
               </tr>

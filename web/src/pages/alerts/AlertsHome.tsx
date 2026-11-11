@@ -215,7 +215,7 @@ export function AlertsHome() {
                   { key: "ends", label: t("alerts_col_ends"),
                     render: (a) => (a.src || a.dst
                       ? <>{a.src ? <HostName name={a.src} /> : "—"} → {a.dst ? <HostName name={a.dst} /> : "—"}</> : "—") },
-                  { key: "delivery", label: t("alerts_col_delivery"), render: (a) => <Deliveries item={a} /> },
+                  { key: "delivery", label: t("alerts_col_delivery"), nowrap: true, render: (a) => <Deliveries item={a} /> },
                 ]}
               />
             </div>

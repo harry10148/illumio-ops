@@ -100,7 +100,7 @@ function StatusTable({ status }: { status: SiemStatusView }) {
                   </div>
                 </td>
               )}
-              <td>{t(CURSOR_KEYS[s.source] ?? s.source)}</td>
+              <td className="nowrap">{t(CURSOR_KEYS[s.source] ?? s.source)}</td>
               <td><span className="badge" data-tone={STATE_TONES[s.state]}>{t(STATE_KEYS[s.state])}</span>
                 {s.state === "needs_alert_mode" && <div className="hint"><Link to="/system/collection">{t("siem_go_collection")}</Link></div>}
                 {s.state === "baseline_building" && <div className="hint">{t("siem_baseline_hint", { days: String(status.baseline_days) })}</div>}
