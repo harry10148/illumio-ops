@@ -6,30 +6,21 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { AlertDetail, AlertItem, AlertList as AlertListData } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { ActionNote, DataTable, DetailPane, HostName, KpiStrip, PageHead, Segmented, SeverityTag, Tag, shortTime } from "../../components/ui";
+import { DataTable, DetailPane, KpiStrip, PageHead, Segmented, SeverityTag, Tag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { notifyShellStatus, useBasicMode } from "../../shell/status";
-import { QuarantineDialog } from "../quarantine/QuarantineDialog";
+import { AlertBody, AlertHosts, categoryWord } from "./AlertBody";
 import { deliveryText } from "./common";
 
 const PERIODS = ["1", "7", "30"];
 type Category = "" | "lateral" | "anomaly" | "traffic" | "event" | "system";
-const CATEGORY_KEYS: Record<Exclude<Category, "">, string> = {
-  lateral: "alert_cat_lateral", anomaly: "alert_cat_anomaly", traffic: "alert_cat_traffic",
-  event: "alert_cat_event", system: "alert_cat_system",
-};
 // Basic mode collects no traffic: lateral, anomaly and traffic alerts cannot happen there (spec §4.6).
 const BASIC_CATEGORIES: Category[] = ["", "event", "system"];
 const ALL_CATEGORIES: Category[] = ["", "lateral", "anomaly", "traffic", "event", "system"];
 const DELIVERY_TONE: Record<string, "ok" | "crit" | "accum" | "muted" | "high"> = {
   sent: "ok", failed: "crit", pending: "accum", not_notified: "muted", grouped: "muted", no_channel: "high",
 };
-
-function categoryWord(c: string): string {
-  const key = CATEGORY_KEYS[c as Exclude<Category, "">];
-  return key ? t(key) : c;
-}
 
 /** What the period's alerts come to, from the counts the list came with: only the levels that have any. */
 function conclusion(data: AlertListData, days: string): string {
@@ -58,16 +49,13 @@ function Deliveries({ item }: { item: AlertItem }) {
     : null;
 }
 
-function Side({ id, onKnown }: { id: number; onKnown: () => void }) {
-  const lang = useLang();
+function Side({ id }: { id: number }) {
   const [d, setD] = useState<AlertDetail | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
-  const [isolating, setIsolating] = useState(false);
 
   useEffect(() => {
     let live = true;  // an answer for an alert no longer selected must not replace this one (nor its quarantine target)
     setD(null);
-    setIsolating(false);
     void call("alerts.get", undefined, { alert_id: String(id) }).then((env) => {
       if (!live) return;
       if (env.ok && env.data) {
@@ -80,62 +68,7 @@ function Side({ id, onKnown }: { id: number; onKnown: () => void }) {
 
   if (error) return <p className="form-error">{t(error.message_key, error.params)}</p>;
   if (!d) return <p className="muted">{t("loading")}</p>;
-  const q = d.quarantine;
-  return (
-    <div className="stack alert-side" data-role="alert-side">
-      <div className="row">
-        <SeverityTag severity={d.severity} />
-        <Tag tone="muted">{categoryWord(d.category)}</Tag>
-        {d.category !== "event" && d.category !== "system" && <Tag tone="adv">◆ {t("mode_advanced")}</Tag>}
-        {d.grouped && <Tag tone="muted">{t("alerts_grouped_tag")}</Tag>}
-      </div>
-      <h2 className="side-title" data-role="alert-summary">{d.summary}</h2>
-      <p className="hint">{d.rule_name} · <span className="num">{formatTime(d.fired_at, lang)}</span></p>
-      {d.caveats.map((c) => <p key={c} className="notice">{c}</p>)}
-      <div>
-        <h3 className="side-h">{t("alert_timeline_title")}</h3>
-        <ol className="timeline" data-role="timeline">
-          {d.timeline.map((e, i) => (
-            <li key={i} data-kind={e.kind}><span className="num" title={formatTime(e.at, lang)}>{shortTime(e.at)}</span> {e.text}</li>
-          ))}
-        </ol>
-      </div>
-      <div>
-        <h3 className="side-h">{t("alert_beyond_title")}</h3>
-        {d.beyond_vendor.length === 0
-          ? <p className="muted" data-role="beyond-none">{t("alert_beyond_none")}</p>
-          : <ul className="plain-list" data-role="beyond">{d.beyond_vendor.map((s) => <li key={s}>{s}</li>)}</ul>}
-      </div>
-      <div>
-        <h3 className="side-h">{t("alert_delivery_title")}</h3>
-        <p className="row">{d.deliveries.map((x) => (x.status === "not_notified"
-          ? <span key={x.channel} className="hint">{deliveryText(x)}</span>
-          : <Tag key={x.channel} tone={DELIVERY_TONE[x.status] ?? "muted"}>{deliveryText(x)}</Tag>
-        ))}</p>
-      </div>
-      <div className="side-actions">
-        {d.evidence_kind
-          ? <Link className="btn-primary" to={`/investigate?alert=${d.id}`} data-role="open-workbench">{t("alert_start_investigation")}</Link>
-          : <span className="hint">{t("alert_no_evidence_to_investigate")}</span>}
-        {q.eligible && q.key ? (
-          <button type="button" className="btn-quiet" data-role="quarantine" onClick={() => setIsolating(true)}>
-            {t("alert_quarantine")}
-          </button>
-        ) : (
-          <span className="hint" data-role="quarantine-reason">{t(q.reason === "unmanaged" ? "alert_q_unmanaged"
-            : q.reason === "not_in_inventory" ? "alert_q_not_in_inventory" : "alert_q_no_subject")}</span>
-        )}
-        {d.rule_type === "lateral" && !d.grouped && (
-          <Link className="btn-text" to={`/alerts/${d.id}#mark-known`} onClick={onKnown}>{t("alert_known_mark")}</Link>
-        )}
-        <Link to={`/alerts/${d.id}`} data-role="open-detail">{t("alert_full_detail")}</Link>
-        {q.eligible && q.key && q.no_enforcement && <ActionNote>{t("alert_quarantine_no_effect")}</ActionNote>}
-      </div>
-      {isolating && q.key && (
-        <QuarantineDialog hosts={[{ key: q.key, name: q.name ?? q.key }]} onClose={() => setIsolating(false)} />
-      )}
-    </div>
-  );
+  return <div className="alert-side" data-role="alert-side"><AlertBody d={d} full={false} /></div>;
 }
 
 export function AlertsHome() {
@@ -244,9 +177,7 @@ export function AlertsHome() {
                       <div className="hint">{categoryWord(a.category)} · {a.rule_name}</div>
                     </div>
                   ) },
-                  { key: "ends", label: t("alerts_col_ends"),
-                    render: (a) => (a.src || a.dst
-                      ? <>{a.src ? <HostName name={a.src} /> : "—"} → {a.dst ? <HostName name={a.dst} /> : "—"}</> : "—") },
+                  { key: "hosts", label: t("alerts_col_devices"), render: (a) => <AlertHosts a={a} /> },
                   { key: "delivery", label: t("alerts_col_delivery"), nowrap: true, render: (a) => <Deliveries item={a} /> },
                 ]}
               />
@@ -261,7 +192,7 @@ export function AlertsHome() {
           </div>
           {selected !== null && (
             <DetailPane label={t("alert_detail_title")}>
-              <Side key={selected} id={selected} onKnown={() => undefined} />
+              <Side key={selected} id={selected} />
             </DetailPane>
           )}
         </div>

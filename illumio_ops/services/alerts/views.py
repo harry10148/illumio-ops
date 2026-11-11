@@ -41,6 +41,8 @@ from illumio_ops.services.reports.common import DETECTOR_NAME_KEYS
 from illumio_ops.store import alerts as store
 from illumio_ops.store.flowdb import analysis as detection_store
 from illumio_ops.store.flowdb import events as event_store
+from illumio_ops.store.flowdb import labels as label_store
+from illumio_ops.store.flowdb import workloads
 
 PAGE = 50
 EVIDENCE_LIMIT = 200
@@ -120,6 +122,12 @@ class NoteView(BaseModel):
     created_at: datetime
 
 
+class DeviceFacts(BaseModel):
+    in_inventory: bool            # a managed workload the inventory holds (an address never is)
+    environment: str | None       # its environment label's value (the label key the lateral settings name)
+    enforcement_mode: str | None
+
+
 class AlertDetail(AlertItem):
     params: dict[str, Any]
     facts: dict[str, Any]
@@ -133,6 +141,7 @@ class AlertDetail(AlertItem):
     beyond_vendor: list[str]
     quarantine: QuarantineEligibility
     next_steps: list[str]  # what to do next (domain.guidance); empty when there is nothing specific to say
+    device_facts: dict[str, DeviceFacts]  # per host key of `devices`, what the inventory holds about it now
 
 
 class AlertEvidence(BaseModel):
@@ -373,7 +382,31 @@ def alert_detail(ctx: AppContext, alert_id: int) -> AlertDetail | None:
                         created_at=datetime.fromisoformat(n["created_at"])) for n in notes],
         timeline=_timeline(ctx, row, item.rule_name, detection, lang),
         beyond_vendor=_beyond(ctx, params, lang) if item.rule_type is AlertRuleType.LATERAL else [],
-        quarantine=_quarantine(ctx, detection), next_steps=next_steps(alert_view(row), lang))
+        quarantine=_quarantine(ctx, detection), next_steps=next_steps(alert_view(row), lang),
+        device_facts=_device_facts(ctx, [d.key for d in about]))
+
+
+def _device_facts(ctx: AppContext, keys: Sequence[str]) -> dict[str, DeviceFacts]:
+    """What the inventory holds now about each host an alert names: read from the store, the PCE is not asked. A
+    store that is another PCE's (a switch not yet cleared) says nothing about these hosts."""
+    none = {k: DeviceFacts(in_inventory=False, environment=None, enforcement_mode=None) for k in keys}
+    hrefs = {k for k in keys if not k.startswith("ip:")}
+    if not hrefs:
+        return none
+    s = ctx.settings.current()
+    try:
+        with ctx.flows().connect() as conn:
+            require_same_pce(conn, s.pce)
+            found = {w.href: w for w in workloads.all_workloads(conn) if w.href in hrefs}
+            sets = label_store.label_sets(conn, {w.label_set for w in found.values() if w.label_set is not None})
+    except BindingMismatch:
+        return none
+    env_key = s.lateral.environment_label_key
+    for href, w in found.items():
+        labels = sets.get(w.label_set, {}) if w.label_set is not None else {}
+        none[href] = DeviceFacts(in_inventory=bool(w.managed), environment=labels.get(env_key),
+                                 enforcement_mode=w.enforcement_mode)
+    return none
 
 
 def evidence_segment(ctx: AppContext, alert_id: int) -> tuple[str | None, dict[str, Any] | None] | None:

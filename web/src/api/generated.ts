@@ -724,6 +724,15 @@ status: string
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "DeviceFacts".
+ */
+export interface DeviceFacts {
+enforcement_mode: (string | null)
+environment: (string | null)
+in_inventory: boolean
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "NoteView".
  */
 export interface NoteView {
@@ -767,6 +776,9 @@ confidence: {
 }
 console_link: (string | null)
 deliveries: DeliveryView[]
+device_facts: {
+[k: string]: DeviceFacts
+}
 devices: AlertDevice[]
 devices_more: number
 dst: (string | null)

@@ -326,6 +326,13 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-st
 /* why an action will not do what its name says, under the action — never inside the button */
 .action-note { flex-basis: 100%; margin: 0; color: var(--text-3); font-size: var(--fs-mini); }
 .table td[data-nowrap] { white-space: nowrap; }
+/* the hosts an alert is about: a name to open, and what the inventory says of it */
+.device-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.device-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-5); padding: var(--space-4) var(--space-5);
+                  border: 1px solid var(--line); border-radius: var(--radius-m); overflow-wrap: anywhere; }
+.device-list li.hint { border-style: dashed; }
+.alert-body h3 + p, .alert-body h3 + ul, .alert-body h3 + ol { margin-top: 0; }
+.alert-body p { margin: 0; }
 /* an alert fired since the page was last opened */
 .new-dot { display: inline-block; width: 7px; height: 7px; margin-right: var(--space-3); border-radius: 50%; background: var(--accent-fg); vertical-align: 1px; }
 .nav-badge[data-role=nav-new] { border: 0; background: var(--accent-fg); color: var(--accent-on); }

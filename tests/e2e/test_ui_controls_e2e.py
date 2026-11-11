@@ -20,7 +20,7 @@ def test_why_quarantine_would_do_nothing_is_under_the_button_not_in_it(context, 
     sign_in(page, live_app.url)
     side = page.locator("[data-role=alert-side]")
     button = side.locator("[data-role=quarantine]")
-    expect(button).to_have_text("Quarantine")
+    expect(button).to_have_text("Quarantine db…")
     note = side.locator("[data-role=action-note]")
     expect(note).to_contain_text("no effect")
     assert note.bounding_box()["y"] >= button.bounding_box()["y"] + button.bounding_box()["height"] - 1
@@ -38,7 +38,7 @@ def test_times_and_counts_are_in_the_reading_face(context, live_app):
 
 
 def test_an_address_is_monospace_and_a_host_name_is_not(context, live_app):
-    alerts_e2e._lateral(live_app.ctx, "new_process", subject="ip:10.0.0.9")  # names its source 10.0.0.9, its target db-01
+    alerts_e2e._lateral(live_app.ctx, "new_process", subject="ip:10.0.0.9")  # an older alert: its ends are words only
     page = context.new_page()
     sign_in(page, live_app.url)
     ends = page.locator("[data-role=alert-list] tbody tr").first.locator("td").nth(3)

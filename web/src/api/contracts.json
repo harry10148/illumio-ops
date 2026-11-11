@@ -13542,6 +13542,43 @@
             "title": "DeliveryView",
             "type": "object"
           },
+          "DeviceFacts": {
+            "properties": {
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "environment": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Environment"
+              },
+              "in_inventory": {
+                "title": "In Inventory",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "in_inventory",
+              "environment",
+              "enforcement_mode"
+            ],
+            "title": "DeviceFacts",
+            "type": "object"
+          },
           "NoteView": {
             "properties": {
               "body": {
@@ -13719,6 +13756,13 @@
             },
             "title": "Deliveries",
             "type": "array"
+          },
+          "device_facts": {
+            "additionalProperties": {
+              "$ref": "#/$defs/DeviceFacts"
+            },
+            "title": "Device Facts",
+            "type": "object"
           },
           "devices": {
             "items": {
@@ -13898,7 +13942,8 @@
           "timeline",
           "beyond_vendor",
           "quarantine",
-          "next_steps"
+          "next_steps",
+          "device_facts"
         ],
         "title": "AlertDetail",
         "type": "object"
@@ -14456,6 +14501,43 @@
             "title": "DeliveryView",
             "type": "object"
           },
+          "DeviceFacts": {
+            "properties": {
+              "enforcement_mode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Enforcement Mode"
+              },
+              "environment": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Environment"
+              },
+              "in_inventory": {
+                "title": "In Inventory",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "in_inventory",
+              "environment",
+              "enforcement_mode"
+            ],
+            "title": "DeviceFacts",
+            "type": "object"
+          },
           "NoteView": {
             "properties": {
               "body": {
@@ -14633,6 +14715,13 @@
             },
             "title": "Deliveries",
             "type": "array"
+          },
+          "device_facts": {
+            "additionalProperties": {
+              "$ref": "#/$defs/DeviceFacts"
+            },
+            "title": "Device Facts",
+            "type": "object"
           },
           "devices": {
             "items": {
@@ -14812,7 +14901,8 @@
           "timeline",
           "beyond_vendor",
           "quarantine",
-          "next_steps"
+          "next_steps",
+          "device_facts"
         ],
         "title": "AlertDetail",
         "type": "object"

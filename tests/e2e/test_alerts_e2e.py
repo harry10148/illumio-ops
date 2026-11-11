@@ -222,7 +222,7 @@ def test_lateral_alert_marked_known_then_removed(context, live_app):
     form = page.locator("[data-role=mark-known]")
     form.locator("input[name=known_reason]").fill("Nightly backup host")
     form.get_by_label("Every detection of this kind about this host (or account)").check()
-    form.get_by_role("button", name="Mark known").click()
+    form.get_by_role("button", name="Stop alerting on this").click()
     expect(form.locator(".form-ok")).to_have_text("Marked known; this alert now counts as handled.")
     page.click(".sidenav .nav-item[data-nav='/system']")
     page.click(".subnav >> a[href=\"/system/lateral\"]")
@@ -620,3 +620,108 @@ def test_no_alerts_is_said_in_a_sentence(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     expect(page.locator("[data-role=page-conclusion]")).to_have_text("No alerts in the last 7 days.")
+
+
+# ── the hosts an alert is about, and one body for the side panel and the full page (purpose-led UI spec §6.1) ──
+
+W = "/orgs/1/workloads/"
+
+
+def _about(ctx, devices, *, more=0, rule_type=AlertRuleType.LATERAL, subject="xenv|a|b", pack_key="rule_lateral_cross_env",
+           params=None):
+    from dataclasses import replace
+
+    from illumio_ops.domain.alert_devices import Device
+    now = datetime.now(UTC)
+    t = Trigger(rule_id="d" * 32, rule_type=rule_type, subject_key=subject, severity=Severity.HIGH, first_seen=now,
+                last_seen=now, late=False, message_key="alert_system_disk_low",
+                params={"free": "1 GB", "warn": "10 GB", **(params or {})}, facts={}, evidence=None, confidence=Confidence())
+    t = replace(t, devices=tuple(Device(k, r) for k, r in devices), devices_more=more)
+    pce = ctx.settings.current().pce
+    with ctx.db() as conn:
+        return store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="", pack_key=pack_key, trigger=t,
+                                  at=now, channels=["line"], hold=None)
+
+
+def test_an_alert_lists_its_hosts_and_each_opens_that_host(context, live_app):
+    from tests.e2e import test_hosts_e2e as hosts_e2e
+    hosts_e2e._seed(live_app)  # db: a managed host the inventory holds
+    seed(live_app.ctx)
+    _about(live_app.ctx, [(hosts_e2e.DB, "source"), ("ip:10.0.0.9", "destination")])
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    row = page.locator("[data-role=alert-list] tbody tr").first
+    links = row.locator("[data-role=host-link]")
+    expect(links).to_have_count(2)
+    expect(links.first).to_have_text("db")
+    assert links.first.get_attribute("href").startswith("/hosts?key=") and links.first.get_attribute("href").endswith("#connections")
+    assert "JetBrains Mono" in links.nth(1).locator("[data-role=address]").evaluate("(e) => getComputedStyle(e).fontFamily")
+    # opening a host from a row is not choosing that row: the other alert stays in the side panel
+    page.locator("[data-role=alert-list] tbody tr").nth(1).click()
+    chosen = page.locator("[data-role=alert-side] [data-role=alert-summary]").inner_text()
+    links.first.click()
+    expect(page.locator("h1")).to_have_text("db")
+    page.go_back()
+    expect(page.locator("[data-role=alert-list] tbody tr").first).to_be_visible()
+    assert chosen
+
+
+def test_the_side_panel_and_the_alerts_own_page_say_the_same(context, live_app):
+    from tests.e2e import test_hosts_e2e as hosts_e2e
+    hosts_e2e._seed(live_app)
+    a = _about(live_app.ctx, [(hosts_e2e.DB, "source"), ("ip:10.0.0.9", "destination")])
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    side = page.locator("[data-role=alert-side] [data-role=alert-body]")
+    expect(side.locator("[data-role=alert-devices] li")).to_have_count(2)
+    said = side.locator("[data-role=alert-devices]").inner_text()
+    assert "Source" in said and "Recording only (Visibility Only)" in said and "unmanaged address" in said
+    actions = set(side.locator("[data-role=alert-actions] a, [data-role=alert-actions] button").all_inner_texts())
+    summary = side.locator("[data-role=alert-summary]").inner_text()
+    page.goto(f"{live_app.url}/alerts/{a}")
+    full = page.locator("[data-role=alert-detail] [data-role=alert-body]")
+    expect(full.locator("[data-role=alert-devices] li")).to_have_count(2)
+    assert full.locator("[data-role=alert-devices]").inner_text() == said
+    there = set(full.locator("[data-role=alert-actions] a, [data-role=alert-actions] button").all_inner_texts())
+    assert there == actions - {"Full detail (evidence, notes)"}
+    assert full.locator("[data-role=alert-summary]").inner_text() == summary != ""
+
+
+def test_many_hosts_are_three_in_the_list_and_twenty_in_the_detail_the_rest_a_count(context, live_app):
+    a = _about(live_app.ctx, [(f"{W}h{i}", "subject") for i in range(20)], more=5, rule_type=AlertRuleType.EVENT,
+               subject="e" * 32, pack_key="rule_agent_heartbeat")
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    row = page.locator("[data-role=alert-list] tbody tr").first
+    expect(row.locator("[data-role=host-link]")).to_have_count(3)
+    expect(row).to_contain_text("and 22 more")
+    assert row.locator("[data-role=host-link]").first.get_attribute("href").endswith("#status")
+    page.goto(f"{live_app.url}/alerts/{a}")
+    devices = page.locator("[data-role=alert-detail] [data-role=alert-devices]")
+    expect(devices.locator("[data-role=host-link]")).to_have_count(20)
+    expect(devices).to_contain_text("and 5 more")
+    assert page.evaluate("document.querySelector('main').scrollWidth <= document.querySelector('main').clientWidth + 1")
+
+
+def test_an_alert_stored_before_hosts_were_kept_still_reads(context, live_app):
+    a = _lateral(live_app.ctx, "new_process", subject="ip:10.0.0.9")  # its parameters name a host and a target
+    with live_app.ctx.db() as conn:
+        conn.execute("DELETE FROM alert_devices")  # as an alert from before the upgrade, not backfilled
+        conn.commit()
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    row = page.locator("[data-role=alert-list] tbody tr").first
+    expect(row).to_contain_text("10.0.0.9")
+    expect(row.locator("[data-role=host-link]")).to_have_count(0)
+    page.goto(f"{live_app.url}/alerts/{a}")
+    expect(page.locator("[data-role=alert-detail] [data-role=alert-devices]")).to_contain_text("10.0.0.9")
+    expect(page.locator(".form-error")).to_have_count(0)
+
+
+def test_a_system_alert_says_it_is_about_no_host(context, live_app):
+    seed(live_app.ctx)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    expect(page.locator("[data-role=alert-list] tbody tr").first).to_contain_text("The PCE or this tool")
+    expect(page.locator("[data-role=alert-side] [data-role=alert-devices]")).to_have_text(
+        "This alert is about this tool or the PCE itself, not a particular host.")

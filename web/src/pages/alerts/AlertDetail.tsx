@@ -7,7 +7,8 @@ import { formatTime } from "../../components/ProbeResults";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
-import { DELIVERY_TONES, SEVERITY_KEYS, SEVERITY_TONES, deliveryText, word } from "./common";
+import { AlertBody } from "./AlertBody";
+import { DELIVERY_TONES, deliveryText } from "./common";
 
 type Row = Record<string, unknown>;
 
@@ -202,56 +203,8 @@ export function AlertDetail() {
       <p><Link to="/">{t("alert_back")}</Link></p>
       <div className="page-head">
         <div className="page-title"><h1>{d.rule_name}</h1><Purpose>{t("purpose_alert_detail")}</Purpose></div>
-        {d.evidence_kind && (
-          <Link className="btn-primary" to={`/investigate?alert=${id}`} data-role="open-workbench">{t("alert_open_workbench")}</Link>
-        )}
-        {/^(\/orgs\/\d+\/workloads\/|ip:)/.test(d.subject_key) && (
-          <Link className="btn-text" to={`/hosts?${new URLSearchParams({ key: d.subject_key }).toString()}`} data-role="open-host">
-            {t("hosts_title")}
-          </Link>
-        )}
-        {d.console_link && (
-          <a className="btn-text" href={d.console_link} target="_blank" rel="noopener noreferrer">{t("alert_open_console")}</a>
-        )}
       </div>
-      <div className="card stack">
-        <p>
-          <span className="badge" data-tone={SEVERITY_TONES[d.severity]}>{word(SEVERITY_KEYS, d.severity)}</span>{" "}
-          <strong data-role="alert-summary">{d.summary}</strong>
-        </p>
-        <p className="hint">{t("alert_fired_at", { at: formatTime(d.fired_at, lang) })}</p>
-        {d.caveats.map((c) => <p key={c} className="notice">{c}</p>)}
-        {d.grouped && typeof d.params.known_reason === "string"
-          ? <p className="hint" data-role="known-reason">{t("alert_known_reason", { reason: d.params.known_reason })}</p>
-          : d.grouped && <p className="hint">{t("alert_grouped_known_cause")}</p>}
-      </div>
-      {d.next_steps.length > 0 && (
-        <div className="card stack" data-role="next-steps">
-          <h2>{t("guide_title")}</h2>
-          {d.next_steps.map((s) => <p key={s}>{s}</p>)}
-        </div>
-      )}
-      <div className="card stack" data-role="alert-context">
-        <h2>{t("alert_timeline_title")}</h2>
-        <ol className="timeline" data-role="timeline">
-          {d.timeline.map((e, i) => (
-            <li key={i} data-kind={e.kind}><span className="num">{formatTime(e.at, lang)}</span> {e.text}</li>
-          ))}
-        </ol>
-        <h2>{t("alert_beyond_title")}</h2>
-        {d.beyond_vendor.length === 0
-          ? <p className="muted">{t("alert_beyond_none")}</p>
-          : <ul className="plain-list" data-role="beyond">{d.beyond_vendor.map((x) => <li key={x}>{x}</li>)}</ul>}
-        {d.quarantine.eligible && d.quarantine.key ? (
-          <p>
-            <Link className="btn-text" to={`/hosts?${new URLSearchParams({ key: d.quarantine.key }).toString()}`}
-                  data-role="quarantine-host">{t("alert_quarantine_on_host", { host: d.quarantine.name ?? d.quarantine.key })}</Link>
-          </p>
-        ) : (
-          <p className="hint" data-role="quarantine-reason">{t(d.quarantine.reason === "unmanaged" ? "alert_q_unmanaged"
-            : d.quarantine.reason === "not_in_inventory" ? "alert_q_not_in_inventory" : "alert_q_no_subject")}</p>
-        )}
-      </div>
+      <div className="card"><AlertBody d={d} full /></div>
       <div className="card stack">
         <h2>{t("alert_evidence_title")}</h2>
         <p className="hint">{t("alert_evidence_hint")}</p>
