@@ -1,0 +1,93 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>告警頁示意</title>
+<style>
+:root{--t1:#313638;--t2:#5B6164;--t3:#646B6E;--line:#E6E2DA;--soft:#F0EDE6;--warm:#F7F4EE;--act:#F3EEE4;--accent:#FF5500;--fill:#C24300;
+--hi-b:#E8762E;--hi-bg:#FDEEE4;--hi-fg:#A63A08;--md-b:#FFA22F;--md-bg:#FFF3E0;--md-fg:#8A5600;--ok:#166644}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 "Noto Sans TC","Noto Sans CJK TC",sans-serif;color:var(--t1);background:#fff;display:flex;min-height:1000px}
+nav{width:212px;border-right:1px solid var(--line);padding:20px 8px;flex:none}
+.brand{font-weight:600;font-size:17px;padding:0 12px 4px}.brand:before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);margin-right:6px}
+.sub{font-size:12px;color:var(--t3);padding:0 12px 16px}
+.grp{font-size:11px;color:var(--t3);padding:14px 12px 4px;letter-spacing:.04em}
+nav a{display:flex;justify-content:space-between;padding:7px 12px;border-radius:6px;color:var(--t1);text-decoration:none}
+nav a.on{background:var(--act);font-weight:600;box-shadow:inset 3px 0 0 var(--accent)}
+.new{font-size:11px;background:var(--fill);color:#fff;border-radius:9px;padding:0 7px;line-height:18px;font-weight:600}
+main{flex:1;padding:24px 32px;min-width:0}
+h1{font-size:26px;margin:0;font-weight:600}.purpose{color:var(--t2);margin:2px 0 0}
+.head{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:16px;border-bottom:1px solid var(--line)}
+select,.seg{height:34px;border:1px solid #D9D3C7;border-radius:6px;background:#fff;font:inherit;font-size:13px;padding:0 10px}
+.sum{margin:16px 0;padding:14px 16px;background:var(--warm);border-radius:8px;font-size:15px}.sum b{font-weight:600}
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}.bar .sp{flex:1}
+.seg{display:inline-flex;padding:0;overflow:hidden}.seg span{padding:0 12px;line-height:32px;color:var(--t2);border-right:1px solid var(--line)}.seg span:last-child{border:0}
+.seg span.on{background:var(--act);color:var(--t1);font-weight:600}.seg i{font-style:normal;color:var(--t3);margin-left:4px;font-size:12px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
+table{width:100%;border-collapse:collapse;table-layout:fixed}th{font-size:12px;color:var(--t3);text-align:left;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--soft);vertical-align:top}td.time,td.note,td.sent{white-space:nowrap}
+tr.sel td{background:var(--act)}tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.time{color:var(--t2);font-variant-numeric:tabular-nums}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--fill);margin-right:6px}.nodot{display:inline-block;width:13px}
+.sev{display:inline-block;font-size:12px;font-weight:600;border-radius:4px;padding:0 7px;line-height:20px}.sev.h{background:var(--hi-bg);color:var(--hi-fg)}.sev.m{background:var(--md-bg);color:var(--md-fg)}
+.what{font-weight:500}.kind{display:block;font-size:12px;color:var(--t3);font-weight:400}
+a.dev{color:var(--t1);text-decoration:underline;text-decoration-color:#B9B2A4;text-underline-offset:3px}
+.ip{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px}
+.note{color:var(--t3);font-size:13px}.sent{color:var(--ok);font-size:13px}
+aside{border:1px solid var(--line);border-radius:8px;padding:18px;position:relative}
+aside h2{font-size:17px;margin:8px 0 4px;line-height:1.4}.meta{color:var(--t3);font-size:12.5px}
+.sec{font-size:12px;color:var(--t3);font-weight:600;margin:18px 0 6px}
+.plain{margin:0}.more{font-size:13px;color:var(--t2);text-decoration:underline;text-underline-offset:3px}
+.devcard{border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.devcard small{display:block;color:var(--t3);font-size:12px}.devcard a{font-size:13px;color:var(--t1);text-decoration:underline;text-underline-offset:3px}
+.tl{margin:0;padding:0 0 0 12px;border-left:2px solid var(--line);list-style:none;font-size:13px}.tl li{padding:2px 0}.tl span{color:var(--t3);margin-right:8px;font-variant-numeric:tabular-nums}
+.acts{border-top:1px solid var(--line);margin-top:18px;padding-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{height:34px;border-radius:6px;padding:0 14px;font:inherit;font-weight:600;border:1px solid #D9D3C7;background:#fff;color:var(--t1)}
+.btn.p{background:var(--fill);border-color:var(--fill);color:#fff}.btn[disabled]{color:#A9A294;background:#FAF8F4}
+.why{font-size:12.5px;color:var(--t3);margin:8px 0 0;flex-basis:100%}.txt{font-size:13px;color:var(--t2);text-decoration:underline;text-underline-offset:3px;margin-left:auto}
+.tagline{position:fixed;right:12px;bottom:8px;font-size:11px;color:#A9A294}
+</style>
+<nav>
+ <div class="brand">illumio-ops</div><div class="sub">進階模式 · 收集正常</div>
+ <div class="grp">監看</div><a class="on">告警 <span class="new">新 3</span></a><a>告警規則與通知</a><a>報表</a>
+ <div class="grp">設備</div><a>主機</a><a>VEN 總覽</a><a>隔離與加速收集</a>
+ <div class="grp">分析</div><a>偵測</a><a>調查</a>
+ <div class="grp">自動</div><a>規則排程</a>
+ <div class="grp">設定</div><a>SIEM 轉送</a><a>系統</a>
+</nav>
+<main>
+ <div class="head"><div><h1>告警</h1><p class="purpose">最近發生了哪些需要注意的事，以及牽涉到哪些設備。</p></div>
+  <select><option>最近 7 天</option></select></div>
+ <div class="sum">近 7 天共 <b>25 則</b>：高 <b>12</b>、中 <b>13</b>。上次查看之後新增 <b>3 則</b>。</div>
+ <div class="bar">
+  <div class="seg"><span class="on">全部<i>25</i></span><span>高<i>12</i></span><span>中<i>13</i></span></div>
+  <div class="seg"><span class="on">所有類型</span><span>橫向移動</span><span>流量異常</span><span>事件</span><span>系統</span></div>
+  <span class="sp"></span>
+  <div class="seg"><span class="on">全部</span><span>只看新的</span></div>
+ </div>
+ <div class="cols">
+ <table><colgroup><col style="width:122px"><col style="width:52px"><col><col style="width:250px"><col style="width:84px"></colgroup>
+  <tr><th>時間</th><th>等級</th><th>發生什麼</th><th>涉及設備</th><th>通知</th></tr>
+  <tr class="sel"><td class="time"><span class="dot"></span>11-10 11:47</td><td><span class="sev m">中</span></td><td><span class="what">跨環境的遠端管理連線（SSH）</span><span class="kind">橫向移動 · Physical → Server</span></td><td><a class="dev">dev.lab.local</a> → <a class="dev">ilo-flow</a></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="dot"></span>11-10 10:17</td><td><span class="sev m">中</span></td><td><span class="what">第一次出現的遠端管理連線（SSH）</span><span class="kind">橫向移動 · 新的管理連線</span></td><td><a class="dev">dev.lab.local</a> → <span class="ip">192.168.20.99</span></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="dot"></span>11-10 09:37</td><td><span class="sev m">中</span></td><td><span class="what">跨環境的遠端管理連線（遠端桌面）</span><span class="kind">橫向移動 · Server → NetworkDevice</span></td><td><a class="dev">dc</a> → <a class="dev">Fortigate</a></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="nodot"></span>11-09 22:17</td><td><span class="sev m">中</span></td><td><span class="what">連線方向反了：平常是 wg 連過來</span><span class="kind">流量異常 · port 3128</span></td><td><span class="ip">172.16.15.131</span> → <a class="dev">wg</a></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="nodot"></span>11-09 09:46</td><td><span class="sev m">中</span></td><td><span class="what">連線方向反了：平常是 dev.lab.local 連過來</span><span class="kind">流量異常 · 連線方向反轉</span></td><td><a class="dev">Fortigate</a> → <a class="dev">dev.lab.local</a></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="nodot"></span>11-09 09:06</td><td><span class="sev m">中</span></td><td><span class="what">跨環境的遠端管理連線（SSH）</span><span class="kind">橫向移動 · Physical → Kubernetes</span></td><td><a class="dev">dev.lab.local</a> → <a class="dev">k8s-master</a></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="nodot"></span>11-09 01:57</td><td><span class="sev m">中</span></td><td><span class="what">跨環境的遠端管理連線（SSH）</span><span class="kind">橫向移動 · Physical → Server</span></td><td><a class="dev">dev.lab.local</a> → <a class="dev">pce.lab.local</a></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="nodot"></span>11-08 21:30</td><td><span class="sev h">高</span></td><td><span class="what">PCE 健康檢查失敗</span><span class="kind">系統 · 連續兩次檢查失敗</span></td><td class="note">PCE 本身</td><td class="sent">已寄 2 處</td></tr>
+  <tr><td class="time"><span class="nodot"></span>11-08 16:16</td><td><span class="sev m">中</span></td><td><span class="what">跨環境的遠端管理連線（SSH）</span><span class="kind">橫向移動 · Physical → Server</span></td><td><a class="dev">dev.lab.local</a> → <a class="dev">ilo-flow</a></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="nodot"></span>11-08 16:11</td><td><span class="sev m">中</span></td><td><span class="what">跨環境的遠端管理連線（SSH）</span><span class="kind">橫向移動 · Physical → Server</span></td><td><a class="dev">dev.lab.local</a> → <a class="dev">batch.lab.local</a></td><td class="note">只記錄</td></tr>
+  <tr><td class="time"><span class="nodot"></span>11-08 16:01</td><td><span class="sev m">中</span></td><td><span class="what">第一次出現的遠端管理連線（SSH）</span><span class="kind">橫向移動 · 新的管理連線</span></td><td><span class="ip">100.95.71.12</span> → <a class="dev">dev.lab.local</a></td><td class="note">只記錄</td></tr>
+ </table>
+ <aside>
+  <span class="sev m">中</span> <span class="meta">橫向移動 · 2026-11-10 11:47</span>
+  <h2>dev.lab.local 用 SSH 連到另一個環境的 ilo-flow</h2>
+  <div class="sec">這代表什麼</div>
+  <p class="plain">實體機環境的主機，用遠端管理的方式連進伺服器環境。兩個環境之間通常不該有這種連線。 <a class="more">為什麼會被偵測到</a></p>
+  <div class="sec">涉及設備</div>
+  <div class="devcard"><div>dev.lab.local<small>來源 · Physical · 還沒開始擋（Idle）</small></div><a>看這台主機</a></div>
+  <div class="devcard"><div>ilo-flow<small>目的 · Server · 只擋部分（Selective）</small></div><a>看這台主機</a></div>
+  <div class="sec">經過</div>
+  <ul class="tl"><li><span>11-10 10:09</span>第一次看到這條管理連線</li><li><span>11-10 11:41</span>發現它跨了環境</li><li><span>11-10 11:47</span>產生這則告警</li></ul>
+  <div class="acts"><button class="btn p">調查這條連線</button><button class="btn" disabled>隔離來源主機…</button><a class="txt">這類以後不要再告警</a>
+   <p class="why">無法隔離：dev.lab.local 還沒開始擋（Idle），套上隔離標籤也不會生效。</p></div>
+ </aside>
+ </div>
+</main>
+<div class="tagline">示意圖 · 資料取自 .106 實際告警，「新 3」為假設值</div>
+</html>
