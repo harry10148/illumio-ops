@@ -228,7 +228,7 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
                   <span>{h.is_ruleset ? t("rs_whole_ruleset", { name: h.name }) : `${h.name} · ${h.ruleset_name}`}</span>
                   <Tag tone={h.enabled ? "ok" : "muted"}>{h.enabled ? t("rs_live_enabled") : t("rs_live_disabled")}</Tag>
                 </label>
-                <div className="hint mono">{h.summary}</div>
+                <div className="hint">{h.summary}</div>
                 {why && <div className="hint" data-role="rs-target-why">{why}</div>}
               </li>
             );
@@ -272,7 +272,7 @@ function EditSchedule({ schedule, writeKey, onDone }: { schedule: ScheduleView; 
     <div className="stack" data-role="rs-edit">
       <h2>{t("rs_edit_title")}</h2>
       <p>{schedule.is_ruleset ? t("rs_whole_ruleset", { name: schedule.name }) : `${schedule.name} · ${schedule.ruleset_name}`}</p>
-      <p className="hint mono">{schedule.summary}</p>
+      <p className="hint">{schedule.summary}</p>
       {!writeKey && <p className="notice">{t("rs_no_write_key")}</p>}
       {fields}
       <div className="actions">
@@ -376,7 +376,7 @@ export function RuleSchedules() {
               columns={[
                 { key: "target", label: t("rs_col_target"), render: (s) => (
                   <div><div>{s.is_ruleset ? t("rs_whole_ruleset", { name: s.name }) : `${s.name} · ${s.ruleset_name}`}</div>
-                    <div className="hint mono">{s.summary}</div></div>) },
+                    <div className="hint">{s.summary}</div></div>) },
                 { key: "type", label: t("rs_col_type"), render: (s) => <span className="nowrap">{weeklyOf(s) ? t("rs_type_weekly") : t("rs_type_expiry")}</span> },
                 { key: "time", label: t("rs_col_time"), render: (s) => (
                   <div><div>{planText(s, lang)}</div><div className="hint">{previewText(s.preview_key, s.preview_params)}</div></div>) },
@@ -389,8 +389,8 @@ export function RuleSchedules() {
                   <div data-role="rs-last">
                     <Tag tone={s.last_run.result === "failed" ? "crit" : s.last_run.result === "skipped" ? "high" : "ok"}>
                       {word(ACTION_KEYS, s.last_run.action)}
-                    </Tag> <span className="mono hint">{shortTime(s.last_run.at)}</span>
-                    {s.last_run.status !== null && <div className="hint mono">HTTP {s.last_run.status} {s.last_run.detail ?? ""}</div>}
+                    </Tag> <span className="num hint">{shortTime(s.last_run.at)}</span>
+                    {s.last_run.status !== null && <div className="hint">HTTP {s.last_run.status} {s.last_run.detail ?? ""}</div>}
                   </div>) : <span className="hint">{t("rs_never_checked")}</span>) },
                 { key: "act", label: "", render: (s) => (
                   <div className="row nowrap">
@@ -413,7 +413,7 @@ export function RuleSchedules() {
               rowKey={(r) => `${r.at}-${r.name}-${r.action}`}
               empty={t("rs_runs_none")}
               columns={[
-                { key: "at", label: t("rs_col_at"), kind: "mono", render: (r) => formatTime(r.at, lang) },
+                { key: "at", label: t("rs_col_at"), kind: "time", render: (r) => formatTime(r.at, lang) },
                 { key: "name", label: t("rs_col_target"), render: (r) => r.name },
                 { key: "action", label: t("rs_col_action"), render: (r) => word(ACTION_KEYS, r.action) },
                 { key: "result", label: t("rs_col_result"), render: (r) => (

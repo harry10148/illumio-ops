@@ -8,7 +8,7 @@ import type {
   Coverage, DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostHit, HostProfile as Profile, HostRansomware, HostTamper, PullInfo, QuarantineAction, QuarantineOutcome, RankedValue, SegmentDimension,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { NeedsAdvanced, PageHead, Panel, SeverityTag } from "../../components/ui";
+import { HostName, NeedsAdvanced, PageHead, Panel, SeverityTag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, word } from "../alerts/common";
@@ -604,7 +604,7 @@ function Usual({ profile }: { profile: Profile }) {
       <h3 className="side-h">{title}</h3>
       {rows.length === 0 ? <p className="muted">{t("hosts_usual_empty")}</p> : (
         <ol className="plain-list" data-role={role}>
-          {rows.map((r) => <li key={r.value}><span className="mono">{r.value}</span> <span className="hint">{r.connections.toLocaleString()}</span></li>)}
+          {rows.map((r) => <li key={r.value}><HostName name={r.value} /> <span className="hint num">{r.connections.toLocaleString()}</span></li>)}
         </ol>
       )}
     </div>
@@ -630,7 +630,7 @@ function Different({ profile }: { profile: Profile }) {
     <ul className="plain-list" data-role="different">
       {different.map((d) => (
         <li key={d.detection_id}><SeverityTag severity={d.severity} /> {d.text}{" "}
-          <span className="hint mono">{formatTime(d.first_seen, lang)}</span></li>
+          <span className="hint num">{formatTime(d.first_seen, lang)}</span></li>
       ))}
     </ul>
   );

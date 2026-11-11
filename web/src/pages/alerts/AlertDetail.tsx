@@ -234,7 +234,7 @@ export function AlertDetail() {
         <h2>{t("alert_timeline_title")}</h2>
         <ol className="timeline" data-role="timeline">
           {d.timeline.map((e, i) => (
-            <li key={i} data-kind={e.kind}><span className="mono">{formatTime(e.at, lang)}</span> {e.text}</li>
+            <li key={i} data-kind={e.kind}><span className="num">{formatTime(e.at, lang)}</span> {e.text}</li>
           ))}
         </ol>
         <h2>{t("alert_beyond_title")}</h2>

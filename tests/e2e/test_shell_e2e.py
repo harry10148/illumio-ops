@@ -65,8 +65,10 @@ def test_fonts_offline(live_app, context):
     page.on("request", lambda r: outside.append(r.url) if not r.url.startswith(live_app.url) else None)
     sign_in(page, live_app.url)
     page.locator(".sidenav").wait_for()
-    family = page.evaluate("getComputedStyle(document.querySelector('.nav-user .mono')).fontFamily")
-    assert outside == [] and "JetBrains Mono" in family
+    # the monospace face is for values to copy (an address, a port): it loads from this server, and so does Montserrat
+    loaded = page.evaluate("""Promise.all(['12px "JetBrains Mono Variable"', '600 12px "Montserrat"']
+        .map((f) => document.fonts.load(f).then((faces) => faces.length)))""")
+    assert outside == [] and all(n > 0 for n in loaded), (outside, loaded)
 
 
 def test_a_failed_dictionary_is_fetched_again(live_app, context):

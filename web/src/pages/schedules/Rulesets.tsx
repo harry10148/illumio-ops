@@ -83,7 +83,7 @@ export function Rulesets() {
                 rowKey={(r) => r.href}
                 empty={t("rsb_no_rules")}
                 columns={[
-                  { key: "rule", label: t("rsb_col_rule"), kind: "mono", render: (r) => r.label },
+                  { key: "rule", label: t("rsb_col_rule"), render: (r) => r.label },
                   { key: "kind", label: t("rsb_col_kind"), render: (r) => (
                     <Tag tone={r.kind === "allow" ? "ok" : "crit"}>{t(KIND_KEYS[r.kind])}</Tag>) },
                   { key: "state", label: t("rsb_col_state"), render: (r) => (
@@ -92,7 +92,7 @@ export function Rulesets() {
                       <Flags pending={r.draft_pending} scheduled={r.scheduled} />
                     </span>) },
                   { key: "what", label: t("rsb_col_what"), render: (r) => (
-                    <div><div className="mono">{r.summary}</div>{r.description && <div className="hint">{r.description}</div>}</div>) },
+                    <div><div>{r.summary}</div>{r.description && <div className="hint">{r.description}</div>}</div>) },
                 ]}
               />
             </Panel>

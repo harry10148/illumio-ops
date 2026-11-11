@@ -158,8 +158,8 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
                           </div>
                         )}
                       </td>
-                      <td className="wb-num mono" data-role="fired-7d">{s?.fired_7d ?? 0}</td>
-                      <td className="wb-num mono" data-role="known-7d">{s?.known_7d ?? 0}</td>
+                      <td className="wb-num" data-role="fired-7d">{s?.fired_7d ?? 0}</td>
+                      <td className="wb-num" data-role="known-7d">{s?.known_7d ?? 0}</td>
                       <td>{s?.last_status ? word(STATUS_KEYS, s.last_status) : ""}</td>
                     </tr>
                   );

@@ -307,7 +307,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                 <td>
                   <span className="badge" data-tone={STATUS_TONES[r.status]}>{word(STATUS_KEYS, r.status)}</span>
                   {r.error_key && <div className="hint">{t(r.error_key)}</div>}
-                  {r.error_detail && <div className="hint mono">{r.error_detail}</div>}
+                  {r.error_detail && <div className="hint">{r.error_detail}</div>}
                 </td>
                 <td>
                   {r.files.map((f) => (
@@ -325,7 +325,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                 </td>
                 <td>
                   {r.email_status ? word(EMAIL_KEYS, r.email_status) : ""}
-                  {r.email_detail && <div className="hint mono">{r.email_detail}</div>}
+                  {r.email_detail && <div className="hint">{r.email_detail}</div>}
                 </td>
                 <td>
                   <button type="button" className="btn-quiet" disabled={r.status === "running"}

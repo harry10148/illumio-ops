@@ -1,7 +1,7 @@
 // The console's building blocks (UI redesign spec §7, samples 01–11). Pages compose these; colours come only from
 // tokens.css through data-tone.
-import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Link, type LinkProps } from "react-router-dom";
 
 import { t } from "../i18n";
 
@@ -14,6 +14,35 @@ export function shortTime(iso: string, now: Date = new Date()): string {
   if (d.toDateString() === now.toDateString()) return hm;
   const md = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   return d.getFullYear() === now.getFullYear() ? `${md} ${hm}` : `${d.getFullYear()}-${md}`;
+}
+
+/** The three levels of action, and the dangerous one (purpose-led UI spec §5.2): one primary in a region, the rest
+ * secondary, text for going somewhere or for what is seldom done. */
+export type ButtonKind = "primary" | "secondary" | "text" | "danger";
+const BUTTON_CLASS: Record<ButtonKind, string> = {
+  primary: "btn-primary", secondary: "btn-quiet", text: "btn-text", danger: "btn-danger",
+};
+
+export function Button({ kind = "secondary", className, type = "button", ...rest }:
+    ButtonHTMLAttributes<HTMLButtonElement> & { kind?: ButtonKind }) {
+  return <button type={type} className={className ? `${BUTTON_CLASS[kind]} ${className}` : BUTTON_CLASS[kind]} {...rest} />;
+}
+
+/** A link that reads as a button of that level. */
+export function LinkButton({ kind = "secondary", className, ...rest }: LinkProps & { kind?: ButtonKind }) {
+  return <Link className={className ? `${BUTTON_CLASS[kind]} ${className}` : BUTTON_CLASS[kind]} {...rest} />;
+}
+
+/** Why an action will not do what its name says (or cannot be taken), on its own line under the action. */
+export function ActionNote({ children }: { children: ReactNode }) {
+  return <p className="action-note" data-role="action-note">{children}</p>;
+}
+
+const ADDRESS = /^(ip:)?(\d{1,3}(\.\d{1,3}){3}|[0-9a-f:]*:[0-9a-f:]+)(\/\d+)?$/i;
+
+/** A host by name in the reading face; an address in monospace (a value to copy). */
+export function HostName({ name }: { name: string }) {
+  return ADDRESS.test(name.trim()) ? <span className="mono" data-role="address">{name}</span> : <>{name}</>;
 }
 
 export type Tone = "crit" | "high" | "med" | "low" | "ok" | "accum" | "adv" | "muted";
@@ -76,7 +105,7 @@ export function KpiStrip({ items }: { items: KpiItem[] }) {
           <div className="kpi-label">{k.label}</div>
           {k.value === null
             ? <div className="kpi-reason"><Reason text={k.reason ?? t("value_not_computed")} /></div>
-            : <div className="kpi-value mono">{k.value}</div>}
+            : <div className="kpi-value">{k.value}</div>}
           {k.delta && <div className="kpi-delta">{k.delta}</div>}
         </div>
       ))}
@@ -87,8 +116,8 @@ export function KpiStrip({ items }: { items: KpiItem[] }) {
 export interface Column<R> {
   key: string;
   label: string;
-  /** Numbers and times line up right and use the monospace face. */
-  kind?: "text" | "num" | "mono";
+  /** num: right-aligned figures; time: one line, digits of one width; mono: a value to copy (address, port, href). */
+  kind?: "text" | "num" | "time" | "mono";
   render: (row: R) => ReactNode;
 }
 

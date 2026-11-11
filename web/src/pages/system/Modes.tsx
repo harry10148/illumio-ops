@@ -55,9 +55,9 @@ export function Modes() {
       <Panel title={t("modes_data_title")} role="data-status">
         <dl className="kv-list">
           <dt>{t("modes_events_latest")}</dt>
-          <dd className="mono">{d.events_latest ? formatTime(d.events_latest, lang) : <Reason text={t("shell_collection_not_started")} />}</dd>
+          <dd className="num">{d.events_latest ? formatTime(d.events_latest, lang) : <Reason text={t("shell_collection_not_started")} />}</dd>
           <dt>{t("modes_flows_latest")}</dt>
-          <dd className="mono">{d.flows_latest ? formatTime(d.flows_latest, lang)
+          <dd className="num">{d.flows_latest ? formatTime(d.flows_latest, lang)
             : <Reason text={d.mode === "basic" ? basicWhy : t("shell_collection_not_started")} />}</dd>
           <dt>{t("modes_baseline")}</dt>
           <dd>{d.baseline_days === null ? <Reason text={basicWhy} />
@@ -69,7 +69,7 @@ export function Modes() {
           <dd data-role="gaps">{d.gaps.length === 0 ? t("modes_gaps_none") : (
             <ul className="plain-list">
               {d.gaps.map((g, i) => (
-                <li key={i} className="mono">{g.source} · {g.kind} · {formatTime(g.start, lang)} – {formatTime(g.end, lang)}</li>
+                <li key={i} className="num">{g.source} · {g.kind} · {formatTime(g.start, lang)} – {formatTime(g.end, lang)}</li>
               ))}
             </ul>
           )}</dd>
@@ -79,7 +79,7 @@ export function Modes() {
         <dl className="kv-list">
           {d.disk.map((p) => (
             <div key={p.name} style={{ display: "contents" }}>
-              <dt>{t(DISK_KEYS[p.name] ?? p.name)}</dt><dd className="mono" data-disk={p.name}>{size(p.bytes)}</dd>
+              <dt>{t(DISK_KEYS[p.name] ?? p.name)}</dt><dd className="num" data-disk={p.name}>{size(p.bytes)}</dd>
             </div>
           ))}
         </dl>

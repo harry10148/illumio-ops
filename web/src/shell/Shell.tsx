@@ -48,7 +48,7 @@ function Item({ item, status, onPick }: { item: NavItem; status: ShellStatus | n
     <NavLink to={item.to ?? item.path} end={item.path === "/"} className="nav-item" onClick={onPick}
              data-dimmed={dimmed || undefined} data-nav={item.path}>
       <span>{t(item.labelKey)}{dimmed && <span className="nav-mark" title={t("needs_advanced_title")}> ◆</span>}</span>
-      {count > 0 && <span className="nav-badge mono" aria-label={t("shell_unprocessed", { n: String(count) })}>{count}</span>}
+      {count > 0 && <span className="nav-badge num" aria-label={t("shell_unprocessed", { n: String(count) })}>{count}</span>}
     </NavLink>
   );
 }
@@ -101,11 +101,11 @@ export function Shell({ me, onSignedOut }: Props) {
               </NavLink>
             )}
             <div className="nav-user">
-              <span className="mono">{me.username}</span>
+              <span>{me.username}</span>
               <button type="button" className="btn-link" onClick={signOut}>{t("user_menu_logout")}</button>
             </div>
             {status && (
-              <div className="nav-version mono" data-role="product-version">{t("shell_version", { version: status.version })}</div>
+              <div className="nav-version num" data-role="product-version">{t("shell_version", { version: status.version })}</div>
             )}
           </div>
         </nav>

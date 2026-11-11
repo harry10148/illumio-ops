@@ -338,7 +338,7 @@ function History({ actions, lang }: { actions: FleetAction[]; lang: string }) {
     <DataTable<FleetAction>
       rows={actions} rowKey={(a) => String(a.id)} empty={t("fleet_history_none")}
       columns={[
-        { key: "at", label: t("fleet_col_at"), kind: "mono", render: (a) => formatTime(a.at, lang) },
+        { key: "at", label: t("fleet_col_at"), kind: "time", render: (a) => formatTime(a.at, lang) },
         { key: "by", label: t("fleet_col_by"), render: (a) => a.by },
         { key: "host", label: t("fleet_col_host"), render: (a) => <Link to={`/hosts?key=${encodeURIComponent(a.workload_href)}`}>{hostName(a.hostname, a.workload_href)}</Link> },
         { key: "action", label: t("fleet_col_action"), render: (a) => (
@@ -484,10 +484,10 @@ function Fleet() {
               <Link to={`/hosts?key=${encodeURIComponent(h.key)}`}>{hostName(h.name, h.key)}</Link>) },
             { key: "mode", label: t("hosts_mode"), render: (h) => modeWord(h.mode) },
             { key: "online", label: t("fleet_tally_online"), render: (h) => word(ONLINE_KEYS, h.online) },
-            { key: "beat", label: t("fleet_col_heartbeat"), kind: "mono", render: (h) => (h.last_heartbeat_at ? formatTime(h.last_heartbeat_at, lang) : "—") },
+            { key: "beat", label: t("fleet_col_heartbeat"), kind: "time", render: (h) => (h.last_heartbeat_at ? formatTime(h.last_heartbeat_at, lang) : "—") },
             { key: "sync", label: t("hosts_policy_sync"), render: (h) => (
               <span>{h.policy_sync_state ?? "—"}{h.problems.length ? ` · ${h.problems.map((p) => word(PROBLEM_KEYS, p)).join("、")}` : ""}</span>) },
-            { key: "version", label: t("fleet_tally_versions"), kind: "mono", render: (h) => h.ven_version ?? "—" },
+            { key: "version", label: t("fleet_tally_versions"), render: (h) => h.ven_version ?? "—" },
             { key: "os", label: t("fleet_tally_os"), render: (h) => h.os_id ?? "—" },
             { key: "env", label: t("fleet_col_env"), render: (h) => h.env ?? "—" },
             { key: "app", label: t("fleet_col_app"), render: (h) => h.app ?? "—" },

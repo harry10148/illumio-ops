@@ -6,7 +6,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { AlertDetail, AlertItem, AlertList as AlertListData } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { DataTable, DetailPane, KpiStrip, PageHead, SeverityTag, Tag, shortTime } from "../../components/ui";
+import { ActionNote, DataTable, DetailPane, HostName, KpiStrip, PageHead, SeverityTag, Tag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { useBasicMode } from "../../shell/status";
@@ -39,6 +39,8 @@ function Deliveries({ item }: { item: AlertItem }) {
   }
   if (sent > 0) return <span data-delivery="sent"><Tag tone="ok">{t("alerts_delivery_sent", { n: String(sent) })}</Tag></span>;
   const [first] = item.deliveries;
+  // recorded only is a setting, not an outcome: said in words, not as a tag
+  if (first?.status === "not_notified") return <span className="hint" data-delivery="not_notified">{deliveryText(first)}</span>;
   return first
     ? <span data-delivery={first.status}><Tag tone={DELIVERY_TONE[first.status] ?? "muted"}>{deliveryText(first)}</Tag></span>
     : null;
@@ -76,13 +78,13 @@ function Side({ id, onKnown }: { id: number; onKnown: () => void }) {
         {d.grouped && <Tag tone="muted">{t("alerts_grouped_tag")}</Tag>}
       </div>
       <h2 className="side-title" data-role="alert-summary">{d.summary}</h2>
-      <p className="hint">{d.rule_name} · <span className="mono">{formatTime(d.fired_at, lang)}</span></p>
+      <p className="hint">{d.rule_name} · <span className="num">{formatTime(d.fired_at, lang)}</span></p>
       {d.caveats.map((c) => <p key={c} className="notice">{c}</p>)}
       <div>
         <h3 className="side-h">{t("alert_timeline_title")}</h3>
         <ol className="timeline" data-role="timeline">
           {d.timeline.map((e, i) => (
-            <li key={i} data-kind={e.kind}><span className="mono" title={formatTime(e.at, lang)}>{shortTime(e.at)}</span> {e.text}</li>
+            <li key={i} data-kind={e.kind}><span className="num" title={formatTime(e.at, lang)}>{shortTime(e.at)}</span> {e.text}</li>
           ))}
         </ol>
       </div>
@@ -94,8 +96,9 @@ function Side({ id, onKnown }: { id: number; onKnown: () => void }) {
       </div>
       <div>
         <h3 className="side-h">{t("alert_delivery_title")}</h3>
-        <p className="row">{d.deliveries.map((x) => (
-          <Tag key={x.channel} tone={DELIVERY_TONE[x.status] ?? "muted"}>{deliveryText(x)}</Tag>
+        <p className="row">{d.deliveries.map((x) => (x.status === "not_notified"
+          ? <span key={x.channel} className="hint">{deliveryText(x)}</span>
+          : <Tag key={x.channel} tone={DELIVERY_TONE[x.status] ?? "muted"}>{deliveryText(x)}</Tag>
         ))}</p>
       </div>
       <div className="side-actions">
@@ -104,7 +107,7 @@ function Side({ id, onKnown }: { id: number; onKnown: () => void }) {
           : <span className="hint">{t("alert_no_evidence_to_investigate")}</span>}
         {q.eligible && q.key ? (
           <button type="button" className="btn-quiet" data-role="quarantine" onClick={() => setIsolating(true)}>
-            {t("alert_quarantine")}{q.no_enforcement ? ` · ${t("alert_quarantine_no_effect")}` : ""}
+            {t("alert_quarantine")}
           </button>
         ) : (
           <span className="hint" data-role="quarantine-reason">{t(q.reason === "unmanaged" ? "alert_q_unmanaged"
@@ -114,6 +117,7 @@ function Side({ id, onKnown }: { id: number; onKnown: () => void }) {
           <Link className="btn-quiet" to={`/alerts/${d.id}#mark-known`} onClick={onKnown}>{t("alert_known_mark")}</Link>
         )}
         <Link to={`/alerts/${d.id}`} data-role="open-detail">{t("alert_full_detail")}</Link>
+        {q.eligible && q.key && q.no_enforcement && <ActionNote>{t("alert_quarantine_no_effect")}</ActionNote>}
       </div>
       {isolating && q.key && (
         <QuarantineDialog hosts={[{ key: q.key, name: q.name ?? q.key }]} onClose={() => setIsolating(false)} />
@@ -202,7 +206,7 @@ export function AlertsHome() {
                 onRowClick={(a) => setSelected(a.id)}
                 empty={unprocessed ? t("alerts_none_unprocessed") : t("alerts_none")}
                 columns={[
-                  { key: "time", label: t("alerts_col_time"), kind: "mono", render: (a) => <span title={formatTime(a.fired_at, lang)}>{shortTime(a.fired_at)}</span> },
+                  { key: "time", label: t("alerts_col_time"), kind: "time", render: (a) => <span title={formatTime(a.fired_at, lang)}>{shortTime(a.fired_at)}</span> },
                   { key: "sev", label: t("alerts_col_severity"), render: (a) => <SeverityTag severity={a.severity} /> },
                   { key: "title", label: t("alerts_col_alert"), render: (a) => (
                     <div data-alert-id={a.id}>
@@ -210,8 +214,9 @@ export function AlertsHome() {
                       <div className="hint">{categoryWord(a.category)} · {a.rule_name}</div>
                     </div>
                   ) },
-                  { key: "ends", label: t("alerts_col_ends"), kind: "mono",
-                    render: (a) => (a.src || a.dst ? `${a.src ?? "—"} → ${a.dst ?? "—"}` : "—") },
+                  { key: "ends", label: t("alerts_col_ends"),
+                    render: (a) => (a.src || a.dst
+                      ? <>{a.src ? <HostName name={a.src} /> : "—"} → {a.dst ? <HostName name={a.dst} /> : "—"}</> : "—") },
                   { key: "delivery", label: t("alerts_col_delivery"), render: (a) => <Deliveries item={a} /> },
                 ]}
               />

@@ -64,7 +64,7 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
             margin-top: var(--space-5); padding: var(--space-4) var(--space-5) 0; border-top: 1px solid var(--line);
             color: var(--text-3); font-size: var(--fs-mini); }
 .nav-version { padding: var(--space-2) var(--space-5) 0; color: var(--text-3); font-size: var(--fs-micro); }
-.btn-link { border: 0; background: none; padding: 0; color: var(--accent-text); font: inherit; cursor: pointer;
+.btn-link { border: 0; background: none; padding: 0; color: var(--text-1); font: inherit; cursor: pointer;
             text-decoration: underline; text-underline-offset: 3px; }
 .content { overflow: auto; padding: var(--space-7) var(--space-8); min-width: 0; }
 .page { max-width: 1400px; }
@@ -76,9 +76,10 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .subnav-item.active { border-radius: 0; color: var(--text-1); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
 
 /* ── console building blocks (components/ui.tsx) ─────────────────────── */
-.tag { display: inline-flex; align-items: center; gap: var(--space-1); padding: 1px var(--space-4);
-       border: 1px solid var(--mark); border-radius: var(--radius-s); background: var(--fill); color: var(--ink);
-       font-size: var(--fs-micro); line-height: 1.6; white-space: nowrap; }
+/* a state is a tag: a fill and a word, never a frame (a frame reads as something to press), always one line */
+.tag, .badge { display: inline-flex; align-items: center; gap: var(--space-1); height: 20px; padding: 0 var(--space-4);
+       border: 0; border-radius: var(--radius-s); background: var(--fill); color: var(--ink);
+       font-size: var(--fs-mini); font-weight: 500; line-height: 20px; white-space: nowrap; vertical-align: middle; }
 .reason { color: var(--text-3); font-size: var(--fs-mini); font-family: var(--font-ui); }
 .needs-advanced { display: grid; gap: var(--space-3); padding: var(--space-5) var(--space-6);
                   border: 1px dashed var(--tone-adv-border); border-radius: var(--radius-l); background: var(--tone-adv-bg); }
@@ -96,7 +97,7 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .kpi-label::before { content: ""; width: 7px; height: 7px; background: var(--mark); flex: none; }
 .kpi[data-tone="muted"] .kpi-label { color: var(--text-3); }
 .kpi[data-tone="muted"] .kpi-label::before { background: var(--line-strong); }
-.kpi-value { margin-top: var(--space-2); font-family: var(--font-num); font-size: var(--fs-num); font-weight: 500;
+.kpi-value { margin-top: var(--space-2); font-family: var(--font-ui); font-size: var(--fs-num); font-weight: 500;
              font-variant-numeric: tabular-nums; color: var(--text-1); }
 .kpi[data-tone="crit"] .kpi-value, .kpi[data-tone="high"] .kpi-value { color: var(--ink); }
 .kpi-reason { min-height: 27px; display: flex; align-items: center; }
@@ -115,7 +116,7 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .panel-body { padding: var(--space-5) var(--space-6); }
 .panel-body > .table-wrap { margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-6)); }
 .data-table td[data-kind="num"], .data-table th[data-kind="num"] { text-align: right; font-variant-numeric: tabular-nums; }
-.data-table td[data-kind="num"] { font-family: var(--font-num); }
+.data-table td[data-kind="time"] { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-2); }
 .data-table td[data-kind="mono"] { font-family: var(--font-mono); font-size: var(--fs-mini); }
 .data-table tr.clickable { cursor: pointer; }
 .data-table tr.clickable:hover td { background: var(--surface-hover); }
@@ -161,6 +162,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   overflow-wrap: anywhere;
 }
 button { font: inherit; cursor: pointer; }
+/* every button is one size, wherever it sits (a table cell is set smaller) */
+.btn-primary, .btn-quiet, .btn-danger, .btn-text { font-size: var(--fs-ui); white-space: nowrap; }
 button:disabled { cursor: progress; opacity: .7; }
 .btn-primary {
   height: var(--ctl-h);
@@ -222,7 +225,6 @@ button:disabled { cursor: progress; opacity: .7; }
 .table th, .table td { text-align: left; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
 .table th { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .08em; color: var(--text-2); font-weight: 600;
             border-bottom-color: var(--line); }
-.badge { display: inline-block; padding: 0 var(--space-4); border-radius: var(--radius-s); background: var(--fill); color: var(--ink); border: 1px solid var(--mark); font-size: var(--fs-mini); }
 .wrap { overflow-wrap: anywhere; max-width: 48ch; }
 .nowrap { white-space: nowrap; }
 .log-message { min-width: 32ch; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--fs-mini); }
@@ -258,15 +260,24 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-st
 /* Alerts (P4) */
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap; }
 .page-head h1 { margin: 0; }
-/* links read as actions: orange, underlined */
-.page a:not([class]) { color: var(--accent-text); text-underline-offset: 3px; }
+/* a link is ink with a quiet underline; the accent is kept for the one main action of a region */
+.page a:not([class]), .btn-text { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--line-strong);
+                                  text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.page a:not([class]):hover, .btn-text:hover:not(:disabled) { text-decoration-color: var(--text-1); }
+/* the third level of action: no frame, for going somewhere or for what is seldom done */
+.btn-text { height: var(--ctl-h); padding: 0 var(--space-2); border: 0; background: none; }
+/* why an action will not do what its name says, under the action — never inside the button */
+.action-note { flex-basis: 100%; margin: 0; color: var(--text-3); font-size: var(--fs-mini); }
+/* figures and times: the reading face, digits of one width */
+.num { font-variant-numeric: tabular-nums; }
 .sentence { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; }
 .sentence input.narrow, input.narrow { width: 7em; }
 fieldset { border: 1px solid var(--line); border-radius: var(--radius-m); padding: var(--space-5) var(--space-6); margin: 0;
            min-width: 0; display: grid; gap: var(--space-4); }
 legend { padding: 0 var(--space-2); color: var(--text-1); font-weight: 600; }
 td .badge + .badge { margin-left: var(--space-2); }
-a.btn-primary, a.btn-quiet { display: inline-flex; align-items: center; text-decoration: none; }
+a.btn-primary, a.btn-quiet, a.btn-danger, a.btn-text { display: inline-flex; align-items: center; }
+a.btn-primary, a.btn-quiet, a.btn-danger { text-decoration: none; }
 .table input[type=checkbox] { height: auto; margin: 0; }
 /* Workbench (P6a) */
 .wb-body { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: var(--space-6); align-items: start; }
@@ -359,7 +370,7 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 .side-h { margin: 0 0 var(--space-3); font-size: var(--fs-mini); color: var(--text-3); font-weight: 500; }
 .timeline { list-style: none; margin: 0; padding-left: var(--space-5); border-left: 2px solid var(--line-strong);
             display: grid; gap: var(--space-3); }
-.timeline .mono { color: var(--text-3); margin-right: var(--space-3); font-size: var(--fs-mini); }
+.timeline .num { color: var(--text-3); margin-right: var(--space-3); font-size: var(--fs-mini); }
 .timeline li[data-kind="alert"] { font-weight: 500; }
 .side-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); padding-top: var(--space-4);
                 border-top: 1px solid var(--line); }
