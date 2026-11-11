@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { Catalog, CustomReport, FlowCondition, ReportScheduleFields, SchedulesView, ScheduleItem } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Switch } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { STATUS_KEYS, STATUS_TONES, TYPE_KEYS, lookbackChoices, word } from "./common";
 import { FilterSummary, ReportFilter } from "./ReportFilter";
@@ -204,13 +205,14 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
     } else setError(env.error);
   }
 
-  async function toggle(item: ScheduleItem) {
-    if (!view) return;
+  async function toggle(item: ScheduleItem): Promise<boolean> {
+    if (!view) return false;
     const { id, ...fields } = item.schedule;
     const env = await call("report_schedules.update", { revision: view.revision, schedule: { ...fields, enabled: !fields.enabled } },
       { schedule_id: id });
     if (env.ok && env.data) setView(env.data);
     else setError(env.error);
+    return env.ok;
   }
 
   async function remove(id: string) {
@@ -273,7 +275,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
                         <div className="hint">{t("gui_reports_failures", { n: String(item.consecutive_failures) })}</div>
                       )}
                     </td>
-                    <td><input type="checkbox" aria-label={t("gui_reports_enabled")} checked={s.enabled} onChange={() => void toggle(item)} /></td>
+                    <td><Switch label={t("gui_reports_enabled")} name="schedule_enabled" checked={s.enabled} onChange={() => toggle(item)} /></td>
                     <td className="nowrap">
                       <button type="button" className="btn-quiet" onClick={() => void runNow(s.id)}>{t("gui_reports_run_now")}</button>
                       <button type="button" className="btn-quiet" onClick={() => { const { id, ...fields } = s; setEditing({ id, fields }); }}>{t("btn_edit")}</button>

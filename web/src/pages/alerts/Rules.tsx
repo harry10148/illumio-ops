@@ -4,6 +4,7 @@ import { Link, Navigate } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { EvaluateRequested, RuleListItem, RulesView } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { Switch } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { STATUS_KEYS, TYPE_KEYS, word } from "./common";
@@ -47,11 +48,12 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
     else { setError(env.error); setKeepSaved(false); }
   }
 
-  async function toggle(item: RuleListItem, field: "enabled" | "notify") {
-    if (!view) return;
+  async function toggle(item: RuleListItem, field: "enabled" | "notify"): Promise<boolean> {
+    if (!view) return false;
     const rule = { ...item.rule, [field]: !item.rule[field] };
     const env = await call("alert_rules.update", { revision: view.revision, rule }, { rule_id: item.rule.id });
     if (env.ok && env.data) { setView(env.data); setError(null); } else setError(env.error);
+    return env.ok;
   }
 
   async function applyPack(mode: Mode) {
@@ -129,12 +131,12 @@ export function Rules({ embedded = false }: { embedded?: boolean }) {
                       <td className="rule-words" data-role="rule-condition">{conditionSummary(item.rule)}</td>
                       <td className="rule-words" data-role="rule-exclusion">{exclusionSummary(item.rule) || t("rules_no_exclusion")}</td>
                       <td>
-                        <input type="checkbox" aria-label={t("rules_col_enabled")} checked={item.rule.enabled}
-                               onChange={() => void toggle(item, "enabled")} />
+                        <Switch label={t("rules_col_enabled")} name="rule_enabled" checked={item.rule.enabled}
+                                onChange={() => toggle(item, "enabled")} />
                       </td>
                       <td>
-                        <input type="checkbox" aria-label={t("rules_col_notify")} checked={item.rule.notify}
-                               onChange={() => void toggle(item, "notify")} />
+                        <Switch label={t("rules_col_notify")} name="rule_notify" checked={item.rule.notify}
+                                onChange={() => toggle(item, "notify")} />
                         {!item.rule.notify && <span className="hint"> {t("rules_record_only")}</span>}
                       </td>
                       <td>

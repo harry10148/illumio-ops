@@ -58,3 +58,69 @@ def test_recorded_only_is_said_in_words_not_as_a_tag(context, live_app):
     expect(cell).to_have_text("recorded only (rule setting)")
     expect(cell.locator(".tag")).to_have_count(0)
     assert page.locator("[data-role=alert-list] [data-delivery=not_notified].tag").count() == 0
+
+
+# ── switches, segments, checkboxes (spec §5.3) ──────────────────────────────
+
+def _rules_page(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alert-rules")
+    switch = page.locator("[data-role=rule-list] [role=switch]").first
+    expect(switch).to_be_visible()
+    return page, switch
+
+
+def test_a_switch_that_fails_to_save_goes_back_and_says_so(context, live_app):
+    page, switch = _rules_page(context, live_app)
+    before = switch.get_attribute("aria-checked")
+    page.route("**/api/alert-rules/*", lambda route: route.fulfill(
+        status=500, content_type="application/json",
+        body='{"ok": false, "data": null, "error": {"code": "internal", "message_key": "error_internal", "params": {}}}')
+        if route.request.method == "PUT" else route.continue_())
+    switch.click()
+    expect(switch).to_have_attribute("data-state", "failed")
+    expect(switch).to_have_attribute("aria-checked", before)
+    expect(page.locator(".form-error")).to_be_visible()
+
+
+def test_a_switch_that_saves_shows_it_and_the_change_is_kept(context, live_app):
+    page, switch = _rules_page(context, live_app)
+    after = "false" if switch.get_attribute("aria-checked") == "true" else "true"
+    switch.click()
+    expect(switch).to_have_attribute("data-state", "saved")
+    expect(switch).to_have_attribute("aria-checked", after)
+    page.reload()
+    expect(page.locator("[data-role=rule-list] [role=switch]").first).to_have_attribute("aria-checked", after)
+
+
+def test_a_segment_is_chosen_from_the_keyboard_and_shows_where_the_focus_is(context, live_app):
+    alerts_e2e.seed(live_app.ctx)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    choice = page.locator("[data-role=alert-unprocessed] button[data-value=all]")
+    expect(choice).to_have_attribute("aria-pressed", "false")
+    choice.focus()
+    page.keyboard.press("Tab")
+    page.keyboard.press("Shift+Tab")  # arrive by keyboard, so the focus ring is the visible kind
+    assert choice.evaluate("(e) => e === document.activeElement && getComputedStyle(e).outlineStyle !== 'none'")
+    page.keyboard.press("Space")
+    expect(choice).to_have_attribute("aria-pressed", "true")
+
+
+def test_a_checkbox_is_drawn_by_the_page_and_sits_on_its_text_line(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules/new")
+    box = page.locator("input[name=enabled]")
+    expect(box).to_be_visible()
+    off = box.evaluate("""(e) => { const label = e.closest('label'), r = e.getBoundingClientRect();
+        const range = document.createRange(); range.selectNodeContents(label);
+        const line = [...range.getClientRects()].find((x) => x.width > 20 && x.height > 0) || label.getBoundingClientRect();
+        return Math.abs((r.top + r.bottom) / 2 - (line.top + line.bottom) / 2); }""")
+    assert off <= 3, off
+    assert box.evaluate("(e) => getComputedStyle(e).appearance") == "none"
+    before = box.is_checked()
+    box.focus()
+    page.keyboard.press("Space")
+    assert box.is_checked() != before

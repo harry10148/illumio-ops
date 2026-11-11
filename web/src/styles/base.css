@@ -235,8 +235,37 @@ button:disabled { cursor: progress; opacity: .7; }
 .stack { display: grid; gap: var(--space-7); align-content: start; }
 .stack > h1 { margin-bottom: 0; }
 .span-all { grid-column: 1 / -1; margin: 0; }
-label.check { display: flex; align-items: center; gap: var(--space-4); color: var(--text-1); }
-label.check input { height: auto; }
+/* a checkbox is drawn here, not by the browser: a 16px box on the text's line, ink when ticked */
+input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 16px; height: 16px;
+                       margin: 0; padding: 0; border: 1px solid var(--text-3); border-radius: 3px; background: var(--surface-0);
+                       vertical-align: middle; cursor: pointer; }
+input[type=checkbox]:checked { background: var(--text-1); border-color: var(--text-1); }
+input[type=checkbox]:checked::after { content: ""; position: absolute; left: 4px; top: 1px; width: 5px; height: 9px;
+                       border: solid var(--surface-0); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+input[type=checkbox]:indeterminate { background: var(--text-1); border-color: var(--text-1); }
+input[type=checkbox]:indeterminate::after { content: ""; position: absolute; left: 3px; right: 3px; top: 6px; height: 2px; background: var(--surface-0); }
+input[type=checkbox]:disabled { opacity: .45; cursor: default; }
+/* beside its words: on the first line of them, however many lines they run to */
+label:has(> input[type=checkbox]) { display: flex; align-items: flex-start; gap: var(--space-4); color: var(--text-1); }
+label > input[type=checkbox] { margin-top: calc((1lh - 16px) / 2); }
+/* a switch is for what takes effect the moment it is pressed; it says whether the change was kept */
+.switch { position: relative; width: 34px; height: 20px; padding: 0; border: 1px solid var(--text-3); border-radius: 10px;
+          background: var(--surface-0); vertical-align: middle; transition: background .12s; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+                 background: var(--text-3); transition: left .12s; }
+.switch[aria-checked="true"] { background: var(--text-1); border-color: var(--text-1); }
+.switch[aria-checked="true"]::after { left: 16px; background: var(--surface-0); }
+.switch[data-state="saved"] { box-shadow: 0 0 0 3px var(--tone-ok-bg); border-color: var(--tone-ok-border); }
+.switch[data-state="failed"] { box-shadow: 0 0 0 3px var(--tone-crit-bg); border-color: var(--tone-crit-border); }
+/* a choice of one among a few: the segments of one control, the chosen one filled in */
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-m); overflow: hidden; background: var(--surface-1); }
+.seg > button { height: 30px; padding: 0 var(--space-5); border: 0; border-right: 1px solid var(--line); background: none;
+                color: var(--text-2); font-size: var(--fs-mini); white-space: nowrap; }
+.seg > button:last-child { border-right: 0; }
+.seg > button:hover { background: var(--surface-hover); color: var(--text-1); }
+.seg > button[aria-pressed="true"] { background: var(--surface-active); color: var(--text-1); font-weight: 600; }
+.seg > button:focus-visible { outline-offset: -2px; }
+.seg-count { margin-left: var(--space-2); color: var(--text-3); font-weight: 400; font-variant-numeric: tabular-nums; }
 .block { display: grid; gap: var(--space-2); margin-top: var(--space-6); }
 textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-strong); border-radius: var(--radius-m);
            background: var(--surface-0); color: var(--text-1); font: inherit; resize: vertical; }
@@ -278,7 +307,6 @@ legend { padding: 0 var(--space-2); color: var(--text-1); font-weight: 600; }
 td .badge + .badge { margin-left: var(--space-2); }
 a.btn-primary, a.btn-quiet, a.btn-danger, a.btn-text { display: inline-flex; align-items: center; }
 a.btn-primary, a.btn-quiet, a.btn-danger { text-decoration: none; }
-.table input[type=checkbox] { height: auto; margin: 0; }
 /* Workbench (P6a) */
 .wb-body { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: var(--space-6); align-items: start; }
 .wb-dims { display: flex; flex-direction: column; gap: var(--space-3); max-height: calc(100vh - 220px); overflow-y: auto; }
@@ -341,7 +369,8 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 [data-section=status] p { margin: 0; }
 
 /* Quarantine (P6d) */
-[data-role=quarantine] { border: 1px solid var(--tone-warn-border); }
+/* the dialog, not the button that opens it (both carry the role) */
+[data-role=quarantine]:not(button) { border: 1px solid var(--tone-warn-border); }
 [data-role=quarantine] .row:first-child { justify-content: space-between; align-items: baseline; }
 .q-detail { overflow-wrap: anywhere; max-width: 32rem; }
 
@@ -357,13 +386,15 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 /* Alerts home (UI redesign sample 01) */
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4);
               margin: var(--space-6) 0 var(--space-5); }
-.chips-row { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.chip-btn { height: 30px; padding: 0 var(--space-5); border: 1px solid var(--line-strong); border-radius: var(--radius-s);
-            background: var(--surface-1); color: var(--text-2); font-size: var(--fs-mini); }
+/* a row of choices is one segmented control (the same look as .seg); it wraps into rows on a narrow screen */
+.chips-row { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+             overflow: hidden; background: var(--surface-1); }
+.chip-btn { height: 30px; padding: 0 var(--space-5); border: 0; border-right: 1px solid var(--line);
+            background: none; color: var(--text-2); font-size: var(--fs-mini); white-space: nowrap; }
+.chip-btn:last-child { border-right: 0; }
 .chip-btn:hover { background: var(--surface-hover); color: var(--text-1); }
-/* a segment that is on: ink outline and an orange underline — a fill would read as an action */
-.chip-btn[aria-pressed="true"], .chip-btn[aria-selected="true"] { background: var(--surface-2); border-color: var(--text-1);
-            color: var(--text-1); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.chip-btn[aria-pressed="true"], .chip-btn[aria-selected="true"] { background: var(--surface-active); color: var(--text-1); font-weight: 600; }
+.chip-btn:focus-visible { outline-offset: -2px; }
 .inline-label { display: flex; align-items: center; gap: var(--space-3); }
 .alert-side .row { gap: var(--space-3); }
 .side-title { margin: 0; font-size: 17px; line-height: 1.45; }

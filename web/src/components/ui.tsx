@@ -1,6 +1,6 @@
 // The console's building blocks (UI redesign spec §7, samples 01–11). Pages compose these; colours come only from
 // tokens.css through data-tone.
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, type LinkProps } from "react-router-dom";
 
 import { t } from "../i18n";
@@ -36,6 +36,54 @@ export function LinkButton({ kind = "secondary", className, ...rest }: LinkProps
 /** Why an action will not do what its name says (or cannot be taken), on its own line under the action. */
 export function ActionNote({ children }: { children: ReactNode }) {
   return <p className="action-note" data-role="action-note">{children}</p>;
+}
+
+/** For what takes effect the moment it is pressed. onChange keeps the change and answers whether it was kept: the
+ * switch shows the new state at once, marks it saved, or goes back and marks it failed (the caller shows the error). */
+export function Switch({ checked, onChange, label, name, disabled }: {
+  checked: boolean; onChange: (next: boolean) => Promise<boolean>; label: string; name?: string; disabled?: boolean;
+}) {
+  const [shown, setShown] = useState(checked);
+  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<"saved" | "failed" | undefined>();
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => { if (!busy) setShown(checked); }, [checked, busy]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  async function press() {
+    const next = !shown;
+    setShown(next);
+    setBusy(true);
+    setState(undefined);
+    let kept = false;
+    try { kept = await onChange(next); } catch { kept = false; }
+    setBusy(false);
+    if (!kept) setShown(!next);
+    setState(kept ? "saved" : "failed");
+    window.clearTimeout(timer.current);
+    if (kept) timer.current = window.setTimeout(() => setState(undefined), 1500);
+  }
+  return (
+    <button type="button" role="switch" className="switch" name={name} aria-checked={shown} aria-label={label}
+            data-state={state} disabled={disabled || busy} onClick={() => void press()} />
+  );
+}
+
+export interface Segment<T extends string> { value: T; label: string; count?: number; attrs?: Record<string, string> }
+
+/** One choice among a few that exclude each other. */
+export function Segmented<T extends string>({ value, options, onChange, label, role }: {
+  value: T; options: Segment<T>[]; onChange: (v: T) => void; label: string; role?: string;
+}) {
+  return (
+    <div className="seg" role="group" aria-label={label} data-seg data-role={role}>
+      {options.map((o) => (
+        <button key={o.value} type="button" aria-pressed={o.value === value} data-value={o.value} {...o.attrs}
+                onClick={() => onChange(o.value)}>
+          {o.label}{o.count !== undefined && <span className="seg-count">{o.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 const ADDRESS = /^(ip:)?(\d{1,3}(\.\d{1,3}){3}|[0-9a-f:]*:[0-9a-f:]+)(\/\d+)?$/i;

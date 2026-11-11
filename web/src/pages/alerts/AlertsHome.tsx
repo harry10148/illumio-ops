@@ -6,7 +6,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { AlertDetail, AlertItem, AlertList as AlertListData } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { ActionNote, DataTable, DetailPane, HostName, KpiStrip, PageHead, SeverityTag, Tag, shortTime } from "../../components/ui";
+import { ActionNote, DataTable, DetailPane, HostName, KpiStrip, PageHead, Segmented, SeverityTag, Tag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { useBasicMode } from "../../shell/status";
@@ -187,11 +187,9 @@ export function AlertsHome() {
             </button>
           ))}
         </div>
-        <label className="check">
-          <input type="checkbox" name="unprocessed" checked={unprocessed}
-                 onChange={(e) => { setUnprocessed(e.target.checked); setPage(1); }} />
-          {t("alerts_only_unprocessed")}
-        </label>
+        <Segmented label={t("alerts_only_unprocessed")} role="alert-unprocessed" value={unprocessed ? "unprocessed" : "all"}
+                   options={[{ value: "all", label: t("alerts_all") }, { value: "unprocessed", label: t("alerts_only_unprocessed") }]}
+                   onChange={(v) => { setUnprocessed(v === "unprocessed"); setPage(1); }} />
       </div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {data && (

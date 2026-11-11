@@ -106,7 +106,7 @@ _JS = r"""
 
   // button_font: buttons share one size (a segmented choice has its own)
   for (const el of all('button, a[class^="btn"], a[class*=" btn"]')) {
-    if (el.hasAttribute('aria-pressed') || el.getAttribute('role') === 'tab' || el.closest('[data-seg]')) continue;
+    if (el.hasAttribute('aria-pressed') || ['tab', 'switch'].includes(el.getAttribute('role')) || el.closest('[data-seg]')) continue;  // a switch has no words
     const size = getComputedStyle(el).fontSize;
     if (size !== '14px') add('button_font', el, size);
   }

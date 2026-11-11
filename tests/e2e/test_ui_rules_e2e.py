@@ -24,7 +24,7 @@ from tests.services.reports.test_findings import flow
 PATHS = ui_rules.PATHS
 
 PENDING: dict[str, str] = {
-    "styled_checkbox": "Task 3", "cards_apart": "Task 4", "no_overlap": "Task 4", "header_one_line": "Task 4"}
+    "cards_apart": "Task 4", "no_overlap": "Task 4", "header_one_line": "Task 4"}
 
 WIDE = {"width": 1440, "height": 900}
 
