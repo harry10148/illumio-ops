@@ -433,4 +433,4 @@ export function RuleSchedules() {
   );
 }
 
-registerNav({ section: "main", path: "/rule-schedules", labelKey: "nav_rule_schedules", order: 18, component: RuleSchedules });
+registerNav({ section: "automate", path: "/rule-schedules", labelKey: "nav_rule_schedules", order: 10, component: RuleSchedules });

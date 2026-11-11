@@ -25,6 +25,7 @@ const JOB_LABEL_KEYS: Record<string, string> = {
   reports_run: "job_name_reports_run",
   reports_retention: "job_name_reports_retention",
   siem_dispatch: "job_name_siem_dispatch",
+  rule_schedules_tick: "job_name_rule_schedules_tick",
 };
 
 function every(seconds: number | null): string {

@@ -10,6 +10,7 @@ import type {
 import { formatTime } from "../../components/ProbeResults";
 import { HostName, NeedsAdvanced, PageHead, Panel, Purpose, SeverityTag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
+import { modeWord } from "../../terms";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, word } from "../alerts/common";
 import type { Req } from "../workbench/conditions";
@@ -17,10 +18,6 @@ import { DETAIL_KEYS, LEVEL_KEYS, Outcome, QuarantineDialog, STATUS_KEYS, nonEmp
 import { Pulled } from "../workbench/Workbench";
 
 // Literal maps: i18n keys are never built from data.
-const MODE_KEYS: Record<string, string> = {
-  full: "hosts_mode_full", selective: "hosts_mode_selective", visibility_only: "hosts_mode_visibility_only",
-  idle: "hosts_mode_idle",
-};
 const PATTERN_KEYS: Record<string, string> = {
   regular_cycle: "tamper_pattern_regular_cycle", burst: "tamper_pattern_burst", sporadic: "tamper_pattern_sporadic",
   too_few: "tamper_pattern_too_few",
@@ -516,7 +513,7 @@ export function HostProfile() {
         {profile.managed && !profile.in_inventory && <p className="notice">{t("hosts_not_in_inventory")}</p>}
         {id && (
           <dl className="host-facts">
-            <dt>{t("hosts_mode")}</dt><dd data-role="host-mode">{mode ? word(MODE_KEYS, mode) : "—"}</dd>
+            <dt>{t("hosts_mode")}</dt><dd data-role="host-mode">{mode ? modeWord(mode) : "—"}</dd>
             <dt>{t("hosts_os")}</dt><dd>{id.os_id ?? "—"}</dd>
             <dt>{t("hosts_ven")}</dt><dd>{[id.ven_version, id.agent_status].filter(Boolean).join(" · ") || "—"}</dd>
             <dt>{t("hosts_heartbeat")}</dt><dd>{id.last_heartbeat_at ? formatTime(id.last_heartbeat_at, lang) : "—"}</dd>
@@ -660,4 +657,4 @@ function HostRoute() {
   return params.get("key") ? <HostProfile /> : <HostSearchPage />;
 }
 
-registerNav({ section: "main", path: "/hosts", labelKey: "nav_hosts", order: 16, component: HostRoute });
+registerNav({ section: "devices", path: "/hosts", labelKey: "nav_hosts", order: 10, component: HostRoute });

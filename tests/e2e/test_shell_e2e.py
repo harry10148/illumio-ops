@@ -1,23 +1,47 @@
 """The console frame: navigation order and sections, basic-mode marks, the narrow layout, offline fonts."""
 from __future__ import annotations
 
-from tests.e2e.conftest import no_horizontal_overflow, sign_in
+from playwright.sync_api import expect
 
-MAIN_ORDER = ["Alerts", "Detection", "Investigate"]
+from tests.e2e.conftest import no_horizontal_overflow, sign_in
 
 
 def _nav_texts(page) -> list[str]:
     return [t.strip().rstrip("◆").strip() for t in page.locator(".sidenav .nav-item").all_inner_texts()]
 
 
-def test_nav_order_and_sections(live_app, context):
+def test_the_navigation_is_grouped_by_what_a_page_is_for(live_app, context):
+    """Purpose-led UI spec §4.1: watching first (alerts, their rules, reports), then hosts, analysis, automation and
+    settings — each group under its heading."""
     page = context.new_page()
     sign_in(page, live_app.url)
-    texts = _nav_texts(page)
-    assert texts[:3] == MAIN_ORDER
-    assert texts.index("Reports and delivery") < texts.index("SIEM forwarding") < texts.index("Alert rules and notifications")
-    assert texts[-1] == "System"
-    assert page.locator(".nav-section").first.text_content().strip() == "Output"  # the words; the eyebrow shows them in capitals
+    groups = {}
+    for group in page.locator(".sidenav [data-nav-group]").all():
+        title = group.locator(".nav-section").text_content().strip()  # the words; the eyebrow shows them in capitals
+        groups[title] = [t.strip().rstrip("◆").strip() for t in group.locator(".nav-item").all_inner_texts()]
+    assert list(groups) == ["Watch", "Hosts", "Analyse", "Automation", "Settings"]
+    assert groups["Watch"] == ["Alerts", "Alert rules and notifications", "Reports"]
+    assert groups["Hosts"][:2] == ["Hosts", "VEN fleet"]
+    assert groups["Analyse"] == ["Detection", "Investigate"]
+    assert groups["Automation"] == ["Rule schedules"]
+    assert groups["Settings"] == ["SIEM forwarding", "System"]
+
+
+def test_every_address_that_opened_a_page_still_does(live_app, context):
+    """Regrouping the navigation moves no page: an address in a bookmark or an emailed link still opens."""
+    from tests.e2e import ui_rules
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    for path in ui_rules.PATHS:
+        page.goto(live_app.url + path)
+        expect(page.locator("main h1")).to_have_count(1)
+        assert page.url.split("?")[0].rstrip("/") == (live_app.url + path.split("?")[0]).rstrip("/"), path
+    # the older addresses that lead on to where the page is now
+    for old, now in (("/alerts", "/"), ("/lateral", "/detect"), ("/alerts/rules", "/alert-rules"),
+                     ("/system/reports", "/reports"), ("/system/channels", "/alert-rules")):
+        page.goto(live_app.url + old)
+        page.wait_for_url(lambda url, now=now: url.split("?")[0].rstrip("/") == (live_app.url + now).rstrip("/"))
+        expect(page.locator("main h1")).to_have_count(1)
 
 
 def test_status_line_says_mode_and_collection(live_app, context):

@@ -617,5 +617,5 @@ function LateralRedirect() {
   return <Navigate to={`/detect${search}`} replace />;
 }
 
-registerNav({ section: "main", path: "/detect", labelKey: "nav_detect", order: 14, component: LateralMovement, needs: "advanced" });
-registerNav({ section: "main", path: "/lateral", labelKey: "nav_detect", order: 14, component: LateralRedirect, hidden: true });
+registerNav({ section: "analyse", path: "/detect", labelKey: "nav_detect", order: 10, component: LateralMovement, needs: "advanced" });
+registerNav({ section: "analyse", path: "/lateral", labelKey: "nav_detect", order: 10, component: LateralRedirect, hidden: true });

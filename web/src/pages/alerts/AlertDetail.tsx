@@ -295,5 +295,5 @@ export function AlertDetail() {
   );
 }
 
-registerNav({ section: "main", path: "/alerts/:id", labelKey: "alert_detail_title", order: 11, component: AlertDetail,
+registerNav({ section: "watch", path: "/alerts/:id", labelKey: "alert_detail_title", order: 11, component: AlertDetail,
               hidden: true });

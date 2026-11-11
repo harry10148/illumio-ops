@@ -1,10 +1,17 @@
 // Pages add themselves to the left navigation; a page that is not built does not
-// appear (no placeholders). Sections follow the UI redesign spec §3: the work (main),
-// what the product puts out (output), and the settings at the bottom; "system" pages
-// are listed in the System page's own sub-navigation.
+// appear (no placeholders). Sections are what a page is for (purpose-led UI spec §4.1): watching
+// (alerts, their rules, reports), hosts, analysis, automation, settings; "system" pages are listed
+// in the System page's own sub-navigation.
 import type { ComponentType } from "react";
 
-export type NavSection = "main" | "output" | "bottom" | "system";
+export type NavSection = "watch" | "devices" | "analyse" | "automate" | "settings" | "system";
+
+/** The groups of the left navigation, in order, each with its heading. */
+export const NAV_GROUPS: { section: NavSection; titleKey: string }[] = [
+  { section: "watch", titleKey: "nav_section_watch" }, { section: "devices", titleKey: "nav_section_devices" },
+  { section: "analyse", titleKey: "nav_section_analyse" }, { section: "automate", titleKey: "nav_section_automate" },
+  { section: "settings", titleKey: "nav_section_settings" },
+];
 
 export interface NavItem {
   section: NavSection;

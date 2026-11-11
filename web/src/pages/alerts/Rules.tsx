@@ -192,5 +192,5 @@ function RulesRedirect() {
   return <Navigate to="/alert-rules" replace />;
 }
 
-registerNav({ section: "main", path: "/alerts/rules", labelKey: "nav_alert_rules", order: 12, component: RulesRedirect,
+registerNav({ section: "watch", path: "/alerts/rules", labelKey: "nav_alert_rules", order: 12, component: RulesRedirect,
               hidden: true });

@@ -101,4 +101,4 @@ export function RulesAndChannels() {
   );
 }
 
-registerNav({ section: "bottom", path: "/alert-rules", labelKey: "nav_alert_rules", order: 10, component: RulesAndChannels });
+registerNav({ section: "watch", path: "/alert-rules", labelKey: "nav_alert_rules", order: 20, component: RulesAndChannels });

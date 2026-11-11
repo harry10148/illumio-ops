@@ -103,5 +103,5 @@ export function Rulesets() {
   );
 }
 
-registerNav({ section: "main", path: "/rule-schedules/rulesets", labelKey: "rsb_title", order: 19, component: Rulesets,
+registerNav({ section: "automate", path: "/rule-schedules/rulesets", labelKey: "rsb_title", order: 11, component: Rulesets,
   hidden: true });

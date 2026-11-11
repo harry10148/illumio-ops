@@ -41,6 +41,8 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
               font-size: var(--fs-micro); color: var(--text-3); }
 .nav-status [data-tone] { color: var(--ink); }
 .nav-items { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; }
+.nav-group { display: flex; flex-direction: column; gap: var(--space-1); }
+.nav-group:first-child .nav-section { padding-top: 0; }
 .nav-section { padding: var(--space-6) var(--space-5) var(--space-2); font-size: var(--fs-micro); font-weight: 600; color: var(--text-3);
                text-transform: uppercase; letter-spacing: .08em; }
 .nav-spacer { flex: 1; min-height: var(--space-6); }

@@ -503,4 +503,4 @@ export function Workbench() {
   );
 }
 
-registerNav({ section: "main", path: "/investigate", labelKey: "nav_workbench", order: 15, component: Workbench });
+registerNav({ section: "analyse", path: "/investigate", labelKey: "nav_workbench", order: 20, component: Workbench });

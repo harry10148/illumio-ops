@@ -411,5 +411,5 @@ function EventFields({ rule, set, fieldError }: {
   );
 }
 
-registerNav({ section: "main", path: "/alerts/rules/:id", labelKey: "rule_editor_title", order: 13, component: RuleEditor,
+registerNav({ section: "watch", path: "/alerts/rules/:id", labelKey: "rule_editor_title", order: 13, component: RuleEditor,
               hidden: true });

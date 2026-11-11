@@ -12,6 +12,7 @@ import type {
 import { formatTime } from "../../components/ProbeResults";
 import { DataTable, Disclosure, KpiStrip, PageHead, Panel } from "../../components/ui";
 import { t, useLang } from "../../i18n";
+import { modeWord as plainMode } from "../../terms";
 import { registerNav } from "../../shell/nav";
 import { word } from "../alerts/common";
 import { Pulled } from "../workbench/Workbench";
@@ -482,7 +483,7 @@ function Fleet() {
                      disabled={!chosen.has(h.key) && chosen.size >= MAX} onChange={() => toggle(h)} />) },
             { key: "host", label: t("fleet_col_host"), render: (h) => (
               <Link to={`/hosts?key=${encodeURIComponent(h.key)}`}>{hostName(h.name, h.key)}</Link>) },
-            { key: "mode", label: t("hosts_mode"), nowrap: true, render: (h) => modeWord(h.mode) },
+            { key: "mode", label: t("hosts_mode"), nowrap: true, render: (h) => (h.mode ? plainMode(h.mode) : t("fleet_not_reported")) },
             { key: "online", label: t("fleet_tally_online"), nowrap: true, render: (h) => word(ONLINE_KEYS, h.online) },
             { key: "beat", label: t("fleet_col_heartbeat"), kind: "time", render: (h) => (h.last_heartbeat_at ? formatTime(h.last_heartbeat_at, lang) : "—") },
             { key: "sync", label: t("hosts_policy_sync"), render: (h) => (
@@ -499,4 +500,4 @@ function Fleet() {
   );
 }
 
-registerNav({ section: "main", path: "/fleet", labelKey: "nav_fleet", order: 17, component: Fleet });
+registerNav({ section: "devices", path: "/fleet", labelKey: "nav_fleet", order: 20, component: Fleet });

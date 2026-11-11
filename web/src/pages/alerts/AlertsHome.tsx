@@ -276,5 +276,5 @@ function AlertsRedirect() {
   return <Navigate to={`/${search}`} replace />;
 }
 
-registerNav({ section: "main", path: "/", labelKey: "nav_alerts", order: 10, component: AlertsHome, badge: "new" });
-registerNav({ section: "main", path: "/alerts", labelKey: "nav_alerts", order: 10, component: AlertsRedirect, hidden: true });
+registerNav({ section: "watch", path: "/", labelKey: "nav_alerts", order: 10, component: AlertsHome, badge: "new" });
+registerNav({ section: "watch", path: "/alerts", labelKey: "nav_alerts", order: 10, component: AlertsRedirect, hidden: true });

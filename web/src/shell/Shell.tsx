@@ -4,7 +4,7 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-route
 import { call, setCsrfToken } from "../api/client";
 import type { Me, ShellStatus } from "../api/generated";
 import { t } from "../i18n";
-import { type NavItem, allNavItems, navItems } from "./nav";
+import { NAV_GROUPS, allNavItems, navItems, type NavItem } from "./nav";
 import { ShellStatusContext, useShellStatusPoll } from "./status";
 
 /** Pages fire this after changing something /api/auth/me reports (password, language). */
@@ -93,17 +93,24 @@ export function Shell({ me, onSignedOut }: Props) {
           </div>
           <StatusLine status={status} />
           <div className="nav-items">
-            {navItems("main").map((item) => <Item key={item.path} item={item} status={status} onPick={close} />)}
-            {navItems("output").length > 0 && <div className="nav-section">{t("nav_section_output")}</div>}
-            {navItems("output").map((item) => <Item key={item.path} item={item} status={status} onPick={close} />)}
+            {NAV_GROUPS.map(({ section, titleKey }) => {
+              const own = navItems(section);
+              const system = section === "settings" && systemFirst;
+              if (own.length === 0 && !system) return null;
+              return (
+                <div key={section} className="nav-group" data-nav-group={section}>
+                  <div className="nav-section">{t(titleKey)}</div>
+                  {own.map((item) => <Item key={item.path} item={item} status={status} onPick={close} />)}
+                  {system && (
+                    <NavLink to={system} className={inSystem ? "nav-item active" : "nav-item"} onClick={close}
+                             data-nav="/system">
+                      <span>{t("nav_system")}</span>
+                    </NavLink>
+                  )}
+                </div>
+              );
+            })}
             <div className="nav-spacer" />
-            {navItems("bottom").map((item) => <Item key={item.path} item={item} status={status} onPick={close} />)}
-            {systemFirst && (
-              <NavLink to={systemFirst} className={inSystem ? "nav-item active" : "nav-item"} onClick={close}
-                       data-nav="/system">
-                <span>{t("nav_system")}</span>
-              </NavLink>
-            )}
             <div className="nav-user">
               <span>{me.username}</span>
               <button type="button" className="btn-link" onClick={signOut}>{t("user_menu_logout")}</button>

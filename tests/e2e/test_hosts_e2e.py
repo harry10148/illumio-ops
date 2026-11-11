@@ -184,3 +184,11 @@ def test_host_no_overflow_760(narrow_context, live_app):
     page.goto(f"{live_app.url}/hosts?key={DB}")
     page.locator("[data-role=usual]").wait_for()
     assert no_horizontal_overflow(page)
+
+
+def test_the_enforcement_mode_is_said_in_plain_words_with_the_pce_term_beside(context, live_app):
+    _seed(live_app)  # db is in Visibility Only
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    expect(page.locator("[data-role=host-mode]")).to_have_text("Recording only (Visibility Only)")
