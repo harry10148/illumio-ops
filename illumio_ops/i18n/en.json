@@ -1568,7 +1568,7 @@
   "rpt_conclusion_ransomware_none": "No ransomware protection analysis result for this period; the data notes say why.",
   "rpt_rw_kpi_unprotected": "Unprotected services",
   "rpt_rw_sec_unprotected": "Unprotected services",
-  "rpt_rw_unprotected_intro": "The services ransomware commonly uses that are unprotected on these hosts. No traffic is kept, so they cannot be sorted by recent use into fix first, safe to block and suspicious; alert or full mode sorts them.",
+  "rpt_rw_unprotected_intro": "The services ransomware commonly uses that are unprotected, one row per service with the number of hosts it is unprotected on; which hosts is under “Hosts and their scores”. No traffic is kept, so they cannot be sorted by recent use into fix first, safe to block and suspicious; alert or full mode sorts them.",
   "rpt_hint_pending_rw_analysis": "The ransomware analysis has not been computed yet (it runs every hour once the inventory is collected), so this report has no host ratings, service lists or trend.",
   "rpt_hint_unsupported_rw": "This PCE gives no ransomware risk rating, so this report has no host ratings, service lists or trend.",
   "rpt_hint_pending_rw_org": "The PCE gave no organisation protection figure in this period (the last was on {day}), so that number is not shown.",
@@ -3579,5 +3579,9 @@
   "rpt_sync_staged": "Staged",
   "rpt_status_success": "Success",
   "rpt_status_failure": "Failure",
-  "rpt_rule_no_description": "{ruleset}: rule {id} (no description)"
+  "rpt_rule_no_description": "{ruleset}: rule {id} (no description)",
+  "rpt_rw_col_on_hosts": "Hosts",
+  "rpt_rw_quality_source_one": "Services, severities, protection states and exposure are the PCE's own judgement.",
+  "rpt_rw_term_state_use_one": "The unprotected ones are counted under “Unprotected services”.",
+  "rpt_rw_how_intro_one": "Every number here comes from the PCE's own ransomware ratings: which high-risk services (SMB, RDP, WinRM…) each host listens on and whether policy protects them. The list of unprotected services says what is open; the scores show where each host stands."
 }

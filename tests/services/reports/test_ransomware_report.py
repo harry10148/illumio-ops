@@ -167,12 +167,35 @@ def test_without_kept_traffic_the_unprotected_services_are_one_list(ctx):
     doc = _build(ctx)
     ids = [s.id for s in doc.sections]
     assert "unprotected" in ids and not {"priority", "safe", "suspicious"} & set(ids)
-    assert [r[:3] for r in _tables(doc, "unprotected")[0].rows] == [("a", "SMB", "445/TCP"), ("a", "RDP", "3389/TCP")]
+    assert [r[:3] for r in _tables(doc, "unprotected")[0].rows] == [("RDP", "3389/TCP", "Critical"),
+                                                                    ("SMB", "445/TCP", "Critical")]
     keys = {k.key: k.value for k in doc.kpis}
     assert keys["unprotected"] == 2 and not {"priority", "safe_to_block", "suspicious"} & set(keys)
     assert not incomplete(doc)
     _std(ctx)
     assert {"priority", "safe", "suspicious"} <= {s.id for s in _build(ctx).sections}
+
+
+def test_the_one_list_is_by_service_and_nothing_speaks_of_three_lists(ctx):
+    """6.6.0 acceptance (.135): 1,808 rows in host order, "the first 100", under a guide to three lists that were
+    not there. One row per service, the most severe and most widespread first; the words fit what is shown."""
+    def unknown(name, port, severity):
+        return {**svc(name, port, severity=severity), "traffic": "unknown"}
+    hosts = [hostrow(n, computed=5.0, services=[unknown("Telnet", 23, "medium"), unknown("SMB", 445, "critical")])
+             for n in ("a", "b", "c")]
+    hosts.append(hostrow("d", computed=5.0, services=[unknown("VNC", 5900, "high"), unknown("RPC", 135, "critical")]))
+    _result(ctx, {"unsupported": False, "contradictions": 0, "priority": [], "safe_to_block": [], "suspicious": [],
+                  "hosts": hosts})
+    doc = _build(ctx)
+    table = _tables(doc, "unprotected")[0]
+    assert list(table.rows) == [("SMB", "445/TCP", "Critical", 3), ("RPC", "135/TCP", "Critical", 1),
+                                ("VNC", "5900/TCP", "High", 1), ("Telnet", "23/TCP", "Medium", 3)]
+    assert table.total_rows == 4 and table.limit_note is None
+    words = " ".join([*doc.data_quality, *(s.intro or "" for s in doc.sections),
+                      *(str(c) for r in _tables(doc, "how")[0].rows for c in r)]).lower()
+    assert "three lists" not in words and "fix first" not in " ".join(r[0] for r in _tables(doc, "how")[0].rows).lower()
+    _std(ctx)
+    assert "three lists" in " ".join(_build(ctx).data_quality).lower()
 
 
 def test_zh_tw_builds(ctx):

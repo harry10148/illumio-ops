@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.6.1] - 2026-11-11
+
+Found by generating every report on both installs after 6.6.0.
+
+### Fixed
+
+- Lateral posture and new connections reports on an install that keeps traffic and archives it: since 6.3.0 the
+  30 days of baseline before a report's period counted when deciding whether to read the archive, so with the
+  default retention (35 days of traffic) every weekly report was built from a throwaway store with no baseline and no
+  daily snapshots. It read 0 pivot hosts, 0 cross-environment connections and 0 new connections. A period the store
+  keeps is read from the store again.
+- A period that really is read from the archive builds its baselines from the archived rows (before: none, so no
+  connection was new and the exposure graph was empty).
+- Reports built from traffic pulled when the report is made (lightweight mode) or read from the archive no longer
+  say "Baseline 0 of 30 days" beside numbers that rest on the baseline they just loaded.
+- Ransomware report with no kept traffic: the single list is one row per service with the number of hosts it is
+  unprotected on, the most severe first (before: a row per host and service in host order, the first 100 of 1,808 on
+  one PCE), and the guide, the data note and the glossary no longer speak of three lists that are not shown.
+
 ## [6.6.0] - 2026-11-11
 
 Report content: a report reads from its title to its end with no optional setting made; shorter; easier to scan.

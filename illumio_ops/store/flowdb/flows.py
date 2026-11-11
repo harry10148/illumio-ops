@@ -277,8 +277,10 @@ def _update_baselines(conn: sqlite3.Connection, conn_key: str, *, log_new: bool 
 def rebuild_baselines(conn: sqlite3.Connection) -> None:
     """The four baselines from the primary rows held, as _update_baselines would have left them: for a store whose
     rows were loaded without upsert_flows (the archive's throwaway store). What the tables held is dropped."""
-    for table in ("connection_baseline", "user_baseline", "account_source_baseline", "process_baseline"):
-        conn.execute(f"DELETE FROM {table}")
+    conn.execute("DELETE FROM connection_baseline")
+    conn.execute("DELETE FROM user_baseline")
+    conn.execute("DELETE FROM account_source_baseline")
+    conn.execute("DELETE FROM process_baseline")
     conn.create_function("account_key", 1, account_key, deterministic=True)
     span = "first_seen = MIN(first_seen, excluded.first_seen), last_seen = MAX(last_seen, excluded.last_seen)"
     rows = "FROM flows WHERE is_primary = 1"

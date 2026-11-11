@@ -54,6 +54,7 @@ _TERMS = (("rpt_rw_col_pce_percent", "rpt_rw_term_pce_means", "rpt_rw_term_pce_u
           ("rpt_rw_sec_suspicious", "rpt_rw_suspicious_intro", "rpt_rw_term_suspicious_use"))
 
 
+_SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 MODE_NAMES = {"full": "Full", "selective": "Selective", "visibility_only": "Visibility Only", "idle": "Idle"}
 NAMES_SHOWN = 5  # service names in a host's explanation; the rest are counted
 _EXPOSURE_KEYS = {"fully_protected": "rpt_rw_exposure_fully_protected"}
@@ -140,14 +141,23 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     list_sections = tuple(Section(id=sid, title=t(title), intro=t(intro), blocks=(list_table(key, t(title), empty),))
                           for sid, key, title, intro, empty in _LISTS)
 
+    # One row per service, the most severe first and then the one on the most hosts: a row per host and service was
+    # 1,808 rows in host order on the NFR PCE. Which hosts is in the hosts chapter (6.6.1).
+    on_hosts: dict[tuple[str, int | None, int, str], int] = {}
+    for _, s in unsorted_rows:
+        key = (str(s.get("name")), s.get("port"), int(s.get("proto") or 0), str(s.get("severity") or "").lower())
+        on_hosts[key] = on_hosts.get(key, 0) + 1
+    by_service = sorted(on_hosts.items(), key=lambda kv: (_SEVERITY_RANK.get(kv[0][3], len(_SEVERITY_RANK)), -kv[1],
+                                                          kv[0][0], str(kv[0][1]), kv[0][2]))
     unprotected_table = TableBlock(
         title=t("rpt_rw_sec_unprotected"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="service", label=t("rpt_col_name")),
-                 Column(key="port", label=t("rpt_col_service")), Column(key="severity", label=t("rpt_col_severity"))),
-        rows=tuple((name(h), s.get("name"), port_text(s.get("port"), int(s.get("proto") or 0)),
-                    severity_name(lang, str(s.get("severity") or "").lower())) for h, s in unsorted_rows[:LIST_ROWS]),
-        total_rows=len(unsorted_rows), empty_text="",
-        limit_note=t("rpt_limit_top_n", n=LIST_ROWS) if len(unsorted_rows) > LIST_ROWS else None)
+        columns=(Column(key="service", label=t("rpt_col_name")), Column(key="port", label=t("rpt_col_service")),
+                 Column(key="severity", label=t("rpt_col_severity")),
+                 Column(key="hosts", label=t("rpt_rw_col_on_hosts"), kind="number")),
+        rows=tuple((svc_name, port_text(port, proto), severity_name(lang, sev), n)
+                   for (svc_name, port, proto, sev), n in by_service[:LIST_ROWS]),
+        total_rows=len(by_service), empty_text="",
+        limit_note=t("rpt_limit_top_n", n=LIST_ROWS) if len(by_service) > LIST_ROWS else None)
     unprotected_section = Section(id="unprotected", title=t("rpt_rw_sec_unprotected"),
                                   intro=t("rpt_rw_unprotected_intro"), blocks=(unprotected_table,))
 
@@ -261,7 +271,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                                    else None) for d in days),
                      empty_text=t("rpt_rw_none_trend"))
 
-    quality = [t("rpt_rw_quality_source"), t("rpt_rw_quality_approx")]
+    quality = [t("rpt_rw_quality_source_one" if one_list else "rpt_rw_quality_source"), t("rpt_rw_quality_approx")]
     if org_now is None:
         quality.append(hint(lang, "rpt_hint_pending_rw_org", day=org_last) if org_last
                        else hint(lang, "rpt_hint_pending_rw_org_none"))
@@ -281,11 +291,15 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         quality.append(t("rpt_quality_analysis_failed", error=run_error[:200]))
     if values["contradictions"]:
         quality.append(t("rpt_rw_quality_contradictions", n=values["contradictions"]))
+    # With one list there are no three lists to explain: their rows and every mention of them stay out (6.6.1).
+    shown_terms = (*_TERMS[:4], ("rpt_rw_col_state", "rpt_rw_term_state_means", "rpt_rw_term_state_use_one")) \
+        if one_list else _TERMS
     terms = TableBlock(
         title=t("rpt_rw_tbl_terms"),
         columns=(Column(key="term", label=t("rpt_rw_col_term")), Column(key="means", label=t("rpt_rdy_col_means")),
                  Column(key="use", label=t("rpt_rw_col_use"))),
-        rows=tuple((t(term), t(means), t(use)) for term, means, use in _TERMS), total_rows=len(_TERMS), empty_text="")
+        rows=tuple((t(term), t(means), t(use)) for term, means, use in shown_terms), total_rows=len(shown_terms),
+        empty_text="")
     findings: list[Finding] = []
     if ok and lists["priority"]:
         findings.append(Finding(severity=Severity.HIGH, title=t("rpt_rw_finding_priority", n=len(lists["priority"])),
@@ -301,7 +315,8 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ransomware"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(findings),
         data_quality=tuple(quality),
-        sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rw_how_intro"), blocks=(terms,)),
+        sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rw_how_intro_one" if one_list else "rpt_rw_how_intro"),
+                          blocks=(terms,)),
                   *((unprotected_section,) if one_list else list_sections),
                   Section(id="hosts", title=t("rpt_rw_sec_hosts"), intro=t("rpt_rw_hosts_intro"),
                           blocks=(host_table, service_table)),
