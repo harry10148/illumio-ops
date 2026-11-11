@@ -970,6 +970,8 @@ class IncrementTop(BaseModel):
     proto: int
     connections: int
     mbps: float | None
+    src_key: str | None = None  # the hosts' keys: an alert lists them as hosts to open
+    dst_key: str | None = None
 
 
 class IncrementTotals(BaseModel):
@@ -1021,7 +1023,8 @@ def increment_totals(ctx: AppContext, cond: FlowCondition, *, start: datetime, e
     rates = [(r, _mbps(r["bytes"], r["seconds"])) for r in rows]
     key = (lambda pair: (pair[1] or 0.0)) if rank_by == "mbps" else (lambda pair: pair[0]["connections"])
     top = [IncrementTop(src=r["src_hostname"] or r["src_key"], dst=r["dst_hostname"] or r["dst_key"], port=r["port"],
-                        proto=r["proto"], connections=r["connections"], mbps=rate)
+                        proto=r["proto"], connections=r["connections"], mbps=rate, src_key=r["src_key"],
+                        dst_key=r["dst_key"])
            for r, rate in sorted(rates, key=key, reverse=True)[:TOP_INCREMENTS]]
     stamp = db_time(new_after)
     gaps = merge_gaps(cov.gaps)

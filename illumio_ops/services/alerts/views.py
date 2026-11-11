@@ -11,6 +11,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from illumio_ops.domain.alert_devices import Device, Role
 from illumio_ops.domain.alertcategory import AlertCategory, category, category_filter
 from illumio_ops.domain.beyond_vendor import beyond_vendor
 from illumio_ops.domain.segment import EventSegment, FlowSegment
@@ -55,6 +56,13 @@ class DeliveryView(BaseModel):
     sent_at: datetime | None
 
 
+class AlertDevice(BaseModel):
+    key: str        # a workload href or ip:<address>: what the host page opens
+    name: str
+    role: Role
+    managed: bool   # a workload (an address is not)
+
+
 class AlertItem(BaseModel):
     id: int
     fired_at: datetime
@@ -71,6 +79,9 @@ class AlertItem(BaseModel):
     category: AlertCategory
     src: str | None  # the source and destination the alert's parameters name (none for rule-wide alerts)
     dst: str | None
+    pack_key: str | None
+    devices: list[AlertDevice]  # the hosts the alert is about; none for an alert stored before they were kept
+    devices_more: int           # how many more there were than are listed
 
 
 class AlertCounts(BaseModel):
@@ -132,6 +143,7 @@ class AlertQuery(BaseModel):
     unprocessed: bool = False
     severity: Severity | None = None
     rule: str | None = Field(default=None, max_length=64)
+    device: str | None = Field(default=None, max_length=256)  # only the alerts about this host (its key)
     page: int = Field(default=1, ge=1, le=100000)
 
 
@@ -180,8 +192,13 @@ def _named_params(params: dict[str, Any], names: Mapping[str, str]) -> dict[str,
     return {k: names.get(v, v) if isinstance(v, str) else v for k, v in params.items()}
 
 
+def _devices(found: Sequence[Device], names: Mapping[str, str]) -> list[AlertDevice]:
+    return [AlertDevice(key=d.key, name=names.get(d.key) or d.key.removeprefix("ip:"), role=d.role,
+                        managed=not d.key.startswith("ip:")) for d in found]
+
+
 def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row],
-          names: Mapping[str, str] | None = None) -> AlertItem:
+          names: Mapping[str, str] | None = None, found: Sequence[Device] = ()) -> AlertItem:
     lang = ctx.settings.current().display.language
     params = _named_params(json.loads(row["params_json"]), names or {})
     v = replace(alert_view(row), params=params)
@@ -191,7 +208,9 @@ def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row],
                      rule_type=rule_type, rule_name=rule_title(v, lang),
                      subject_key=v.subject_key, summary=summary(v, lang), caveats=caveats(v, lang), late=v.late,
                      grouped=row["grouped_annotation"] is not None, deliveries=_deliveries(deliveries),
-                     category=category(rule_type, params.get("detector")), src=src, dst=dst)
+                     category=category(rule_type, params.get("detector")), src=src, dst=dst,
+                     pack_key=row["pack_key"], devices=_devices(found, names or {}),
+                     devices_more=int(row["devices_more"]))
 
 
 def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) -> AlertList:
@@ -204,15 +223,17 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
                                         rule_type=q.type.value if q.type else None, rule_types=types,
                                         detectors_in=inside, detectors_not_in=outside, ungrouped_only=q.unprocessed,
                                         severity=q.severity.value if q.severity else None, rule_id=q.rule,
-                                        limit=PAGE, offset=(q.page - 1) * PAGE)
+                                        device=q.device, limit=PAGE, offset=(q.page - 1) * PAGE)
         found = store.deliveries(conn, [r["id"] for r in rows])
+        about = store.devices(conn, [r["id"] for r in rows])
         counted = store.period_counts(conn, pce_url=url, org_id=org, since=since)
     by_alert: dict[int, list[sqlite3.Row]] = {}
     for d in found:
         by_alert.setdefault(d["alert_id"], []).append(d)
     counts = AlertCounts(**{k: counted.get(k, 0) for k in ("critical", "high", "medium", "low", "grouped")})
-    names = display_names(ctx, _hrefs(rows))
-    return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], []), names) for r in rows], total=total, page=q.page,
+    names = display_names(ctx, _hrefs(rows) | {d.key for ds in about.values() for d in ds})
+    return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], []), names, about.get(r["id"], ())) for r in rows],
+                     total=total, page=q.page,
                      page_size=PAGE, counts=counts)
 
 
@@ -312,7 +333,8 @@ def alert_detail(ctx: AppContext, alert_id: int) -> AlertDetail | None:
             return None
         deliveries = store.deliveries(conn, [alert_id])
         notes = store.notes(conn, alert_id)
-    item = _item(ctx, row, deliveries, display_names(ctx, _hrefs([row])))
+        about = store.devices(conn, [alert_id]).get(alert_id, [])
+    item = _item(ctx, row, deliveries, display_names(ctx, _hrefs([row]) | {d.key for d in about}), about)
     evidence = json.loads(row["evidence_json"]) if row["evidence_json"] else None
     lang = ctx.settings.current().display.language
     params = json.loads(row["params_json"])

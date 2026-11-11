@@ -13449,6 +13449,39 @@
       "request_schema": null,
       "response_schema": {
         "$defs": {
+          "AlertDevice": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "managed": {
+                "title": "Managed",
+                "type": "boolean"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "source",
+                  "destination",
+                  "subject"
+                ],
+                "title": "Role",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "role",
+              "managed"
+            ],
+            "title": "AlertDevice",
+            "type": "object"
+          },
           "AlertRuleType": {
             "enum": [
               "event",
@@ -13687,6 +13720,17 @@
             "title": "Deliveries",
             "type": "array"
           },
+          "devices": {
+            "items": {
+              "$ref": "#/$defs/AlertDevice"
+            },
+            "title": "Devices",
+            "type": "array"
+          },
+          "devices_more": {
+            "title": "Devices More",
+            "type": "integer"
+          },
           "dst": {
             "anyOf": [
               {
@@ -13759,6 +13803,17 @@
             "title": "Notes",
             "type": "array"
           },
+          "pack_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pack Key"
+          },
           "params": {
             "additionalProperties": true,
             "title": "Params",
@@ -13824,6 +13879,9 @@
           "category",
           "src",
           "dst",
+          "pack_key",
+          "devices",
+          "devices_more",
           "params",
           "facts",
           "confidence",
@@ -13881,6 +13939,39 @@
             "title": "AlertCounts",
             "type": "object"
           },
+          "AlertDevice": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "managed": {
+                "title": "Managed",
+                "type": "boolean"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "source",
+                  "destination",
+                  "subject"
+                ],
+                "title": "Role",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "role",
+              "managed"
+            ],
+            "title": "AlertDevice",
+            "type": "object"
+          },
           "AlertItem": {
             "properties": {
               "category": {
@@ -13907,6 +13998,17 @@
                 },
                 "title": "Deliveries",
                 "type": "array"
+              },
+              "devices": {
+                "items": {
+                  "$ref": "#/$defs/AlertDevice"
+                },
+                "title": "Devices",
+                "type": "array"
+              },
+              "devices_more": {
+                "title": "Devices More",
+                "type": "integer"
               },
               "dst": {
                 "anyOf": [
@@ -13935,6 +14037,17 @@
               "late": {
                 "title": "Late",
                 "type": "boolean"
+              },
+              "pack_key": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Pack Key"
               },
               "rule_id": {
                 "title": "Rule Id",
@@ -13985,7 +14098,10 @@
               "deliveries",
               "category",
               "src",
-              "dst"
+              "dst",
+              "pack_key",
+              "devices",
+              "devices_more"
             ],
             "title": "AlertItem",
             "type": "object"
@@ -14213,6 +14329,39 @@
       },
       "response_schema": {
         "$defs": {
+          "AlertDevice": {
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "managed": {
+                "title": "Managed",
+                "type": "boolean"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "source",
+                  "destination",
+                  "subject"
+                ],
+                "title": "Role",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "role",
+              "managed"
+            ],
+            "title": "AlertDevice",
+            "type": "object"
+          },
           "AlertRuleType": {
             "enum": [
               "event",
@@ -14451,6 +14600,17 @@
             "title": "Deliveries",
             "type": "array"
           },
+          "devices": {
+            "items": {
+              "$ref": "#/$defs/AlertDevice"
+            },
+            "title": "Devices",
+            "type": "array"
+          },
+          "devices_more": {
+            "title": "Devices More",
+            "type": "integer"
+          },
           "dst": {
             "anyOf": [
               {
@@ -14523,6 +14683,17 @@
             "title": "Notes",
             "type": "array"
           },
+          "pack_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pack Key"
+          },
           "params": {
             "additionalProperties": true,
             "title": "Params",
@@ -14588,6 +14759,9 @@
           "category",
           "src",
           "dst",
+          "pack_key",
+          "devices",
+          "devices_more",
           "params",
           "facts",
           "confidence",

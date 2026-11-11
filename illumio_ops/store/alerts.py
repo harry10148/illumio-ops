@@ -10,6 +10,12 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
+from illumio_ops.domain.alert_devices import (
+    Device,
+    capped,
+    devices_of_detection,
+    devices_of_events,
+)
 from illumio_ops.domain.alerting import RuleState, Trigger
 from illumio_ops.domain.segment import EventSegment
 from illumio_ops.domain.values import DeliveryStatus
@@ -38,14 +44,15 @@ def insert_alert(conn: sqlite3.Connection, *, pce_url: str, org_id: str, rule_na
     cur = conn.execute(
         "INSERT INTO alerts (id, pce_url, org_id, rule_id, rule_type, rule_name, pack_key, severity, subject_key, "
         "fired_at, first_seen, last_seen, late, notify, grouped_annotation, message_key, params_json, facts_json, "
-        "evidence_json, confidence_json) VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM alerts), 0), "
-        "COALESCE((SELECT id FROM alert_id_floor), 0)) + 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "evidence_json, confidence_json, devices_more) VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM alerts), 0), "
+        "COALESCE((SELECT id FROM alert_id_floor), 0)) + 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (pce_url, org_id, trigger.rule_id, trigger.rule_type.value, rule_name, pack_key, trigger.severity.value,
          trigger.subject_key, _t(at), _t(trigger.first_seen), _t(trigger.last_seen), int(trigger.late),
          int(hold is None), trigger.grouped_annotation, trigger.message_key,
          json.dumps(trigger.params, default=str), json.dumps(trigger.facts, default=str), evidence_json(trigger),
-         json.dumps(asdict(trigger.confidence), default=str)))
+         json.dumps(asdict(trigger.confidence), default=str), trigger.devices_more))
     alert_id = int(cur.lastrowid or 0)
+    _write_devices(conn, alert_id, trigger.devices)
     rows: list[tuple[int, str, str, int, str | None]]
     if hold is not None:
         rows = [(alert_id, NOT_SENT, hold.value, 0, None)]
@@ -58,9 +65,48 @@ def insert_alert(conn: sqlite3.Connection, *, pce_url: str, org_id: str, rule_na
     return alert_id
 
 
+def _write_devices(conn: sqlite3.Connection, alert_id: int, found: Sequence[Device]) -> None:
+    conn.executemany("INSERT OR IGNORE INTO alert_devices (alert_id, key, role) VALUES (?, ?, ?)",
+                     [(alert_id, d.key, d.role) for d in found])
+
+
+def devices(conn: sqlite3.Connection, alert_ids: Sequence[int]) -> dict[int, list[Device]]:
+    """The hosts each alert is about, in the order they were stored; an alert about none is absent."""
+    out: dict[int, list[Device]] = {}
+    for chunk in (alert_ids[i:i + 500] for i in range(0, len(alert_ids), 500)):
+        marks = ",".join("?" * len(chunk))
+        for r in conn.execute(f"SELECT alert_id, key, role FROM alert_devices WHERE alert_id IN ({marks}) "
+                              "ORDER BY alert_id, rowid", list(chunk)):
+            out.setdefault(int(r["alert_id"]), []).append(Device(r["key"], r["role"]))
+    return out
+
+
+def backfill_devices(conn: sqlite3.Connection) -> int:
+    """Alerts stored before hosts were recorded (0018) are given theirs, once: a detection's from its fingerprint (the
+    alert's subject), an event rule's when its subject is the host. What names no host is left as it is — and is not
+    looked at again, as nothing about it changes. Returns how many alerts were given hosts."""
+    rows = conn.execute(
+        "SELECT id, rule_type, subject_key FROM alerts WHERE rule_type IN ('lateral', 'event') "
+        "AND NOT EXISTS (SELECT 1 FROM alert_devices d WHERE d.alert_id = alerts.id)").fetchall()
+    given = 0
+    with conn:
+        for r in rows:
+            found = (devices_of_detection(r["subject_key"]) if r["rule_type"] == "lateral"
+                     else devices_of_events([r["subject_key"]]))
+            kept, more = capped(found)
+            if not kept:
+                continue
+            _write_devices(conn, int(r["id"]), kept)
+            if more:
+                conn.execute("UPDATE alerts SET devices_more = ? WHERE id = ?", (more, int(r["id"])))
+            given += 1
+    return given
+
+
 def _where(*, pce_url: str, org_id: str, since: datetime, rule_types: Sequence[str] | None = None,
            severity: str | None = None, rule_id: str | None = None, detectors_in: Sequence[str] | None = None,
-           detectors_not_in: Sequence[str] | None = None, ungrouped_only: bool = False) -> tuple[str, list[Any]]:
+           detectors_not_in: Sequence[str] | None = None, ungrouped_only: bool = False,
+           device: str | None = None) -> tuple[str, list[Any]]:
     clauses, params = ["pce_url = ?", "org_id = ?", "fired_at >= ?"], [pce_url, org_id, _t(since)]
     for column, value in (("severity", severity), ("rule_id", rule_id)):
         if value:
@@ -78,6 +124,9 @@ def _where(*, pce_url: str, org_id: str, since: datetime, rule_types: Sequence[s
         params.extend(detectors_not_in)
     if ungrouped_only:
         clauses.append("grouped_annotation IS NULL")
+    if device:
+        clauses.append("id IN (SELECT alert_id FROM alert_devices WHERE key = ?)")
+        params.append(device)
     return " AND ".join(clauses), params
 
 
@@ -91,13 +140,14 @@ def set_grouped(conn: sqlite3.Connection, alert_id: int, annotation_id: int, *, 
 def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime, rule_type: str | None = None,
                 severity: str | None = None, rule_id: str | None = None, rule_types: Sequence[str] | None = None,
                 detectors_in: Sequence[str] | None = None, detectors_not_in: Sequence[str] | None = None,
-                ungrouped_only: bool = False, limit: int, offset: int) -> tuple[list[sqlite3.Row], int]:
+                ungrouped_only: bool = False, device: str | None = None, limit: int,
+                offset: int) -> tuple[list[sqlite3.Row], int]:
     """rule_types / detectors_in / detectors_not_in: a category's filter (domain/alertcategory.py); detectors are the
-    lateral alert's `detector` parameter."""
+    lateral alert's `detector` parameter. device: only the alerts about this host (its key)."""
     types = rule_types if rule_types else ((rule_type,) if rule_type else None)
     where, params = _where(pce_url=pce_url, org_id=org_id, since=since, rule_types=types, severity=severity,
                            rule_id=rule_id, detectors_in=detectors_in, detectors_not_in=detectors_not_in,
-                           ungrouped_only=ungrouped_only)
+                           ungrouped_only=ungrouped_only, device=device)
     rows = conn.execute(f"SELECT * FROM alerts WHERE {where} ORDER BY fired_at DESC, id DESC LIMIT ? OFFSET ?",
                         [*params, limit, offset]).fetchall()
     total = conn.execute(f"SELECT COUNT(*) FROM alerts WHERE {where}", params).fetchone()[0]

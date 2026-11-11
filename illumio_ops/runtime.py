@@ -21,6 +21,7 @@ from illumio_ops.settings.secrets import (
     new_secret_key,
 )
 from illumio_ops.settings.store import SettingsInvalid, SettingsStore
+from illumio_ops.store import alerts as alert_store
 from illumio_ops.store.db import connect, migrate, pending_migrations
 from illumio_ops.store.flowdb.db import MIGRATIONS_PACKAGE as FLOW_MIGRATIONS
 from illumio_ops.tls import build_ssl_context, cert_info, ensure_self_signed
@@ -134,6 +135,9 @@ def prepare(root: Path | None) -> Runtime:
                 migrate(conn)
             except RuntimeError as exc:
                 raise StartupError(EXIT_CONFIG, str(exc)) from None
+            given = alert_store.backfill_devices(conn)  # alerts from before 6.8.0 learn which hosts they are about
+            if given:
+                logger.info("{} earlier alerts were given the hosts they are about", given)
         ssl_ctx, fingerprint = _tls_material(paths, s)
         ctx = AppContext(paths=paths, settings=store, served_tls=s.web.tls, served_cert_fingerprint=fingerprint)
         # The flow database is migrated here, before the listener, as the app database is: on the first job's

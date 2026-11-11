@@ -297,7 +297,8 @@ def increment_facts(totals: Any, at: datetime, watermark: datetime | None) -> In
     return IncrementFacts(
         connections=totals.connections, bytes=totals.bytes, bytes_rows=totals.bytes_rows, rows=totals.rows,
         new_rows=totals.new_rows, max_mbps=totals.max_mbps,
-        top=tuple(IncrementTopFact(t.src, t.dst, t.port, t.proto, t.connections, t.mbps) for t in totals.top),
+        top=tuple(IncrementTopFact(t.src, t.dst, t.port, t.proto, t.connections, t.mbps, getattr(t, "src_key", None),
+                                   getattr(t, "dst_key", None)) for t in totals.top),
         gaps=tuple(totals.coverage.gaps), latency_seconds=int((at - watermark).total_seconds()) if watermark else None)
 
 

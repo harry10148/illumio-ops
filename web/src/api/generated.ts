@@ -703,6 +703,16 @@ unresolved: string[]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertDevice".
+ */
+export interface AlertDevice {
+key: string
+managed: boolean
+name: string
+role: ("source" | "destination" | "subject")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DeliveryView".
  */
 export interface DeliveryView {
@@ -757,6 +767,8 @@ confidence: {
 }
 console_link: (string | null)
 deliveries: DeliveryView[]
+devices: AlertDevice[]
+devices_more: number
 dst: (string | null)
 evidence_kind: (("flow" | "event") | null)
 facts: {
@@ -770,6 +782,7 @@ last_seen: string
 late: boolean
 next_steps: string[]
 notes: NoteView[]
+pack_key: (string | null)
 params: {
 [k: string]: unknown
 }
@@ -804,11 +817,14 @@ export interface AlertItem {
 category: ("lateral" | "anomaly" | "traffic" | "event" | "system")
 caveats: string[]
 deliveries: DeliveryView[]
+devices: AlertDevice[]
+devices_more: number
 dst: (string | null)
 fired_at: string
 grouped: boolean
 id: number
 late: boolean
+pack_key: (string | null)
 rule_id: string
 rule_name: string
 rule_type: AlertRuleType

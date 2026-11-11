@@ -2,12 +2,14 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
+from illumio_ops.domain.alert_devices import Device
 from illumio_ops.domain.alerting import (
     DetectionFact,
     EndFact,
     EventFact,
     GapFact,
     IncrementFacts,
+    IncrementTopFact,
     JobFact,
     ProbeFact,
     RuleState,
@@ -353,3 +355,47 @@ def test_disk_low_summary_names_the_space():
     from illumio_ops.domain.values import Language
     text = summary(v, Language.EN)
     assert "{" not in text and "3.0 GB" in text and "10.0 GB" in text
+
+
+# ── the hosts an alert is about (purpose-led UI spec §8) ──
+
+def test_an_event_alert_about_one_host_names_it():
+    [t] = evaluate_event_rule(event_rule(), [ev(1)], 0, now=NOW)
+    assert t.devices == (Device("/orgs/1/workloads/w1", "subject"),) and t.devices_more == 0
+
+
+def test_a_count_threshold_alert_names_the_hosts_of_the_events_that_fired_it():
+    r = event_rule(threshold="count", threshold_count=3)
+    events = [ev(1, host="/orgs/1/workloads/w1"), ev(2, host="/orgs/1/workloads/w2"), ev(3, host="/orgs/1/workloads/w1"),
+              ev(4, host=None)]
+    [t] = evaluate_event_rule(r, events, 4, now=NOW)
+    assert t.subject_key == r.id  # the rule fires as a whole, as before
+    assert t.devices == (Device("/orgs/1/workloads/w1", "subject"), Device("/orgs/1/workloads/w2", "subject"))
+
+
+def test_a_detection_alert_names_the_hosts_in_its_fingerprint():
+    w = "/orgs/1/workloads/"
+    d = det(detector=DetectorKind.CROSS_ENV, fingerprint=f"xenv|{w}a|{w}b|22|6", subject_key=w + "a")
+    [t] = evaluate_lateral_rule(lateral_rule(detectors=("cross_env",)), [d])
+    assert t.devices == (Device(w + "a", "source"), Device(w + "b", "destination"))
+
+
+def test_a_traffic_alert_names_both_ends_of_its_top_connections_once():
+    w = "/orgs/1/workloads/"
+    top = (IncrementTopFact("a", "b", 22, 6, 20, None, src_key=w + "a", dst_key="ip:10.0.0.9"),
+           IncrementTopFact("a", "c", 445, 6, 5, None, src_key=w + "a", dst_key=w + "c"),
+           IncrementTopFact("x", "y", 80, 6, 1, None))  # an older fact without keys names nothing
+    t = evaluate_traffic_rule(traffic_rule(), inc(connections=25, rows=3, new_rows=1, top=top), now=NOW, window=WINDOW)
+    assert t.devices == (Device(w + "a", "source"), Device("ip:10.0.0.9", "destination"), Device(w + "c", "destination"))
+
+
+def test_a_system_alert_names_no_host():
+    f = facts(sources=(SourceFact("traffic", 3, "timeout", NOW),))
+    [t] = evaluate_system(system_rule(SystemCheck.COLLECTION_FAILING), f, now=NOW)
+    assert t.devices == ()
+
+
+def test_more_hosts_than_an_alert_lists_are_counted():
+    r = event_rule(threshold="count", threshold_count=3)
+    [t] = evaluate_event_rule(r, [ev(i, host=f"/orgs/1/workloads/h{i}") for i in range(25)], 25, now=NOW)
+    assert len(t.devices) == 20 and t.devices_more == 5

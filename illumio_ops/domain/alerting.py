@@ -11,6 +11,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
+from illumio_ops.domain.alert_devices import (
+    Device,
+    capped,
+    devices_of_detection,
+    devices_of_events,
+    is_host_key,
+)
 from illumio_ops.domain.alertrules import (
     BandwidthRule,
     EventRule,
@@ -95,6 +102,8 @@ class Trigger:
     evidence: FlowSegment | EventSegment | None
     confidence: Confidence
     grouped_annotation: int | None = None
+    devices: tuple[Device, ...] = ()  # the hosts the alert is about (domain/alert_devices), at most MAX_DEVICES
+    devices_more: int = 0             # how many more there were
 
 
 @dataclass(frozen=True)
@@ -149,6 +158,8 @@ class IncrementTopFact:
     proto: int
     connections: int
     mbps: float | None
+    src_key: str | None = None  # the hosts' keys (the names above are for reading)
+    dst_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -270,7 +281,11 @@ def _event_trigger(rule: EventRule, matched: Sequence[EventFact], subject: str, 
     key = EVENT_MESSAGE_KEYS[rule.threshold]
     if rule.threshold is ThresholdType.IMMEDIATE and not names:
         key = EVENT_SUBJECT_KEYS["actor" if actors else "none"]
+    # the hosts of the events that fired the rule now (a count rule's earlier matches in its window are a number
+    # only: they are not read again for their hosts)
+    devices, more = capped(devices_of_events(e.host_key for e in matched))
     return Trigger(
+        devices=devices, devices_more=more,
         rule_id=rule.id, rule_type=AlertRuleType.EVENT, subject_key=subject, severity=severity, first_seen=first,
         last_seen=last, late=all(e.timestamp < now - LATE_AFTER for e in matched),
         message_key=key, params={"event_types": list(types), "hosts": names[:10], "hosts_total": len(names),
@@ -316,7 +331,14 @@ def _flow_trigger(rule: TrafficRule | BandwidthRule | VolumeRule, facts: Increme
     assert rule.severity is not None  # flow rules require one
     top = [{"src": t.src, "dst": t.dst, "port": t.port, "proto": t.proto, "connections": t.connections,
             "mbps": t.mbps} for t in facts.top]
+    ends: list[Device] = []
+    for t in facts.top:
+        for key, role in ((t.src_key, "source"), (t.dst_key, "destination")):
+            if key and is_host_key(key) and Device(key, role) not in ends:  # type: ignore[arg-type]
+                ends.append(Device(key, role))  # type: ignore[arg-type]
+    devices, more = capped(tuple(ends))
     return Trigger(
+        devices=devices, devices_more=more,
         rule_id=rule.id, rule_type=AlertRuleType(rule.type), subject_key=rule.id, severity=rule.severity,
         first_seen=window[0], last_seen=window[1], late=False, message_key=FLOW_MESSAGE_KEYS[AlertRuleType(rule.type)],
         params={"window_minutes": rule.window_minutes, "top": top, **(params or {})},
@@ -401,7 +423,9 @@ def evaluate_lateral_rule(rule: LateralRule, changed: Sequence[DetectionFact], *
                                                                          label_groups=label_groups) is not None:
             continue
         c = d.confidence
+        devices, more = capped(devices_of_detection(d.fingerprint))
         out.append(Trigger(
+            devices=devices, devices_more=more,
             rule_id=rule.id, rule_type=AlertRuleType.LATERAL, subject_key=d.fingerprint,
             severity=rule.severity or d.severity, first_seen=d.first_seen, last_seen=d.last_seen, late=d.late,
             message_key=LATERAL_MESSAGE_KEYS[d.detector],

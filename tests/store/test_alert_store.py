@@ -83,3 +83,59 @@ def test_rule_state_round_trip_and_suppressed_counts(tmp_path):
         summary = store.rule_summaries(conn, pce_url=A[0], org_id=A[1], now=NOW)["r"]
         assert (summary.suppressed_cooldown, summary.suppressed_throttle, summary.last_status) == (1, 1, "no_data")
         assert store.rule_summaries(conn, pce_url=A[0], org_id=A[1], now=NOW)["r" * 32].fired_7d == 1
+
+
+# ── the hosts an alert is about (purpose-led UI spec §8) ──
+
+W = "/orgs/1/workloads/"
+
+
+def _with_devices(conn, devices, *, more=0, rule_type=AlertRuleType.LATERAL, subject="xenv|a|b", at=NOW):
+    from dataclasses import replace
+    t = replace(trig(subject), rule_type=rule_type, devices=tuple(devices), devices_more=more)
+    return store.insert_alert(conn, pce_url=A[0], org_id=A[1], rule_name="r", pack_key=None, trigger=t, at=at,
+                              channels=["line"], hold=None)
+
+
+def test_an_alert_is_stored_with_its_hosts_and_found_by_one(tmp_path):
+    from illumio_ops.domain.alert_devices import Device
+    ctx = make_ctx(tmp_path)
+    with ctx.db() as conn:
+        a = _with_devices(conn, [Device(W + "a", "source"), Device("ip:10.0.0.9", "destination")], more=2)
+        b = insert(conn)
+        conn.commit()
+        assert store.devices(conn, [a, b]) == {a: [Device(W + "a", "source"), Device("ip:10.0.0.9", "destination")]}
+        assert store.get_alert(conn, a, pce_url=A[0], org_id=A[1])["devices_more"] == 2
+        since = NOW - timedelta(days=1)
+        rows, total = store.list_alerts(conn, pce_url=A[0], org_id=A[1], since=since, device="ip:10.0.0.9", limit=50, offset=0)
+        assert [r["id"] for r in rows] == [a] and total == 1
+        rows, total = store.list_alerts(conn, pce_url=A[0], org_id=A[1], since=since, device=W + "zz", limit=50, offset=0)
+        assert rows == [] and total == 0
+
+
+def test_deleting_an_alert_removes_its_hosts(tmp_path):
+    from illumio_ops.domain.alert_devices import Device
+    ctx = make_ctx(tmp_path)
+    with ctx.db() as conn:
+        a = _with_devices(conn, [Device(W + "a", "source")], at=NOW - timedelta(days=40))
+        conn.commit()
+        assert store.delete_alerts_before(conn, NOW - timedelta(days=30)) == 1
+        assert conn.execute("SELECT COUNT(*) FROM alert_devices WHERE alert_id = ?", (a,)).fetchone()[0] == 0
+
+
+def test_alerts_from_before_are_given_their_hosts_once(tmp_path):
+    """An upgrade: alerts stored before hosts were recorded. A detection's are read from its fingerprint (the
+    alert's subject), an event rule's host is its subject; what names no host stays without."""
+    ctx = make_ctx(tmp_path)
+    with ctx.db() as conn:
+        lateral = _with_devices(conn, [], subject=f"xenv|{W}a|{W}b|22|6")
+        event = _with_devices(conn, [], rule_type=AlertRuleType.EVENT, subject=W + "c")
+        system = insert(conn)
+        counted = _with_devices(conn, [], rule_type=AlertRuleType.EVENT, subject="r" * 32)
+        conn.commit()
+        assert store.backfill_devices(conn) == 2
+        got = store.devices(conn, [lateral, event, system, counted])
+        assert [(d.key, d.role) for d in got[lateral]] == [(W + "a", "source"), (W + "b", "destination")]
+        assert [(d.key, d.role) for d in got[event]] == [(W + "c", "subject")]
+        assert system not in got and counted not in got
+        assert store.backfill_devices(conn) == 0

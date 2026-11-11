@@ -204,3 +204,31 @@ def test_marking_known_handles_the_marked_alert_too(client, ctx):
         _, total = store.list_alerts(conn, pce_url=url, org_id=org, since=NOW - timedelta(days=1), ungrouped_only=True,
                                      limit=10, offset=0)
     assert total == 1
+
+
+# ── the hosts an alert is about (purpose-led UI spec §8) ──
+
+def test_an_alert_lists_its_hosts_by_name_and_can_be_found_by_one(client, ctx):
+    from dataclasses import replace
+
+    from illumio_ops.domain.alert_devices import Device
+    w = "/orgs/1/workloads/aaa"
+    t = Trigger(rule_id="b" * 32, rule_type=AlertRuleType.LATERAL, subject_key=f"xenv|{w}|ip:10.0.0.9|22|6",
+                severity=Severity.HIGH, first_seen=NOW, last_seen=NOW, late=False, message_key="alert_system_disk_low",
+                params={"free": "1 GB", "warn": "10 GB"}, facts={}, evidence=None, confidence=Confidence())
+    t = replace(t, devices=(Device(w, "source"), Device("ip:10.0.0.9", "destination")), devices_more=3)
+    pce = ctx.settings.current().pce
+    with ctx.db() as conn:
+        about = store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="", pack_key="rule_lateral_cross_env",
+                                   trigger=t, at=NOW, channels=["line"], hold=None)
+    other = seed(ctx)  # stored with no host: an alert from before, or one about no host
+    login(client)
+    items = {i["id"]: i for i in get(client, "/api/alerts?days=3650").get_json()["data"]["items"]}
+    assert [(d["key"], d["role"], d["managed"]) for d in items[about]["devices"]] == [
+        (w, "source", True), ("ip:10.0.0.9", "destination", False)]
+    assert items[about]["devices"][1]["name"] == "10.0.0.9" and items[about]["devices_more"] == 3
+    assert items[about]["pack_key"] == "rule_lateral_cross_env"
+    assert items[other]["devices"] == [] and items[other]["devices_more"] == 0
+    only = get(client, "/api/alerts?days=3650&device=ip:10.0.0.9").get_json()["data"]
+    assert [i["id"] for i in only["items"]] == [about] and only["total"] == 1
+    assert get(client, f"/api/alerts/{about}").get_json()["data"]["devices"][0]["key"] == w
