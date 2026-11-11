@@ -120,14 +120,14 @@ export function Dlq() {
         <>
           <div className="row">
             <button type="button" className="btn-quiet" disabled={busy || picked.length === 0} onClick={() => void act("resend")} data-role="dlq-resend">{t("siem_dlq_resend", { n: String(picked.length) })}</button>
-            <button type="button" className="btn-quiet" disabled={busy || picked.length === 0} onClick={() => setConfirm("purge")} data-role="dlq-purge">{t("siem_dlq_purge", { n: String(picked.length) })}</button>
+            <button type="button" className="btn-danger" disabled={busy || picked.length === 0} onClick={() => setConfirm("purge")} data-role="dlq-purge">{t("siem_dlq_purge", { n: String(picked.length) })}</button>
             <button type="button" className="btn-quiet" disabled={busy} onClick={() => setConfirm("resend_all")} data-role="dlq-resend-all">{t("siem_dlq_resend_all")}</button>
-            <button type="button" className="btn-quiet" disabled={busy} onClick={() => setConfirm("purge_all")} data-role="dlq-purge-all">{t("siem_dlq_purge_all")}</button>
+            <button type="button" className="btn-danger" disabled={busy} onClick={() => setConfirm("purge_all")} data-role="dlq-purge-all">{t("siem_dlq_purge_all")}</button>
             <label className="row">{t("siem_dlq_older_than")}
               <input name="dlq_older_days" type="number" min={1} max={3650} value={olderDays}
                      onChange={(e) => setOlderDays(Number(e.target.value))} />
             </label>
-            <button type="button" className="btn-quiet" disabled={busy || !(olderDays >= 1)} onClick={() => setConfirm("purge_older")}
+            <button type="button" className="btn-danger" disabled={busy || !(olderDays >= 1)} onClick={() => setConfirm("purge_older")}
                     data-role="dlq-purge-older">{t("siem_dlq_purge_older", { days: String(olderDays) })}</button>
           </div>
           {confirm && (

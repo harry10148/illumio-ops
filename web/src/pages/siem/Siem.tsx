@@ -152,7 +152,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
           <input type="checkbox" name="siem_dest_enabled" checked={d.enabled} onChange={(e) => set("enabled", e.target.checked)} />
           {t("siem_dest_enabled")}
         </label>
-        <button type="button" className="btn-quiet" onClick={onRemove} data-role="siem-remove">{t("siem_remove")}</button>
+        <button type="button" className="btn-danger" onClick={onRemove} data-role="siem-remove">{t("siem_remove")}</button>
       </div>
       <div className="form-grid">
         <label>{t("siem_name")}

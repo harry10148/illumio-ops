@@ -168,7 +168,7 @@ function KnownMarks() {
               <p>{m.reason}</p>
               <p className="hint">
                 {t("alert_note_by", { who: m.created_by, at: formatTime(m.created_at, lang) })}{" "}
-                <button type="button" className="btn-quiet" onClick={() => void remove(m.id)}>{t("lateral_known_remove")}</button>
+                <button type="button" className="btn-text" onClick={() => void remove(m.id)}>{t("lateral_known_remove")}</button>
               </p>
             </li>
           ))}

@@ -270,7 +270,7 @@ function Tamper({ hostKey, href, tamper, onChange }: {
             {n.process && <span className="badge">{n.process}</span>}
             {n.host_href === null && <span className="badge">{t("hosts_tamper_note_all")}</span>}
             <span className="hint">{t("hosts_tamper_explains", { n: String(tamper.explained[String(n.id)] ?? 0) })}</span>
-            <button type="button" className="btn-quiet" onClick={() => void remove(n.id)}>{t("wb_remove")}</button>
+            <button type="button" className="btn-text" onClick={() => void remove(n.id)}>{t("wb_remove")}</button>
           </li>
         ))}
       </ul>

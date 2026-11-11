@@ -114,7 +114,7 @@ function Side({ id, onKnown }: { id: number; onKnown: () => void }) {
             : q.reason === "not_in_inventory" ? "alert_q_not_in_inventory" : "alert_q_no_subject")}</span>
         )}
         {d.rule_type === "lateral" && !d.grouped && (
-          <Link className="btn-quiet" to={`/alerts/${d.id}#mark-known`} onClick={onKnown}>{t("alert_known_mark")}</Link>
+          <Link className="btn-text" to={`/alerts/${d.id}#mark-known`} onClick={onKnown}>{t("alert_known_mark")}</Link>
         )}
         <Link to={`/alerts/${d.id}`} data-role="open-detail">{t("alert_full_detail")}</Link>
         {q.eligible && q.key && q.no_enforcement && <ActionNote>{t("alert_quarantine_no_effect")}</ActionNote>}

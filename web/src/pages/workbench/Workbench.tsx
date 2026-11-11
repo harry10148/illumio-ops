@@ -148,7 +148,7 @@ function DimensionBox({ req, dim, open, onToggle, onPick, names, onQuarantine }:
               <div key={key} className="wb-dim-item">
                 <button type="button" className="wb-dim-row" data-chosen={on} disabled={!pickable || on}
                   onClick={() => onPick(dim, row)} title={label}>
-                  <span className="wb-dim-label">{label}</span>
+                  <span className="wb-dim-label" title={label}>{label}</span>
                   <span className="wb-dim-value">{row.value.toLocaleString()}</span>
                 </button>
                 {HOST_DIMS.has(dim.dimension) && HOST_KEY.test(key) && (

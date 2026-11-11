@@ -38,7 +38,7 @@ function One({ rep, onChanged, generate }: {
         ) : <strong>{rep.name}</strong>}
         <div className="row">
           <button type="button" className="btn-quiet" onClick={() => setRenaming(!renaming)}>{t("cust_rename")}</button>
-          <button type="button" className="btn-quiet" data-role="custom-delete"
+          <button type="button" className="btn-danger" data-role="custom-delete"
             onClick={() => void act(call("custom_reports.delete", undefined, { report_id: String(rep.id) }))}>{t("cust_delete")}</button>
           <button type="button" className="btn-quiet" data-role="custom-generate-open" onClick={() => setMaking(!making)}>
             {t("gui_reports_generate_open")}
@@ -53,7 +53,7 @@ function One({ rep, onChanged, generate }: {
             <Link className="btn-quiet" data-role="custom-section-open" title={t("cust_open_section_hint")}
               to={`/investigate?custom=${rep.id}&section=${i}`}>{t("cust_open_section")}</Link>{" "}
             {rep.sections.length > 1 && (
-              <button type="button" className="btn-quiet" data-role="custom-section-remove"
+              <button type="button" className="btn-text" data-role="custom-section-remove"
                 onClick={() => void act(call("custom_reports.remove_section", {}, { report_id: String(rep.id), index: String(i) }))}>
                 {t("cust_remove_section")}
               </button>

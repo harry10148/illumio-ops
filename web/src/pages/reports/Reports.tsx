@@ -183,7 +183,7 @@ function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: 
                     onClick={() => setOpen(open === e.report_type ? null : e.report_type)}>
                     {t("gui_reports_generate_open")}
                   </button>
-                  <Link to="/reports?tab=schedules" className="btn-quiet">{t("rpt_schedule_link")}</Link>
+                  <Link to="/reports?tab=schedules" className="btn-text">{t("rpt_schedule_link")}</Link>
                 </div>
               )}
               {e.report_type === "custom" && (
@@ -263,7 +263,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
             <button type="button" className="btn-quiet" onClick={() => setConfirming(false)}>{t("btn_cancel")}</button>
           </>
         ) : (
-          <button type="button" className="btn-quiet" data-role="bulk-delete" disabled={picked.size === 0}
+          <button type="button" className="btn-danger" data-role="bulk-delete" disabled={picked.size === 0}
             onClick={() => { setOutcome(null); setConfirming(true); }}>
             {t("gui_reports_delete_selected", { n: String(picked.size) })}
           </button>

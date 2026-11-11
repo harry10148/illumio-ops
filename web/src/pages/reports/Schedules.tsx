@@ -279,7 +279,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
                     <td className="nowrap">
                       <button type="button" className="btn-quiet" onClick={() => void runNow(s.id)}>{t("gui_reports_run_now")}</button>
                       <button type="button" className="btn-quiet" onClick={() => { const { id, ...fields } = s; setEditing({ id, fields }); }}>{t("btn_edit")}</button>
-                      <button type="button" className="btn-quiet" onClick={() => void remove(s.id)}>{t("gui_reports_delete")}</button>
+                      <button type="button" className="btn-danger" onClick={() => void remove(s.id)}>{t("gui_reports_delete")}</button>
                     </td>
                   </tr>
                 );

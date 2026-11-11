@@ -4,8 +4,10 @@
    · Light only: no theme switch, no dark values (spec §2 non-goal).
    · Colour carries severity and state only, and never alone (a word goes with it).
    · 5.x Direction D look: warm paper, hairlines, no shadows; Illumio orange marks actions and
-     the current place only. Titles and numerals are set in Montserrat; times, host and program
-     names in JetBrains Mono. Both are bundled with the frontend (no request leaves the server).
+     the current place only. Titles are set in Montserrat. JetBrains Mono is for values to copy
+     (an address, a port, a certificate); times, figures and host names are in the reading face
+     with digits of one width (purpose-led UI spec §5.3). Both fonts are bundled with the
+     frontend (no request leaves the server).
      Chinese uses the system font: a Chinese web font is several MB and the emailed report HTML
      could not embed one either.
 
@@ -27,7 +29,7 @@
 :root {
   color-scheme: light;
 
-  /* 5.x Direction D: Montserrat sets titles and numerals; Chinese falls through to the system font. */
+  /* 5.x Direction D: Montserrat sets titles; Chinese falls through to the system font. */
   --font-ui: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", system-ui, sans-serif;
   --font-display: "Montserrat", var(--font-ui);
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;

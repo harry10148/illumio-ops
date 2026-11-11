@@ -309,7 +309,7 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-st
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap; }
 .page-head h1 { margin: 0; }
 /* a link is ink with a quiet underline; the accent is kept for the one main action of a region */
-.page a:not([class]), .btn-text { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--line-strong);
+.page a:not([class]), .btn-text { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--text-3);
                                   text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .page a:not([class]):hover, .btn-text:hover:not(:disabled) { text-decoration-color: var(--text-1); }
 /* the third level of action: no frame, for going somewhere or for what is seldom done */
@@ -327,6 +327,7 @@ legend { padding: 0 var(--space-2); color: var(--text-1); font-weight: 600; }
 td .badge + .badge { margin-left: var(--space-2); }
 a.btn-primary, a.btn-quiet, a.btn-danger, a.btn-text { display: inline-flex; align-items: center; }
 a.btn-primary, a.btn-quiet, a.btn-danger { text-decoration: none; }
+.btn-danger:hover:not(:disabled) { background: var(--tone-crit-bg); }
 /* Workbench (P6a) */
 .wb-body { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: var(--space-6); align-items: start; }
 .wb-dims { display: flex; flex-direction: column; gap: var(--space-3); max-height: calc(100vh - 220px); overflow-y: auto; }
@@ -411,6 +412,9 @@ code.cmd { white-space: pre-wrap; word-break: break-all; font-size: var(--fs-min
 /* a card's first row: what it is on the left, what to do with it on the right, on one line */
 .card-head { justify-content: space-between; align-items: center; }
 .card-head h2, .card-head h3 { margin: 0; }
+/* a control is as wide as what it holds: a choice as its longest option, a number or a date as a number or a date */
+select { justify-self: start; max-width: 100%; }
+input[type=number], input[type=date] { justify-self: start; width: 9em; max-width: 100%; }
 /* a button is as wide as its words, never the width of the card it sits in */
 .stack > button, .stack > a.btn-primary, .stack > a.btn-quiet, .card > button { justify-self: start; }
 /* one control as wide as its choices, wherever it is put */

@@ -110,9 +110,15 @@ def _save_section(page):
     page.wait_for_selector("[data-role=save-section-form]")
 
 
-# what a page shows only after something is pressed: opened, never submitted
+def _schedule_editor(page):
+    page.click("[data-role=schedules] .btn-primary")
+    page.wait_for_selector("[data-role=schedule-editor]")
+
+
+# what a page shows only after something is pressed: opened, never submitted. (The new rule schedule pane, the
+# channel forms and the rule editor are on their pages as they load, so the walk already covers them.)
 STATES = (("/fleet", _fleet_enforce), ("/fleet", _fleet_rate), (f"/hosts?key={fleet_e2e.DB}", _quarantine),
-          ("/reports", _generate), ("/investigate", _save_section))
+          ("/reports", _generate), ("/reports?tab=schedules", _schedule_editor), ("/investigate", _save_section))
 
 
 def walk_states(page, base_url: str) -> dict[str, list[str]]:

@@ -254,7 +254,7 @@ export function PceConnection() {
               <button type="button" className="btn-primary" disabled={busy} onClick={() => void send("keep")}>
                 {t("pce_choice_keep")}
               </button>
-              <button type="button" className="btn-quiet" disabled={busy} onClick={() => void send("clear")}>
+              <button type="button" className="btn-danger" disabled={busy} onClick={() => void send("clear")}>
                 {t("pce_choice_clear")}
               </button>
             </div>

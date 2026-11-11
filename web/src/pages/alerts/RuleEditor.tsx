@@ -275,11 +275,11 @@ export function RuleEditor() {
           {id !== "new" && (confirmDelete ? (
             <>
               <span>{t("rule_delete_confirm")}</span>
-              <button type="button" className="btn-quiet" data-role="delete-confirm" onClick={() => void remove()}>{t("btn_confirm")}</button>
+              <button type="button" className="btn-danger" data-role="delete-confirm" onClick={() => void remove()}>{t("btn_confirm")}</button>
               <button type="button" className="btn-quiet" onClick={() => setConfirmDelete(false)}>{t("btn_cancel")}</button>
             </>
           ) : (
-            <button type="button" className="btn-quiet" onClick={() => setConfirmDelete(true)}>{t("rule_delete")}</button>
+            <button type="button" className="btn-danger" onClick={() => setConfirmDelete(true)}>{t("rule_delete")}</button>
           ))}
           <button type="button" className="btn-quiet" onClick={() => void runPreview()}>{t("rule_preview")}</button>
           <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
