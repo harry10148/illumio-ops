@@ -25,9 +25,13 @@
   | 應用摘要 | `allowed_pct` | 分母只算有判定的 |
   | 規則使用 | 多三個：`rhc_hit`、`rhc_zero`、`rhc_no_record` | 併入 Rule Hit Count |
   | 每週總覽 | 全新 | 新型別 |
-  | 安全風險、應用摘要 | `maturity`、`enforced_hosts_pct` 的 `previous` 由 `None` 變成有值（有快照時） | Task 4 |
+  | 安全風險 | `maturity`、`enforced_hosts_pct` 的 `previous` 由 `None` 變成有值（條件見 Task 4） | Task 4 |
 
-  `pb_flows`、`blocked_flows` 本來就只數有判定的，不變。流量報表的 `flows`、`connections`、`sources`、`destinations` 是「看到多少」，照舊含沒有判定的。
+  `pb_flows`、`blocked_flows` 本來就只數有判定的，不變。
+  查過的事實（2026-11-13）：`flow_totals`、`maturity()`、`run_rules`、`readiness_rows` 的呼叫者全部在 `services/reports/` 底下，畫面沒有用到，
+  所以不會有「畫面與報表對同一個數字說兩個值」。安全風險的上期值是用同一個算法現算的（不是取舊報表存的數字），升級後第一份的比較兩邊是同一個基準。
+  準備度的 `policy`、`staged` 已經除以有判定的連線；`ringfence`（同一個 app 內的連線比例）分子分母都是全部連線，它量的是連線往哪裡去、不是判定，**不改**，
+  在準備度「怎麼算」的說明表補一句寫明這一點。準備度的數字因此都不變。流量報表的 `flows`、`connections`、`sources`、`destinations` 是「看到多少」，照舊含沒有判定的。
 - 19 條規則的觸發條件除了「只算有判定的」之外不變（§9.3）；不加新規則。
 - 定義只有一個：有判定＝`policy_decision IN ('allowed','potentially_blocked','blocked')`；沒有判定＝`'unknown'`。不看 `state`。
   沒有判定的再分兩種，只看隨那筆流量存下的 `src_managed／dst_managed`：兩端都是 0＝「兩端都沒有 VEN」；其餘＝「至少一端有 VEN」。
@@ -68,11 +72,15 @@
   - `undecided: Undecided`，`Undecided(flows, connections, unmanaged_flows, unmanaged_connections, managed_flows, managed_connections)`：
     `unmanaged_*`＝兩端都沒有 VEN；`managed_*`＝至少一端有 VEN；兩者相加等於 `flows／connections`。
   - **改意思**：`from_unmanaged_connections`、`admin_open_connections` 只算有判定的（SQL 加 `f.policy_decision != 'unknown'`）。
+    安全風險的 `unmanaged_connections` 這個數字因此會比〈非受管端點〉報表看到的少很多（.106：77,664 → 420 筆的量級）：數字名稱改成寫明
+    「有判定的非受管來源連線」（en 對應），note 固定一句指向〈只能監看的流量〉。
     `from_unmanaged`、`to_unmanaged`（筆數，流量報表「非受管」章用）不動。
 - `maturity()`：`lateral` 與 `managed` 兩部分的分母改成 `connections - undecided_connections`（與 `policy` 同一個分母；為 0 時三部分都是 `None`）。
   `MaturityInputs` 的欄位不必改名；docstring 寫明三部分都只算有判定的連線。
 - `_flow_kpis.allowed_pct`、`app_summary` 的 `allowed_pct`：分母改成有判定的連線；沒有有判定的連線時值是 `None`，`note` 用新句
   `rpt_no_decided_flows`（zh「期間內沒有帶判定的流量，所以算不出比例。」）。
+  應用摘要的結論句用到 `allowed_pct`：它是 `None` 時不得落到「不完整」的句式——在 `CONCLUSIONS[APP_SUMMARY]` 補一個不含它的短句式
+  （三個連線數），並確認 `conclusion.incomplete()` 的其他使用者（grep）不會因此把報表當成沒算出來。
 - 判定表（流量 `decisions`、應用摘要 `impact`、安全風險 `coverage`）：只列有判定的三列，比例的分母是有判定的合計；表下一句
   `rpt_decided_note`（zh「比例只算有判定的流量；沒有判定的 {flows} 筆（{connections} 次連線）見〈只能監看的流量〉。」），沒有就不寫。
   `rpt_trf_unknown_note` 由這一句取代（刪掉舊鍵）。應用摘要的 `impact_text`、安全風險的 `direction` 句同樣只算有判定的。
@@ -81,7 +89,7 @@
   - B004：條件加 `decision != 'unknown'`。B005：分母 `r.sum("decision != 'unknown'")`；分母為 0 時不觸發。
   - B007、B008、B009、L001、L006 與已指定判定的規則不動。
   - `rpt_rule_b004_desc`、`rpt_rule_b005_desc` 與兩條的 `_how` 句補上「只算有判定的流量」（en、zh）。
-- 安全風險「分段成熟度怎麼算」的說明表（`parts_table`）加一句固定文字：三個以連線比例計分的部分只算有判定的連線，沒有判定的不計入（`rpt_sec_how_decided`）。
+- 安全風險「分段成熟度怎麼算」的說明表（`parts_table`）加一句固定文字：三個以連線比例計分的部分只算有判定的連線，沒有判定的不計入；自 6.10.0 起如此，與更早產出的報表的分數不能直接相比（`rpt_sec_how_decided`）。
 
 - [ ] **Step 1: 寫失敗測試**
   - `flow_totals`：造 allowed 10 連線、potentially_blocked 30、blocked 0、unknown（兩端非受管）50、unknown（來源受管）10，其中非受管來源的有判定流量 4 連線、
@@ -153,6 +161,7 @@
     （zh「橫向移動的偵測與可觸及範圍見〈橫向移動態勢〉報表。」）。
   - `users` → 抽成 `flowsections.users_section(inp, spec) -> tuple[Section, ...]`（原樣搬：兩張排名、欄位覆蓋的判斷、工作台連結），
     改由流量報表呼叫，放在流量報表 `unmanaged` 章之後。安全風險不再呼叫。
+- 搬章與改章名之後，grep 兩個語言檔裡以字面章名指路的句子（3a 抓過兩句同類的），指到不存在的章就改。
 - 被拿掉的章用到、之後沒有人用的 i18n 鍵刪掉；`CONCLUSION_KPIS[SECURITY_RISK]`（`maturity`、`enforced_hosts_pct`、`critical_high_findings`）不受影響，確認即可。
 
 - [ ] **Step 1: 寫失敗測試**：安全風險的章 id 序列等於上面的清單（有資料時）；沒有 `ransomware／lateral／users／ports` 這四個 id；
@@ -177,18 +186,19 @@
   `snapshot_day` 一併寫入 `managed`。若有把快照複製到別處的函式（`copy_from`），一併帶上新欄。
 - `workloads.mode_counts_on(conn, day) -> ModeCounts | None`：那一天的快照裡 `managed = 1` 的主機各模式幾台；那天沒有快照或有任何一列 `managed IS NULL` 回 `None`。
 - 安全風險：上期結束那一天（顯示時區的日曆日，與每日快照的 `day` 同一種算法——確認 `snapshot_day` 的 `day` 是哪個時區的日期並照它）取 `mode_counts_on`。
-  有的話：`enforced_hosts_pct.previous` 用它算；`maturity.previous` 用「上期的主機模式＋上期的流量數字（現有的 `before`）＋上期沒有的勒索部分留空」重算——
-  **只有在上期流量也有完整收集（現有的 `traffic_covered`）時才給**，否則 `previous=None`。勒索部分沒有歷史：上期分數一律不含勒索部分；
-  為了可比，本期用來比較的也必須是同一組部分。做法：`maturity.previous` 只在「本期與上期有分數的部分相同」時才給；不同就 `None`，
-  並在 `maturity` 的 note 補固定一句 `rpt_sec_no_previous_parts`（zh「本期與上期能計分的部分不同，所以不比較。」）。
-  → 因為本期通常有勒索部分而上期沒有，這個數字多半不比。【我的決定】改成：比較用的分數兩期都**不含勒索部分**重算一次，note 寫明
-  `rpt_sec_previous_without_ransomware`（zh「與上期的比較不含勒索防護那一部分（它沒有歷史紀錄）。」），這樣變化那一行有意義。兩期任一期主機或流量部分缺就不比。
+  有的話：`enforced_hosts_pct.previous` 用它算。
+  `maturity.previous`：用「上期那天的主機模式＋上期的流量數字（現有的 `before`）」重算。勒索部分沒有歷史，所以**只有本期也沒有勒索部分時**
+  （PCE 不給勒索評等、或分析沒跑）兩期計分的部分才相同，才給 `previous`；本期有勒索部分時 `previous=None`，`maturity` 的 note 補固定一句
+  `rpt_sec_no_previous_parts`（zh「上期沒有勒索防護那一部分的紀錄，計分的部分不同，所以不比較。」）。不得拿兩個不同基準的分數相減。
+  另外兩個前提，缺一就是 `None`：上期流量有完整收集（現有的 `traffic_covered`）；本期值取的是**現在**的清冊，所以期間必須結束在今天或昨天
+  （顯示時區）——指定較早期間的手動報表這兩個數字不比。
+- 不變量測試：以同一時刻的清冊寫一份快照，`mode_counts_on` 算出的已強制比例等於報表本期的 `enforced_hosts_pct`（「受管」的認定兩邊一致）。
 - 有篩選條件的報表（`inp.params.filter` 不是 `None`）：快照沒有 Label，這兩個數字的 `previous` 一律 `None`。應用摘要的 `enforced_hosts_pct` 因此不比（它一定有篩選）。
 - 升級後第一個週期：上期結束那天的快照沒有 `managed` → `None`，報表照 3a 的規則不寫變化。
 
 - [ ] **Step 1: 寫失敗測試**：遷移後舊列 `managed` 是 NULL、`mode_counts_on` 回 `None`；新快照寫入後回正確的台數（含一台非受管的不計）；
   安全風險在上期那天有快照且上期流量完整時兩個數字有 `previous`，值等於手算；沒有快照、快照有 NULL、有篩選、上期流量不完整——四種各一個測試都是 `None`；
-  變化的比較不含勒索部分且有那一句 note。
+  本期有勒索部分時 `maturity.previous` 是 `None` 且有那一句 note、沒有勒索部分時有值；期間結束在三天前的報表兩個數字都不比；上面的不變量測試。
 - [ ] **Step 2: 確認失敗；實作。**
 - [ ] **Step 3: 跑 `tests/store tests/domain tests/services tests/gates`（含單一寫入者與遷移的閘門），全過。**
 - [ ] **Step 4: commit** `feat(v6-reports): the maturity score and the enforced share are compared with the previous period once a snapshot knows which hosts were managed`
@@ -221,6 +231,14 @@
 - 設定升級 `_v13_to_v14`：`reports.schedules` 裡 `report_type == "rule_hit_count"` 的每一個 → `report_type = "policy_usage"`、`lookback_days = min(原值, 30)`；
   改完後若與另一個排程除了 `id` 與 `name` 之外完全相同，留 id 較小的那個。步驟是純函式、可重跑（跑兩次結果相同）。
   改了哪幾個：升級函式回傳之外，用 `logger.info` 記一行（排程名稱、原回溯天數 → 新值、是否因重複被拿掉）；設定檔升級沒有別的紀錄管道，這是我的決定。
+- 升級步驟必須是純函式；`upgrade()` 每次載入設定都在記憶體跑一次，所以**紀錄不寫在升級函式裡**。先查升級後的設定何時寫回磁碟
+  （`settings/store.py`），把那一行 `logger.info` 放在「讀到舊版、寫回新版」的那一處，只印一次；若現況從不主動寫回，就在啟動時偵測到 RHC 排程被轉換時寫回並記錄。
+- 被去重拿掉的排程：它名下已產出的報表留著（清單照常顯示、照各自的保留規則清理），不轉給留下的那個；在那一行紀錄裡寫明。
+- **按概念掃**：型別不在 `specs()` 之後，凡是拿「已存的報表或排程的型別」去查 `specs()` 的路徑都要容得下 `rule_hit_count`：報表清單與單筆、下載與開啟、刪除、
+  保留份數清理（`retention.py`）、catalog 的排程數與份數統計、重寄、排程清單與「立即執行」、5.x 遷移器的 `specs()[kind]`。逐一 grep `specs()`、`REGISTRY`、
+  `report_type` 的使用處，回報列出查了哪些。測試：資料庫裡有一份舊 RHC 報表與（升級前的）RHC 排程時，上述每條路徑都不丟例外。
+- 儲存排程的路由現在靠 `availability()` 拒絕不能產的型別；型別不在 `specs()` 後可能變成不拒。測試：存 `rule_hit_count` 的排程被拒，原因是 `rpt_err_rhc_merged`。
+- 狀態不是 ENABLED 時不得呼叫 `pull_rhc`（它會在 PCE 上產一份報表，是寫入；NFR 不寫）：用 spy 測「沒開時 `pull_rhc` 被呼叫 0 次」。
 - 5.x 遷移器：`TYPES["rule_hit_count"]` → `ReportType.POLICY_USAGE`（回溯天數照現有的 `spec.max_lookback` 上限）。
 - 前端：拿掉範本頁對 `rule_hit_count` 的特殊連結（`Reports.tsx`）；RHC 的開關與狀態畫面留在原處不動，確認它不依賴那張卡片存在。
   `tests/e2e/test_reports_e2e.py` 的卡片數由 16 改 15。
@@ -278,6 +296,16 @@
     `pb_connections`、`new_connections` 兩個數字 `None` 並帶原因；規則沒有執行 → 照 3a 產生「規則沒有執行」的 `findings` 章（空表、說明原因），
     第 1 頁因此不說「沒有需要處理的項目」；`data_quality` 一句；結論用第二種句式。告警、VEN、政策三章照出。整份報表是「完成」。
   - 取流量的保留期限：期間早於 PCE 還留著的範圍時，同上處理（寫原因），不讓整份失敗。
+  - 這種情況下第 1 頁與 `findings` 章不得寫 3a 的「這段期間沒有流量可以評估規則」（原因不對）：用自己的句子 `rpt_wk_rules_no_flows`
+    （zh「流量向 PCE 取不到，所以規則沒有評估。」）。`render_html.to_do` 要能分辨這兩種「規則沒跑」——由 `findings` 章的空表說法帶出，不在 renderer 裡判斷型別。
+- 告警的上期值：上期整段都在「這個安裝已經在評估告警、而且告警還留著」的範圍內才給（最早一則告警的時間、告警的保留天數、安裝時間，取實際有的依據；
+  implementer 讀 `store/alerts.py` 的清理與設定後定，寫進回報），否則 `previous=None`——不得把「沒有紀錄」印成 0 則。
+- `needs_traffic=False` 的副作用逐項處理：catalog 的 `mode` 要標成 on_demand（它在輕量模式會向 PCE 取流量；`views.py` 的判斷加上這個型別或給 spec 一個旗標）；
+  `refusal` 對回溯上限與「期間早於保留範圍」的檢查不會自動套用——給這個型別 `max_lookback`（同流量報表）並確認超過時被拒；它讀事件（政策那一章），`reads_events=True`
+  以便較早的期間讀封存。自己 pull 時補上 `_build` 原本替流量報表做的事：`require_same_pce`／generation 檢查（PCE 中途換了要失敗，不是產一份混的）、
+  `_ondemand_lines` 的資料註記、新連線基準的 `ondemand_prepare`。
+- 一次 pull 涵蓋上期與新連線基準需要的 lead，不要 pull 兩次。Task 7 在 .135 記下它實際花多久（它是常用第一張）。
+- caveat：收集缺口與「沒有判定的流量」兩句同其他流量類報表（Task 2 的同一個函式）。
 - 郵件、XLSX 不必特別處理（讀同一份文件）。
 
 - [ ] **Step 1: 寫失敗測試**
@@ -285,7 +313,7 @@
     `pb_connections` 對 `FlowTotals`、新連線對 `new_connections` 報表、Provision 對稽核報表）——每一項都是「兩邊各算一次再比」，不是寫死數字。
   - 上期：告警的 `previous` 只數上期區間內的（造一則剛好在邊界上的告警確認歸屬）。
   - 本期內失聯：一台三天前失聯（在 7 天期間內）列出；一台二十天前失聯不列；一台在線不列。
-  - 輕量模式、PCE 取流量失敗：報表狀態完成；`flows`、`new_connections` 兩章是原因；另外三章有內容；兩個流量數字是 `None`；有 `findings` 章；
+  - 輕量模式、PCE 取流量失敗：頁面上沒有「沒有流量可以評估規則」而有「流量向 PCE 取不到」；報表狀態完成；`flows`、`new_connections` 兩章是原因；另外三章有內容；兩個流量數字是 `None`；有 `findings` 章；
     渲染出的第 1 頁沒有「沒有需要處理的項目」；結論是第二種句式。
   - 輕量模式、取得到：五章都有內容。
   - 型別登記齊全：所有「列舉全部型別」的測試加上新型別後通過；範本頁常用第一張是每週總覽；en、zh 沒有漏翻的 key。
@@ -302,10 +330,12 @@
 
 - [ ] **Step 0（Task 5 部署之前要準備）**：在 .106 建一個回溯 90 天的 Rule Hit Count 排程（停用狀態即可），用來驗升級。
 - [ ] **Step 1**: `illumio_ops/__init__.py`、README 徽章改 `6.10.0`；CHANGELOG 寫一節，**列出哪些數字的算法變了與為什麼**（這是使用者會在報表上看到的變動）。全套閘門全綠。
-- [ ] **Step 2: 改前基準。** 部署前一刻在 .106 以固定期間（最近一段完整的 7 天）產 14 型 zh_TW，倒出數字（3a 的腳本在 scratchpad `t8/`）。
+- [ ] **Step 2: 改前基準。** 用規格 §9.2 那張表的同一段期間 2026-11-05–11-11（.106 的流量保留 35 天，夠；6.9.0 在這段期間的數字已在 scratchpad `t8/after-6.9.0.json`）。
+  部署前一刻再產一次 14 型 zh_TW 當基準（讀「現在」的數字會動）。
 - [ ] **Step 3: 部署 .106，同一期間重產全部型別 × 兩種語言**，逐型比對：
   - Global Constraints 表**沒列**的 key：必須與基準完全相同。
-  - 表列的 key：把改前改後列成表，與規格 §9.2 的表對照（期間不同，數字不會一樣；要對的是方向與機制：`allowed_pct` 上升、非受管連線數大幅下降、成熟度略升）。
+  - 表列的 key：把改前改後列成表，與規格 §9.2 的表**逐項對照**（同一段期間：`allowed_pct` 2.7 → 3.9、B004 77,664 → 420 筆、B005 0.2% → 2.6%、成熟度各部分）；
+    不符的逐項查明是資料在這幾天變了（讀現在的清冊）還是算錯。
     以唯讀 SQL 在 .106 的流量庫直接算一次「有判定的連線數、其中 allowed 的」驗證 `allowed_pct`，兩邊各算一次再比。
   - 規則的發現：改前改後哪幾條的嚴重度或筆數變了，逐條列出（B001、B004、B005、B006、L002、L005、L007 之外的不該變）。
 - [ ] **Step 4: 逐份看。** 全部型別 × 兩種語言用量測腳本在 1440、820、print 量過；人眼看：每週總覽、安全風險、流量、規則使用的 PDF 第 1 頁與新章節。
