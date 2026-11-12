@@ -21,8 +21,13 @@ alerts are the way in, a host is where they lead.
   before this release are given their hosts at the first start where they can be read from what the alert kept.
 - Quarantine has a page: the hosts that carry the quarantine label now, who put it on and when, releasing one after a
   confirmation, and the record of quarantines and releases. It needs no write key to read.
-- The host page without a host says where to start: the hosts recent alerts are about, the managed hosts that lost
-  contact, the hosts in quarantine, and the attention list.
+- The VEN overview is the way in to hosts. Its search finds a host by part of its name, one of its addresses, a
+  label's value, its operating system or its VEN version; quick filters list the hosts with alerts in the last 7
+  days, the hosts that lost contact and the hosts in quarantine, each with its count. An address with alerts that the
+  PCE does not manage is named under the list, and a searched address the inventory does not hold is offered as the
+  unmanaged address it is. The inventory keeps each workload's interface addresses for this (filled at its next
+  read). "Hosts" is no longer an entry of the navigation: `/hosts` without a host leads to the overview, and a
+  host's own page is reached from it, from an alert or from a report.
 - The host page of one host: a first sentence of what it comes to (mode, VEN contact, alerts of the last 7 days,
   quarantine), the alerts about this host, and sections a link can land on.
 - The alerts page can be narrowed to one host (`/?device=<key>`).
@@ -30,8 +35,8 @@ alerts are the way in, a host is where they lead.
 
 ### Changed
 
-- The navigation is in five groups by what a page is for: Watch (alerts, alert rules, reports), Hosts (hosts, VEN
-  fleet, quarantine), Analyse (detection, investigate), Automation (rule schedules), Settings (SIEM, system). No
+- The navigation is in five groups by what a page is for: Watch (alerts, alert rules, reports), Hosts (VEN fleet,
+  quarantine), Analyse (detection, investigate), Automation (rule schedules), Settings (SIEM, system). No
   address changed.
 - "Unprocessed" is replaced by "new": an alert is new until the alerts page has been opened, nothing has to be marked.
   The badge in the navigation counts new alerts, the list marks them, and the page keeps its own measure while it is

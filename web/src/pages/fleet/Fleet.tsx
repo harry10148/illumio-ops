@@ -455,16 +455,6 @@ function Fleet() {
         { key: "sync", label: t("fleet_kpi_sync"), value: o ? o.sync_problems : null, tone: o?.sync_problems ? "high" : "muted" },
       ]} />
       <Disclosure summary={t("fleet_online_title")}><p className="hint">{t("fleet_online_rule")}</p></Disclosure>
-      {o && (
-        <div className="host-grid" data-role="fleet-tallies">
-          <TallyTable title={t("fleet_tally_modes")} role="fleet-modes" rows={o.modes} wordOf={modeWord} />
-          <TallyTable title={t("fleet_tally_versions")} role="fleet-versions" rows={o.versions} wordOf={(v) => v ?? t("fleet_not_reported")} />
-          <TallyTable title={t("fleet_tally_os")} role="fleet-os" rows={o.systems} wordOf={(v) => v ?? t("fleet_not_reported")} />
-          <TallyTable title={t("fleet_tally_online")} role="fleet-online"
-                      rows={ONLINE.map((s) => ({ value: s, hosts: o.online[s] ?? 0 }))} wordOf={(v) => word(ONLINE_KEYS, v ?? "")} />
-          <TallyTable title={t("fleet_tally_sync")} role="fleet-sync" rows={o.sync_states} wordOf={(v) => v ?? t("fleet_not_reported")} />
-        </div>
-      )}
       <Panel title={t("fleet_list_title")} role="fleet-list"
              meta={list ? t("fleet_list_count", { n: list.total.toLocaleString() }) : undefined}>
         <div className="row" data-role="fleet-filter">
@@ -552,6 +542,17 @@ function Fleet() {
           </p>
         )}
       </Panel>
+      {/* the list a search narrows sits right under the search; how the fleet divides comes after it */}
+      {o && (
+        <div className="host-grid" data-role="fleet-tallies">
+          <TallyTable title={t("fleet_tally_modes")} role="fleet-modes" rows={o.modes} wordOf={modeWord} />
+          <TallyTable title={t("fleet_tally_versions")} role="fleet-versions" rows={o.versions} wordOf={(v) => v ?? t("fleet_not_reported")} />
+          <TallyTable title={t("fleet_tally_os")} role="fleet-os" rows={o.systems} wordOf={(v) => v ?? t("fleet_not_reported")} />
+          <TallyTable title={t("fleet_tally_online")} role="fleet-online"
+                      rows={ONLINE.map((s) => ({ value: s, hosts: o.online[s] ?? 0 }))} wordOf={(v) => word(ONLINE_KEYS, v ?? "")} />
+          <TallyTable title={t("fleet_tally_sync")} role="fleet-sync" rows={o.sync_states} wordOf={(v) => v ?? t("fleet_not_reported")} />
+        </div>
+      )}
       <Panel title={t("fleet_history_title")} role="fleet-history"><History actions={actions} lang={lang} /></Panel>
     </section>
   );
