@@ -330,6 +330,18 @@ VEN 總覽、規則排程、報表、SIEM 轉送、告警規則與通知、系�
 使用者 2026-11-12 對四項（沒有判定流量造成的數字變動、判定的白話用語、範本頁分常用／專題、安全風險移走三章）回覆同意。
 實作計畫：`docs/superpowers/plans/2026-11-12-v6-reports-stage3a-presentation.md`（3b 的計畫在 3a 落地後寫）。
 
+寫計畫時定下、與下文不同的地方以這裡為準【我的決定】：
+
+- 重點數字的排序由收尾步驟（`finish()`）依一張表做，不是每個 builder 各排一次；某型缺某個領頭數字時由後面的遞補。
+- 白話用語是固定規則，不是「第一次出現才帶」：當作名稱的地方（表格裡的判定值、選項、標籤、欄名、數字名稱、標題）用「白話（原文）」，
+  句子裡維持 PCE 的原文，所以發現卡片的內文仍會出現 Potentially Blocked、Visibility Only、Selective。
+  英文版：`Allowed (a rule allows it)`、`Potentially Blocked (blocked once enforcement starts)`、`Blocked`。
+- 「讀數字前先知道」在 3a 有兩種：收集缺口、封存缺日（期間從封存讀而有幾天讀不到）。
+- 模型另加 `ReportDocument.gui_base`（主機連結的網址開頭）；`notes`（資料註記）是 renderer 產生的章，id 保留。
+- 第 1 頁不得把「沒評估」說成「沒事」：有規則沒能評估或規則沒跑時，「最該做的事」那一塊寫明並指向那一章。自訂報表沒有這一塊。
+- 3a 的常用只有 4 份（每週總覽在 3b 才有）；Rule Hit Count 的卡片 3a 仍在。
+- 郵件不再列逐條發現與資料註記：它是第 1 頁。
+
 **第 1 頁（給不看細節的人）**【使用者同意】由上到下：
 
 1. 一句結論（現有 `conclusion`）。

@@ -43,11 +43,30 @@ openpyxl；React 19＋TypeScript（範本頁、用語表）；pytest＋Playwrigh
 
 ## Review Focus
 
-1. **一個數字都不能變**：Task 8 用 .106 同一段固定期間，改前改後逐型比對 `Kpi.key → value`。
+1. **一個數字都不能變**：兩層證據。Task 0 在動任何 builder 之前把每型 fixture 文件的 `{key: (value, previous)}` 釘成測試，之後每個 task 都跑；
+   Task 8 在部署前一刻取 .106 的基準、部署後立刻重產比對。
 2. **合併的三件事不得漏掉或重複發現**：每個發現恰好屬於一件事；第 1 頁沒列的件數寫得出來（Task 1）。
 3. **主機連結對到正確的列**：`finish()` 會拿掉空欄、HTML 會把每列都一樣的欄拿掉、HTML 只印前 200 列；連結以欄的 key 對應，不以位置（Task 5、6）。
 4. **沒有對外網址、沒有 XLSX、沒有發現、沒有重點數字（自訂報表）、沒有上期**：第 1 頁每一塊都有說法，不留空框（Task 6）。
 5. **紙本**：超過 10 列的表只印 10 列並寫總數與去處；卡片不被切開；不因強制分頁出現空白頁（Task 6、Task 8 以 print media 量）。
+
+---
+
+**執行方式：** Task 0–7 依序，一次只有一個 implementer（Task 2–5 都改同一批 builder 與兩個 i18n 檔，不得平行）。每份 brief 明文要求先確認
+`pwd` 是 `/home/harry/rd/illumio-ops/.worktrees/v6-ui`、分支是 `feat/v6-reports-stage3`。
+
+### Task 0: 把現在的數字釘住
+
+**Files:**
+- Create: `tests/services/reports/test_numbers_pinned.py`
+
+在動任何 builder 之前做，單獨提交。對 `tests/services/reports` 現有 fixture 能建出的每一型報表（目標是有 HTML 的 15 型全部；借用各型測試檔已有的
+建構方式，不新造資料），把 `{k.key: (k.value, k.previous) for k in doc.kpis}` 以字面值寫進測試。之後的 task 不得修改這個檔案裡的期望值；
+`finish()` 重排之後順序會變，所以比的是字典不是序列。哪幾型沒有現成 fixture、因此沒釘到，列在回報裡（那幾型只靠 Task 8 的實機比對）。
+
+- [ ] **Step 1: 寫測試，跑過（它描述現況，本來就該綠）。**
+- [ ] **Step 2: 把其中一個期望值改錯跑一次，確認會紅，再改回來。**
+- [ ] **Step 3: commit** `test(v6-reports): the key numbers of every report type are pinned before the page is rearranged`
 
 ---
 
@@ -211,6 +230,8 @@ openpyxl；React 19＋TypeScript（範本頁、用語表）；pytest＋Playwrigh
   | L009 | 報表只看得到傳輸量與目的端；是否為資料外洩，要對照主機上的程式與用途確認。 |
   | L010 | 管理 port 能跨環境，一個環境被入侵就會打開其他環境。 |
 
+- [ ] **Step 0: 先讀 `tests/services/reports/test_report_i18n.py` 與 `test_report_copy.py`**（它們對每型報表的輸出檢查沒有漏翻的 key、中文版沒有英文句子）；
+  新文案要過這兩支，不是改它們。
 - [ ] **Step 1: 寫失敗測試**（`test_findings.py`）
   - `findings.py` 裡每一個以字面出現的 `(規則, rec_key)` 都在 `ACTION_CODES`（以 AST 或正則掃 `RuleOutcome("B001", …, "rpt_rule_b001_rec_…"` 與 `_simple(...)` 的引數；
     測試本身先對一個少登記的假表確認會紅）。`ACTION_CODES` 的每個代號都在 `ACTION_ORDER`，都有 `rpt_act_<代號>` 兩個語言的句子。
@@ -321,8 +342,10 @@ openpyxl；React 19＋TypeScript（範本頁、用語表）；pytest＋Playwrigh
 - 做法：四個報表模組的 `DECISION_KEYS`／`EDGE_STATE_KEYS` 與四個前端檔的對照表改指向 `term_decision_*`；`web/src/terms.ts` 加 `decisionWord(decision)`
   （同 `modeWord`），前端四處改用它。`decision_allowed／decision_potentially_blocked／decision_blocked` 三個舊鍵若不再有人用就刪掉。
 - 名稱類的字串逐一改（清查方式：兩個語言檔裡不分大小寫找 `potentially blocked`、`allowed`、`blocked`，把「整個值就是名稱」的挑出來；句子不動）。
-  至少包含：`rpt_sec_kpi_pb_flows`（→「開始擋之後會被擋的流量」）、`rpt_sec_sec_pb`、`rpt_sec_tbl_pb`、`lat_state_potentially_blocked`、
+  名稱裡也帶 PCE 的原文。至少包含：`rpt_sec_kpi_pb_flows`（→「開始擋之後會被擋的流量（Potentially Blocked）」）、`rpt_sec_sec_pb`、`rpt_sec_tbl_pb`、`lat_state_potentially_blocked`、
   `wb_pred_pb_by_boundary`、`wb_pred_pb_by_override_deny`，以及 `rpt_sec_kpi_allowed_pct` 與 blocked 流量的數字名稱。完整清單（改了哪些、哪些因為是句子而不改）列在回報。
+- `tests/i18n/test_terminology.py` 的 docstring 與「判定值寫 Allowed／Blocked」那一條的說明更新成現在的規則（名稱處是白話＋括號原文，句子裡是原文），
+  規則本身（禁用的寫法）不放寬。
 - 模式：`common.py` 加 `mode_word(lang, mode) -> str`，回 `term_mode_*` 的句子（不認得的模式照原樣）。報表表格裡印模式的地方全部改用它
   （`app_summary` 的主機表現在直接印 `visibility_only` 這種原始值；`ven_status` 的 `_MODE_KEYS`、`security_risk` 與 `readiness` 的模式分布表一併對齊）。
 - 欄寬：這些說法比原文長。Task 6 的版面與 `tests/e2e/test_report_table_fit.py` 要用最長的說法量過（en 的 Potentially Blocked 那一句最長）。
@@ -379,12 +402,19 @@ openpyxl；React 19＋TypeScript（範本頁、用語表）；pytest＋Playwrigh
 5. `data-role="top-actions"`：標題「最該做的 {n} 件事」（n 是實際列出的件數，1–3）。每件：序號、嚴重度標籤、`short`、
    「解決 {n} 項發現：〈標題〉、〈標題〉…」（最多 4 個標題，其餘「另 {n} 項」；每個標題連到下方對應的卡片）、`focus` 的句子（最多 2 句）。
    - 超過 3 件：最後一行「另有 {n} 件，見下方的發現。」
-   - 沒有發現：現有的 `rpt_findings_none` 一句，沒有清單。
+   - 沒有發現、而且規則都評估過（或這份報表不跑規則）：現有的 `rpt_findings_none` 一句，沒有清單。
+   - **不得把「沒評估」說成「沒事」**：文件有 `findings` 章（有規則沒能評估，或規則根本沒跑）時，這一塊的最後加一句
+     `rpt_actions_unevaluated`「有 {n} 條規則沒能評估，見〈{section}〉。」並連到那一章；規則完全沒跑（沒有符合的流量）而且沒有任何發現時，
+     只寫 `rpt_actions_not_run`「這段期間沒有流量可以評估規則，見〈{section}〉。」，**不寫**「本期沒有需要處理的項目」。
+     判斷依據：`doc.sections` 裡有 id 為 `findings` 的章；`n` 是那張表的列數，表是空的（規則沒跑）就用第二句。
+     輕量模式下 L006 一律沒能評估（沒有暴露面分析），所以 .135 的每份流量類報表都會走到這裡。
+   - 自訂報表（`ReportType.CUSTOM`）：不出這一塊，也不出發現卡片；第 1 頁只有結論與目錄。
 6. `data-role="findings"`：每個發現一張卡片（`data-role="finding"`、`id="finding-<n>"`、`data-severity`），依嚴重度排，全部列出（不設上限：最多 19＋builder 自己的）。
    卡片三段固定、各有小標：**發生什麼**（`title` 為卡片標題；`what` 非空才有內文）、**為什麼要緊**（`why`；空就不出現這一段）、
    **怎麼做**（它屬於第 1 頁的第 N 件事時，前面一句「見上方第 {n} 件事。」，再接 `action`）。MITRE 代號在卡片底部（現有的 chips）。
    紙本：卡片 `break-inside: avoid`。
-7. `data-role="other-kpis"`：`doc.kpis[3:]`，沿用現有的小格（含變化與 note）；沒有就不出現。
+7. `data-role="other-kpis"`：`doc.kpis[3:]`，沿用現有的小格（含 note）；變化那一行與領頭格、XLSX、郵件用同一個函式（`kpi_trend`，改成新句子），
+   全份報表不再有箭頭版；沒有就不出現。
 8. 目錄，再來是章節。**章節順序**：一般章節 → 「怎麼讀這份報表」這一部分。這一部分的內容依序是：
    - builder 的 `how` 章（有的才有；7 型有）。
    - `notes` 章「資料註記」：`doc.data_quality` 的清單（從摘要搬來；現在的「資料品質」標題改成這個）。
@@ -400,6 +430,7 @@ openpyxl；React 19＋TypeScript（範本頁、用語表）；pytest＋Playwrigh
   - 沒有 XLSX：`rpt_print_capped_no_xlsx`「列印只列前 10 列；螢幕上的這份報表列到前 {shown} 列，共 {total} 列。」
   `total` 是 `len(t.rows)`。螢幕上原有的截斷說明（`rpt_rows_capped` 等）螢幕與紙本都照舊顯示。
 - `html_rows` 小於 10 的表、列數不超過 10 的表：不加這個屬性、不加這一句。
+- 「怎麼讀這份報表」那一部分的表（`how` 章的評分因子、等級、名詞表）是說明，不是資料：不套這個上限，紙本全部印出。
 - 紙本其他規則：封面、第 1 頁、發現接續排版，不強制分頁（拿掉 shell 裡對 `.exec`、`.toc` 的強制分頁，若有）；章節之間只用 `break-inside: avoid` 與
   `break-after: avoid`（標題不與內容分開）；表格跨頁重複表頭（現有）。
 
@@ -412,6 +443,8 @@ openpyxl；React 19＋TypeScript（範本頁、用語表）；pytest＋Playwrigh
 - 沒有對外網址時：全部是文字；`data_quality` 已有的那一句（`rpt_cust_no_links` 類）沿用到有主機表的報表——由 renderer 之外的 `finish()` 補：
   文件有任一 `host_keys` 而 `gui_base` 為空時加一句 `rpt_quality_no_host_links`「沒有設定主控台的對外網址，所以報表裡的主機名稱不是連結。」
   （`gui_base` 在 `finish` 之後才填的話，把這一步放在填完之後；順序由 implementer 依 `generate.py` 現況安排，測試釘住結果）。
+- 收信開附件的人多半還沒登入主控台：確認未登入時點連結，登入後仍回到同一個網址（`?key=` 與 `#段落` 都在）。現況若會掉，在這個 task 修
+  （登入頁保留原網址），並加 e2e。
 - 報表不放隔離按鈕。
 
 - [ ] **Step 1: 寫失敗測試**（`test_render_html.py`；斷言渲染出來的文字與結構，不是 class 名稱的存在）
@@ -421,6 +454,8 @@ openpyxl；React 19＋TypeScript（範本頁、用語表）；pytest＋Playwrigh
   - 變化與方向：`previous=None` 的格子沒有變化那一行；相同 →「與上期持平」；多 2,823 →「比上期多 2,823」；`better="lower"` →「越低越好」；`neutral` 沒有方向。
   - 6 個發現、4 件事：top-actions 列 3 件與「另有 1 件」；每個發現卡片都在；屬於第 2 件事的卡片寫「見上方第 2 件事」；第 4 件事的卡片沒有這一句。
   - 一件事 6 個發現：4 個標題＋「另 2 項」。沒有發現：一句、沒有清單、沒有卡片。
+  - 有 2 個發現、另有 1 條規則沒能評估：三件事之外多一句「有 1 條規則沒能評估」且連到 `#findings`。沒有發現、規則沒跑：只有「沒有流量可以評估規則」那一句，
+    頁面上沒有「本期沒有需要處理的項目」。自訂報表：沒有 top-actions、沒有 findings 區塊。
   - `what` 與 `why` 為空的發現：卡片沒有空的小標。
   - 12 列的表：`data-print-cap`、有 print-only 的句子且 `total=12`；10 列的表沒有；`html_rows=5` 的表沒有；沒有 XLSX 時用另一句。
   - 主機連結：有 `gui_base` → 連結的 href 等於 `host_url` 的值、含 `#status`；沒有 → 沒有 `<a data-role="host-link">`；鍵是容器 workload → 文字；
@@ -479,14 +514,14 @@ openpyxl；React 19＋TypeScript（範本頁、用語表）；pytest＋Playwrigh
 
 這一個 task 由主對話（不是 subagent）執行，因為要碰兩台機器。
 
-- [ ] **Step 0（要在 Task 1 開始寫程式之前做）: 改前基準。** .106 現在跑 6.8.0。以固定期間（`period_from=2026-11-05`、`period_to=2026-11-11`）
-  在 .106 產生有 HTML 的 15 型 × zh_TW（需要 app 的 `app_summary` 用同一個 app；`custom` 用現有的一份自訂報表），
-  把每份的 `Kpi.key → value、previous`（`reports` 表存的 `kpis`）倒成 JSON，存到 scratchpad 的 `baseline-6.8.0.json`；
-  同時保留這 15 份 HTML 當「改前」對照。唯讀腳本照既有做法（scp 到 /tmp，以 `illumio-ops` 帳號執行）。
+- [ ] **Step 0（Task 1 開始之前）: 留下改前的樣子。** 在 .106（6.8.0）產生有 HTML 的 15 型 × zh_TW，把 HTML 存到 scratchpad 當版面對照。不拿它比數字。
 - [ ] **Step 1: 全套閘門**（`gates.sh`）全綠。
-- [ ] **Step 2: 打包並部署 .106**（`scripts/build_bundle.sh` → `./install.sh --accept-report`）。
-- [ ] **Step 3: 數字不變。** 同一段固定期間再產 15 型，逐型比對 `key → value、previous`：除了順序之外必須完全相同。
-  任何一個不同都是缺陷，先修再往下（唯一的例外是期間固定卻會隨「現在」變的數字，例如 VEN 現況；這類要在回報逐一列出並說明為什麼會變）。
+- [ ] **Step 2: 數字基準，然後部署 .106。** 部署前一刻，在 .106 以最近一段完整的 7 天（固定 `period_from`／`period_to`）產生 15 型，
+  把每份的 `Kpi.key → value、previous`（`reports` 表存的 `kpis`）倒成 JSON 存到 scratchpad。接著打包（`scripts/build_bundle.sh`）並部署
+  （`./install.sh --accept-report`）。
+- [ ] **Step 3: 數字不變。** 部署後立刻以同一段期間再產 15 型，逐型比對 `key → value、previous`：除了順序之外必須完全相同。
+  不同的每一個都逐一查明：是兩次產生之間資料真的變了（讀「現在」的數字，例如 VEN 在線台數；要拿得出是哪筆資料變了），還是程式改壞了。
+  查不出資料原因的一律當缺陷，先修再往下。
 - [ ] **Step 4: 逐份看**（專案報表規則）。15 型 × 2 語言，每份用 Playwright 開螢幕版（1440、820）與 print media（A4），逐份檢查並記錄：
   第 1 頁五塊是否齊全且沒有空框；三格等高；最長的中文與英文字串有沒有被切或溢出；超過 10 列的表在紙本是 10 列且有去處句；卡片沒有被切開；
   沒有只有標題的頁；主機連結點得進去且落在對的段；「怎麼讀這份報表」在最後。以程式量的項目（溢出、列數、等高、分頁）附數字，
