@@ -91,6 +91,12 @@ def test_findings_section(ctx):
     doc = _build(ctx)
     assert any("Ransomware Risk Port" in f.title for f in doc.findings)
     assert all(f.what and f.why and f.action_code and f.action_short for f in doc.findings)
+    # as many findings as rules that fired, none held back
+    from illumio_ops.domain.filter import FilterSpec
+    from illumio_ops.services.reports import findings
+    outcomes = findings.run_rules(ctx, FilterSpec(start=START, end=END), ctx.settings.current().reports.rule_thresholds,
+                                  Language.EN, now=NOW)
+    assert len(doc.findings) == sum(1 for o in outcomes if o.severity is not None) >= 1
     # a rule that fired is a finding, never a row of the closing section
     assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
 

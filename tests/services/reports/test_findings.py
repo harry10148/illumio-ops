@@ -460,6 +460,13 @@ def test_unevaluated_section_lists_only_the_rule_that_could_not_run(ctx):
     assert "Not evaluated" in table.rows[0] and "exposure graph has not been computed" in " ".join(table.rows[0])
 
 
+def test_closing_table_title_fits_an_xlsx_sheet_name():
+    """Excel caps a sheet name at 31 characters; a longer title is shortened (with the whole title above the table).
+    The closing table's own title is kept within the cap so its sheet is not one of those."""
+    for lang in Language:
+        assert len(tr(lang, "rpt_rules_tbl_unevaluated")) <= 31
+
+
 def test_unevaluated_section_says_the_rules_did_not_run():
     for lang, said in ((Language.EN, "The rules were not evaluated"), (Language.ZH_TW, "規則未評估")):
         (section,) = findings.unevaluated_section([], lang, **_section_args(), evaluated=False)

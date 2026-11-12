@@ -115,6 +115,26 @@ def test_findings_only_this_app(ctx):
     assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
 
 
+def test_as_many_findings_as_rules_that_fired(ctx, monkeypatch):
+    """Stage 3a: none held back (the summary showed the first five)."""
+    from illumio_ops.services.reports import findings
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["reports"]["rule_thresholds"].update(
+        unmanaged_connection=1, lateral_outbound_dst=1, cross_env_connection=1, discovery_protocol=1, pb_lateral=1))
+    _write(ctx, [flow(src_app="Finance", dst_app="X", port=p, **kw) for p, kw in (
+        (5900, {}), (445, {"src_env": "Dev", "dst_env": "Prod"}), (22, {"decision": "potentially_blocked"}),
+        (23, {"decision": "blocked"}), (137, {"proto": 17}), (1433, {"src_env": "Dev", "dst_env": "Prod"}))])
+    seen = []
+    real = findings.run_rules
+
+    def spy(*a, **k):
+        seen.append(real(*a, **k))
+        return seen[-1]
+    monkeypatch.setattr(findings, "run_rules", spy)
+    doc = _build(ctx, _app("Finance"))
+    fired = [o for o in seen[0] if o.severity is not None]
+    assert len(seen) == 1 and len(fired) > 5 and len(doc.findings) == len(fired)
+
+
 def test_zh_tw_builds(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443)])
     assert "Finance" in _build(ctx, _app("Finance"), Language.ZH_TW).title

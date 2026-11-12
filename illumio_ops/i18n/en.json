@@ -1310,7 +1310,7 @@
   "rpt_rule_not_evaluated": "Not evaluated",
   "rpt_rule_error": "This rule could not be evaluated ({error}); the other rules ran.",
   "rpt_rules_sec_unevaluated": "Rules not evaluated",
-  "rpt_rules_tbl_unevaluated": "Rules that could not be evaluated",
+  "rpt_rules_tbl_unevaluated": "Rules that were not evaluated",
   "rpt_act_focus": "{finding}: {top} has the most.",
   "rpt_act_enforce": "Move the hosts that still only record, without blocking, to enforcement.",
   "rpt_act_cross_env_rules": "Remove or narrow the rules that allow connections between environments.",
