@@ -254,3 +254,20 @@ def test_the_alerts_page_can_be_narrowed_to_one_host_and_widened_again(context, 
     expect(page.locator("[data-role=alert-device-filter]")).to_contain_text("Host: db")
     page.locator("[data-role=alert-device-filter] button").click()
     expect(page.locator("[data-role=alert-list] tbody tr")).to_have_count(2)
+
+
+def test_signing_in_from_a_report_link_lands_on_the_host_it_named(context, live_app):
+    """A report's reader opens a host link without a session (an emailed attachment): the sign-in form is shown at
+    that address, and signing in lands on the same host and the same part of its page — key and #section kept."""
+    from tests.web.conftest import ADMIN_PASSWORD
+    _seed(live_app)
+    page = context.new_page()
+    url = f"{live_app.url}/hosts?key=%2Forgs%2F1%2Fworkloads%2Fdb#status"
+    page.goto(url)
+    page.fill("input[autocomplete=username]", "illumio")
+    page.fill("input[autocomplete=current-password]", ADMIN_PASSWORD)
+    page.click("button[type=submit]")
+    page.wait_for_selector(".shell")
+    expect(page.locator("h1")).to_have_text("db")
+    assert page.url == url
+    expect(page.locator("#status")).to_be_in_viewport()

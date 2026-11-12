@@ -2,9 +2,11 @@
 previous-period comparison of a key metric."""
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from itertools import islice
 from typing import Any
+from urllib.parse import quote_plus
 
 from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.report import HTML_ROW_CAP
@@ -60,6 +62,21 @@ MODE_KEYS = {"idle": "term_mode_idle", "visibility_only": "term_mode_visibility_
 
 def tr(lang: Language, msg: str, /, **params: object) -> str:
     return translate(lang, msg, {k: "" if v is None else str(v) for k, v in params.items()})
+
+
+# What the console's host page opens (web/src/components/HostLink.tsx OPENS): a workload or an address, not a
+# Kubernetes or container workload.
+HOST_PAGE_KEY = re.compile(r"^(/orgs/\d+/workloads/|ip:)")
+
+
+def host_url(base: str | None, key: str | None, section: str | None) -> str | None:
+    """The address of a host's page in the console, the same one the web app's hostPath makes (its
+    URLSearchParams leaves '*' and writes '~' as %7E; Python's urlencode does the opposite). None: no external
+    address is set, or the key is not one the host page opens — the name stays text."""
+    if not base or not key or not base.startswith(("http://", "https://")) or not HOST_PAGE_KEY.match(key):
+        return None
+    query = quote_plus(key, safe="*").replace("~", "%7E")
+    return f"{base.rstrip('/')}/hosts?key={query}" + (f"#{section}" if section else "")
 
 
 def unnamed_host(key: str, lang: Language) -> str | None:

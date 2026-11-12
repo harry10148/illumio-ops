@@ -8,6 +8,9 @@ rest is; a cell longer than CELL_SOFT_MAX characters is cut in the HTML only, wi
 A report has at most 2 caveats ("know this before reading the numbers"): a third is refused when the document is
 built, never dropped. One thing to do (domain/actions.py) lists the titles of its first 4 findings and says how many
 more there are; the first page lists the first 3 things to do and says how many more there are.
+On paper a table lists its first PRINT_ROW_CAP rows (the first as the reader sorted them) and a sentence under it
+says how many there are and where: the XLSX sheet, or the report on screen. The tables of "how to read this report"
+are printed whole. Every finding is a card (no cap: the rules are 19 at most, a builder adds a handful).
 """
 from __future__ import annotations
 
@@ -30,6 +33,9 @@ XLSX_ROW_CAP = 1_000_000
 CELL_SOFT_MAX = 2_000
 BAR_POINT_CAP = 90
 CAVEATS_MAX = 2
+PRINT_ROW_CAP = 10
+# Section ids a builder may not use: 'notes' is the data notes chapter the HTML renderer writes at the end.
+RESERVED_SECTION_IDS = frozenset({"appendix", "notes"})
 
 # The part of the host page a table's host links open at: the web app's HostSection (components/HostLink.tsx).
 HostSection = Literal["status", "alerts", "different", "usual", "connections", "would-block", "ransomware", "tamper",
@@ -171,8 +177,8 @@ class ReportDocument(_Model):
     @model_validator(mode="after")
     def _ids(self) -> ReportDocument:
         ids = [s.id for s in self.sections]
-        if len(ids) != len(set(ids)) or "appendix" in ids:
-            raise ValueError("section ids are unique and 'appendix' is reserved")
+        if len(ids) != len(set(ids)) or RESERVED_SECTION_IDS & set(ids):
+            raise ValueError("section ids are unique; 'appendix' and 'notes' are reserved")
         return self
 
     def tables(self) -> list[tuple[Section, TableBlock]]:

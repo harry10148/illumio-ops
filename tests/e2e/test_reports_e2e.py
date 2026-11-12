@@ -322,3 +322,34 @@ def test_bulk_delete_from_the_list(context, live_app):
     expect(page.locator("[data-role=bulk-outcome]")).to_contain_text("Deleted 2")
     expect(page.locator("[data-role=report-list] tbody tr")).to_have_count(1)
     expect(page.locator(f"[data-report-id='{ids[2]}']")).to_have_count(1)
+
+
+def test_a_host_named_in_a_report_leads_to_its_page(context, live_app):
+    """Stage 3a: a host in a report table is a link to the console's host page, at the part the table is about. The
+    report opens sealed off from the console (no cookie of its own); the link still lands signed in."""
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.values import ReportType
+    from illumio_ops.services.reports.registry import ReportParams
+    from tests.services.reports.test_ven_status import _inventory, host
+    ctx = live_app.ctx
+    _inventory(ctx, [host("db"), host("web")], read_at=datetime.now(UTC))
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["reports"].update(gui_external_url=live_app.url))
+    generate.enqueue(ctx, ReportParams(report_type=ReportType.VEN_STATUS), trigger="manual", schedule_id=None,
+                     now=datetime.now(UTC))
+    generate.run_queued(ctx)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    row = page.locator("[data-role=report-list] tbody tr").first
+    with context.expect_page() as opened:
+        row.locator("[data-role=report-open]").click()
+    report = opened.value
+    report.wait_for_load_state()
+    link = report.locator("a[data-role=host-link]").first
+    expect(link).to_have_text("db")
+    assert link.get_attribute("href") == f"{live_app.url}/hosts?key=%2Forgs%2F1%2Fworkloads%2Fdb#status"
+    link.click()
+    report.wait_for_url("**/hosts?key=*")
+    expect(report.locator("h1")).to_have_text("db")
+    assert report.url == f"{live_app.url}/hosts?key=%2Forgs%2F1%2Fworkloads%2Fdb#status"
+    expect(report.locator("#status")).to_be_in_viewport()

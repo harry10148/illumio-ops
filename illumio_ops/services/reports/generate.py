@@ -417,9 +417,9 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
                                            pce_label=row.pce_label))
         if fdb.generation != generation:
             raise _Fail("rpt_err_pce_switched")
-        doc = finish(doc)
+        # gui_base before finish: finish says in the data notes when the hosts a table names cannot be links
+        doc = finish(doc.model_copy(update={"gui_base": settings.reports.gui_external_url.rstrip("/") or None}))
         doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id),
-                                     "gui_base": settings.reports.gui_external_url.rstrip("/") or None,
                                      "conclusion": conclusion(doc, lambda key, p: translate(doc.lang, key, p), tz=tz)})
         files = _write(out_dir, doc, row.id, params.formats, tz)
         kpis = [{"key": k.key, "label": k.label, "value": k.value, "previous": k.previous} for k in doc.kpis]
@@ -454,9 +454,13 @@ class CoverageText:
     caveats: tuple[str, ...]
 
 
+GAP_HOURS_LEAST = 0.1  # the smallest total the gap sentence gives as a number; under it: "less than 0.1 hours"
+
+
 def gap_caveats(gaps: Sequence[tuple[datetime, datetime, str]], lang: Language) -> tuple[str, ...]:
     """One sentence for every gap there is (not only the MAX_GAP_LINES the notes list): how many, and the hours they
-    cover to one decimal. Two gaps over the same time (a failed read and a truncated one) are that time once."""
+    cover to one decimal (under GAP_HOURS_LEAST: "less than 0.1 hours", never "0.0"). Two gaps over the same time
+    (a failed read and a truncated one) are that time once."""
     if not gaps:
         return ()
     seconds, upto = 0.0, None
@@ -465,7 +469,10 @@ def gap_caveats(gaps: Sequence[tuple[datetime, datetime, str]], lang: Language) 
         if b > a:
             seconds += (b - a).total_seconds()
             upto = b
-    return (translate(lang, "rpt_caveat_gaps", {"n": str(len(gaps)), "hours": f"{seconds / 3600:.1f}"}),)
+    hours = seconds / 3600
+    if hours < GAP_HOURS_LEAST:  # one decimal would print "0.0 hours" for gaps that are there
+        return (translate(lang, "rpt_caveat_gaps_brief", {"n": str(len(gaps)), "least": f"{GAP_HOURS_LEAST:.1f}"}),)
+    return (translate(lang, "rpt_caveat_gaps", {"n": str(len(gaps)), "hours": f"{hours:.1f}"}),)
 
 
 def archive_caveats(caveats: tuple[str, ...], res: archive_read.ArchiveResult, lang: Language) -> tuple[str, ...]:

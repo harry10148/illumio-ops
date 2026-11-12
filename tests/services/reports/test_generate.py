@@ -212,6 +212,18 @@ def test_hours_of_two_gaps_over_the_same_time_are_counted_once(ctx):
     assert ": 2," in got.caveats[0] and "3.0 hours" in got.caveats[0]  # 03:00-06:00, not 2 + 2
 
 
+def test_gaps_under_a_tenth_of_an_hour_are_not_said_as_zero_hours(ctx):
+    start, end = _gaps(ctx, [(_at(22, 3), _at(22, 3, 2), "failed"), (_at(23, 3), _at(23, 3, 3), "failed")])
+    zh = generate.coverage_text(ctx, start, end, Language.ZH_TW, now=NOW, tz=UTC)
+    assert zh.caveats == ("期間內有 2 段、共不到 0.1 小時沒有收集到資料；明細在最後的「資料註記」。",)
+    en = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
+    assert ": 2, less than 0.1 hours in all" in en.caveats[0] and "0.0" not in en.caveats[0]
+    # six minutes is 0.1 hours: said as the number
+    at = datetime(2026, 10, 22, 3, tzinfo=UTC)
+    assert "0.1 hours" in generate.gap_caveats([(at, at + timedelta(minutes=6), "failed")], Language.EN)[0]
+    assert "less than" in generate.gap_caveats([(at, at + timedelta(minutes=5), "failed")], Language.EN)[0]
+
+
 def test_no_gap_no_sentence(ctx):
     start, end = _gaps(ctx, [])
     got = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
@@ -398,3 +410,28 @@ def test_the_document_carries_the_console_address(ctx, monkeypatch, external, ba
     assert _row(ctx, rid).status is ReportStatus.DONE
     assert seen[0].gui_base == base
     assert seen[0].gui_link == (f"{base}/reports?id={rid}" if base else None)
+
+
+@pytest.mark.parametrize(("external", "said"), [("", True), ("https://ops.example", False)])
+def test_a_report_made_without_the_console_address_says_its_hosts_are_not_links(ctx, monkeypatch, external, said):
+    """The address is on the document before finish() reads it: a report naming hosts says, in its data notes, why
+    they are not links — and does not say it when they are."""
+    from illumio_ops.domain.report import Column, Section, TableBlock
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["reports"].update(gui_external_url=external))
+    hosts = TableBlock(title="Hosts", columns=(Column(key="host", label="Host", kind="host"),), rows=(("db",),),
+                       total_rows=1, empty_text="-", host_keys={"host": ("/orgs/1/workloads/db",)}, host_section="status")
+
+    def build(inp: BuildInput) -> ReportDocument:
+        return _doc(inp).model_copy(update={"sections": (Section(id="hosts", title="Hosts", blocks=(hosts,)),)})
+    _register(monkeypatch, build)
+    seen = []
+    real = generate._write
+    monkeypatch.setattr(generate, "_write", lambda out_dir, doc, *a, **kw: (seen.append(doc), real(out_dir, doc, *a, **kw))[1])
+    rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL), trigger="manual", schedule_id=None, now=NOW)
+    generate.run_queued(ctx, now=NOW)
+    assert _row(ctx, rid).status is ReportStatus.DONE
+    sentence = "The console's external address is not set, so the hosts named in this report are not links."
+    assert (sentence in seen[0].data_quality) is said
+    html = (ctx.paths.reports_dir / str(rid) / _row(ctx, rid).files[0]).read_text(encoding="utf-8")
+    assert ('data-role="host-link" href="https://ops.example/hosts?key=%2Forgs%2F1%2Fworkloads%2Fdb#status"' in html) is not said
+    assert (sentence.replace("'", "&#x27;") in html) is said  # the page escapes the apostrophe

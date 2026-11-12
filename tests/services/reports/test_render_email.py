@@ -24,7 +24,7 @@ def test_subject_counts_findings():
 
 def test_four_kpis_with_previous_or_none():
     r = render_email(make_doc(kpis=KPIS), tz=UTC)
-    for text in ("Pivot hosts", "▲ 3", "no critical assets", "Unchanged"):
+    for text in ("Pivot hosts", "Up 3 from the previous period", "no critical assets", "Unchanged"):
         assert text in r.text and text in r.html
     assert "No previous period" not in r.text and "No previous period" not in r.html
 

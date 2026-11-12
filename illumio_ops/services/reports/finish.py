@@ -7,7 +7,9 @@
   period" line that sat under every number);
 - a data note said twice is said once;
 - the key numbers a report's first page leads with (domain/conclusion.py LEAD_KPIS) come first, in that order; the
-  others follow in the builder's order. No number is added, dropped or changed.
+  others follow in the builder's order. No number is added, dropped or changed;
+- one data note when a table names hosts the console has a page for and no external address is set (gui_base, which
+  the generator fills before calling this): the names are text, not links, and the note says why.
 A part that is missing for another reason (an unset setting, an analysis not run, an unsupported PCE) is not this
 module's: its builder leaves it out and says why in the data notes (hints.py).
 Called by generate (and by the tests that build a report directly)."""
@@ -24,7 +26,7 @@ from illumio_ops.domain.report import (
     TextBlock,
 )
 from illumio_ops.domain.values import ReportType
-from illumio_ops.services.reports.common import tr
+from illumio_ops.services.reports.common import host_url, tr
 
 NOTHING = "nothing"  # the closing section's id
 
@@ -68,6 +70,12 @@ def _lead_first(report_type: ReportType, kpis: tuple[Kpi, ...]) -> tuple[Kpi, ..
     return (*(k for key in lead for k in kpis if k.key == key), *(k for k in kpis if k.key not in lead))
 
 
+def _would_link(doc: ReportDocument) -> bool:
+    """A table names a host that would be a link if the console's address were set."""
+    return any(host_url("https://x", key, None) is not None
+               for _, t in doc.tables() if t.rows for keys in t.host_keys.values() for key in keys)
+
+
 def finish(doc: ReportDocument) -> ReportDocument:
     doc = doc.model_copy(update={"sections": tuple(
         s.model_copy(update={"blocks": tuple(_without_empty_columns(b) for b in s.blocks)}) for s in doc.sections)})
@@ -75,6 +83,8 @@ def finish(doc: ReportDocument) -> ReportDocument:
     valued = [k for k in doc.kpis if k.value is not None]
     if valued and all(k.previous is None for k in valued):
         notes.append(tr(doc.lang, "rpt_quality_no_previous"))
+    if not doc.gui_base and _would_link(doc):
+        notes.append(tr(doc.lang, "rpt_quality_no_host_links"))
     kept = [s for s in doc.sections if not holds_nothing(s)]
     folded = [s for s in doc.sections if holds_nothing(s)]
     if doc.report_type is ReportType.CUSTOM:  # the operator's own sections, counted in the sentence, each with its link
