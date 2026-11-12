@@ -125,8 +125,12 @@ def test_sending_shown_between_done_and_sent(tmp_path, monkeypatch):
 
 def _mail(tmp_path, monkeypatch, *, cap=None, **params):
     """What deliver hands to send_mail for a report with no external address (so the email has no link)."""
+    from illumio_ops.domain.report import Finding
+    from illumio_ops.domain.values import Severity
     ctx = _ctx(tmp_path, 25)
-    _register(monkeypatch, FakeBuilder())
+    fake = FakeBuilder()
+    finding = Finding(severity=Severity.HIGH, title="Open RDP", why="w", action="a")
+    _register(monkeypatch, lambda inp: fake(inp).model_copy(update={"findings": (finding,)}))
     sent = {}
 
     def fake_send(cfg, **kw):

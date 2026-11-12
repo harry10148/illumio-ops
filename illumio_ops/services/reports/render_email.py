@@ -65,7 +65,7 @@ def _e(value: object) -> str:
 def render_email(doc: ReportDocument, *, tz: tzinfo | None, note: str | None = None,
                  attached: bool = False) -> Rendered:
     """`note`: a line before the link saying an attachment was left out for its size. `attached`: the email carries
-    the report as a file, so an email without a link can say where the findings are."""
+    the report as a file, so an email without a link says where its findings are (when it has any)."""
     lang = doc.lang
     period = period_text(doc.period_start, doc.period_end, tz)
     n = len(doc.findings)
@@ -145,7 +145,7 @@ def render_email(doc: ReportDocument, *, tz: tzinfo | None, note: str | None = N
         link = f'<a style="color:{t["accent-fg"]}" href="{_e(doc.gui_link)}">{_e(tr(lang, "rpt_open_in_gui"))}</a>'
     else:
         last.append(tr(lang, "rpt_mail_no_link"))
-        if attached:
+        if attached and doc.findings:  # never after "nothing needs action", nor for a report without rules
             last.append(tr(lang, "rpt_mail_see_attachment"))
         lines += last
         link = ""

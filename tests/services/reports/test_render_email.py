@@ -103,11 +103,21 @@ def test_no_link_without_external_url():
 
 
 def test_no_link_points_at_the_attachment_when_there_is_one():
-    r = render_email(make_doc(), tz=UTC, attached=True)
+    r = render_email(make_doc(findings=_findings(2)), tz=UTC, attached=True)
     for part in (r.text, r.html):
         assert "No GUI address is set" in part and "The full findings are in the attached report." in part
-    linked = render_email(make_doc(gui_link="https://ops.example/reports?id=9"), tz=UTC, attached=True)
+    linked = render_email(make_doc(findings=_findings(2), gui_link="https://ops.example/reports?id=9"), tz=UTC,
+                          attached=True)
     assert "attached report" not in linked.text and "attached report" not in linked.html
+
+
+def test_no_findings_are_said_to_be_in_the_attachment_when_there_are_none():
+    """Not after "nothing needs action", and not for a custom report (it has no rules)."""
+    custom = make_doc(report_type=ReportType.CUSTOM, kpis=(), sections=(Section(id="s1", title="Saved section"),))
+    for doc in (make_doc(), custom):
+        r = render_email(doc, tz=UTC, attached=True)
+        for part in (r.text, r.html):
+            assert "No GUI address is set" in part and "attached report" not in part
 
 
 def test_the_note_about_dropped_attachments_stays():
@@ -142,7 +152,7 @@ def test_the_text_and_the_html_say_the_same(lang):
                 _f("Unmanaged sources", "unmanaged", Severity.LOW))
     doc = make_doc(lang=lang, kpis=KPIS, findings=findings, sections=(_unevaluated([("L006", "x")]),)).model_copy(
         update={"conclusion": "One thing to do.", "caveats": ("Two stretches were not collected.",)})
-    for kw in ({"attached": True}, {"note": "Too large."}):
+    for kw in ({"attached": True}, {"note": "Too large."}):  # (the document has findings)
         r = render_email(doc, tz=UTC, **kw)
         said = _said(r.html).replace(" ", "")
         # a line of the text is one or more things the HTML sets apart (a number's name, its value, what is under it)
