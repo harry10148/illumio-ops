@@ -1,0 +1,66 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>報表第 1 頁示意</title>
+<style>
+:root{--t1:#313638;--t2:#5B6164;--t3:#646B6E;--line:#E6E2DA;--soft:#F0EDE6;--warm:#F7F4EE;--fill:#C24300;
+--cr:#BE122F;--crbg:#F9E6E9;--hi-bg:#FDEEE4;--hi-fg:#A63A08;--md-bg:#FFF3E0;--md-fg:#8A5600;--ok:#166644;--okbg:#E7F1EC;--info:#2D454C;--infobg:#E5F2F9}
+*{box-sizing:border-box}body{margin:0;background:#EDEAE4;font:14px/1.6 "Noto Sans TC","Noto Sans CJK TC",sans-serif;color:var(--t1)}
+.page{width:794px;min-height:1123px;margin:24px auto;background:#fff;padding:44px 52px;border-top:6px solid var(--cr)}
+.eyebrow{font-size:11px;color:var(--t3);letter-spacing:.08em}.eyebrow b{letter-spacing:0;font-weight:500}
+h1{font-size:28px;margin:4px 0 6px}.lead{font-size:17px;font-weight:600;margin:0 0 6px;line-height:1.5}
+.meta{color:var(--t3);font-size:12.5px;margin:0 0 14px}
+.caveat{border-left:3px solid var(--info);background:var(--infobg);color:var(--info);padding:10px 14px;margin:0 0 18px;font-size:13px}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px}
+.num{border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.num .k{font-size:12.5px;color:var(--t2)}.num .v{font-size:30px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums}
+.num .v small{font-size:15px;font-weight:400;color:var(--t3)}.num .d{font-size:12.5px;margin-top:4px}
+.better{color:var(--ok)}.worse{color:var(--cr)}.same{color:var(--t3)}.dir{color:var(--t3);font-size:12px}
+h2{font-size:15px;margin:0 0 10px}
+.todo{counter-reset:n;display:grid;gap:8px;margin:0 0 22px;padding:0;list-style:none}
+.todo li{counter-increment:n;display:grid;grid-template-columns:28px 1fr;gap:10px;background:var(--warm);border-radius:8px;padding:12px 14px}
+.todo li:before{content:counter(n);width:24px;height:24px;border-radius:50%;background:var(--fill);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.todo b{font-weight:600}.todo .for{display:block;color:var(--t3);font-size:12.5px;margin-top:2px}
+.card{border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:10px;break-inside:avoid}
+.card h3{margin:0 0 8px;font-size:14.5px;display:flex;gap:8px;align-items:center}
+.tag{font-size:12px;font-weight:600;border-radius:4px;padding:0 7px;line-height:20px;white-space:nowrap}
+.tag.c{background:var(--crbg);color:var(--cr)}.tag.h{background:var(--hi-bg);color:var(--hi-fg)}
+.rows{display:grid;grid-template-columns:86px 1fr;gap:4px 12px;font-size:13px}.rows dt{color:var(--t3)}.rows dd{margin:0}
+a{color:var(--t1);text-decoration:underline;text-decoration-color:#8a8f91;text-underline-offset:3px}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px}
+.foot{color:#A9A294;font-size:11px;margin-top:18px}
+</style>
+<div class="page">
+ <div class="eyebrow">ILLUMIO-OPS · <b>安全風險</b></div>
+ <h1>安全風險</h1>
+ <p class="lead">防護完成度 47／100（D 級）；四分之三的受管主機已開始擋；有 5 項嚴重或高風險的發現要處理。</p>
+ <p class="meta">pce.lab.local · 2026-11-04 – 2026-11-10 · 產生於 2026-11-11 08:27</p>
+ <p class="caveat"><b>讀數字前先知道：</b>本期 93% 的連線紀錄是以快照方式記下的，PCE 沒有回報它們被允許還是會被擋。下面的「有規則允許」只算有回報判定的那 7%；其餘另列在第 3 頁「只能監看的流量」。</p>
+ <div class="nums">
+  <div class="num"><div class="k">防護完成度（分段成熟度）</div><div class="v">47<small>／100</small></div><div class="d same">與上期相同 <span class="dir">· 越高越好</span></div></div>
+  <div class="num"><div class="k">已開始擋的受管主機</div><div class="v">75.0<small>%</small></div><div class="d same">與上期相同 <span class="dir">· 越高越好</span></div></div>
+  <div class="num"><div class="k">開始擋之後會被擋的連線</div><div class="v">7,125</div><div class="d better">比上期少 2,823 <span class="dir">· 越低越好</span></div></div>
+ </div>
+ <h2>最該做的 3 件事</h2>
+ <ol class="todo">
+  <li><div><b>把還在「只記錄、不擋」的主機切到開始擋。</b><span class="for">解決 2 項發現：勒索常用 port 沒被擋下、橫向移動 port 仍暢通。涉及 CoreServices、DemoApp、Traffic、K8sNode、onlineboutique。</span></div></li>
+  <li><div><b>確認 6 個連到 20 台以上主機的帳號是不是管理員。</b><span class="for">解決 1 項發現：單一使用者連往大量目的端。最多的是 lab\administrator（242 台）。</span></div></li>
+  <li><div><b>把 113 筆來自非受管位址、連到資料庫或 Windows 管理 port 的連線查清楚。</b><span class="for">解決 1 項發現：非受管主機存取關鍵服務。最多的來源是 <span class="mono">172.16.15.101</span>（66 筆）。</span></div></li>
+ </ol>
+ <h2>發現（5 項，依嚴重度）</h2>
+ <div class="card">
+  <h3><span class="tag c">嚴重</span>勒索常用的 port 沒有被擋下</h3>
+  <dl class="rows">
+   <dt>發生什麼</dt><dd>SMB、RPC、遠端桌面等勒索軟體常用的 port 上，有 71 筆連線沒有被擋，其中 1 筆跨了環境。主要目的端是 <a>dc</a>（65 筆）。</dd>
+   <dt>為什麼要緊</dt><dd>沒有規則允許這些連線，它們能通只是因為目的主機還在「只記錄、不擋（Visibility Only）」。</dd>
+   <dt>怎麼做</dt><dd>見上方第 1 件事。切換前先查這幾條跨環境連線為何存在：<span class="mono">135/TCP</span> 35 筆、<span class="mono">445/TCP</span> 30 筆。</dd>
+  </dl>
+ </div>
+ <div class="card">
+  <h3><span class="tag h">高</span>一個帳號連到很多台主機</h3>
+  <dl class="rows">
+   <dt>發生什麼</dt><dd>有 6 個帳號各自連往超過 20 個不同的目的端：nt authority\system 322、lab\administrator 242、nt authority\network service 89。</dd>
+   <dt>為什麼要緊</dt><dd>一般使用者不會連這麼多台；帳號被盜用時最先出現的就是這個樣子。</dd>
+   <dt>怎麼做</dt><dd>見上方第 2 件事。</dd>
+  </dl>
+ </div>
+ <p class="foot">示意圖 · 數字取自 .106 的 2026-11-04–11-10 安全風險報表；「與上期相同」兩格與白話標題為示意，實作依規則產生。</p>
+</div>
+</html>
