@@ -38,7 +38,6 @@ from illumio_ops.services.reports.registry import BuildInput
 
 TOP = 30
 UNCOVERED_TOP = 10
-KEY_FINDINGS = 5
 APP = "app"
 UNCOVERED = (PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.BLOCKED)
 
@@ -177,7 +176,7 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=title, period_start=inp.start, period_end=inp.end,
         generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
+        findings=findings.as_findings(outcomes, lang),
         data_quality=(*quality, *(() if hosts else (hint(lang, "rpt_hint_pending_app_hosts", labels=", ".join(f"{k}={v}" for k, v in conds.items())),)),
                       *flowsections.no_links_note(inp)),
         sections=(
@@ -199,9 +198,9 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
                              limit=UNCOVERED_TOP)),
                     workbench_link=peer_link("inbound", SegmentDimension.SRC_LABEL, uncovered=True,
                                              limit=UNCOVERED_TOP)),
-            *findings.rest_sections(outcomes, lang, summary=outcomes, limit=KEY_FINDINGS,
-                                    title=t("rpt_trf_sec_findings"), intro=t("rpt_app_findings_intro"),
-                                    table_title=t("rpt_trf_tbl_findings"), evaluated=bool(flows))))
+            *findings.unevaluated_section(outcomes, lang,
+                                          title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_app_findings_intro"),
+                                          table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(flows))))
 
 
 def _kpi_values(parts: dict[str, FlowTotals], decisions: dict[str, tuple[int, int]]) -> dict[str, float | int]:

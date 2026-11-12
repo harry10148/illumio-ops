@@ -55,7 +55,6 @@ from illumio_ops.store.flowdb import analysis
 
 TOP = 20
 RANSOMWARE_TOP = 5  # a summary: the ransomware report holds the list
-KEY_FINDINGS = 5
 APP = "app"  # the app label key
 UNCOVERED = (PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.BLOCKED)
 PB_ONLY = (PolicyDecision.POTENTIALLY_BLOCKED,)
@@ -369,7 +368,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_security_risk"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(fired, lang, limit=KEY_FINDINGS),
+        findings=findings.as_findings(outcomes, lang),
         data_quality=(*quality, *missing, *flowsections.no_links_note(inp)),
         sections=tuple(s for s in (
             Section(id="how", title=t("rpt_sec_sec_how"), intro=t("rpt_sec_how_intro"),
@@ -393,7 +392,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                         link((), GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS)) if fc.initiator_process
                         else None)),
             Section(id="lateral", title=t("rpt_sec_sec_lateral"), blocks=(TextBlock(paragraphs=tuple(lateral_lines)),)),
-            *findings.rest_sections(_by_category(outcomes), lang, summary=fired, limit=KEY_FINDINGS,
-                                    title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                                    table_title=t("rpt_sec_tbl_findings"), evaluated=bool(totals.flows)))
+            *findings.unevaluated_section(_by_category(outcomes), lang,
+                                          title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_trf_findings_intro"),
+                                          table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(totals.flows)))
             if s is not None))

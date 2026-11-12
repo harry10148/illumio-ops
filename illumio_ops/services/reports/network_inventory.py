@@ -31,7 +31,6 @@ from illumio_ops.services.reports.registry import BuildInput
 TOP = 20
 TOP_SERVICES = 3
 PAIR_LIMIT = 1000  # app x service and app x source-app pairs read for the per-app table
-KEY_FINDINGS = 5
 APP = "app"
 HYGIENE_KEYS = (APP, "loc", "role")  # with the configured environment key
 SETS_SHOWN = 5  # label combinations listed per endpoint; more are counted
@@ -165,7 +164,7 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_network_inventory"),
         period_start=inp.start, period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
+        findings=findings.as_findings(outcomes, lang),
         data_quality=(*quality, *flowsections.no_links_note(inp)),
         sections=(
             Section(id="hygiene", title=t("rpt_inv_sec_hygiene"), intro=t("rpt_inv_hygiene_intro", keys=", ".join(keys)),
@@ -180,6 +179,6 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
             Section(id="services", title=t("rpt_inv_sec_services"), intro=t("rpt_inv_services_intro"),
                     blocks=(provided,)),
             Section(id="unmanaged", title=t("rpt_inv_sec_unmanaged"), blocks=(unmanaged,)),
-            *findings.rest_sections(outcomes, lang, summary=outcomes, limit=KEY_FINDINGS,
-                                    title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                                    table_title=t("rpt_trf_tbl_findings"), evaluated=bool(totals))))
+            *findings.unevaluated_section(outcomes, lang,
+                                          title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_trf_findings_intro"),
+                                          table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(totals))))

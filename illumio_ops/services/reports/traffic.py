@@ -38,7 +38,6 @@ from illumio_ops.services.reports.generate import (
 from illumio_ops.services.reports.registry import BuildInput
 
 TOP = 20
-KEY_FINDINGS = 5
 APP = "app"
 _KPI_KEYS = {"flows": "rpt_trf_kpi_flows", "connections": "rpt_trf_kpi_connections",
              "sources": "rpt_trf_kpi_sources", "destinations": "rpt_trf_kpi_destinations"}
@@ -173,7 +172,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_traffic"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang, limit=KEY_FINDINGS),
+        findings=findings.as_findings(outcomes, lang),
         data_quality=(*quality, *flowsections.no_links_note(inp)),
         sections=(Section(id="decisions", title=t("rpt_trf_sec_decisions"), intro=t("rpt_trf_decisions_intro"),
                           blocks=decision_blocks),
@@ -185,6 +184,6 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
                           workbench_link=link(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST,
                                               metric=SegmentMetric.BYTES) if fc.bytes else None),
                   Section(id="unmanaged", title=t("rpt_trf_sec_unmanaged"), blocks=(unmanaged,)),
-                  *findings.rest_sections(outcomes, lang, summary=outcomes, limit=KEY_FINDINGS,
-                                          title=t("rpt_trf_sec_findings"), intro=t("rpt_trf_findings_intro"),
-                                          table_title=t("rpt_trf_tbl_findings"), evaluated=bool(totals.flows))))
+                  *findings.unevaluated_section(outcomes, lang,
+                                                title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_trf_findings_intro"),
+                                                table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(totals.flows))))

@@ -267,9 +267,8 @@ def test_every_rule_rendered(ctx):
         doc = specs()[ReportType.SECURITY_RISK].build(BuildInput(
             ctx=ctx, params=ReportParams(report_type=ReportType.SECURITY_RISK), start=START, end=END, lang=lang,
             tz=UTC, now=NOW, pce_label="pce"))
-        rows = next(s for s in doc.sections if s.id == "findings").blocks[0].rows
-        # 6.6.0: the closing table lists the rules the summary's findings do not already show
-        assert len({r[0] for r in rows}) + len(doc.findings) == len(RULES)
+        # stage 3a: every rule that fired is a finding; all were evaluated, so there is no closing section
+        assert len(doc.findings) == len(RULES) and "findings" not in {s.id for s in doc.sections}
 
 
 def test_injected_missing_key_is_caught(ctx, monkeypatch):

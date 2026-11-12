@@ -120,11 +120,23 @@ def test_all_kpis_rendered(ctx):
     assert len(doc.kpis) >= 9 and all(k.label in html for k in doc.kpis)
 
 
-def test_key_findings_critical_high_only(ctx):
+def test_every_fired_rule_is_a_finding_and_the_number_still_counts_critical_and_high(ctx):
+    """Stage 3a: the findings are every rule that fired (they were the critical and high ones only); the key number
+    "critical / high findings" is computed as before."""
+    from illumio_ops.services.reports import findings, flowsections
     _write(ctx, [flow(port=22, decision="potentially_blocked"), flow(port=5900)])
     doc = _build(ctx)
-    assert doc.findings and all(f.severity in (Severity.CRITICAL, Severity.HIGH) for f in doc.findings)
-    assert any(r[0] == "B003" for r in _tables(doc, "findings")[0].rows)  # the full list keeps the medium one
+    outcomes = findings.run_rules(ctx, flowsections.window(_inp(ctx)), ctx.settings.current().reports.rule_thresholds,
+                                  Language.EN, now=NOW)
+    fired = [o for o in outcomes if o.severity is not None]
+    assert len(doc.findings) == len(fired)
+    severities = {f.severity for f in doc.findings}
+    assert Severity.MEDIUM in severities and Severity.HIGH in severities  # B003 (medium) is a finding now
+    high = sum(1 for f in doc.findings if f.severity in (Severity.CRITICAL, Severity.HIGH))
+    assert 0 < high < len(doc.findings)
+    assert {k.key: k.value for k in doc.kpis}["critical_high_findings"] == high
+    # the closing section holds only what could not be evaluated (no exposure graph here: L006)
+    assert [r[0] for r in _tables(doc, "findings")[0].rows] == ["L006"]
 
 
 def test_ransomware_summary(tmp_path):

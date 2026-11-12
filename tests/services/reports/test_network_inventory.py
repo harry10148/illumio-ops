@@ -90,7 +90,8 @@ def test_findings_section(ctx):
     _write(ctx, [flow(port=5900)])
     doc = _build(ctx)
     assert any("Ransomware Risk Port" in f.title for f in doc.findings)
-    # 6.6.0: already in the summary, not repeated at the end
+    assert all(f.what and f.why and f.action_code and f.action_short for f in doc.findings)
+    # a rule that fired is a finding, never a row of the closing section
     assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
 
 

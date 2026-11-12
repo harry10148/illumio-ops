@@ -110,7 +110,8 @@ def test_findings_only_this_app(ctx):
     _write(ctx, [flow(src_app="Finance", dst_app="Other", port=5900)])
     doc = _build(ctx, _app("Finance"))
     assert any("Ransomware Risk Port" in f.title for f in doc.findings)
-    # 6.6.0: a rule the summary's findings already show is not listed again at the end
+    assert all(f.what and f.why and f.action_code and f.action_short for f in doc.findings)
+    # a rule that fired is a finding, never a row of the closing section
     assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
 
 
@@ -126,4 +127,6 @@ def test_exposure_finding_limited_to_the_app(ctx):
         analysis.write_result(conn, "exposure", params={}, at=NOW, result={
             "hosts": [{"key": "/orgs/1/workloads/elsewhere", "reach_now": 50}]})
         conn.commit()
-    assert not any(r[0] == "L006" for r in _table(_build(ctx, _app("Finance")), "findings").rows)
+    doc = _build(ctx, _app("Finance"))
+    # L006 was evaluated on the app's own hosts and did not fire: no finding, and no closing section to list it in
+    assert doc.findings == () and "findings" not in {s.id for s in doc.sections}

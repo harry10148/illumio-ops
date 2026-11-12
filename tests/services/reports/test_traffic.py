@@ -76,26 +76,42 @@ def test_bytes_section_states_coverage(tmp_path):
 def test_findings_from_rules(ctx):
     _write(ctx, [flow(port=5900)])
     doc = _build(ctx)
-    assert doc.findings[0].title == "Ransomware Risk Port (High)" and "1 allowed flows" in doc.findings[0].why
-    # 6.6.0: in the summary, not repeated at the end
+    first = doc.findings[0]
+    assert first.title == "Ransomware Risk Port (High)" and "1 allowed flows" in first.what
+    assert first.why == "These remote-access ports let someone outside keep control of a host."
+    assert first.action_code == "narrow_rules" and first.action_short
+    # a rule that fired is a finding, never a row of the closing section
     assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
 
 
-def test_closing_rules_list_only_what_the_summary_does_not_show(ctx):
-    """6.6.0 Task 5: the summary shows the first five rules that fired; the closing section repeated them all."""
-    from illumio_ops.services.reports import traffic as mod
+def test_every_rule_that_fired_is_a_finding_and_the_closing_section_holds_only_the_unevaluated(ctx):
+    """Stage 3a: every rule that fired is a finding (6.6.0 showed the first five and listed the rest at the end);
+    the closing section lists only the rules that could not be evaluated."""
+    from illumio_ops.services.reports import findings, flowsections
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["reports"]["rule_thresholds"].update(
         unmanaged_connection=1, lateral_outbound_dst=1, cross_env_connection=1, discovery_protocol=1, pb_lateral=1))
     _write(ctx, [flow(port=5900), flow(port=445, src_env="Dev", dst_env="Prod"), flow(port=1433, unmanaged_src=True),
                  flow(port=22, decision="potentially_blocked"), flow(port=137, proto=17), flow(port=23, decision="blocked"),
                  flow(src="jump", dst="t1", port=22), flow(src="jump", dst="t2", port=22)])
     doc = _build(ctx)
-    assert len(doc.findings) == mod.KEY_FINDINGS
-    closing = _section(doc, "findings")
+    outcomes = findings.run_rules(ctx, flowsections.window(_inp(ctx)), ctx.settings.current().reports.rule_thresholds,
+                                  Language.EN, now=NOW)
+    fired = [o for o in outcomes if o.severity is not None]
+    assert len(fired) > 5 and len(doc.findings) == len(fired)
+    assert [f.severity for f in doc.findings] == [o.severity for o in fired]  # most severe first, as ranked
     rows = _table(doc, "findings").rows
-    assert rows and "already show 5" in closing.intro
-    shown = {f.title for f in doc.findings}
-    assert not {r[1] for r in rows} & shown
+    assert [r[0] for r in rows] == ["L006"]  # no exposure graph here: the one rule not evaluated
+    assert not {r[1] for r in rows} & {f.title for f in doc.findings}
+
+
+def test_no_closing_section_when_every_rule_was_evaluated(ctx):
+    from illumio_ops.store.flowdb import analysis
+    _write(ctx, [flow(port=5900)])
+    with ctx.flows().connect() as conn:
+        analysis.write_result(conn, "exposure", params={}, at=NOW, result={"hosts": []})
+        conn.commit()
+    doc = _build(ctx)
+    assert len(doc.findings) == 1 and "findings" not in {s.id for s in doc.sections}
 
 
 def test_rule_error_shown_as_not_evaluated(ctx, monkeypatch):

@@ -24,6 +24,8 @@ from loguru import logger
 
 from illumio_ops.domain.filter import FilterSpec
 from illumio_ops.domain.findings_rules import (
+    ACTION_CODES,
+    ACTION_SHORT_KEYS,
     BY_ID,
     CATEGORY_KEYS,
     CLEARTEXT_PORTS,
@@ -75,9 +77,11 @@ class _Run:
         return int(self.conn.execute(f"SELECT COALESCE(SUM({column}), 0) FROM {_AGG} WHERE {cond}",
                                      params).fetchone()[0])
 
-    def top(self, sql: str, params: list[Any]) -> str:
-        """'name (n), …' for the top rows of a (key, count) query."""
-        return ", ".join(f"{self.names(str(k))} ({n:,})" for k, n in self.conn.execute(sql + f" LIMIT {TOP}", params))
+    def top(self, sql: str, params: list[Any]) -> tuple[str, str]:
+        """'name (n), …' for the top rows of a (key, count) query, and the name of the first row (a rule's focus):
+        one read gives both, and the first name is never cut back out of the joined text (a name may hold a comma)."""
+        rows = [(self.names(str(k)), n) for k, n in self.conn.execute(sql + f" LIMIT {TOP}", params)]
+        return ", ".join(f"{name} ({n:,})" for name, n in rows), rows[0][0] if rows else ""
 
     def ports_text(self, cond: str, params: list[Any]) -> str:
         return ", ".join(f"{port_text(p, q)} ({n:,})" for p, q, n in self.conn.execute(
@@ -95,16 +99,16 @@ def _b001(r: _Run) -> RuleOutcome | None:
     pb = r.sum(f"{base} AND decision = 'potentially_blocked'", pp)
     cross = r.sum(f"{base} AND {CROSS_ENV}", pp)
     cross_allowed = r.sum(f"{base} AND {CROSS_ENV} AND decision = 'allowed'", pp)
+    top, first = r.top(f"SELECT dst_key, SUM(flows) n FROM {_AGG} WHERE {base} GROUP BY dst_key ORDER BY n DESC", pp)
     params = {"n_total": total, "n_allowed": allowed, "n_pb": pb, "n_cross_env": cross,
-              "named_ports": r.ports_text(base, pp),
-              "top_destinations": r.top(f"SELECT dst_key, SUM(flows) n FROM {_AGG} WHERE {base} GROUP BY dst_key "
-                                        "ORDER BY n DESC", pp)}
+              "named_ports": r.ports_text(base, pp), "top_destinations": top}
     if cross:
         rec = "rpt_rule_b001_rec_critical_cross_env" if cross_allowed else "rpt_rule_b001_rec_pb_cross_env"
-        return RuleOutcome("B001", Severity.CRITICAL, "rpt_rule_b001_desc", rec, params)
+        return RuleOutcome("B001", Severity.CRITICAL, "rpt_rule_b001_desc", rec, params, focus=first)
     if allowed:
-        return RuleOutcome("B001", Severity.HIGH, "rpt_rule_b001_desc", "rpt_rule_b001_rec_allowed", params)
-    return RuleOutcome("B001", Severity.MEDIUM, "rpt_rule_b001_desc", "rpt_rule_b001_rec_pb", params)
+        return RuleOutcome("B001", Severity.HIGH, "rpt_rule_b001_desc", "rpt_rule_b001_rec_allowed", params,
+                           focus=first)
+    return RuleOutcome("B001", Severity.MEDIUM, "rpt_rule_b001_desc", "rpt_rule_b001_rec_pb", params, focus=first)
 
 
 def _simple(rule_id: str, ports: Collection[tuple[int, int | None]], decision: str, severity: Severity,
@@ -115,11 +119,12 @@ def _simple(rule_id: str, ports: Collection[tuple[int, int | None]], decision: s
         n = r.sum(cond, pp)
         if not n:
             return None
+        top, first = r.top(f"SELECT dst_key, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY dst_key ORDER BY n DESC",
+                           pp)
         return RuleOutcome(rule_id, severity, desc, rec, {
             "n_flows": n, "named_ports": r.ports_text(cond, pp),
             "unique_src": r.conn.execute(f"SELECT COUNT(DISTINCT src_key) FROM {_AGG} WHERE {cond}", pp).fetchone()[0],
-            "top_destinations": r.top(f"SELECT dst_key, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY dst_key "
-                                      "ORDER BY n DESC", pp)})
+            "top_destinations": top}, focus=first)
     return rule
 
 
@@ -127,10 +132,10 @@ def _b004(r: _Run) -> RuleOutcome | None:
     n = r.sum("src_managed = 0", [])
     if n <= r.t.unmanaged_connection:
         return None
+    top, first = r.top(f"SELECT src_key, SUM(flows) n FROM {_AGG} WHERE src_managed = 0 GROUP BY src_key "
+                       "ORDER BY n DESC", [])
     return RuleOutcome("B004", Severity.MEDIUM, "rpt_rule_b004_desc", "rpt_rule_b004_rec", {
-        "n_flows": n, "threshold": r.t.unmanaged_connection,
-        "top_sources": r.top(f"SELECT src_key, SUM(flows) n FROM {_AGG} WHERE src_managed = 0 GROUP BY src_key "
-                             "ORDER BY n DESC", [])})
+        "n_flows": n, "threshold": r.t.unmanaged_connection, "top_sources": top}, focus=first)
 
 
 def _b005(r: _Run) -> RuleOutcome | None:
@@ -161,7 +166,7 @@ def _b006(r: _Run) -> RuleOutcome | None:
                 else (Severity.MEDIUM, "rpt_rule_b006_rec_pb"))
     return RuleOutcome("B006", sev, "rpt_rule_b006_desc", rec, {
         "n_sources": len(over), "threshold": r.t.lateral_outbound_dst,
-        "top_sources": ", ".join(f"{r.names(k)} ({n})" for k, n in over[:TOP])})
+        "top_sources": ", ".join(f"{r.names(k)} ({n})" for k, n in over[:TOP])}, focus=r.names(over[0][0]))
 
 
 def _b007(r: _Run) -> RuleOutcome | None:
@@ -170,7 +175,7 @@ def _b007(r: _Run) -> RuleOutcome | None:
         return None
     return RuleOutcome("B007", Severity.HIGH, "rpt_rule_b007_desc", "rpt_rule_b007_rec", {
         "n_users": len(over), "threshold": r.t.user_destination,
-        "top_users": ", ".join(f"{k} ({n})" for k, n in over[:TOP])})
+        "top_users": ", ".join(f"{k} ({n})" for k, n in over[:TOP])}, focus=str(over[0][0]))
 
 
 def _b008(r: _Run) -> RuleOutcome | None:
@@ -192,21 +197,22 @@ def _b008(r: _Run) -> RuleOutcome | None:
         return None
     rows = r.conn.execute(f"SELECT src_key, dst_key, port, proto, b FROM {_PAIRS} WHERE b > ? ORDER BY b DESC "
                           f"LIMIT {TOP}", (limit,)).fetchall()
+    pairs = [(f"{r.names(s_)} → {r.names(d)} {port_text(p_, q)}", b) for s_, d, p_, q, b in rows]
     return RuleOutcome("B008", Severity.MEDIUM, "rpt_rule_b008_desc", "rpt_rule_b008_rec", {
         "n_outliers": n_out, "limit_mb": f"{limit / MiB:.1f}", "n_with_bytes": n,
-        "top_pairs": ", ".join(f"{r.names(s_)} → {r.names(d)} {port_text(p_, q)} ({b / MiB:.1f} MB)"
-                               for s_, d, p_, q, b in rows)})
+        "top_pairs": ", ".join(f"{pair} ({b / MiB:.1f} MB)" for pair, b in pairs)}, focus=pairs[0][0])
 
 
 def _b009(r: _Run) -> RuleOutcome | None:
     n = r.sum(CROSS_ENV, [])
     if n <= r.t.cross_env_connection:
         return None
+    pairs = [(f"{a} → {b}", n_) for a, b, n_ in r.conn.execute(
+        f"SELECT src_env, dst_env, SUM(flows) n FROM {_AGG} WHERE {CROSS_ENV} GROUP BY 1, 2 ORDER BY n DESC "
+        f"LIMIT {TOP}")]
     return RuleOutcome("B009", Severity.LOW, "rpt_rule_b009_desc", "rpt_rule_b009_rec", {
         "n_flows": n, "threshold": r.t.cross_env_connection,
-        "top_pairs": ", ".join(f"{a} → {b} ({n_:,})" for a, b, n_ in r.conn.execute(
-            f"SELECT src_env, dst_env, SUM(flows) n FROM {_AGG} WHERE {CROSS_ENV} GROUP BY 1, 2 ORDER BY n DESC "
-            f"LIMIT {TOP}"))})
+        "top_pairs": ", ".join(f"{pair} ({n_:,})" for pair, n_ in pairs)}, focus=pairs[0][0] if pairs else "")
 
 
 def _l001(r: _Run) -> RuleOutcome | None:
@@ -239,7 +245,8 @@ def _l003(r: _Run) -> RuleOutcome | None:
         return None
     return RuleOutcome("L003", Severity.HIGH, "rpt_rule_l003_desc", "rpt_rule_l003_rec", {
         "n_targets": len(rows), "threshold": r.t.db_unique_src_app,
-        "top_targets": ", ".join(f"{r.names(d)} {port_text(p, q)} ({n})" for d, p, q, n in rows[:TOP])})
+        "top_targets": ", ".join(f"{r.names(d)} {port_text(p, q)} ({n})" for d, p, q, n in rows[:TOP])},
+        focus=f"{r.names(rows[0][0])} {port_text(rows[0][1], rows[0][2])}")
 
 
 def _l004(r: _Run) -> RuleOutcome | None:
@@ -248,9 +255,9 @@ def _l004(r: _Run) -> RuleOutcome | None:
     n = r.sum(cond, pp)
     if not n:
         return None
+    top, first = r.top(f"SELECT dst_key, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY dst_key ORDER BY n DESC", pp)
     return RuleOutcome("L004", Severity.HIGH, "rpt_rule_l004_desc", "rpt_rule_l004_rec", {
-        "n_flows": n, "top_destinations": r.top(f"SELECT dst_key, SUM(flows) n FROM {_AGG} WHERE {cond} "
-                                                "GROUP BY dst_key ORDER BY n DESC", pp)})
+        "n_flows": n, "top_destinations": top}, focus=first)
 
 
 def _l005(r: _Run) -> RuleOutcome | None:
@@ -278,7 +285,8 @@ def _l006(r: _Run) -> RuleOutcome | None:
     hosts.sort(key=lambda h: -int(h.get("reach_now") or 0))
     return RuleOutcome("L006", Severity.HIGH, "rpt_rule_l006_desc", "rpt_rule_l006_rec", {
         "n_hosts": len(hosts), "threshold": r.t.blast_radius,
-        "top_hosts": ", ".join(f"{r.names(h['key'])} ({h['reach_now']})" for h in hosts[:TOP])})
+        "top_hosts": ", ".join(f"{r.names(h['key'])} ({h['reach_now']})" for h in hosts[:TOP])},
+        focus=r.names(hosts[0]["key"]))
 
 
 def _l007(r: _Run) -> RuleOutcome | None:
@@ -287,10 +295,9 @@ def _l007(r: _Run) -> RuleOutcome | None:
     n = r.sum(cond, pp)
     if n < r.t.unmanaged_critical:
         return None
+    top, first = r.top(f"SELECT src_key, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY src_key ORDER BY n DESC", pp)
     return RuleOutcome("L007", Severity.HIGH, "rpt_rule_l007_desc", "rpt_rule_l007_rec", {
-        "n_flows": n, "named_ports": r.ports_text(cond, pp),
-        "top_sources": r.top(f"SELECT src_key, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY src_key "
-                             "ORDER BY n DESC", pp)})
+        "n_flows": n, "named_ports": r.ports_text(cond, pp), "top_sources": top}, focus=first)
 
 
 def _l008(r: _Run) -> RuleOutcome | None:
@@ -299,11 +306,13 @@ def _l008(r: _Run) -> RuleOutcome | None:
     n = r.sum(cond, pp)
     if n < r.t.pb_lateral:
         return None
+    apps = r.conn.execute(
+        f"SELECT dst_app, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY dst_app ORDER BY n DESC LIMIT {TOP}",
+        pp).fetchall()
+    # most of it going to hosts with no app label is not a "who": the focus stays empty
     return RuleOutcome("L008", Severity.HIGH, "rpt_rule_l008_desc", "rpt_rule_l008_rec", {
         "n_flows": n, "threshold": r.t.pb_lateral,
-        "top_apps": ", ".join(f"{a or '—'} ({n_:,})" for a, n_ in r.conn.execute(
-            f"SELECT dst_app, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY dst_app ORDER BY n DESC LIMIT {TOP}",
-            pp))})
+        "top_apps": ", ".join(f"{a or '—'} ({n_:,})" for a, n_ in apps)}, focus=str(apps[0][0] or "") if apps else "")
 
 
 def _l009(r: _Run) -> RuleOutcome | None:
@@ -311,10 +320,11 @@ def _l009(r: _Run) -> RuleOutcome | None:
     total = r.sum(cond, [], "bytes")
     if total < r.t.exfil_mb * MiB:
         return None
+    dsts = [(r.names(d), b) for d, b in r.conn.execute(
+        f"SELECT dst_key, SUM(bytes) b FROM {_AGG} WHERE {cond} GROUP BY dst_key ORDER BY b DESC LIMIT {TOP}")]
     return RuleOutcome("L009", Severity.HIGH, "rpt_rule_l009_desc", "rpt_rule_l009_rec", {
         "total_mb": f"{total / MiB:.1f}", "threshold": f"{r.t.exfil_mb:g}",
-        "top_dst_fmt": ", ".join(f"{r.names(d)} ({b / MiB:.1f} MB)" for d, b in r.conn.execute(
-            f"SELECT dst_key, SUM(bytes) b FROM {_AGG} WHERE {cond} GROUP BY dst_key ORDER BY b DESC LIMIT {TOP}"))})
+        "top_dst_fmt": ", ".join(f"{name} ({b / MiB:.1f} MB)" for name, b in dsts)}, focus=dsts[0][0] if dsts else "")
 
 
 def _l010(r: _Run) -> RuleOutcome | None:
@@ -323,11 +333,12 @@ def _l010(r: _Run) -> RuleOutcome | None:
     n = r.sum(cond, pp)
     if n < r.t.cross_env_lateral:
         return None
+    pairs = [(f"{a} → {b}", n_) for a, b, n_ in r.conn.execute(
+        f"SELECT src_env, dst_env, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY 1, 2 ORDER BY n DESC "
+        f"LIMIT {TOP}", pp)]
     return RuleOutcome("L010", Severity.CRITICAL, "rpt_rule_l010_desc", "rpt_rule_l010_rec", {
         "n_flows": n, "named_ports": r.ports_text(cond, pp),
-        "top_pairs": ", ".join(f"{a} → {b} ({n_:,})" for a, b, n_ in r.conn.execute(
-            f"SELECT src_env, dst_env, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY 1, 2 ORDER BY n DESC "
-            f"LIMIT {TOP}", pp))})
+        "top_pairs": ", ".join(f"{pair} ({n_:,})" for pair, n_ in pairs)}, focus=pairs[0][0] if pairs else "")
 
 
 RULE_FUNCTIONS: dict[str, Callable[[_Run], RuleOutcome | None]] = {
@@ -379,31 +390,38 @@ def _params(o: RuleOutcome) -> dict[str, Any]:
     return {k: f"{v:,}" if isinstance(v, int) and not isinstance(v, bool) else v for k, v in o.params.items()}
 
 
-def as_findings(outcomes: list[RuleOutcome], lang: Language, *, limit: int) -> tuple[Finding, ...]:
-    """The first `limit` rules that fired (outcomes are ranked), as the report's key findings."""
-    return tuple(Finding(severity=o.severity, title=tr(lang, BY_ID[o.rule_id].name_key),
-                         why=tr(lang, o.desc_key, **_params(o)), action=tr(lang, o.rec_key, **_params(o)),
-                         techniques=BY_ID[o.rule_id].techniques)
-                 for o in outcomes if o.severity is not None)[:limit]
+def as_findings(outcomes: list[RuleOutcome], lang: Language) -> tuple[Finding, ...]:
+    """Every rule that fired, in the order given (outcomes are ranked): what it found (the fact), why that matters
+    (the rule's fixed sentence), what the rule recommends, and the thing to do it belongs to (ACTION_CODES)."""
+    out = []
+    for o in outcomes:
+        if o.severity is None:
+            continue
+        info = BY_ID[o.rule_id]
+        code = ACTION_CODES[(o.rule_id, o.rec_key)]
+        name = tr(lang, info.name_key)
+        out.append(Finding(
+            severity=o.severity, title=name, what=tr(lang, o.desc_key, **_params(o)), why=tr(lang, info.why_key),
+            action=tr(lang, o.rec_key, **_params(o)), techniques=info.techniques, action_code=code,
+            action_short=tr(lang, ACTION_SHORT_KEYS[code]),
+            action_focus=tr(lang, "rpt_act_focus", finding=name, top=o.focus) if o.focus else ""))
+    return tuple(out)
 
 
-def rest_sections(outcomes: list[RuleOutcome], lang: Language, *, summary: list[RuleOutcome], limit: int, title: str,
-                  intro: str, table_title: str, evaluated: bool = True) -> tuple[Section, ...]:
-    """The closing "rules" section: the rules the summary's findings (as_findings(summary, limit)) do not already
-    show — it repeated all of them (6.6.0). Nothing when every rule that fired is in the summary; the section stays
-    when the rules did not run, to say so."""
-    shown = {o.rule_id for o in [o for o in summary if o.severity is not None][:limit]}
-    rest = [o for o in outcomes if o.rule_id not in shown]
-    if outcomes and not rest:
+def unevaluated_section(outcomes: list[RuleOutcome], lang: Language, *, title: str, intro: str, table_title: str,
+                        evaluated: bool = True) -> tuple[Section, ...]:
+    """The closing "rules" section: only the rules that could not be evaluated (every rule that fired is a finding
+    in the summary). Nothing when all of them were evaluated; evaluated=False: the rules did not run (no traffic
+    matched), and the section stays to say so."""
+    rest = [o for o in outcomes if o.severity is None]
+    if evaluated and not rest:
         return ()
-    note = tr(lang, "rpt_rules_rest_intro", n=len(shown)) if shown else ""
-    return (Section(id="findings", title=title, intro=f"{intro} {note}".strip(),
-                    blocks=(outcomes_table(rest, lang, title=table_title, evaluated=evaluated),)),)
+    return (Section(id="findings", title=title, intro=intro, blocks=(outcomes_table(rest, lang, title=table_title),)),)
 
 
-def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str, evaluated: bool = True) -> TableBlock:
-    """Every rule that fired or could not be evaluated, with what it found and what to do. evaluated=False: the
-    rules did not run (no traffic matched), which the empty table says instead of "no rule fired"."""
+def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str) -> TableBlock:
+    """The rules given, one row each: a rule that fired with what it found and what to do, a rule that could not be
+    evaluated with the reason. An empty table says the rules did not run: the only case it is built empty for."""
     def row(o: RuleOutcome) -> tuple[str, ...]:
         info = BY_ID[o.rule_id]
         head = (o.rule_id, tr(lang, info.name_key), tr(lang, CATEGORY_KEYS[info.category]))
@@ -420,4 +438,4 @@ def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str, e
                Column(key="mitre", label=tr(lang, "rpt_col_mitre")))
     rows = tuple(row(o) for o in outcomes)
     return TableBlock(title=title, columns=columns, rows=rows, total_rows=len(rows),
-                      empty_text=tr(lang, "rpt_rules_none_fired" if evaluated else "rpt_rules_not_evaluated"))
+                      empty_text=tr(lang, "rpt_rules_not_evaluated"))
