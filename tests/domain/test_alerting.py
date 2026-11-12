@@ -399,3 +399,11 @@ def test_more_hosts_than_an_alert_lists_are_counted():
     r = event_rule(threshold="count", threshold_count=3)
     [t] = evaluate_event_rule(r, [ev(i, host=f"/orgs/1/workloads/h{i}") for i in range(25)], 25, now=NOW)
     assert len(t.devices) == 20 and t.devices_more == 5
+
+
+def test_an_event_about_several_hosts_names_them_all():
+    """A system task's one event can name several workloads (the offline check): the alert lists each."""
+    w = "/orgs/1/workloads/"
+    e = replace(ev(1, host=None, event_type="system_task.agent_offline_check"), hosts=(w + "ftp", w + "game"))
+    [t] = evaluate_event_rule(event_rule(event_types=("system_task.agent_offline_check",)), [e], 0, now=NOW)
+    assert t.devices == (Device(w + "ftp", "subject"), Device(w + "game", "subject"))

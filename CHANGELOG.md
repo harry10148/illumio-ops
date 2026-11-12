@@ -33,6 +33,13 @@ alerts are the way in, a host is where they lead.
 - The alerts page can be narrowed to one host (`/?device=<key>`).
 - The detection page has a table of contents.
 
+### Fixed
+
+- An alert on a system task's event — a VEN going offline, missed heartbeats — did not know which host it was about:
+  the PCE names the workload under the event's resource changes, and only events sent by a VEN were matched to a
+  host. Found by stopping a VEN on the lab: the offline alert fired and named no host. The event's own workloads are
+  now its hosts, one or several.
+
 ### Changed
 
 - The navigation is in five groups by what a page is for: Watch (alerts, alert rules, reports), Hosts (VEN fleet,

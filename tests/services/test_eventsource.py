@@ -172,3 +172,31 @@ def test_new_event_host_through_ven(collected):
     rows, _ = events_after(collected, 0, limit=100)
     mine = [r for r in rows if r.created_by_href == ven]
     assert mine and all(r.host_key == "/orgs/1/workloads/w-9" and r.hostname == "h9" for r in mine)
+
+
+# ── a system task's event names its hosts in resource_changes (lab 2026-11-12: a VEN stopped on `game`) ──
+
+def _offline_check(href, hosts):
+    """system_task.agent_offline_check as the lab PCE 26.2.20 sends it: created by the system, the workloads that
+    went offline under resource_changes."""
+    return {"href": href, "timestamp": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "pce_fqdn": "pce.lab.local",
+            "created_by": {"system": {}}, "event_type": "system_task.agent_offline_check", "status": "success",
+            "severity": "info", "notifications": [],
+            "resource_changes": [{"uuid": f"u{i}", "change_type": "update", "changes": {"online": {"before": True, "after": False}},
+                                  "resource": {"workload": {"href": f"/orgs/1/workloads/{name}", "name": name,
+                                                            "hostname": name, "labels": []}}}
+                                 for i, name in enumerate(hosts)]}
+
+
+def test_an_offline_check_event_is_about_the_workload_it_names(collected):
+    from illumio_ops.services.eventsource import events_after
+    _store_events(collected, [_offline_check("/orgs/1/events/off1", ["game"]),
+                              _offline_check("/orgs/1/events/off2", ["game", "ftp"])])
+    rows, _ = events_after(collected, 0, limit=100)
+    one = next(r for r in rows if r.href.endswith("off1"))
+    assert (one.host_key, one.hostname, one.hosts) == ("/orgs/1/workloads/game", "game", ("/orgs/1/workloads/game",))
+    two = next(r for r in rows if r.href.endswith("off2"))
+    assert two.host_key is None  # about two hosts: not one host's event
+    assert two.hosts == ("/orgs/1/workloads/ftp", "/orgs/1/workloads/game")
+    sent = next(r for r in rows if r.event_type == "agent.tampering")
+    assert sent.hosts == ((sent.host_key,) if sent.host_key else ())  # a VEN-sent event: the host it is matched to

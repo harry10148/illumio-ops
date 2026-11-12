@@ -413,6 +413,9 @@ class NewEvent(EventRow):
     host_key: str | None   # the workload the event is about (its href), when the store can tell
     hostname: str | None   # that host's name (a VEN-sent event names its host even when no workload matches)
     actor: str | None      # who made the change, when a user or a service account did
+    # Every workload the event is about. A VEN-sent event is about the one it is matched to; a system task's event
+    # (the offline check, the missed-heartbeats check) names its workloads under resource_changes — one or several.
+    hosts: tuple[str, ...] = ()
 
 
 _NEW_COLUMNS = ("e.id, e.href, e.event_type, e.severity, e.status, e.timestamp, e.created_by_kind, e.created_by_name, "
@@ -423,8 +426,18 @@ _NEW_COLUMNS = ("e.id, e.href, e.event_type, e.severity, e.status, e.timestamp, 
 
 
 def _new_event(r: Any) -> NewEvent:
-    return NewEvent(**_event_row(r).model_dump(), id=r["id"], host_key=r["host_key"], hostname=r["hostname"],
-                    actor=r["actor"])
+    """host_key from the store's own matching (the event's workload column, else the VEN that sent it). When that
+    finds none, the workloads the event itself names: until 6.8.0 a system task's event had no host at all, so an
+    offline alert could not say which host went offline (lab 2026-11-12). One named workload is the event's host;
+    several are listed, and the event is no single host's."""
+    row = _event_row(r)
+    key, name = r["host_key"], r["hostname"]
+    named = event_hosts(row.raw)
+    hosts: tuple[str, ...] = (key,) if key else tuple(sorted(named.workload_hrefs))
+    if not key and len(hosts) == 1:
+        key = hosts[0]
+        name = name or next((n for _, href, n in named.entities if href == key and n), None)
+    return NewEvent(**row.model_dump(), id=r["id"], host_key=key, hostname=name, actor=r["actor"], hosts=hosts)
 
 
 def _ingest_read(ctx: AppContext, sql: str, params: list[Any]) -> list[Any]:

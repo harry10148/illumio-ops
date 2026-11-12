@@ -148,6 +148,7 @@ class EventFact:
     hostname: str | None
     raw: Mapping[str, Any]
     actor: str | None = None  # who made the change, for events about no host (a user, a service account)
+    hosts: tuple[str, ...] = ()  # every workload the event is about (one event of a system task can name several)
 
 
 @dataclass(frozen=True)
@@ -283,7 +284,7 @@ def _event_trigger(rule: EventRule, matched: Sequence[EventFact], subject: str, 
         key = EVENT_SUBJECT_KEYS["actor" if actors else "none"]
     # the hosts of the events that fired the rule now (a count rule's earlier matches in its window are a number
     # only: they are not read again for their hosts)
-    devices, more = capped(devices_of_events(e.host_key for e in matched))
+    devices, more = capped(devices_of_events(h for e in matched for h in (e.hosts or (e.host_key,))))
     return Trigger(
         devices=devices, devices_more=more,
         rule_id=rule.id, rule_type=AlertRuleType.EVENT, subject_key=subject, severity=severity, first_seen=first,
