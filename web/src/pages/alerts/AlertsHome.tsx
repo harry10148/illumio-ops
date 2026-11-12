@@ -160,7 +160,7 @@ export function AlertsHome() {
         </div>
         <Segmented label={t("alerts_seen_filter")} role="alert-seen" value={onlyNew ? "new" : "all"}
                    options={[{ value: "all", label: t("alerts_all") },
-                             { value: "new", label: t("alerts_only_new"), count: data?.new }]}
+                             { value: "new", label: t("alerts_only_new"), count: data?.new || undefined }]}
                    onChange={(v) => { setOnlyNew(v === "new"); setPage(1); }} />
       </div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}

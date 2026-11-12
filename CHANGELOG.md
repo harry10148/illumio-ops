@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.8.0] - 2026-11-12
+
+The second stage of the purpose-led interface (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §4, §6):
+alerts are the way in, a host is where they lead.
+
+### Added
+
+- Every alert lists the hosts it is about, each a link to that host's page landing on the section the alert is about:
+  the VEN's state for an offline, missed-heartbeat or suspend alert, the tampering record for a tampering alert, the
+  connections for a detection or a traffic alert. A rule that fires on a count (missed heartbeats, failed sign-ins)
+  lists the hosts of the events that fired it; a traffic rule lists both ends of its top connections. Alerts stored
+  before this release are given their hosts at the first start where they can be read from what the alert kept.
+- Quarantine has a page: the hosts that carry the quarantine label now, who put it on and when, releasing one after a
+  confirmation, and the record of quarantines and releases. It needs no write key to read.
+- The host page without a host says where to start: the hosts recent alerts are about, the managed hosts that lost
+  contact, the hosts in quarantine, and the attention list.
+- The host page of one host: a first sentence of what it comes to (mode, VEN contact, alerts of the last 7 days,
+  quarantine), the alerts about this host, and sections a link can land on.
+- The alerts page can be narrowed to one host (`/?device=<key>`).
+- The detection page has a table of contents.
+
+### Changed
+
+- The navigation is in five groups by what a page is for: Watch (alerts, alert rules, reports), Hosts (hosts, VEN
+  fleet, quarantine), Analyse (detection, investigate), Automation (rule schedules), Settings (SIEM, system). No
+  address changed.
+- "Unprocessed" is replaced by "new": an alert is new until the alerts page has been opened, nothing has to be marked.
+  The badge in the navigation counts new alerts, the list marks them, and the page keeps its own measure while it is
+  open. `GET /api/shell/status` answers `new_alerts` in place of `unprocessed_alerts`.
+- The alerts page says in one sentence what the period comes to.
+- The side panel of the alerts page and an alert's own page show the same body and the same actions; quarantine opens
+  from the alert itself on both.
+- "Mark known" is named for what it does: "Stop alerting on this".
+- One name for each place: "Investigate" (was also "workbench"), "Detection page" (was also "lateral movement page"),
+  "Notification" (was "Delivery"), "What the PCE console does not show" (was "what the vendor's tools do not show").
+- Enforcement modes are said in plain words with the PCE's term beside them: "Recording only (Visibility Only)".
+- Detection page: the reach ranking, the label summary, the footholds and the initiators start folded; arriving at
+  one from the table of contents opens it.
+- Investigate page: a row's exclude and open-host marks show when the row is pointed at or reached by keyboard.
+- Host names everywhere are links to the host page (detection, investigate results, alert evidence, VEN fleet).
+
 ## [6.7.0] - 2026-11-11
 
 The first of four stages of the purpose-led interface (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md):

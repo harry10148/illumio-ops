@@ -737,9 +737,11 @@ function WhereToStart() {
             </>
           )}
       </Panel>
-      <Panel title={t("hosts_start_attention")} role="start-attention">
-        {basic ? <NeedsAdvanced what={t("hosts_start_attention_basic")} /> : <Attention />}
-      </Panel>
+      {/* the attention list brings its own card and heading (the detection page shows the same one) */}
+      <div data-role="start-attention">
+        {basic ? <Panel title={t("hosts_start_attention")}><NeedsAdvanced what={t("hosts_start_attention_basic")} /></Panel>
+          : <Attention />}
+      </div>
     </div>
   );
 }
