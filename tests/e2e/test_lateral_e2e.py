@@ -144,6 +144,10 @@ def test_focus_asset_link_preselects(context, live_app):
     page.goto(f"{live_app.url}/lateral?host={W}h22")
     expect(page.locator("[data-role=reach] tbody tr")).to_have_count(25)  # the host's row is past the first 20
     expect(page.locator("tr.lat-focus")).to_have_count(1)
+    # asked to show a host in the ranking: the ranking is open, though it starts folded otherwise
+    fresh = context.new_page()
+    fresh.goto(f"{live_app.url}/detect?host={W}h22")
+    expect(fresh.locator("tr.lat-focus")).to_be_visible()
 
 
 def test_result_json_names_never_hrefs(live_app):

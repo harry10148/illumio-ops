@@ -21,7 +21,7 @@ def test_the_navigation_is_grouped_by_what_a_page_is_for(live_app, context):
         groups[title] = [t.strip().rstrip("◆").strip() for t in group.locator(".nav-item").all_inner_texts()]
     assert list(groups) == ["Watch", "Hosts", "Analyse", "Automation", "Settings"]
     assert groups["Watch"] == ["Alerts", "Alert rules and notifications", "Reports"]
-    assert groups["Hosts"][:2] == ["Hosts", "VEN fleet"]
+    assert groups["Hosts"] == ["Hosts", "VEN fleet", "Quarantine"]
     assert groups["Analyse"] == ["Detection", "Investigate"]
     assert groups["Automation"] == ["Rule schedules"]
     assert groups["Settings"] == ["SIEM forwarding", "System"]

@@ -789,6 +789,7 @@ facts: {
 fired_at: string
 first_seen: string
 grouped: boolean
+host_section: (("status" | "tamper" | "connections") | null)
 id: number
 is_new: boolean
 last_seen: string
@@ -835,6 +836,7 @@ devices_more: number
 dst: (string | null)
 fired_at: string
 grouped: boolean
+host_section: (("status" | "tamper" | "connections") | null)
 id: number
 is_new: boolean
 late: boolean
@@ -853,9 +855,11 @@ summary: string
  */
 export interface AlertList {
 counts: AlertCounts
+device_name?: (string | null)
 hosts_recorded_since?: (string | null)
 items: AlertItem[]
 new: number
+new_matching?: number
 page: number
 page_size: number
 total: number

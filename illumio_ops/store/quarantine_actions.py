@@ -34,10 +34,13 @@ def recent(conn: sqlite3.Connection, *, pce_url: str, org_id: str, workload_href
 
 
 def last_applied(conn: sqlite3.Connection, *, pce_url: str, org_id: str) -> dict[str, sqlite3.Row]:
-    """Per workload, the latest quarantine this tool put on it that the PCE accepted."""
-    rows = conn.execute("SELECT * FROM quarantine_actions WHERE pce_url = ? AND org_id = ? AND action = 'apply' "
-                        "AND result = 'ok' ORDER BY id", (pce_url, org_id)).fetchall()
-    return {r["workload_href"]: r for r in rows}  # the later row of a workload replaces the earlier
+    """Per workload, the quarantine this tool put on it that still stands as far as this tool knows: its latest
+    accepted action, when that was putting the label on. A workload this tool released since is absent — a label
+    on it now was put there by someone else."""
+    rows = conn.execute("SELECT * FROM quarantine_actions WHERE pce_url = ? AND org_id = ? AND result = 'ok' "
+                        "ORDER BY id", (pce_url, org_id)).fetchall()
+    latest = {r["workload_href"]: r for r in rows}  # the later row of a workload replaces the earlier
+    return {href: r for href, r in latest.items() if r["action"] == "apply"}
 
 
 def move_pce(conn: sqlite3.Connection, *, old_url: str, new_url: str, org_id: str) -> int:

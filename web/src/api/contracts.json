@@ -13820,6 +13820,22 @@
             "title": "Grouped",
             "type": "boolean"
           },
+          "host_section": {
+            "anyOf": [
+              {
+                "enum": [
+                  "status",
+                  "tamper",
+                  "connections"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Section"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -13931,6 +13947,7 @@
           "devices",
           "devices_more",
           "is_new",
+          "host_section",
           "params",
           "facts",
           "confidence",
@@ -14080,6 +14097,22 @@
                 "title": "Grouped",
                 "type": "boolean"
               },
+              "host_section": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "status",
+                      "tamper",
+                      "connections"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Host Section"
+              },
               "id": {
                 "title": "Id",
                 "type": "integer"
@@ -14156,7 +14189,8 @@
               "pack_key",
               "devices",
               "devices_more",
-              "is_new"
+              "is_new",
+              "host_section"
             ],
             "title": "AlertItem",
             "type": "object"
@@ -14236,6 +14270,18 @@
           "counts": {
             "$ref": "#/$defs/AlertCounts"
           },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Device Name"
+          },
           "hosts_recorded_since": {
             "anyOf": [
               {
@@ -14258,6 +14304,11 @@
           },
           "new": {
             "title": "New",
+            "type": "integer"
+          },
+          "new_matching": {
+            "default": 0,
+            "title": "New Matching",
             "type": "integer"
           },
           "page": {
@@ -14792,6 +14843,22 @@
             "title": "Grouped",
             "type": "boolean"
           },
+          "host_section": {
+            "anyOf": [
+              {
+                "enum": [
+                  "status",
+                  "tamper",
+                  "connections"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Section"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -14903,6 +14970,7 @@
           "devices",
           "devices_more",
           "is_new",
+          "host_section",
           "params",
           "facts",
           "confidence",

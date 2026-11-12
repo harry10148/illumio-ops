@@ -571,7 +571,7 @@
   "alert_grouped_known_cause": "Grouped under a known cause of tampering: recorded, not sent.",
   "alert_known_reason": "Marked known: {reason}. Recorded, not sent.",
   "alert_known_title": "Stop alerting on this",
-  "alert_known_hint": "This alert counts as handled at once (it leaves the unhandled count). Later detections like it are still recorded but grouped and not sent; remove the mark on the Lateral movement settings page.",
+  "alert_known_hint": "Later detections like it are still recorded but grouped and not sent; remove the mark under System › Lateral movement settings.",
   "alert_known_reason_label": "Reason",
   "alert_known_scope_detection": "This detection only",
   "alert_known_scope_subject": "Every detection of this kind about this host (or account)",

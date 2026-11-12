@@ -179,10 +179,12 @@ def alerted_devices(conn: sqlite3.Connection, *, pce_url: str, org_id: str, sinc
 
 
 def devices_recorded_since(conn: sqlite3.Connection, *, pce_url: str, org_id: str) -> datetime | None:
-    """The earliest alert that has its hosts recorded: before it, "the alerts about this host" cannot be complete."""
-    row = conn.execute("SELECT MIN(a.fired_at) FROM alerts a WHERE a.pce_url = ? AND a.org_id = ? AND EXISTS "
-                       "(SELECT 1 FROM alert_devices d WHERE d.alert_id = a.id)", (pce_url, org_id)).fetchone()
-    return datetime.fromisoformat(row[0]) if row and row[0] else None
+    """Since when alerts record their hosts (0020): before it, "the alerts about this host" cannot be complete —
+    earlier alerts were given hosts only where those could be read back. None when no alert of this PCE is older."""
+    since = datetime.fromisoformat(conn.execute("SELECT at FROM alert_devices_since WHERE id = 1").fetchone()[0])
+    older = conn.execute("SELECT 1 FROM alerts WHERE pce_url = ? AND org_id = ? AND fired_at < ? LIMIT 1",
+                         (pce_url, org_id, _t(since))).fetchone()
+    return since if older else None
 
 
 def seen_at(conn: sqlite3.Connection) -> datetime:
@@ -203,6 +205,17 @@ def count_new(conn: sqlite3.Connection, *, pce_url: str, org_id: str, after: dat
     row = conn.execute("SELECT COUNT(*) FROM alerts WHERE pce_url = ? AND org_id = ? AND fired_at > ? AND fired_at >= ?",
                        (pce_url, org_id, _t(after), _t(since) if since else "")).fetchone()
     return int(row[0])
+
+
+def count_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime,
+                 rule_types: Sequence[str] | None = None, severity: str | None = None, rule_id: str | None = None,
+                 detectors_in: Sequence[str] | None = None, detectors_not_in: Sequence[str] | None = None,
+                 ungrouped_only: bool = False, device: str | None = None, fired_after: datetime | None = None) -> int:
+    """How many alerts the same filters as list_alerts match."""
+    where, params = _where(pce_url=pce_url, org_id=org_id, since=since, rule_types=rule_types, severity=severity,
+                           rule_id=rule_id, detectors_in=detectors_in, detectors_not_in=detectors_not_in,
+                           ungrouped_only=ungrouped_only, device=device, fired_after=fired_after)
+    return int(conn.execute(f"SELECT COUNT(*) FROM alerts WHERE {where}", params).fetchone()[0])
 
 
 def count_ungrouped(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime) -> int:

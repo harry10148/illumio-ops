@@ -256,3 +256,70 @@ def test_opening_the_alerts_page_answers_when_it_was_last_opened(client, ctx):
     second = post(client, "/api/alerts/seen", {}, token).get_json()["data"]["previous"]
     assert first < second  # the second call is told the time of the first
     assert client.post("/api/alerts/seen", json={}, environ_overrides=LOCAL).status_code in (400, 403)  # needs the token
+
+
+def test_the_list_says_where_on_the_host_page_each_alert_leads(client, ctx):
+    """Purpose-led UI spec §6.3 — decided where the alert is read, so the list and the alert's own page agree, for a
+    rule of the operator's own as for a built-in one."""
+    from dataclasses import replace
+
+    from illumio_ops.domain.alert_devices import Device
+    pce = ctx.settings.current().pce
+    w = "/orgs/1/workloads/aaa"
+
+    def add(rule_type, pack_key, params):
+        t = Trigger(rule_id="f" * 32, rule_type=rule_type, subject_key=w, severity=Severity.HIGH, first_seen=NOW,
+                    last_seen=NOW, late=False, message_key="alert_system_disk_low",
+                    params={"free": "1 GB", "warn": "10 GB", **params}, facts={}, evidence=None, confidence=Confidence())
+        with ctx.db() as conn:
+            return store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="mine", pack_key=pack_key,
+                                      trigger=replace(t, devices=(Device(w, "subject"),)), at=NOW, channels=["line"], hold=None)
+    want = {
+        add(AlertRuleType.EVENT, "rule_agent_offline", {}): "status",
+        add(AlertRuleType.EVENT, None, {"event_types": ["system_task.agent_missed_heartbeats_check"]}): "status",
+        add(AlertRuleType.EVENT, None, {"event_types": ["agent.tampering"]}): "tamper",
+        add(AlertRuleType.EVENT, None, {"event_types": ["user.sign_in"]}): None,
+        add(AlertRuleType.LATERAL, "rule_lateral_cross_env", {}): "connections",
+        add(AlertRuleType.TRAFFIC, None, {}): "connections",
+        add(AlertRuleType.SYSTEM, "rule_system_disk_low", {}): None,
+    }
+    login(client)
+    got = {i["id"]: i["host_section"] for i in get(client, "/api/alerts?days=3650").get_json()["data"]["items"]}
+    assert got == want
+    one = next(iter(want))
+    assert get(client, f"/api/alerts/{one}").get_json()["data"]["host_section"] == want[one]
+
+
+def test_one_hosts_alerts_say_since_when_hosts_are_recorded_and_how_the_host_is_shown(client, ctx):
+    from dataclasses import replace
+    from datetime import UTC
+
+    from illumio_ops.domain.alert_devices import Device
+    pce = ctx.settings.current().pce
+    t = Trigger(rule_id="g" * 32, rule_type=AlertRuleType.EVENT, subject_key="ip:10.0.0.9", severity=Severity.HIGH,
+                first_seen=NOW, last_seen=NOW, late=False, message_key="alert_system_disk_low",
+                params={"free": "1 GB", "warn": "10 GB"}, facts={}, evidence=None, confidence=Confidence())
+    with ctx.db() as conn:
+        store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="", pack_key=None,
+                           trigger=replace(t, devices=(Device("ip:10.0.0.9", "subject"),)), at=NOW, channels=["line"], hold=None)
+    login(client)
+    # NOW is before this database was made: an alert older than the moment hosts began to be recorded
+    data = get(client, "/api/alerts?days=3650&device=ip:10.0.0.9").get_json()["data"]
+    assert data["device_name"] == "10.0.0.9" and data["hosts_recorded_since"] is not None
+    assert get(client, "/api/alerts?days=3650").get_json()["data"]["hosts_recorded_since"] is None  # not asked about a host
+    with ctx.db() as conn:
+        conn.execute("DELETE FROM alerts")
+        conn.commit()
+        store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="", pack_key=None,
+                           trigger=replace(t, devices=(Device("ip:10.0.0.9", "subject"),)), at=datetime.now(UTC),
+                           channels=["line"], hold=None)
+    assert get(client, "/api/alerts?days=7&device=ip:10.0.0.9").get_json()["data"]["hosts_recorded_since"] is None  # nothing is older
+
+
+def test_the_count_beside_only_new_follows_the_filters(client, ctx):
+    seed(ctx, at=NOW - timedelta(hours=1))
+    seed(ctx, at=NOW - timedelta(hours=1), rule_type=AlertRuleType.EVENT)
+    login(client)
+    after = (NOW - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
+    data = get(client, f"/api/alerts?days=3650&new_after={after}&type=event").get_json()["data"]
+    assert (data["new"], data["new_matching"]) == (2, 1)

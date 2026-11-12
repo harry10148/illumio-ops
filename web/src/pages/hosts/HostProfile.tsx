@@ -472,7 +472,9 @@ export function HostProfile() {
     el.setAttribute("data-arrived", "true");
     const timer = window.setTimeout(() => el.removeAttribute("data-arrived"), 1500);
     return () => window.clearTimeout(timer);
-  }, [hash, profile, alerts]);
+  // (keyed on which host and whether its alerts are in — not on the objects, which change when a note is added)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash, profile?.key, alerts !== null]);
 
   useEffect(() => {
     let live = true;  // a slower answer for the host left behind must not replace this one
@@ -621,8 +623,11 @@ function conclusion(profile: Profile, name: string, alerts: AlertList | null): s
   if (!profile.managed) return t("host_conclusion_unmanaged", { name, n });
   const id = profile.identity;
   if (!profile.in_inventory || !id) return t("host_conclusion_gone", { name, n });
+  // measured to when the inventory was read, not to now: the inventory is an hour old at most, and a heartbeat
+  // set against the clock would call a healthy host lost late in that hour (the 6.4.1 defect)
   const beat = id.last_heartbeat_at ? new Date(id.last_heartbeat_at).getTime() : null;
-  const hours = beat === null ? null : Math.floor((Date.now() - beat) / 3_600_000);
+  const read = new Date(id.fetched_at).getTime();
+  const hours = beat === null ? null : Math.floor(((Number.isNaN(read) ? Date.now() : read) - beat) / 3_600_000);
   const ven = hours === null ? t("host_ven_unknown")
     : id.online !== false && hours < 1 ? t("host_ven_online") : t("host_ven_lost", { n: String(Math.max(1, hours)) });
   const level = profile.labels["Quarantine"];
@@ -668,16 +673,21 @@ function WhereToStart() {
   const [alerted, setAlerted] = useState<AlertedHosts | null>(null);
   const [lost, setLost] = useState<{ hosts: FleetHost[]; total: number; inventory: number } | null>(null);
   const [held, setHeld] = useState<QuarantineCurrent | null>(null);
+  const [failed, setFailed] = useState<Record<string, ApiError | null>>({});  // a list that could not be read says so
   useEffect(() => {
     let live = true;
+    const fail = (list: string, error: ApiError | null) => { if (live) setFailed((f) => ({ ...f, [list]: error })); };
     void call("hosts.alerted", undefined, undefined, { days: String(ALERT_DAYS) }).then((env) => {
-      if (live && env.ok && env.data) setAlerted(env.data);
+      if (live && env.ok && env.data) setAlerted(env.data); else fail("alerted", env.error);
     });
-    void call("quarantine.current").then((env) => { if (live && env.ok && env.data) setHeld(env.data); });
+    void call("quarantine.current").then((env) => {
+      if (live && env.ok && env.data) setHeld(env.data); else fail("held", env.error);
+    });
     void Promise.all([call("fleet.overview"),
                       ...LOST_STATES.map((online) => call("fleet.hosts", undefined, undefined, { online }))]).then(
       ([overview, ...lists]) => {
-        if (!live || !overview.ok || !overview.data) return;
+        if (!live) return;
+        if (!overview.ok || !overview.data) { fail("lost", overview.error); return; }
         const got = lists.flatMap((e) => (e.ok && e.data ? e.data.hosts : []));
         setLost({ hosts: got, total: lists.reduce((n, e) => n + (e.ok && e.data ? e.data.total : 0), 0),
                   inventory: overview.data.total });
@@ -688,7 +698,8 @@ function WhereToStart() {
   return (
     <div className="host-grid" data-role="host-start">
       <Panel title={t("hosts_start_alerted")} role="start-alerted">
-        {!alerted ? <p className="muted">{t("loading")}</p>
+        {failed.alerted ? <p className="form-error">{t(failed.alerted.message_key, failed.alerted.params)}</p>
+          : !alerted ? <p className="muted">{t("loading")}</p>
           : alerted.items.length === 0 ? <p className="muted">{t("hosts_start_alerted_none")}</p> : (
             <>
               <ul className="plain-list">
@@ -705,7 +716,8 @@ function WhereToStart() {
           )}
       </Panel>
       <Panel title={t("hosts_start_lost")} role="start-lost">
-        {!lost ? <p className="muted">{t("loading")}</p>
+        {failed.lost ? <p className="form-error">{t(failed.lost.message_key, failed.lost.params)}</p>
+          : !lost ? <p className="muted">{t("loading")}</p>
           : lost.inventory === 0 ? <p className="muted">{t("hosts_start_no_inventory")}</p>
           : lost.total === 0 ? <p className="muted">{t("hosts_start_lost_none")}</p> : (
             <>
@@ -722,7 +734,8 @@ function WhereToStart() {
           )}
       </Panel>
       <Panel title={t("hosts_start_quarantined")} role="start-quarantined">
-        {!held ? <p className="muted">{t("loading")}</p>
+        {failed.held ? <p className="form-error">{t(failed.held.message_key, failed.held.params)}</p>
+          : !held ? <p className="muted">{t("loading")}</p>
           : held.items.length === 0 ? <p className="muted">{t("hosts_start_quarantined_none")}</p> : (
             <>
               <ul className="plain-list">

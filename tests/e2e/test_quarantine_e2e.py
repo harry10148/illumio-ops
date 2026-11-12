@@ -162,6 +162,11 @@ def test_a_quarantine_is_lifted_after_it_is_confirmed(context, live_app, fake_pc
     expect(page.locator("[data-role=q-outcome]")).to_contain_text("web-01")
     assert f"/api/v2{WL}" in fake_pce.calls
     expect(page.locator("[data-role=q-page-history] tbody tr")).to_have_count(2)  # the release is on record
+    # it leaves the list at once, though the inventory still holds the label until it is read again — and that is said
+    expect(page.locator(f"[data-role=quarantined] tr[data-host='{WL}']")).to_have_count(0)
+    expect(page.locator("[data-role=quarantined] tbody tr")).to_have_count(1)
+    expect(page.locator("[data-role=q-lag]")).to_be_visible()
+    expect(page.locator("[data-role=page-conclusion]")).to_contain_text("1 hosts in quarantine.")
 
 
 def test_without_the_write_key_the_list_is_there_and_nothing_can_be_lifted(context, live_app, fake_pce):

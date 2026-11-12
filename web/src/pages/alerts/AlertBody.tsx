@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 
 import type { AlertDetail, AlertDevice } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { HostLink, type HostSection, sectionForAlert } from "../../components/HostLink";
+import { HostLink, type HostSection } from "../../components/HostLink";
 import { ActionNote, Disclosure, HostName, SeverityTag, Tag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { modeWord } from "../../terms";
@@ -30,13 +30,13 @@ export function categoryWord(c: string): string {
  * the rest as a count. An alert stored before hosts were kept shows the words it has; one about no host says so. */
 export function AlertHosts({ a }: {
   a: { devices: AlertDevice[]; devices_more: number; src: string | null; dst: string | null; rule_type: string;
-       pack_key?: string | null; params?: Record<string, unknown> };
+       host_section: HostSection | null };
 }) {
   if (a.devices.length === 0) {
     if (a.src || a.dst) return <>{a.src ? <HostName name={a.src} /> : "—"} → {a.dst ? <HostName name={a.dst} /> : "—"}</>;
     return <span className="hint">{a.rule_type === "system" ? t("alerts_about_system_short") : "—"}</span>;
   }
-  const section = sectionForAlert(a);
+  const section = a.host_section;
   const shown = a.devices.slice(0, LIST_DEVICES);
   const more = a.devices.length - shown.length + a.devices_more;
   const link = (d: AlertDevice) => <HostLink key={`${d.key}|${d.role}`} hostKey={d.key} name={d.name} section={section} />;
@@ -51,7 +51,7 @@ export function AlertHosts({ a }: {
   );
 }
 
-function Devices({ d, section }: { d: AlertDetail; section: HostSection | undefined }) {
+function Devices({ d, section }: { d: AlertDetail; section: HostSection | null }) {
   if (d.devices.length === 0) {
     return (
       <p className="hint" data-role="alert-devices">
@@ -67,7 +67,7 @@ function Devices({ d, section }: { d: AlertDetail; section: HostSection | undefi
         const about = [
           t(ROLE_KEYS[x.role] ?? x.role),
           facts?.environment,
-          x.managed && facts && !facts.in_inventory ? t("alert_not_in_inventory") : null,
+          facts && !facts.in_inventory ? t("alert_not_in_inventory") : null,
           facts?.enforcement_mode ? modeWord(facts.enforcement_mode) : null,
           !x.managed ? t("alert_unmanaged_address") : null,
         ].filter(Boolean).join(" · ");
@@ -87,7 +87,7 @@ export function AlertBody({ d, full }: { d: AlertDetail; full: boolean }) {
   const lang = useLang();
   const [isolating, setIsolating] = useState(false);
   const q = d.quarantine;
-  const section = sectionForAlert(d);
+  const section = d.host_section;
   const [firstStep, ...moreSteps] = d.next_steps;
   return (
     <div className="stack alert-body" data-role="alert-body">

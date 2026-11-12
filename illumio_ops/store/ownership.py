@@ -13,6 +13,7 @@ TABLE_OWNERS: dict[str, str] = {
     "alert_deliveries": "illumio_ops.store.alerts",
     "alert_devices": "illumio_ops.store.alerts",
     "alerts_seen": "illumio_ops.store.alerts",
+    "alert_devices_since": "illumio_ops.store.alerts",
     "alert_notes": "illumio_ops.store.alerts",
     "alert_rule_state": "illumio_ops.store.alerts",
     "alert_rule_status": "illumio_ops.store.alerts",

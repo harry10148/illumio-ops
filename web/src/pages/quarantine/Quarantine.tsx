@@ -25,6 +25,8 @@ export function Quarantine() {
   const [historyError, setHistoryError] = useState<ApiError | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<QuarantineOutcome | null>(null);
+  // released here since the page opened: the inventory still shows the label until it is read again
+  const [released, setReleased] = useState<string[]>([]);
 
   const load = useCallback(() => {
     void call("quarantine.current").then((env) => {
@@ -41,17 +43,23 @@ export function Quarantine() {
   async function release(host: QuarantinedHost) {
     setConfirming(null);
     const env = await call("quarantine.remove", { keys: nonEmpty([host.key]) });
-    if (env.ok && env.data) { setOutcome(env.data); setError(null); } else setError(env.error);
+    if (env.ok && env.data) {
+      setOutcome(env.data);
+      setError(null);
+      const gone = env.data.results.filter((r) => r.status === "ok" || r.status === "not_quarantined").map((r) => r.key);
+      setReleased((now) => [...now, ...gone]);
+    } else setError(env.error);
     load();
   }
 
-  const idle = now?.items.filter((h) => h.no_enforcement).length ?? 0;
+  const items = now?.items.filter((h) => !released.includes(h.key)) ?? [];
+  const idle = items.filter((h) => h.no_enforcement).length;
   return (
     <section className="page" data-role="quarantine-page">
       <PageHead title={t("nav_quarantine")} purpose={t("purpose_quarantine")} />
-      {now && now.items.length > 0 && (
+      {now && items.length > 0 && (
         <p className="page-conclusion" data-role="page-conclusion">
-          {t("q_page_conclusion", { n: String(now.items.length) })}
+          {t("q_page_conclusion", { n: String(items.length) })}
           {idle > 0 && <> {t("q_page_conclusion_idle", { m: String(idle) })}</>}
         </p>
       )}
@@ -60,10 +68,11 @@ export function Quarantine() {
         <p className="notice" data-role="q-no-write-key">{t("q_no_write_key")} <Link to="/system/pce">{t("nav_system_pce")}</Link></p>
       )}
       {outcome && <Outcome outcome={outcome} />}
-      {now && now.items.length === 0 && (
+      {released.length > 0 && <p className="hint" data-role="q-lag">{t("q_inventory_lag")}</p>}
+      {now && items.length === 0 && (
         <EmptyState text={t("q_page_none")}><Link to="/">{t("q_page_none_next")}</Link></EmptyState>
       )}
-      {now && now.items.length > 0 && (
+      {now && items.length > 0 && (
         <div className="table-wrap">
           <table className="table" data-role="quarantined">
             <thead>
@@ -73,7 +82,7 @@ export function Quarantine() {
               </tr>
             </thead>
             <tbody>
-              {now.items.map((h) => (
+              {items.map((h) => (
                 <tr key={h.key} data-host={h.key}>
                   <td><HostLink hostKey={h.key} name={h.name} section="quarantine" /></td>
                   <td className="nowrap">{t(LEVEL_KEYS[h.level] ?? h.level)}</td>

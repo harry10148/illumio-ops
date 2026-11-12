@@ -368,7 +368,7 @@ function Reach({ ex, name, focus }: { ex: ExposureResult; name: (k: string) => s
   });
   return (
     <>
-      <FoldCard id="lat-reach" section="reach" title={t("lat_reach")}>
+      <FoldCard id="lat-reach" section="reach" title={t("lat_reach")} open={Boolean(focus)}>
         <p className="hint">{t("lat_reach_hint", { hops: String(ex.hops) })}</p>
         {focus && focusAt < 0 && <p className="hint">{t("lat_host_not_in_graph", { host: name(focus) })}</p>}
         <div className="table-wrap">
@@ -647,10 +647,10 @@ function Toc({ stamp }: { stamp: string }) {
 
 /** A section of detail that starts folded: its heading stays, with a button that opens it. Arriving at its anchor
  * opens it. */
-function useFold(id: string) {
+function useFold(id: string, asked = false) {
   const { hash } = useLocation();
-  const [open, setOpen] = useState(false);
-  useEffect(() => { if (hash === `#${id}`) setOpen(true); }, [hash, id]);
+  const [open, setOpen] = useState(asked);
+  useEffect(() => { if (asked || hash === `#${id}`) setOpen(true); }, [asked, hash, id]);
   const button = (
     <button type="button" className="btn-text" data-role="fold-toggle" aria-expanded={open} aria-controls={id}
             onClick={() => setOpen((o) => !o)}>
@@ -660,8 +660,10 @@ function useFold(id: string) {
   return { open, button };
 }
 
-function FoldCard({ id, section, title, children }: { id: string; section: string; title: string; children: ReactNode }) {
-  const fold = useFold(id);
+function FoldCard({ id, section, title, children, open }: {
+  id: string; section: string; title: string; children: ReactNode; /** something in it was asked for: starts open */ open?: boolean;
+}) {
+  const fold = useFold(id, open);
   return (
     <div className="card stack" id={id} data-section={section} data-folded={!fold.open || undefined}>
       <div className="row card-head"><h2>{title}</h2>{fold.button}</div>

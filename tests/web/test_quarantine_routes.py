@@ -84,3 +84,11 @@ def test_the_hosts_in_quarantine_now_with_who_put_them_there(client, ctx):
     assert got[w + "a"]["applied_at"] is not None and got[w + "a"]["name"] == "a"
     # the label is on it but this tool has no record of putting it there; Idle: the label isolates nothing
     assert (got[w + "b"]["applied_at"], got[w + "b"]["applied_by"], got[w + "b"]["no_enforcement"]) == (None, None, True)
+    # this tool released the host since, and the label is on it again: someone else put it there
+    with ctx.db() as conn:
+        quarantine_actions.add(conn, pce_url=pce.url, org_id=pce.org_id, at=now, by="illumio", action="remove",
+                               workload_href=w + "a", hostname="a", level=None, previous_level="Severe",
+                               original_labels=[], result="ok", detail=None)
+        conn.commit()
+    again = {i["key"]: i for i in client.get("/api/quarantine/current", environ_overrides=LOCAL).get_json()["data"]["items"]}
+    assert (again[w + "a"]["applied_at"], again[w + "a"]["applied_by"]) == (None, None)

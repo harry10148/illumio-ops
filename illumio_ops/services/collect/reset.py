@@ -50,7 +50,7 @@ APP_DB_PCE_DERIVED: tuple[str, ...] = ("pce_probe", "alert_eval_state", "siem_cu
 # The SIEM send counts are what each destination took, whichever PCE it came from: a switch leaves them.
 # Fleet actions (enforcement-mode changes, traffic update rate increases) are a record of writes too, each naming its PCE.
 APP_DB_PCE_INDEPENDENT: tuple[str, ...] = ("job_health", "tamper_annotations", "detection_annotations", "alerts",
-                                           "alert_deliveries", "alert_devices", "alerts_seen",
+                                           "alert_deliveries", "alert_devices", "alerts_seen", "alert_devices_since",
                                            "alert_notes", "alert_rule_state", "alert_rule_status", "channel_state",
                                            "reports", "report_schedule_state", "quarantine_actions",
                                            "custom_reports", "alert_id_floor", "siem_dlq", "rule_schedules",

@@ -725,3 +725,14 @@ def test_a_system_alert_says_it_is_about_no_host(context, live_app):
     expect(page.locator("[data-role=alert-list] tbody tr").first).to_contain_text("The PCE or this tool")
     expect(page.locator("[data-role=alert-side] [data-role=alert-devices]")).to_have_text(
         "This alert is about this tool or the PCE itself, not a particular host.")
+
+
+def test_a_workload_the_host_page_cannot_open_is_named_but_not_a_link(context, live_app):
+    """A Kubernetes workload is named in traffic like any host, but the host page takes only a managed workload or
+    an address: its name is shown, and nothing leads to a page that would refuse it."""
+    _about(live_app.ctx, [("/orgs/1/kubernetes_workloads/pod-1", "source"), ("ip:10.0.0.9", "destination")])
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    row = page.locator("[data-role=alert-list] tbody tr").first
+    expect(row.locator("[data-role=alert-hosts]")).to_be_visible()
+    expect(row.locator("[data-role=host-link]")).to_have_count(1)  # the address; the pod is words

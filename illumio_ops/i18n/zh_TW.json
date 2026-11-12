@@ -571,7 +571,7 @@
   "alert_grouped_known_cause": "已歸入竄改的已知原因：只記錄，不送通知。",
   "alert_known_reason": "已標為已知：{reason}。只記錄，不送通知。",
   "alert_known_title": "這類以後不要再告警",
-  "alert_known_hint": "這一則告警會立即算已處理（不再計入未處理）。之後同樣的偵測照樣記錄，但歸組、不送通知；可在「橫向移動」設定頁取消。",
+  "alert_known_hint": "之後同樣的偵測照樣記錄，但歸組、不送通知；可在「系統 › 橫向移動設定」取消。",
   "alert_known_reason_label": "原因",
   "alert_known_scope_detection": "只這一則偵測",
   "alert_known_scope_subject": "這台主機（或帳號）的這類偵測",

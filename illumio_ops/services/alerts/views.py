@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from illumio_ops.domain.alert_devices import Device, Role
+from illumio_ops.domain.alert_devices import Device, Role, is_host_key
 from illumio_ops.domain.alertcategory import AlertCategory, category, category_filter
 from illumio_ops.domain.beyond_vendor import beyond_vendor
 from illumio_ops.domain.segment import EventSegment, FlowSegment
@@ -85,6 +85,9 @@ class AlertItem(BaseModel):
     devices: list[AlertDevice]  # the hosts the alert is about; none for an alert stored before they were kept
     devices_more: int           # how many more there were than are listed
     is_new: bool                # fired after the time the request named (new_after); false when it named none
+    # Where on the host page this alert's hosts should land (purpose-led UI spec §6.3): "status" for a VEN gone
+    # quiet or suspended, "tamper" for tampering, "connections" for a detection or a traffic rule; None: the top.
+    host_section: Literal["status", "tamper", "connections"] | None
 
 
 class AlertCounts(BaseModel):
@@ -106,6 +109,8 @@ class AlertList(BaseModel):
     # Asked for one host's alerts: the earliest alert whose hosts were recorded, when that is within the period —
     # the count before it cannot be complete. None otherwise.
     hosts_recorded_since: datetime | None = None
+    new_matching: int = 0           # of `new`, those the request's filters match (the count beside "only new")
+    device_name: str | None = None  # asked for one host's alerts: how that host is shown
 
 
 class SeenBefore(BaseModel):
@@ -126,7 +131,7 @@ class NoteView(BaseModel):
 
 
 class DeviceFacts(BaseModel):
-    in_inventory: bool            # a managed workload the inventory holds (an address never is)
+    in_inventory: bool            # a workload the inventory holds now (an address has no entry here at all)
     environment: str | None       # its environment label's value (the label key the lateral settings name)
     enforcement_mode: str | None
 
@@ -144,7 +149,7 @@ class AlertDetail(AlertItem):
     beyond_vendor: list[str]
     quarantine: QuarantineEligibility
     next_steps: list[str]  # what to do next (domain.guidance); empty when there is nothing specific to say
-    device_facts: dict[str, DeviceFacts]  # per host key of `devices`, what the inventory holds about it now
+    device_facts: dict[str, DeviceFacts]  # per workload among `devices`, what the inventory holds about it now
 
 
 class AlertEvidence(BaseModel):
@@ -219,6 +224,24 @@ def _devices(found: Sequence[Device], names: Mapping[str, str]) -> list[AlertDev
                         managed=not d.key.startswith("ip:")) for d in found]
 
 
+_STATUS_EVENTS = frozenset({"system_task.agent_offline_check", "system_task.agent_missed_heartbeats_check",
+                            "agent.suspend"})
+
+
+def _host_section(rule_type: AlertRuleType, pack_key: str | None,
+                  params: Mapping[str, Any]) -> Literal["status", "tamper", "connections"] | None:
+    if rule_type is AlertRuleType.SYSTEM:
+        return None
+    if rule_type is not AlertRuleType.EVENT:
+        return "connections"
+    types = {str(x) for x in params.get("event_types") or ()}
+    if pack_key == "rule_agent_tampering" or "agent.tampering" in types:
+        return "tamper"
+    if pack_key in ("rule_agent_offline", "rule_agent_heartbeat", "rule_agent_suspend") or types & _STATUS_EVENTS:
+        return "status"
+    return None
+
+
 def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row],
           names: Mapping[str, str] | None = None, found: Sequence[Device] = (),
           new_after: datetime | None = None) -> AlertItem:
@@ -234,7 +257,8 @@ def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row],
                      category=category(rule_type, params.get("detector")), src=src, dst=dst,
                      pack_key=row["pack_key"], devices=_devices(found, names or {}),
                      devices_more=int(row["devices_more"]),
-                     is_new=new_after is not None and v.fired_at > new_after)
+                     is_new=new_after is not None and v.fired_at > new_after,
+                     host_section=_host_section(rule_type, row["pack_key"], params))
 
 
 def mark_seen(ctx: AppContext, *, now: datetime | None = None) -> SeenBefore:
@@ -260,6 +284,11 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
         new = (store.count_new(conn, pce_url=url, org_id=org, after=q.new_after, since=since)
                if q.new_after is not None else 0)
         recorded = store.devices_recorded_since(conn, pce_url=url, org_id=org) if q.device else None
+        matching = (store.count_alerts(
+            conn, pce_url=url, org_id=org, since=since, rule_types=types or ((q.type.value,) if q.type else None),
+            detectors_in=inside, detectors_not_in=outside, ungrouped_only=q.unprocessed,
+            severity=q.severity.value if q.severity else None, rule_id=q.rule, device=q.device,
+            fired_after=q.new_after) if q.new_after is not None else 0)
         found = store.deliveries(conn, [r["id"] for r in rows])
         about = store.devices(conn, [r["id"] for r in rows])
         counted = store.period_counts(conn, pce_url=url, org_id=org, since=since)
@@ -267,10 +296,12 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
     for d in found:
         by_alert.setdefault(d["alert_id"], []).append(d)
     counts = AlertCounts(**{k: counted.get(k, 0) for k in ("critical", "high", "medium", "low", "grouped")})
-    names = display_names(ctx, _hrefs(rows) | {d.key for ds in about.values() for d in ds})
+    names = display_names(ctx, _hrefs(rows) | {d.key for ds in about.values() for d in ds}
+                          | ({q.device} if q.device and is_host_key(q.device) else set()))
     return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], []), names, about.get(r["id"], ()), q.new_after)
                             for r in rows], new=new,
                      hosts_recorded_since=recorded if recorded is not None and recorded > since else None,
+                     new_matching=matching, device_name=names.get(q.device) if q.device else None,
                      total=total, page=q.page,
                      page_size=PAGE, counts=counts)
 
@@ -394,10 +425,10 @@ def alert_detail(ctx: AppContext, alert_id: int) -> AlertDetail | None:
 def _device_facts(ctx: AppContext, keys: Sequence[str]) -> dict[str, DeviceFacts]:
     """What the inventory holds now about each host an alert names: read from the store, the PCE is not asked. A
     store that is another PCE's (a switch not yet cleared) says nothing about these hosts."""
-    none = {k: DeviceFacts(in_inventory=False, environment=None, enforcement_mode=None) for k in keys}
     hrefs = {k for k in keys if not k.startswith("ip:")}
     if not hrefs:
-        return none
+        return {}
+    none = {k: DeviceFacts(in_inventory=False, environment=None, enforcement_mode=None) for k in hrefs}
     s = ctx.settings.current()
     try:
         with ctx.flows().connect() as conn:
@@ -405,11 +436,11 @@ def _device_facts(ctx: AppContext, keys: Sequence[str]) -> dict[str, DeviceFacts
             found = {w.href: w for w in workloads.all_workloads(conn) if w.href in hrefs}
             sets = label_store.label_sets(conn, {w.label_set for w in found.values() if w.label_set is not None})
     except BindingMismatch:
-        return none
+        return {}  # nothing is known: not the same as "not in the inventory"
     env_key = s.lateral.environment_label_key
     for href, w in found.items():
         labels = sets.get(w.label_set, {}) if w.label_set is not None else {}
-        none[href] = DeviceFacts(in_inventory=bool(w.managed), environment=labels.get(env_key),
+        none[href] = DeviceFacts(in_inventory=True, environment=labels.get(env_key),
                                  enforcement_mode=w.enforcement_mode)
     return none
 

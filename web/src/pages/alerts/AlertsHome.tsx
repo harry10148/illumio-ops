@@ -144,8 +144,7 @@ export function AlertsHome() {
       ]} />
       {device && (
         <p className="row" data-role="alert-device-filter">
-          <span>{t("alerts_device_filter", { name: data?.items.flatMap((i) => i.devices).find((d) => d.key === device)?.name
-            ?? device.replace(/^ip:/, "") })}</span>
+          <span>{t("alerts_device_filter", { name: data?.device_name ?? device.replace(/^ip:/, "") })}</span>
           <button type="button" className="btn-text" onClick={() => { setParams({}); setPage(1); }}>{t("alerts_device_clear")}</button>
         </p>
       )}
@@ -160,7 +159,7 @@ export function AlertsHome() {
         </div>
         <Segmented label={t("alerts_seen_filter")} role="alert-seen" value={onlyNew ? "new" : "all"}
                    options={[{ value: "all", label: t("alerts_all") },
-                             { value: "new", label: t("alerts_only_new"), count: data?.new || undefined }]}
+                             { value: "new", label: t("alerts_only_new"), count: data?.new_matching || undefined }]}
                    onChange={(v) => { setOnlyNew(v === "new"); setPage(1); }} />
       </div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
