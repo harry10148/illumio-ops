@@ -1112,6 +1112,8 @@
   "rpt_mail_subject": "[illumio-ops] {title} {period}: {status}",
   "rpt_mail_status_items": "{n} to look at",
   "rpt_mail_status_none": "nothing to act on",
+  "rpt_mail_subject_plain": "[illumio-ops] {title} {period}",
+  "rpt_mail_status_held": "rules not evaluated",
   "rpt_mail_kpis": "Key metrics",
   "rpt_mail_link": "Open this report in illumio-ops: {url}",
   "rpt_mail_no_link": "No GUI address is set (Settings → Reports), so this email has no link.",

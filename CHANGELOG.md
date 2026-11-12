@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.9.0] - 2026-11-12
+
+How a report reads (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §9.1). No key number is computed
+differently.
+
+### Changed
+
+- A report's first page is for the reader who stops there: the conclusion, what to know before the numbers (a gap in
+  what was collected, days of the archive that could not be read), three lead numbers each with its change from the
+  previous period and which way is better, and the three things to do first. Findings whose advice is the same action
+  are one thing to do, naming the findings it addresses.
+- Findings are cards — what happened, why it matters, what to do — and every rule that fired is one (the flow reports
+  showed the first five; the security risk report only the critical and high ones). The closing rules chapter lists
+  only the rules that could not be evaluated, and the first page says so instead of "nothing to act on".
+- "How to read this report" — how it is worked out, the data notes, the chapters with nothing this period — comes last.
+- On paper a table lists its first ten rows and says how many there are and where the rest is; a card is never split
+  across pages; no page is left blank by a forced break.
+- A host named in a report's table is a link to that host's page, landing on the section the table is about, where
+  the console's address is set.
+- A policy decision is said in plain words beside the PCE's own, on the console and in reports: "Allowed (a rule
+  allows it)", "Potentially Blocked (blocked once enforcement starts)". Report tables say an enforcement mode the way
+  the console does.
+- The report email is the first page: conclusion, what to know, three numbers, the three things to do, the link.
+- The templates page lists the common reports first (security risk, VEN status, new connections, audit), then the
+  rest; a report's group is a tag on its card.
+
 ## [6.8.0] - 2026-11-12
 
 The second stage of the purpose-led interface (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §4, §6):

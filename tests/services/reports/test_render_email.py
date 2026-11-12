@@ -182,3 +182,11 @@ def test_a_report_with_no_key_number_prints_no_heading_over_nothing():
         assert "the data notes say why" in part
     one = render_email(make_doc(kpis=KPIS[:1]), tz=UTC)
     assert "Key metrics" in one.text and "()" not in one.text
+
+
+def test_the_subject_never_says_nothing_to_act_on_when_rules_were_not_evaluated_or_for_a_custom_report():
+    assert "nothing to act on" in render_email(make_doc(findings=()), tz=UTC).subject
+    held = render_email(make_doc(findings=(), sections=(_unevaluated([("L006", "x")]),)), tz=UTC).subject
+    assert "nothing to act on" not in held and "rules not evaluated" in held
+    custom = render_email(make_doc(findings=(), report_type=ReportType.CUSTOM), tz=UTC).subject
+    assert "nothing to act on" not in custom and "2026-10-26" in custom and ": " not in custom.split("2026-10-26", 1)[1][:3]

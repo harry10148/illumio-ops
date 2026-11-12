@@ -1112,6 +1112,8 @@
   "rpt_mail_subject": "［illumio-ops］{title} {period}：{status}",
   "rpt_mail_status_items": "{n} 項需要處理",
   "rpt_mail_status_none": "沒有需要處理的項目",
+  "rpt_mail_subject_plain": "［illumio-ops］{title} {period}",
+  "rpt_mail_status_held": "有規則沒能評估",
   "rpt_mail_kpis": "關鍵指標",
   "rpt_mail_link": "在 illumio-ops 開啟此報表：{url}",
   "rpt_mail_no_link": "未設定 GUI 對外網址（設定 → 報表），信件不含連結。",
