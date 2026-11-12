@@ -31,13 +31,19 @@ from illumio_ops.services.analysis.segments import run_segment
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import AggRow, FieldCoverage
 from illumio_ops.services.hosts import display_names
-from illumio_ops.services.reports.common import host_name, port_text, tr
+from illumio_ops.services.reports.common import (
+    DECISION_IN_SENTENCE_KEYS,
+    DECISION_KEYS,
+    host_key,
+    host_keys,
+    host_name,
+    port_text,
+    tr,
+)
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.workbench import FlowRequest
 from illumio_ops.store.flowdb import policy_objects
 
-DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
-                 "blocked": "decision_blocked", "unknown": "decision_unknown"}
 DIRECTION_KEYS = {"inbound": "rpt_direction_inbound", "outbound": "rpt_direction_outbound"}
 _HOSTS = (SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST)
 _LABELS = (SegmentDimension.SRC_LABEL, SegmentDimension.DST_LABEL)
@@ -128,12 +134,13 @@ def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric:
     """A top-`limit` ranking as a table: one column per grouping level, then the metric. `spec` replaces the
     report's window and filter (a report that builds its own sides, such as one app's inbound traffic);
     `decisions` narrows it (see narrowed). skip_empty: flows without the grouped field (no user, no
-    process) are not ranked as a "(none)" row."""
+    process) are not ranked as a "(none)" row. A level grouped by host is a host column: it carries each row's host
+    key (host_keys), under the key of the column the caller gave for that level."""
     empty = tr(inp.lang, "rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_no_flows")
     seg = segment(inp, group_by=group_by, metric=metric, decisions=decisions, spec=spec,
                   limit=limit + 1 if skip_empty else limit)
     if seg is None:
-        return TableBlock(title=title, columns=tuple(columns), rows=(), total_rows=0, empty_text=empty)
+        return TableBlock(title=title, columns=tuple(columns), rows=(), total_rows=0, empty_text=empty)  # no rows: no keys
     result = run_segment(inp.ctx, seg, now=inp.now)
     rows_in = result.ranking or []
     limit_hit = result.limit_hit
@@ -145,8 +152,12 @@ def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric:
     rows: tuple[tuple[Cell, ...], ...] = tuple(
         (*(_key_text(inp, g, r.keys[i], r.display[i], names) for i, g in enumerate(group_by)), r.value)
         for r in rows_in)
-    return TableBlock(title=title, columns=tuple(columns), rows=rows, total_rows=len(rows), empty_text=empty,
-                      limit_note=tr(inp.lang, "rpt_limit_top_n", n=limit) if limit_hit else None)
+    by_host = [i for i, g in enumerate(group_by) if g.dimension in _HOSTS]
+    shown = tuple(c.model_copy(update={"kind": "host"}) if i in by_host else c for i, c in enumerate(columns))
+    return TableBlock(title=title, columns=shown, rows=rows, total_rows=len(rows), empty_text=empty,
+                      limit_note=tr(inp.lang, "rpt_limit_top_n", n=limit) if limit_hit else None,
+                      host_keys=host_keys(**{shown[i].key: [host_key({}, r.keys[i]) for r in rows_in]
+                                             for i in by_host}))
 
 
 def _side_text(side: EndpointFilter, lang: Language, prefix_key: str) -> list[str]:
@@ -199,7 +210,7 @@ def filter_text(cond: FlowCondition | None, lang: Language) -> str | None:
                         value=", ".join(port_text(p.port, p.proto or 6) for p in cond.exclude_ports)))
     if cond.decisions:
         parts.append(tr(lang, "rpt_filter_decisions",
-                        decisions=", ".join(tr(lang, DECISION_KEYS[d.value]) for d in cond.decisions)))
+                        decisions=", ".join(tr(lang, DECISION_IN_SENTENCE_KEYS[d.value]) for d in cond.decisions)))
     for field, key in _VALUE_TEXT_KEYS.items():
         value = getattr(cond, field)
         if value:

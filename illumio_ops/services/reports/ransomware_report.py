@@ -24,7 +24,14 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.values import Severity
 from illumio_ops.services.analysis.ransomware import host_ransomware
 from illumio_ops.services.reports import reads
-from illumio_ops.services.reports.common import port_text, rule_label, severity_name, tr
+from illumio_ops.services.reports.common import (
+    host_key,
+    host_keys,
+    port_text,
+    rule_label,
+    severity_name,
+    tr,
+)
 from illumio_ops.services.reports.generate import previous_period
 from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.history import previous_values
@@ -126,13 +133,19 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     def name(r: Mapping[str, Any]) -> str:
         return str(r.get("hostname") or str(r.get("host") or r.get("href") or "").rsplit("/", 1)[-1])
 
+    def host_of(r: Mapping[str, Any]) -> str | None:
+        """The workload name(r) names: a list row carries it as `host`, a host of the analysis as `href`."""
+        return host_key({}, r.get("host") or r.get("href"))
+
     def list_table(key: str, title: str, empty: str) -> TableBlock:
         items = lists[key]
         return TableBlock(
             title=title,
-            columns=(Column(key="host", label=t("rpt_col_host")), Column(key="service", label=t("rpt_col_name")),
+            columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                     Column(key="service", label=t("rpt_col_name")),
                      Column(key="port", label=t("rpt_col_service")), Column(key="severity", label=t("rpt_col_severity")),
                      Column(key="sources", label=t("rpt_col_recent_sources"), kind="number")),
+            host_keys=host_keys(host=(host_of(r) for r in items[:LIST_ROWS])), host_section="ransomware",
             rows=tuple((name(r), r.get("name"), port_text(r.get("port"), int(r.get("proto") or 0)),
                         severity_name(lang, str(r.get("severity") or "").lower()), r.get("recent_sources"))
                        for r in items[:LIST_ROWS]),
@@ -196,7 +209,8 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                                           h.get("computed_percent") or 0.0, name(h)))
     host_table = TableBlock(
         title=t("rpt_rw_tbl_hosts"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="pce", label=t("rpt_rw_col_pce_percent")),
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                 Column(key="pce", label=t("rpt_rw_col_pce_percent")),
                  Column(key="computed", label=t("rpt_rw_col_computed")),
                  Column(key="exposure", label=t("rpt_rw_col_exposure")),
                  Column(key="unprotected", label=t("rpt_rw_col_unprotected"), kind="number"),
@@ -206,7 +220,8 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                     exposure(h.get("pce_exposure")),
                     sum(1 for s in h.get("services") or () if _open(s)),
                     t("rpt_rw_contradiction_yes") if h.get("contradiction") else "", explain(h)) for h in ranked),
-        total_rows=len(ranked), empty_text=t("rpt_rw_none_hosts"))
+        total_rows=len(ranked), empty_text=t("rpt_rw_none_hosts"),
+        host_keys=host_keys(host=(host_of(h) for h in ranked)), host_section="ransomware")
     every = [(h, s) for h in ranked for s in h.get("services") or ()]
     # A service that takes nothing off the host's score (contribution 0) is one of hundreds of identical rows: only
     # the ones that do are listed, and the rest are counted (6.6.0).
@@ -216,7 +231,8 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     services = sorted(every, key=lambda hs: not lowers(hs[1]))  # stable: the ones that lower a score first
     service_table = TableBlock(
         title=t("rpt_rw_tbl_services"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="service", label=t("rpt_col_name")),
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                 Column(key="service", label=t("rpt_col_name")),
                  Column(key="port", label=t("rpt_col_service")), Column(key="severity", label=t("rpt_col_severity")),
                  Column(key="weight", label=t("rpt_rw_col_weight"), kind="number"),
                  Column(key="state", label=t("rpt_rw_col_state")),
@@ -229,6 +245,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                     f"{s['contribution']:.1f}" if isinstance(s.get("contribution"), (int, float)) else "—")
                    for h, s in services),
         total_rows=len(services), empty_text=t("rpt_rw_none_hosts"),
+        host_keys=host_keys(host=(host_of(h) for h, _ in services)), host_section="ransomware",
         # the HTML prints the rows that lower a score; every row is in the XLSX
         html_rows=lowering if lowering < len(services) else None,
         html_note=(t("rpt_rw_services_rest", n=len(services) - lowering) if lowering
@@ -237,6 +254,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     # ── allow rules behind the deductions, for the top hosts of the fix-first list ─────
     top_hosts: list[str] = list(dict.fromkeys(str(r.get("host")) for r in lists["priority"] if r.get("host")))
     allow_rows: list[tuple[str, str, str]] = []
+    allow_keys: list[str | None] = []  # the host of each allow row
     names = {str(r.get("host")): name(r) for r in lists["priority"]}
     for href in top_hosts[:ALLOW_HOSTS]:
         try:
@@ -244,6 +262,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         except Exception as exc:  # noqa: BLE001 - one host's lookup failing is said, the report goes on
             logger.warning("allow rules of {} could not be read: {}", href, exc)
             allow_rows.append((names[href], "—", t("rpt_rw_allow_error")))
+            allow_keys.append(host_key({}, href))
             continue
         for key, rules in found.allow_rules.items():
             port, _, proto = key.partition("/")
@@ -254,11 +273,13 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
             if state == "error":
                 text = t("rpt_rw_allow_error")
             allow_rows.append((names[href], port_text(int(port), int(proto or 0)), text))
+            allow_keys.append(host_key({}, href))
     allow_table = TableBlock(
         title=t("rpt_rw_tbl_allow"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="port", label=t("rpt_col_service")),
-                 Column(key="rules", label=t("rpt_rw_col_rules"))),
-        rows=tuple(allow_rows), total_rows=len(allow_rows),
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                 Column(key="port", label=t("rpt_col_service")), Column(key="rules", label=t("rpt_rw_col_rules"))),
+        rows=tuple(allow_rows), total_rows=len(allow_rows), host_keys=host_keys(host=allow_keys),
+        host_section="ransomware",
         empty_text=t("rpt_rw_none_allow"),
         limit_note=t("rpt_rw_allow_top", n=ALLOW_HOSTS) if len(top_hosts) > ALLOW_HOSTS else None)
 

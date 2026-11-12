@@ -29,8 +29,13 @@ from illumio_ops.services.custom_reports import CustomSection
 from illumio_ops.services.eventsource import EventRow
 from illumio_ops.services.flowsource import FlowRow, field_coverage
 from illumio_ops.services.reports import flowsections
-from illumio_ops.services.reports.common import port_text, tr
-from illumio_ops.services.reports.flowsections import DECISION_KEYS
+from illumio_ops.services.reports.common import (
+    DECISION_KEYS,
+    host_key,
+    host_keys,
+    port_text,
+    tr,
+)
 from illumio_ops.services.reports.generate import coverage_text
 from illumio_ops.services.reports.registry import BuildInput, ReportFailed
 from illumio_ops.services.reports.render_html import fmt_time
@@ -66,17 +71,19 @@ def _flow_detail(inp: BuildInput, seg: FlowSegment, title: str) -> tuple[TableBl
     def t(k: str) -> str:
         return tr(inp.lang, k)
     result = run_segment(inp.ctx, seg, now=inp.now)
+    flows = [r for r in result.detail or [] if isinstance(r, FlowRow)]
     rows: tuple[tuple[Cell, ...], ...] = tuple(
         (r.last_detected.isoformat(), r.src_hostname or r.src_ip, r.dst_hostname or r.dst_ip, port_text(r.port, r.proto),
-         t(DECISION_KEYS.get(r.policy_decision, "decision_unknown")), r.num_connections)
-        for r in result.detail or [] if isinstance(r, FlowRow))
+         t(DECISION_KEYS.get(r.policy_decision, "decision_unknown")), r.num_connections) for r in flows)
     return TableBlock(
         title=title, columns=(Column(key="last", label=t("evidence_col_last"), kind="time"),
-                              Column(key="src", label=t("evidence_col_src")), Column(key="dst", label=t("evidence_col_dst")),
+                              Column(key="src", label=t("evidence_col_src"), kind="host"),
+                              Column(key="dst", label=t("evidence_col_dst"), kind="host"),
                               Column(key="port", label=t("evidence_col_port")),
                               Column(key="decision", label=t("evidence_col_decision")),
                               Column(key="connections", label=t("evidence_col_connections"), kind="number")),
         rows=rows, total_rows=len(rows), empty_text=t("rpt_no_flows_filtered"),
+        host_keys=host_keys(src=(host_key({}, r.src_key) for r in flows), dst=(host_key({}, r.dst_key) for r in flows)),
         limit_note=tr(inp.lang, "rpt_limit_top_n", n=seg.limit) if result.limit_hit else None), result.coverage
 
 

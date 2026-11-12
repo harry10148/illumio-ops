@@ -12,6 +12,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { Disclosure, Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { decisionWord } from "../../terms";
 
 type Source = SiemDestinationInput["sources"][number];
 type Decision = SiemDestinationInput["new_connection_decisions"][number];
@@ -45,10 +46,6 @@ const FORMAT_KEYS: Record<SiemDestinationInput["format"], string> = {
   syslog_cef: "siem_format_syslog_cef", json: "siem_format_json", syslog_json: "siem_format_syslog_json",
 };
 const DECISIONS: Decision[] = ["allowed", "potentially_blocked", "blocked", "unknown"];
-const DECISION_KEYS: Record<Decision, string> = {
-  allowed: "decision_allowed", potentially_blocked: "decision_potentially_blocked", blocked: "decision_blocked",
-  unknown: "decision_unknown",
-};
 const DEFAULT_PORTS: Record<string, number> = { udp: 514, tcp: 514, tls: 6514, hec: 8088 };
 
 function newId(): string {
@@ -235,7 +232,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
               <label key={x} className="check">
                 <input type="checkbox" name={`siem_decision_${x}`} checked={d.new_connection_decisions.includes(x)}
                        onChange={(e) => set("new_connection_decisions", toggle(d.new_connection_decisions, x, e.target.checked))} />
-                {t(DECISION_KEYS[x])}
+                {decisionWord(x)}
               </label>
             ))}
           </div>

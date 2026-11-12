@@ -10,6 +10,7 @@ import { HostLink } from "../../components/HostLink";
 import { KpiStrip, NeedsAdvanced, PageHead, type Tone } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { decisionWord } from "../../terms";
 import { SEVERITY_KEYS, SEVERITY_TONES, word } from "../alerts/common";
 import { DETECTOR_KEYS, STATE_KEYS, STATE_TONES } from "../system/Lateral";
 import { QuarantineDialog } from "../quarantine/QuarantineDialog";
@@ -26,9 +27,6 @@ const GROUPS_SHOWN = 30;
 const NAME_MAX = 22;  // a name longer than this is cut with "…" in the path diagram; the full name is its tooltip
 const DAY_KEYS: Record<number, string> = { 1: "lat_days_1", 7: "lat_days_7", 30: "lat_days_30" };
 const LIMIT_KEYS: Record<string, string> = { assets: "lat_limit_assets", cross_env: "lat_limit_cross_env" };
-const EDGE_STATE_KEYS: Record<string, string> = {
-  allowed: "lat_state_allowed", potentially_blocked: "lat_state_potentially_blocked", unknown: "lat_state_unknown",
-};
 const GROUP_KEYS = ["app", "env"] as const;
 
 function endpoint(key: string): EndpointFilter {
@@ -172,7 +170,7 @@ export default function LateralMovement() {
                   {ex.cross_env.map((x) => (
                     <tr key={`${x.src}>${x.dst}`}>
                       <td>{name(x.src)}</td><td>{name(x.dst)}</td><td className="nowrap">{x.src_env} → {x.dst_env}</td>
-                      <td>{(x.ports as Port[]).map(portWord).join("、")}</td><td>{word(EDGE_STATE_KEYS, x.state)}</td>
+                      <td>{(x.ports as Port[]).map(portWord).join("、")}</td><td>{x.state === "unknown" ? t("lat_state_unknown") : decisionWord(x.state)}</td>
                       <td><button type="button" className="btn-quiet" data-role="sim-cross"
                         onClick={() => suggestEdge(x.src, x.dst, x.ports as Port[])}>{t("lat_simulate")}</button></td>
                     </tr>

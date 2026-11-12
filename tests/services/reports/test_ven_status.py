@@ -186,7 +186,7 @@ def test_online_list_and_compat_tally(ctx):
     row = dict(zip(cols, online.rows[1], strict=True))
     assert row["app"] == "Web (Prod)" and row["version"] == "26.2.20"
     assert row["compat"] == "Warning (IPv4 forwarding, existing iptables rules)"  # says which checks, readably
-    assert row["mode"] == "Idle"
+    assert row["mode"] == "Not blocking yet (Idle)"
     assert dict(zip(cols, online.rows[0], strict=True))["compat"] == "Unknown"
     assert dict(zip(cols, online.rows[2], strict=True))["compat"] == "Not checked (not Idle)"
     assert dict(zip(cols, online.rows[3], strict=True))["compat"] == "Not checked (not Idle)"  # its report is a leftover

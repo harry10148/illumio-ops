@@ -6,14 +6,11 @@ import { useState } from "react";
 
 import type { ConditionChoices, EndpointFilter, FlowCondition, PolicyDecision, PortProto } from "../api/generated";
 import { t } from "../i18n";
+import { decisionWord } from "../terms";
 
 export const NO_CHOICES: ConditionChoices = { labels: [], ip_lists: [], label_groups: [], services: [] };
 
 const DECISIONS: PolicyDecision[] = ["allowed", "potentially_blocked", "blocked", "unknown"];
-const DECISION_KEYS: Record<string, string> = {
-  allowed: "decision_allowed", potentially_blocked: "decision_potentially_blocked", blocked: "decision_blocked",
-  unknown: "decision_unknown",
-};
 type Transmission = NonNullable<FlowCondition["transmissions"]>[number];
 const TRANSMISSIONS: Transmission[] = ["unicast", "broadcast", "multicast"];
 const TX_KEYS: Record<string, string> = { unicast: "cond_tx_unicast", broadcast: "cond_tx_broadcast", multicast: "cond_tx_multicast" };
@@ -209,7 +206,7 @@ export function ConditionEditor({ value, choices, onChange, onInvalid }: {
             <label key={d} className="check">
               <input type="checkbox" name={`decision_${d}`} checked={decisions.includes(d)}
                      onChange={(e) => onChange({ ...value, decisions: e.target.checked ? [...decisions, d] : decisions.filter((x) => x !== d) })} />
-              {t(DECISION_KEYS[d] ?? d)}
+              {decisionWord(d)}
             </label>
           ))}
         </div>

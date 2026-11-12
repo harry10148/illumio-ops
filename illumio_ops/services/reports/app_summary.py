@@ -26,8 +26,7 @@ from illumio_ops.domain.values import PolicyDecision, SegmentDimension, SegmentM
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.flowsource import FlowTotals, flow_totals
 from illumio_ops.services.reports import findings, flowsections
-from illumio_ops.services.reports.common import tr
-from illumio_ops.services.reports.flowsections import DECISION_KEYS
+from illumio_ops.services.reports.common import DECISION_KEYS, host_keys, mode_word, tr
 from illumio_ops.services.reports.generate import (
     coverage_text,
     previous_period,
@@ -109,11 +108,11 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
     modes = Counter(h.enforcement_mode for h in hosts)
     host_table = TableBlock(
         title=t("rpt_app_tbl_hosts"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="env", label=env_key),
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"), Column(key="env", label=env_key),
                  Column(key="mode", label=t("rpt_col_enforcement_mode"))),
-        rows=tuple((h.hostname or h.key, h.labels.get(env_key) or t("rpt_no_label"), h.enforcement_mode or "—")
-                   for h in hosts),
-        total_rows=len(hosts), empty_text=t("rpt_app_no_hosts"))
+        rows=tuple((h.hostname or h.key, h.labels.get(env_key) or t("rpt_no_label"),
+                    mode_word(lang, h.enforcement_mode) if h.enforcement_mode else "—") for h in hosts),
+        total_rows=len(hosts), empty_text=t("rpt_app_no_hosts"), host_keys=host_keys(host=(h.key for h in hosts)))
 
     kpis = (
         *(Kpi(key=k, label=t(label), value=now_v[k] if flows else None,

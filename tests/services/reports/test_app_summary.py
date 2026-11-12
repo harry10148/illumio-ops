@@ -67,7 +67,7 @@ def test_intra_app_counted_once(ctx):
                  flow(src_app="Finance", dst_app="DB", port=5432, decision="potentially_blocked")])
     doc = _build(ctx, _app("Finance"))
     rows = {r[0]: r[1] for r in _table(doc, "impact").rows}
-    assert rows == {"Allowed": 2, "Potentially blocked": 1}
+    assert rows == {"Allowed (a rule allows it)": 2, "Potentially Blocked (blocked once enforcement starts)": 1}
     kpi = {k.key: k.value for k in doc.kpis}
     assert kpi["inbound_connections"] == 1 and kpi["outbound_connections"] == 1 and kpi["intra_connections"] == 1
     assert kpi["pb_flows"] == 1
@@ -99,7 +99,9 @@ def test_hosts_of_the_app(ctx):
         conn.commit()
     _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443)])
     doc = _build(ctx, _app("Finance"))
-    assert [r[0] for r in _table(doc, "hosts").rows] == ["f1"]
+    hosts = _table(doc, "hosts")
+    assert hosts.rows == (("f1", "Prod", "Blocking everything (Full)"),)  # the mode in plain words, the PCE's beside
+    assert hosts.host_keys == {"host": ("/orgs/1/workloads/f1",)} and hosts.columns[0].kind == "host"
     assert {k.key: k.value for k in doc.kpis}["enforced_hosts_pct"] == 100.0
 
 

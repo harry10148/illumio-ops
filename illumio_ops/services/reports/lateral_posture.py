@@ -5,7 +5,7 @@ nothing is recomputed here."""
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -25,7 +25,10 @@ from illumio_ops.services.analysis.context import LateralContext, load_lateral_c
 from illumio_ops.services.analysis.lateral_defaults import Initiator, lateral_defaults
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import (
+    DECISION_KEYS,
     detector_name,
+    host_key,
+    host_keys,
     host_name,
     port_text,
     ports_text,
@@ -57,8 +60,7 @@ FINDING_ACTIONS = {FocusKind.DETECTION.value: ("lat_detection", "rpt_act_lat_det
                    FocusKind.PIVOT_HOST.value: ("lat_pivot_host", "rpt_act_lat_pivot_host"),
                    FocusKind.CROSS_ENV.value: ("lat_cross_env", "rpt_act_lat_cross_env")}
 DIRECTORY_DETECTORS = ("auth_to_non_dc", "new_dc_client", "directory_surge")
-EDGE_STATE_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
-                   "unknown": "decision_unknown"}
+EDGE_STATE_KEYS = {k: DECISION_KEYS[k] for k in ("allowed", "potentially_blocked", "unknown")}
 
 
 def _snapshot_on_or_before(snaps: Sequence[tuple[str, dict[str, Any]]], day: str) -> dict[str, Any] | None:
@@ -101,6 +103,11 @@ class _Builder:
 
     def name(self, key: str) -> str:
         return host_name(self.lc.hosts, key, self.lang)
+
+    def keys(self, **columns: Iterable[object]) -> dict[str, tuple[str | None, ...]]:
+        """host_keys of a table's host columns, from what each row's cell was named from (a detection's subject may
+        be an account: no key for that cell)."""
+        return host_keys(**{col: (host_key(self.lc.hosts, k) for k in keys) for col, keys in columns.items()})
 
 
     # ── key metrics ──────────────────────────────────────────────────────────
@@ -170,7 +177,8 @@ class _Builder:
         if exposure is None or not self.critical_set:  # no asset chosen: the section has no subject
             return None
         rows = []
-        for a in sorted(exposure.get("assets") or (), key=lambda a: (-a.get("sources_now", 0), a["key"])):
+        assets = sorted(exposure.get("assets") or (), key=lambda a: (-a.get("sources_now", 0), a["key"]))
+        for a in assets:
             path = min(a.get("paths") or [[]], key=len)
             cuts = "; ".join(self.t("rpt_lat_cut_edge" if c["kind"] == "edge" else "rpt_lat_cut_node",
                                     src=self.name(c["src"]), dst=self.name(c.get("dst") or ""),
@@ -185,7 +193,8 @@ class _Builder:
             Column(key="enforced", label=self.t("rpt_col_sources_enforced"), kind="number"),
             Column(key="path", label=self.t("rpt_col_shortest_path")),
             Column(key="cut", label=self.t("rpt_col_suggested_cut"))),
-            rows=tuple(rows), total_rows=len(rows), empty_text=empty)
+            rows=tuple(rows), total_rows=len(rows), empty_text=empty,
+            host_keys=self.keys(asset=(a["key"] for a in assets)), host_section="connections")
         return Section(id="assets", title=title, intro=self.t("rpt_lat_assets_intro"), blocks=(table,))
 
     def reach_section(self, exposure: Mapping[str, Any] | None) -> Section | None:
@@ -202,6 +211,7 @@ class _Builder:
             Column(key="enforced", label=self.t("rpt_col_reach_enforced"), kind="number"),
             Column(key="pivot", label=self.t("rpt_col_pivot"))),
             rows=rows, total_rows=len(shown), empty_text=self.t("rpt_lat_reach_none"),
+            host_keys=self.keys(host=(h["key"] for h in shown[:REACH_ROWS])), host_section="connections",
             limit_note=self.t("rpt_limit_top", shown=len(rows), total=len(shown)) if len(shown) > len(rows) else None)
         return Section(id="reach", title=title, intro=self.t("rpt_lat_reach_intro", hops=exposure.get("hops")),
                        blocks=(table,))
@@ -218,7 +228,8 @@ class _Builder:
             Column(key="host", label=self.t("rpt_col_host"), kind="host"),
             Column(key="now", label=self.t("rpt_col_reach_now"), kind="number"),
             Column(key="enforced", label=self.t("rpt_col_pivot_after_enforcement"))),
-            rows=rows, total_rows=len(rows), empty_text=self.t("rpt_lat_pivots_none"))
+            rows=rows, total_rows=len(rows), empty_text=self.t("rpt_lat_pivots_none"),
+            host_keys=self.keys(host=(h["key"] for h in pivots)), host_section="connections")
         return Section(id="pivots", title=title, intro=self.t("rpt_lat_pivots_intro"), blocks=(table,))
 
     def detections_section(self, counts: Mapping[str, tuple[int, int]], rows: Sequence[Any], total: int) -> Section:
@@ -245,6 +256,7 @@ class _Builder:
                         *((self.t("rpt_yes") if r["critical_asset"] else "",) if self.critical_set else ()))
                        for r in rows),
             total_rows=total, empty_text=self.t("rpt_lat_detections_none"),
+            host_keys=self.keys(subject=(r["subject_key"] for r in rows)), host_section="connections",
             limit_note=self.t("rpt_limit_top", shown=len(rows), total=total) if total > len(rows) else None)
         return Section(id="detections", title=title, intro=self.t("rpt_lat_detections_intro"),
                        blocks=(count_table, detail))
@@ -266,6 +278,8 @@ class _Builder:
             Column(key="ports", label=self.t("rpt_col_ports")),
             Column(key="state", label=self.t("rpt_col_decision"))),
             rows=rows, total_rows=max(total, len(rows)), empty_text=self.t("rpt_lat_cross_env_none"),
+            host_keys=self.keys(src=(e["src"] for e in edges), dst=(e["dst"] for e in edges)),
+            host_section="connections",
             limit_note=self.t("rpt_limit_top", shown=len(rows), total=total) if total > len(rows) else None)
         return Section(id="cross_env", title=title,
                        intro=self.t("rpt_lat_cross_env_intro", key=self.lc.settings.environment_label_key),
@@ -276,16 +290,20 @@ class _Builder:
         title = self.t("rpt_lat_sec_directory")
         ds = directory_servers(inp.ctx, lc, lc.admin_ports, since=inp.start)
         servers: list[tuple[str, int | None, str]] = []
-        for key in sorted(ds.servers, key=self.name):
+        ordered, declared_ips = sorted(ds.servers, key=self.name), sorted(ds.ips)
+        # row for row; a declared range is not one address, so it has no host page
+        server_keys = [*ordered, *(None if "/" in ip else f"ip:{ip}" for ip in declared_ips)]
+        for key in ordered:
             basis = ("rpt_lat_dir_both" if key in ds.inferred and key in ds.declared
                      else "rpt_lat_dir_inferred" if key in ds.inferred else "rpt_lat_dir_declared")
             servers.append((self.name(key), ds.sources.get(key, 0), self.t(basis)))
-        servers += [(ip, None, self.t("rpt_lat_dir_declared_ip")) for ip in sorted(ds.ips)]
+        servers += [(ip, None, self.t("rpt_lat_dir_declared_ip")) for ip in declared_ips]
         server_table = TableBlock(title=self.t("rpt_lat_tbl_directory_servers"), columns=(
             Column(key="server", label=self.t("rpt_col_server"), kind="host"),
             Column(key="sources", label=self.t("rpt_col_sources_in_period"), kind="number"),
             Column(key="basis", label=self.t("rpt_col_basis"))),
-            rows=tuple(servers), total_rows=len(servers), empty_text=self.t("rpt_lat_dir_none"))
+            rows=tuple(servers), total_rows=len(servers), empty_text=self.t("rpt_lat_dir_none"),
+            host_keys=self.keys(server=server_keys), host_section="connections")
         prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
         prev_known = traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now)
         with reads.reading(inp.ctx) as conn:
@@ -306,6 +324,7 @@ class _Builder:
             rows=tuple((detector_name(self.lang, r["detector"]), self.name(r["subject_key"]),
                         self._detail(json.loads(r["summary_json"])), r["first_seen"]) for r in relevant),
             total_rows=len(relevant), empty_text=self.t("rpt_lat_dir_detections_none"),
+            host_keys=self.keys(subject=(r["subject_key"] for r in relevant)), host_section="connections",
             limit_note=self.t("rpt_limit_detections_read", n=DETECTION_ROWS, total=det_total)
             if det_total > len(dets) else None)
         source_rows: list[tuple[str, int, int | None, str]] = []
@@ -323,6 +342,7 @@ class _Builder:
             Column(key="before", label=self.t("rpt_col_connections_previous"), kind="number"),
             Column(key="change", label=self.t("rpt_col_change"))),
             rows=tuple(source_rows), total_rows=len(source_rows), empty_text=self.t("rpt_lat_dir_sources_none"),
+            host_keys=self.keys(source=(src for src, _ in top)), host_section="connections",
             limit_note=self.t("rpt_lat_dir_sources_top", n=DIRECTORY_SOURCES)
             if len(source_rows) == DIRECTORY_SOURCES else None)
         intro = self.t("rpt_lat_directory_intro", ports=", ".join(port_text(p, q or 6) for p, q in ds.ports))

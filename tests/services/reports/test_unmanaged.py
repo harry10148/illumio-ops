@@ -54,7 +54,7 @@ def test_unmanaged_rollup_grouping(ctx):
     assert set(rows) == {"10.5.5.5", "8.8.8.8", "10.6.6.6"}
     r = rows["10.5.5.5"]
     assert r[1] == "Private" and r[2] == "Both directions" and r[3] == 3 and r[4] == 23
-    assert r[5].startswith("445/TCP") and "Allowed" in r[6]
+    assert r[5].startswith("445/TCP") and r[6] == "Allowed (a rule allows it), Potentially Blocked (blocked once enforcement starts)"
 
 
 def test_private_vs_public(ctx):
@@ -63,8 +63,9 @@ def test_private_vs_public(ctx):
 
 
 def test_ven_candidates_need_three_peers(ctx):
-    rows = _table(build_unmanaged(_inp(ctx)), "candidates").rows
-    assert [r[0] for r in rows] == ["10.5.5.5"]
+    table = _table(build_unmanaged(_inp(ctx)), "candidates")
+    assert [r[0] for r in table.rows] == ["10.5.5.5"]
+    assert table.host_keys == {"address": ("ip:10.5.5.5",)} and table.host_section == "connections"
 
 
 def test_admin_port_sources(ctx):

@@ -36,7 +36,7 @@ from illumio_ops.services.analysis.predicted_block import (
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.flowsource import UnruledLink, readiness_rows, unruled_inbound
 from illumio_ops.services.reports import flowsections
-from illumio_ops.services.reports.common import port_text, rule_label, tr
+from illumio_ops.services.reports.common import mode_word, port_text, rule_label, tr
 from illumio_ops.services.reports.generate import coverage_text
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
@@ -141,7 +141,9 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
 
     def modes(m: Counter[str]) -> str:
         return t("rpt_rdy_modes", full=m["full"], selective=m["selective"], visibility=m["visibility_only"],
-                 idle=m["idle"]) if m else t("rpt_rdy_no_hosts")
+                 idle=m["idle"], full_word=mode_word(lang, "full"), selective_word=mode_word(lang, "selective"),
+                 visibility_word=mode_word(lang, "visibility_only"),
+                 idle_word=mode_word(lang, "idle")) if m else t("rpt_rdy_no_hosts")
 
     def advice(r: Readiness) -> str:
         if r.score is None:

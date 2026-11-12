@@ -20,7 +20,10 @@ from illumio_ops.domain.values import DYNAMIC_PORTS_FROM, Severity
 from illumio_ops.services.analysis.context import LateralContext, load_lateral_context
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import (
+    DECISION_KEYS,
     PORT_CLASS_KEYS,
+    host_key,
+    host_keys,
     host_name,
     port_text,
     tr,
@@ -37,8 +40,6 @@ ROW_LIMIT = 100_000
 FINDING_PAIRS = 3  # connections a finding names; the rest are counted
 ADMIN_ROW_LIMIT = 5_000
 TOP = 20
-DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
-                 "blocked": "decision_blocked", "unknown": "decision_unknown"}
 DYNAMIC_FROM = DYNAMIC_PORTS_FROM
 # Connections on a dynamic port or with no port (ICMP) are left out of every number and list, and counted aside.
 _ELIGIBLE = f"port >= 0 AND port < {DYNAMIC_FROM}"
@@ -82,6 +83,12 @@ class _Builder:
                       self.port_class(r["port"], r["proto"]), r["first_seen"], r["last_seen"],
                       self.t(DECISION_KEYS.get(r["last_decision"] or "unknown", "decision_unknown")))
                      for r in rows)
+
+    def connection_keys(self, rows: Sequence[sqlite3.Row]) -> dict[str, tuple[str | None, ...]]:
+        """The host keys of connection_rows(rows), row for row."""
+        hosts = self.lc.hosts
+        return host_keys(src=(host_key(hosts, r["src_key"]) for r in rows),
+                         dst=(host_key(hosts, r["dst_key"]) for r in rows))
 
     def columns(self) -> tuple[Column, ...]:
         return (Column(key="src", label=self.t("rpt_col_source"), kind="host"),
@@ -183,18 +190,22 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
         Column(key="count", label=b.t("rpt_col_new_connections"), kind="number"),
         Column(key="sources", label=b.t("rpt_col_distinct_sources"), kind="number")),
         rows=tuple((b.name(r[0]), r[1], r[2]) for r in by_dst), total_rows=int(dst_total), empty_text=empty,
+        host_keys=host_keys(dst=(host_key(lc.hosts, r[0]) for r in by_dst)), host_section="connections",
         limit_note=b.t("rpt_limit_top", shown=len(by_dst), total=dst_total) if dst_total > len(by_dst) else None)
     admin_table = TableBlock(title=b.t("rpt_new_tbl_admin"), columns=b.columns(),
                              rows=b.connection_rows(admin_rows), total_rows=max(now_counts["admin"], len(admin_rows)),
+                             host_keys=b.connection_keys(admin_rows), host_section="connections",
                              empty_text=b.t("rpt_new_admin_none"),
                              limit_note=b.limit_note(len(admin_rows), now_counts["admin"]))
     all_table = TableBlock(title=b.t("rpt_new_tbl_all"), columns=b.columns(), rows=b.connection_rows(all_rows),
+                           host_keys=b.connection_keys(all_rows), host_section="connections",
                            total_rows=max(now_counts["new"], len(all_rows)), empty_text=empty,
                            limit_note=b.limit_note(len(all_rows), now_counts["new"]))
     gone_blocks: tuple[TableBlock | TextBlock, ...]
     if prev_known:
         gone_blocks = (TableBlock(title=b.t("rpt_new_tbl_disappeared"), columns=b.columns(),
                                   rows=b.connection_rows(gone_rows), total_rows=max(gone_total, len(gone_rows)),
+                                  host_keys=b.connection_keys(gone_rows), host_section="connections",
                                   empty_text=b.t("rpt_new_disappeared_none"),
                                   limit_note=b.limit_note(len(gone_rows), gone_total)),)
     else:

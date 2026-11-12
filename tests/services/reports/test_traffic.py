@@ -49,7 +49,7 @@ def test_decision_table_flows_and_connections(ctx):
                  flow(port=23, decision="blocked", conns=1)])
     doc = _build(ctx)
     rows = {r[0]: r[1:3] for r in _table(doc, "decisions").rows}
-    assert rows["Allowed"] == (2, 7) and rows["Potentially blocked"] == (1, 5) and rows["Blocked"] == (1, 1)
+    assert rows["Allowed (a rule allows it)"] == (2, 7) and rows["Potentially Blocked (blocked once enforcement starts)"] == (1, 5) and rows["Blocked"] == (1, 1)
     kpis = {k.key: k.value for k in doc.kpis}
     assert kpis["flows"] == 4 and kpis["connections"] == 13
 
@@ -57,7 +57,7 @@ def test_decision_table_flows_and_connections(ctx):
 def test_inbound_single_definition(ctx):
     # Into a managed host = the destination is managed, whoever started it (5.x had three definitions).
     _write(ctx, [flow(port=443, unmanaged_src=True), flow(port=443), flow(port=443, unmanaged_dst=True)])
-    row = next(r for r in _table(_build(ctx), "decisions").rows if r[0] == "Allowed")
+    row = next(r for r in _table(_build(ctx), "decisions").rows if r[0] == "Allowed (a rule allows it)")
     assert row[3] == 2 and row[4] == "66.7%"
 
 

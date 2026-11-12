@@ -3,13 +3,10 @@
 // are counted, never named from a guess.
 import type { EndpointFilter, FlowCondition, PortProto, RuleListItem } from "../../api/generated";
 import { t } from "../../i18n";
+import { decisionWord } from "../../terms";
 import { DETECTOR_KEYS } from "../system/Lateral";
 import { SEVERITY_KEYS, word } from "./common";
 
-const DECISION_KEYS: Record<string, string> = {
-  allowed: "decision_allowed", potentially_blocked: "decision_potentially_blocked", blocked: "decision_blocked",
-  unknown: "decision_unknown",
-};
 const CHECK_KEYS: Record<string, string> = {
   pce_health: "rule_system_pce_health", collection_failing: "rule_system_collection_failing",
   data_loss: "rule_system_data_loss", job_failing: "rule_system_job_failing", disk_low: "rule_system_disk_low",
@@ -44,7 +41,7 @@ function side(name: string, f: EndpointFilter | null | undefined): string[] {
 
 function included(c: FlowCondition): string[] {
   const out: string[] = [];
-  if ((c.decisions ?? []).length) out.push((c.decisions ?? []).map((d) => word(DECISION_KEYS, d)).join(t("rsum_or")));
+  if ((c.decisions ?? []).length) out.push((c.decisions ?? []).map(decisionWord).join(t("rsum_or")));
   out.push(...side(t("rsum_src"), c.src), ...side(t("rsum_dst"), c.dst), ...side(t("rsum_either"), c.either));
   if ((c.ports ?? []).length) out.push(`port ${ports(c.ports)}`);
   if ((c.services ?? []).length) out.push(t("rsum_services", { n: String((c.services ?? []).length) }));

@@ -20,7 +20,7 @@ from illumio_ops.services.analysis.segments import run_segment
 from illumio_ops.services.flowsource import label_conflicts, label_mix
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports import findings, flowsections
-from illumio_ops.services.reports.common import port_text, tr
+from illumio_ops.services.reports.common import host_key, host_keys, port_text, tr
 from illumio_ops.services.reports.generate import (
     coverage_text,
     previous_period,
@@ -58,14 +58,16 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
     scope_groups = flowsections.label_groups_of(inp.ctx, inp.params.filter)
     managed = [h for h in lc.hosts.values()
                if flowsections.host_in_scope(h, inp.params.filter, label_groups=scope_groups)]
-    missing = sorted(((h.hostname or h.key, [k for k in keys if not h.labels.get(k)]) for h in managed),
+    missing = sorted(((h.hostname or h.key, [k for k in keys if not h.labels.get(k)], h.key) for h in managed),
                      key=lambda r: (-len(r[1]), r[0]))
-    missing = [(name, ks) for name, ks in missing if ks]
+    missing = [(name, ks, key) for name, ks, key in missing if ks]
     hygiene = TableBlock(
         title=t("rpt_inv_tbl_hygiene"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="missing", label=t("rpt_col_missing_labels"))),
-        rows=tuple((name, ", ".join(ks)) for name, ks in missing), total_rows=len(missing),
-        empty_text=t("rpt_inv_hygiene_clean", keys=", ".join(keys)))
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                 Column(key="missing", label=t("rpt_col_missing_labels"))),
+        rows=tuple((name, ", ".join(ks)) for name, ks, _ in missing), total_rows=len(missing),
+        empty_text=t("rpt_inv_hygiene_clean", keys=", ".join(keys)),
+        host_keys=host_keys(host=(key for _, _, key in missing)))
     mix = label_mix(inp.ctx, spec, app_key=APP, env_key=env_key, top=TOP)
     prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
     prev_cross = (label_mix(inp.ctx, spec.model_copy(update={"start": prev_start, "end": inp.start}), app_key=APP,
@@ -143,6 +145,7 @@ def build_network_inventory(inp: BuildInput) -> ReportDocument:
         rows=tuple((shown_as.get(c.key, c.key), len(c.sets), sets_text(c.sets), c.connections)
                    for c in found.rows),
         total_rows=found.total, empty_text=t("rpt_inv_conflicts_none") if totals else no_flows,
+        host_keys=host_keys(host=(host_key({}, c.key) for c in found.rows)),
         limit_note=t("rpt_limit_top_n", n=TOP) if found.total > TOP else None)
 
     outcomes = findings.run_rules(inp.ctx, spec, inp.ctx.settings.current().reports.rule_thresholds, lang,

@@ -34,8 +34,10 @@ from illumio_ops.services.eventsource import (
     newest_event_id,
 )
 from illumio_ops.services.hosts import display_names
-from illumio_ops.services.reports.common import DETECTOR_NAME_KEYS
-from illumio_ops.services.reports.flowsections import DECISION_KEYS
+from illumio_ops.services.reports.common import (
+    DECISION_IN_SENTENCE_KEYS,
+    DETECTOR_NAME_KEYS,
+)
 from illumio_ops.settings.schema import Settings, SiemDestination
 from illumio_ops.siem.mask import (
     REDACTED,
@@ -198,7 +200,7 @@ def _new_connections(ctx: AppContext, s: Settings, after: int, limit: int, dest:
             summary=translate(lang, "siem_new_connection_summary", {
                 "src": src.host or src.ip or "", "dst": dst.host or dst.ip or "",
                 "port": f"{r['port']}/{_PROTO.get(int(r['proto']), str(r['proto']))}",
-                "decision": translate(lang, DECISION_KEYS.get(decision, "decision_unknown"))}),
+                "decision": translate(lang, DECISION_IN_SENTENCE_KEYS.get(decision, "decision_unknown"))}),
             src=src, dst=dst, port=int(r["port"]), proto=int(r["proto"]), decision=decision,
             first_seen=_t(r["first_seen"]), pce_fqdn=fqdn))
     return out

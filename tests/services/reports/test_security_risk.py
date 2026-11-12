@@ -73,7 +73,10 @@ def test_enforcement_progress_by_app(ctx):
     _inventory(ctx, [("a1", "full", "Web", "Prod"), ("a2", "selective", "Web", "Prod"),
                      ("a3", "visibility_only", "Web", "Prod"), ("b1", "idle", "DB", "Prod")])
     _write(ctx, [flow(port=443)])
-    rows = {r[0]: r for r in _tables(_build(ctx), "enforcement")[0].rows}
+    table = _tables(_build(ctx), "enforcement")[0]
+    assert [c.label for c in table.columns[2:6]] == ["Blocking everything (Full)", "Blocking some (Selective)",
+                                                     "Recording only (Visibility Only)", "Not blocking yet (Idle)"]
+    rows = {r[0]: r for r in table.rows}
     assert rows["Web (Prod)"][1:6] == (3, 1, 1, 1, 0) and rows["DB (Prod)"][1:6] == (1, 0, 0, 0, 1)
 
 

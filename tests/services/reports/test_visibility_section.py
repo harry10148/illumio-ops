@@ -69,6 +69,7 @@ def test_hosts_reporting_no_allowed_traffic_are_named(ctx, rt):
     # the two managed hosts; an unmanaged row and a host that reports its flows are not listed
     assert table.rows == (("h0", "Reports no traffic"), ("h1", "Reports blocked traffic only"))
     assert table.total_rows == 2 and "2 managed hosts" in sec.intro
+    assert table.host_keys == {"host": ("/orgs/1/workloads/h0", "/orgs/1/workloads/h1")}  # row for row
 
 
 @pytest.mark.parametrize("rt", TYPES)

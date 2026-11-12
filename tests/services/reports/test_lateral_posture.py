@@ -248,6 +248,11 @@ def test_directory_section_marks_inferred_and_declared(ctx):
     by_src = {r[0]: r for r in sources.rows}  # sources no longer in the inventory are named as removed
     s1 = by_src["Removed workload …src-1"]
     assert s1[1] == 1 and s1[2] == 0 and "None last period" in s1[3]  # the previous period had none from it
+    # each row's host key, row for row: a declared address opens the host page as ip:<address>
+    assert dict(zip((r[0] for r in servers.rows), servers.host_keys["server"], strict=True))["10.0.9.10"] == "ip:10.0.9.10"
+    assert all(k and k.startswith("/orgs/") for k in servers.host_keys["server"][:-1])
+    assert len(sources.host_keys["source"]) == len(sources.rows) and all(sources.host_keys["source"])
+    assert {b.host_section for b in (servers, sources)} == {"connections"}
 
 
 def test_generated_through_the_one_path_in_both_languages(ctx):

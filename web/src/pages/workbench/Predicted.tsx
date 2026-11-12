@@ -7,17 +7,22 @@ import { type ApiError, call } from "../../api/client";
 import type { ActorRef, PredictedView, RuleRef, ServiceRef } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
+import { decisionWord } from "../../terms";
 import { word } from "../alerts/common";
 import type { Req } from "./conditions";
 
 const SHOWN = 50;
-const DECISION_KEYS: Record<string, string> = {
-  allowed: "decision_allowed", potentially_blocked: "decision_potentially_blocked", blocked: "decision_blocked",
+// What the draft policy would decide where a Deny Rule is involved; the plain decisions are decisionWord's.
+const DRAFT_KEYS: Record<string, string> = {
   blocked_by_boundary: "wb_pred_blocked_by_boundary", blocked_by_override_deny: "wb_pred_blocked_by_override_deny",
   potentially_blocked_by_boundary: "wb_pred_pb_by_boundary",
   potentially_blocked_by_override_deny: "wb_pred_pb_by_override_deny",
-  allowed_across_boundary: "wb_pred_allowed_across_boundary", unknown: "decision_unknown",
+  allowed_across_boundary: "wb_pred_allowed_across_boundary",
 };
+
+function decided(decision: string): string {
+  return DRAFT_KEYS[decision] ? t(DRAFT_KEYS[decision]) : decisionWord(decision);
+}
 const RULE_TYPE_KEYS: Record<string, string> = {
   allow: "wb_pred_rule_allow", deny: "wb_pred_rule_deny", override_deny: "wb_pred_rule_override_deny",
 };
@@ -109,8 +114,8 @@ export function Predicted({ req }: { req: Req }) {
                         <td>{end(r.flow.src_hostname, r.flow.src_ip)}</td>
                         <td>{end(r.flow.dst_hostname, r.flow.dst_ip)}</td>
                         <td className="nowrap">{r.flow.port ?? "—"}/{protoName(r.flow.proto)}</td>
-                        <td>{word(DECISION_KEYS, r.flow.policy_decision)}</td>
-                        <td>{word(DECISION_KEYS, r.draft_decision)}</td>
+                        <td>{decided(r.flow.policy_decision)}</td>
+                        <td>{decided(r.draft_decision)}</td>
                         <td className="pred-rules">
                           {hrefs.map((h) => <div key={h}>{pb.rules[h] ? ruleText(pb.rules[h]) : t("wb_pred_rule_gone")}</div>)}
                           {r.essential_service_rules.length > 0 && <div className="hint">{t("wb_pred_essential")}</div>}

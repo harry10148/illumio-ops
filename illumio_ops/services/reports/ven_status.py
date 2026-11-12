@@ -23,7 +23,15 @@ from illumio_ops.domain.values import SEVERITY_ORDER, Severity
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.analysis.tamper import list_annotations
 from illumio_ops.services.reports import reads
-from illumio_ops.services.reports.common import sync_state_name, tamper_pattern_name, tr
+from illumio_ops.services.reports.common import (
+    MODE_KEYS,
+    host_key,
+    host_keys,
+    mode_word,
+    sync_state_name,
+    tamper_pattern_name,
+    tr,
+)
 from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
@@ -42,8 +50,6 @@ _KPI_KEYS = {"managed": "rpt_ven_kpi_managed", "online": "rpt_ven_kpi_online", "
              "unexplained_tamper": "rpt_ven_kpi_unexplained_tamper"}
 _BUCKET_KEYS = {"lost_24h": "rpt_ven_bucket_24h", "lost_48h": "rpt_ven_bucket_48h",
                 "long_offline": "rpt_ven_bucket_long"}
-_MODE_KEYS = {"full": "rpt_col_mode_full", "selective": "rpt_col_mode_selective",
-              "visibility_only": "rpt_col_mode_visibility", "idle": "rpt_col_mode_idle"}
 COMPAT_STATES = ("pass", "warn", "fail", "unknown", "na")
 _COMPAT_KEYS = {"pass": "rpt_ven_compat_pass", "warn": "rpt_ven_compat_warn", "fail": "rpt_ven_compat_fail",
                 "unknown": "rpt_ven_compat_unknown", "na": "rpt_ven_compat_na"}
@@ -146,12 +152,14 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                      key=lambda w: w.last_heartbeat_at or "", reverse=True)
     offline_table = TableBlock(
         title=t("rpt_ven_tbl_offline"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="bucket", label=t("rpt_ven_col_bucket")),
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                 Column(key="bucket", label=t("rpt_ven_col_bucket")),
                  Column(key="heartbeat", label=t("rpt_ven_col_heartbeat"), kind="time"),
                  Column(key="sync", label=t("rpt_ven_col_sync")), Column(key="version", label=t("rpt_ven_col_version"))),
         rows=tuple((name[w.href], t(_BUCKET_KEYS[buckets[w.href]]), stamp(w.last_heartbeat_at),
                     sync_state_name(lang, w.policy_sync_state), w.ven_version or "—") for w in offline),
-        total_rows=len(offline), empty_text=t("rpt_ven_none_offline"))
+        total_rows=len(offline), empty_text=t("rpt_ven_none_offline"),
+        host_keys=host_keys(host=(w.href for w in offline)), host_section="status")
     no_label = t("rpt_no_label")
 
     def app_env(w: WorkloadRow) -> str:
@@ -173,16 +181,18 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     online = sorted((w for w in fleet if buckets[w.href] == "online"), key=lambda w: name[w.href])
     online_table = TableBlock(
         title=t("rpt_ven_tbl_online"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="app", label=t("rpt_col_app_env")),
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                 Column(key="app", label=t("rpt_col_app_env")),
                  Column(key="version", label=t("rpt_ven_col_version")), Column(key="os", label=t("rpt_ven_col_os")),
                  Column(key="mode", label=t("rpt_ven_col_mode")),
                  Column(key="heartbeat", label=t("rpt_ven_col_heartbeat"), kind="time"),
                  Column(key="sync", label=t("rpt_ven_col_sync")), Column(key="compat", label=t("rpt_ven_col_compat"))),
         rows=tuple((name[w.href], app_env(w), w.ven_version or "—", w.os_id or "—",
-                    t(_MODE_KEYS[w.enforcement_mode]) if w.enforcement_mode in _MODE_KEYS else t("rpt_ven_unknown"),
+                    mode_word(lang, w.enforcement_mode) if w.enforcement_mode in MODE_KEYS else t("rpt_ven_unknown"),
                     stamp(w.last_heartbeat_at), sync_state_name(lang, w.policy_sync_state), compat_cell(w))
                    for w in online),
-        total_rows=len(online), empty_text=t("rpt_ven_none_online"))
+        total_rows=len(online), empty_text=t("rpt_ven_none_online"),
+        host_keys=host_keys(host=(w.href for w in online)), host_section="status")
     compat_counts = Counter(compat.values())
     compat_table = TableBlock(
         title=t("rpt_ven_tbl_compat"),
@@ -194,13 +204,15 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     sync_rows = sorted(trouble.items(), key=lambda kv: name[kv[0]])
     sync_table = TableBlock(
         title=t("rpt_ven_tbl_sync"),
-        columns=(Column(key="host", label=t("rpt_col_host")), Column(key="problems", label=t("rpt_ven_col_problems")),
+        columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                 Column(key="problems", label=t("rpt_ven_col_problems")),
                  Column(key="sync", label=t("rpt_ven_col_sync")),
                  Column(key="received", label=t("rpt_ven_col_received"), kind="time"),
                  Column(key="applied", label=t("rpt_ven_col_applied"), kind="time")),
         rows=tuple((name[h], ", ".join(t(_PROBLEM_KEYS[p]) for p in ps), sync_state_name(lang, by_href[h].policy_sync_state),
                     stamp(by_href[h].policy_received_at), stamp(by_href[h].policy_applied_at)) for h, ps in sync_rows),
-        total_rows=len(sync_rows), empty_text=t("rpt_ven_none_sync"))
+        total_rows=len(sync_rows), empty_text=t("rpt_ven_none_sync"),
+        host_keys=host_keys(host=(h for h, _ in sync_rows)), host_section="status")
 
     def tally(title: str, label: str, keyfn: Any) -> TableBlock:
         c = Counter(keyfn(w) or t("rpt_ven_unknown") for w in fleet)
@@ -222,10 +234,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         title=t("rpt_sec_tbl_enforcement"),
         columns=(Column(key="app", label=t("rpt_col_app_env")),
                  Column(key="hosts", label=t("rpt_col_managed_hosts"), kind="number"),
-                 Column(key="full", label=t("rpt_col_mode_full"), kind="number"),
-                 Column(key="selective", label=t("rpt_col_mode_selective"), kind="number"),
-                 Column(key="visibility_only", label=t("rpt_col_mode_visibility"), kind="number"),
-                 Column(key="idle", label=t("rpt_col_mode_idle"), kind="number"),
+                 *(Column(key=m, label=mode_word(lang, m), kind="number") for m in MODES),
                  Column(key="unknown", label=t("rpt_ven_unknown"), kind="number"),
                  Column(key="enforced", label=t("rpt_col_enforced_pct"))),
         rows=tuple((g, sum(c.values()), *(c[m] for m in MODES), c["unknown"],
@@ -239,7 +248,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         notes = list_annotations(inp.ctx)
         tamper_blocks = (TableBlock(
             title=t("rpt_ven_tbl_tamper"),
-            columns=(Column(key="host", label=t("rpt_col_host")),
+            columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
                      Column(key="n60", label=t("rpt_ven_col_tamper_60d"), kind="number"),
                      Column(key="n7", label=t("rpt_ven_col_tamper_7d"), kind="number"),
                      Column(key="unexplained", label=t("rpt_ven_col_unexplained"), kind="number"),
@@ -248,7 +257,8 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
             rows=tuple((h.get("hostname") or name.get(str(h.get("href")), str(h.get("href"))), int(h.get("n_60d") or 0),
                         int(h.get("n_7d") or 0), int(h.get("unexplained_7d") or 0), tamper_pattern_name(lang, h.get("pattern")),
                         stamp(h.get("last_at"))) for h in tamper_hosts),
-            total_rows=len(tamper_hosts), empty_text=t("rpt_ven_none_tamper")),
+            total_rows=len(tamper_hosts), empty_text=t("rpt_ven_none_tamper"),
+            host_keys=host_keys(host=(host_key(name, h.get("href")) for h in tamper_hosts)), host_section="tamper"),
             TextBlock(paragraphs=(t("rpt_ven_tamper_known", n=len(notes)),)))
 
     latest = max((w.fetched_at for w in fleet), default=None)

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -21,7 +22,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.values import Severity
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.reports import reads
-from illumio_ops.services.reports.common import port_text, tr
+from illumio_ops.services.reports.common import DECISION_KEYS, host_keys, port_text, tr
 from illumio_ops.services.reports.generate import (
     coverage_text,
     previous_period,
@@ -33,8 +34,6 @@ ROW_LIMIT = 100_000
 PUBLIC_HTML_ROWS = 20  # public addresses the HTML lists (by managed hosts reached); the XLSX has them all
 CANDIDATE_MIN_PEERS = 3
 TOP_PORTS = 3
-DECISION_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
-                 "blocked": "decision_blocked", "unknown": "decision_unknown"}
 SCOPE_KEYS = {"public": "rpt_unm_public", "private": "rpt_unm_private", "shared": "rpt_unm_shared",
               "other": "rpt_unm_other"}
 # One side of each rollup row is a managed host and the other an address without a VEN.
@@ -130,7 +129,8 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
         return ", ".join(t(DECISION_KEYS.get(d, "decision_unknown")) for d in e.decisions)
 
     ordered = sorted(now_eps.values(), key=lambda e: (-e.peers, -e.connections, e.key))
-    columns = (Column(key="address", label=t("rpt_col_address")), Column(key="scope", label=t("rpt_col_scope")),
+    columns = (Column(key="address", label=t("rpt_col_address"), kind="host"),
+               Column(key="scope", label=t("rpt_col_scope")),
                Column(key="direction", label=t("rpt_col_direction")),
                Column(key="peers", label=t("rpt_col_managed_peers"), kind="number"),
                Column(key="connections", label=t("rpt_col_connections"), kind="number"),
@@ -141,29 +141,36 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
         return (e.address, scope(e), direction(e), e.peers, e.connections, top_ports(e), decisions(e), e.first_day,
                 e.last_day)
 
+    def keys(eps: Sequence[_Endpoint]) -> dict[str, tuple[str | None, ...]]:
+        return host_keys(address=(e.key for e in eps))  # ip:<address>: the host page opens for an address too
+
     shown = ordered[:ROW_LIMIT]
     # The whole list and the public one run to thousands of rows that the sections above already sort: the HTML gives
     # their counts and the XLSX holds every row (6.6.0).
     all_table = TableBlock(title=t("rpt_unm_tbl_all"), columns=columns, rows=tuple(row(e) for e in shown),
                            total_rows=len(ordered), empty_text=t("rpt_unm_none"), html_rows=0,
+                           host_keys=keys(shown), host_section="connections",
                            html_note=t("rpt_unm_all_in_xlsx", n=f"{len(ordered):,}"),
                            limit_note=t("rpt_limit_top", shown=f"{len(shown):,}", total=f"{len(ordered):,}")
                            if len(ordered) > len(shown) else None)
     candidates = [e for e in ordered if not is_public(e.address) and e.peers >= CANDIDATE_MIN_PEERS]
     cand_table = TableBlock(title=t("rpt_unm_tbl_candidates"), columns=columns,
                             rows=tuple(row(e) for e in candidates), total_rows=len(candidates),
+                            host_keys=keys(candidates), host_section="connections",
                             empty_text=t("rpt_unm_candidates_none", n=CANDIDATE_MIN_PEERS))
     admin_eps = sorted((e for e in ordered if e.admin_in), key=lambda e: (-e.admin_peers, e.key))
     admin_table = TableBlock(title=t("rpt_unm_tbl_admin"), columns=(
-        Column(key="address", label=t("rpt_col_address")), Column(key="scope", label=t("rpt_col_scope")),
+        Column(key="address", label=t("rpt_col_address"), kind="host"), Column(key="scope", label=t("rpt_col_scope")),
         Column(key="ports", label=t("rpt_col_admin_ports")),
         Column(key="peers", label=t("rpt_col_managed_peers"), kind="number")),
         rows=tuple((e.address, scope(e), ", ".join(port_text(p, q) for p, q in e.admin_in), e.admin_peers)
                    for e in admin_eps),
-        total_rows=len(admin_eps), empty_text=t("rpt_unm_admin_none"))
+        total_rows=len(admin_eps), empty_text=t("rpt_unm_admin_none"), host_keys=keys(admin_eps),
+        host_section="connections")
     public = [e for e in ordered if is_public(e.address)]
     public_table = TableBlock(title=t("rpt_unm_tbl_public"), columns=columns, rows=tuple(row(e) for e in public),
                               total_rows=len(public), empty_text=t("rpt_unm_public_none"), html_rows=PUBLIC_HTML_ROWS,
+                              host_keys=keys(public), host_section="connections",
                               html_note=t("rpt_unm_public_top", n=PUBLIC_HTML_ROWS))
     # an internet source first, then by managed hosts reached: the findings run from the highest severity down
     flagged = sorted(admin_eps, key=lambda e: (not is_public(e.address), -e.admin_peers, e.key))[:5]

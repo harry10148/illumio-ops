@@ -42,8 +42,16 @@ from illumio_ops.domain.values import (
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.flowsource import FlowTotals, field_coverage, flow_totals
 from illumio_ops.services.reports import findings, flowsections, reads
-from illumio_ops.services.reports.common import host_name, port_text, severity_name, tr
-from illumio_ops.services.reports.flowsections import DECISION_KEYS
+from illumio_ops.services.reports.common import (
+    DECISION_KEYS,
+    MODE_KEYS,
+    host_key,
+    host_keys,
+    host_name,
+    port_text,
+    severity_name,
+    tr,
+)
 from illumio_ops.services.reports.generate import (
     coverage_text,
     previous_period,
@@ -275,9 +283,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         title=t("rpt_sec_tbl_enforcement"),
         columns=(Column(key="app", label=t("rpt_col_app_env")),
                  Column(key="hosts", label=t("rpt_col_managed_hosts"), kind="number"),
-                 *(Column(key=m, label=t(label), kind="number") for m, label in (
-                     ("full", "rpt_col_mode_full"), ("selective", "rpt_col_mode_selective"),
-                     ("visibility_only", "rpt_col_mode_visibility"), ("idle", "rpt_col_mode_idle"))),
+                 *(Column(key=m, label=t(MODE_KEYS[m]), kind="number") for m in MODES),
                  Column(key="enforced", label=t("rpt_col_enforced_pct"))),
         rows=tuple((name, sum(c.values()), *(c[m] for m in MODES), pct(c["full"] + c["selective"], sum(c.values())))
                    for name, c in ordered),
@@ -309,10 +315,11 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         priority = [r for r in rw.get("priority") or () if scope is None or r.get("host") in scope]
         rw_blocks = (TableBlock(
             title=t("rpt_sec_tbl_ransomware"),
-            columns=(Column(key="host", label=t("rpt_col_host")), Column(key="service", label=t("rpt_col_name")),
-                     Column(key="port", label=t("rpt_col_service")),
+            columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                     Column(key="service", label=t("rpt_col_name")), Column(key="port", label=t("rpt_col_service")),
                      Column(key="severity", label=t("rpt_col_severity")),
                      Column(key="sources", label=t("rpt_col_recent_sources"), kind="number")),
+            host_keys=host_keys(host=(host_key(lc.hosts, r.get("host")) for r in priority[:RANSOMWARE_TOP])),
             rows=tuple((r.get("hostname") or host_name(lc.hosts, str(r.get("host")), lang), r.get("name"),
                         port_text(r.get("port"), int(r.get("proto") or 0)),
                         severity_name(lang, str(r.get("severity") or "").lower()), r.get("recent_sources"))

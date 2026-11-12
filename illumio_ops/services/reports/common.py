@@ -2,10 +2,12 @@
 previous-period comparison of a key metric."""
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+from itertools import islice
 from typing import Any
 
 from illumio_ops.domain.lateral import HostInfo
+from illumio_ops.domain.report import HTML_ROW_CAP
 from illumio_ops.domain.tamper import TAMPER_PATTERN_KEYS
 from illumio_ops.domain.values import DetectorKind, Language, PortClass
 from illumio_ops.i18n import translate
@@ -45,6 +47,15 @@ PROTOCOLS = {6: "TCP", 17: "UDP", 1: "ICMP"}
 SYNC_STATE_KEYS = {"applied": "rpt_sync_applied", "synced": "rpt_sync_applied", "syncing": "rpt_sync_syncing",
                    "staged": "rpt_sync_staged"}
 EVENT_STATUS_KEYS = {"success": "rpt_status_success", "failure": "rpt_status_failure"}
+# A policy decision where it is a name (a table cell, a state): plain words with the PCE's own word in brackets, the
+# same table the console uses (web/src/terms.ts). decision_unknown is not reworded yet (stage 3b).
+DECISION_KEYS = {"allowed": "term_decision_allowed", "potentially_blocked": "term_decision_potentially_blocked",
+                 "blocked": "term_decision_blocked", "unknown": "decision_unknown"}
+# The same decision inside a sentence: the PCE's own word alone (a sentence is not reworded).
+DECISION_IN_SENTENCE_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
+                             "blocked": "decision_blocked", "unknown": "decision_unknown"}
+MODE_KEYS = {"idle": "term_mode_idle", "visibility_only": "term_mode_visibility_only",
+             "selective": "term_mode_selective", "full": "term_mode_full"}
 
 
 def tr(lang: Language, msg: str, /, **params: object) -> str:
@@ -70,6 +81,27 @@ def host_name(hosts: Mapping[str, HostInfo], key: str, lang: Language) -> str:
     if key.startswith("ip:"):
         return key.removeprefix("ip:")
     return (unnamed_host(key, lang) if host is None else None) or key
+
+
+def host_key(hosts: Mapping[str, Any], key: object) -> str | None:
+    """`key` when it names a host — one the inventory holds, a workload of the PCE, an ip:<address> — else None (an
+    account, a name with no key behind it): what a table's host_keys carry for that cell."""
+    if not isinstance(key, str) or not key:
+        return None
+    return key if key in hosts or key.startswith(("ip:", "/orgs/")) else None
+
+
+def host_keys(**columns: Iterable[str | None]) -> dict[str, tuple[str | None, ...]]:
+    """TableBlock.host_keys from each host column's keys in the order of the table's rows: only the first
+    HTML_ROW_CAP are kept (the HTML prints no more rows, and nothing else reads them)."""
+    return {column: tuple(islice(keys, HTML_ROW_CAP)) for column, keys in columns.items()}
+
+
+def mode_word(lang: Language, mode: str) -> str:
+    """An enforcement mode as "plain words (PCE term)", the console's own wording (web/src/terms.ts modeWord); a
+    mode this table does not know is shown as it is."""
+    key = MODE_KEYS.get(mode)
+    return tr(lang, key) if key else mode
 
 
 def port_text(port: int | None, proto: int) -> str:

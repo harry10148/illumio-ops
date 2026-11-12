@@ -28,8 +28,7 @@ from illumio_ops.services.flowsource import (
     traffic_volume,
 )
 from illumio_ops.services.reports import findings, flowsections
-from illumio_ops.services.reports.common import PROTOCOLS, port_text, tr
-from illumio_ops.services.reports.flowsections import DECISION_KEYS
+from illumio_ops.services.reports.common import DECISION_KEYS, PROTOCOLS, port_text, tr
 from illumio_ops.services.reports.generate import (
     coverage_text,
     previous_period,

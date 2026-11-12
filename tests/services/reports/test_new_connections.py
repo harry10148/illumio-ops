@@ -72,7 +72,7 @@ def test_admin_class_and_last_decision_in_rows(ctx):
     [table] = _tables(build_new_connections(_inp(ctx)), "all")
     rows = {(r[0], r[1], r[2]): r for r in table.rows}
     rdp = rows[("app-01", "fin-db-01", "3389/TCP")]
-    assert rdp[3] == "Remote execution" and rdp[6] == "Allowed"
+    assert rdp[3] == "Remote execution" and rdp[6] == "Allowed (a rule allows it)"
     assert rows[("10.9.9.9", "app-01", "445/TCP")][3] == "Remote execution"
     assert rows[("app-01", "10.1.1.1", "443/TCP")][3] == ""
 

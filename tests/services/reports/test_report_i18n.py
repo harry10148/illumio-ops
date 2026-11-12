@@ -46,7 +46,7 @@ from tests.services.reports.test_unmanaged import _rollup
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
 START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
-RAW_KEY = re.compile(r"\b(?:rpt|gui_reports|detector_name|decision|severity)_[a-z0-9_]+\b")
+RAW_KEY = re.compile(r"\b(?:rpt|gui_reports|detector_name|decision|term|severity)_[a-z0-9_]+\b")
 # PCE console words zh_TW keeps in English (spec §6.2.1): not report copy left untranslated.
 PCE_TERMS = frozenset({"Rule Hit Count", "Override Deny"})
 APP_DB = FlowCondition(dst=EndpointFilter(labels=(LabelCond(key="app", values=("DB",)),)))
@@ -332,3 +332,56 @@ def test_a_collection_gap_is_said_under_the_conclusion_and_listed_in_the_notes(c
         ctx=ctx, params=ReportParams(report_type=report_type, filter=cond, custom_id=custom_id), start=START, end=END,
         lang=Language.EN, tz=UTC, now=NOW, pce_label="pce"))
     assert doc.caveats == said.caveats and said.lines[0] in doc.data_quality
+
+
+def _host_tables(ctx, report_type, lang=Language.EN):
+    cond = APP_DB if specs()[report_type].requires_app else None
+    custom_id = _custom(ctx) if report_type is ReportType.CUSTOM else None
+    doc = specs()[report_type].build(BuildInput(
+        ctx=ctx, params=ReportParams(report_type=report_type, filter=cond, custom_id=custom_id), start=START, end=END,
+        lang=lang, tz=UTC, now=NOW, pce_label="pce"))
+    return [(s.id, b) for s, b in doc.tables()]
+
+
+@pytest.mark.parametrize("report_type", list(ReportType))
+def test_every_host_column_knows_which_host_each_row_names(ctx, report_type):
+    """A host column carries one key per row the HTML prints, and the key is the host the cell names: resolved the
+    way the inventory names it, the nth key gives the nth cell's text."""
+    from illumio_ops.domain.report import HTML_ROW_CAP
+    from illumio_ops.services.hosts import display_names
+    from illumio_ops.services.reports.common import unnamed_host
+    for sid, table in _host_tables(ctx, report_type):
+        host_cols = {c.key for c in table.columns if c.kind == "host"}
+        assert set(table.host_keys) == host_cols, (sid, table.title)
+        named = display_names(ctx, {k for keys in table.host_keys.values() for k in keys if k}, lang=Language.EN)
+        for col, keys in table.host_keys.items():
+            i = [c.key for c in table.columns].index(col)
+            assert len(keys) == min(len(table.rows), HTML_ROW_CAP), (sid, table.title, col)
+            for key, row in zip(keys, table.rows, strict=False):
+                if key is not None:
+                    assert row[i] in (named.get(key), key.removeprefix("ip:"), key.rsplit("/", 1)[-1],
+                                      unnamed_host(key, Language.EN)), (sid, table.title, col, key, row[i])
+
+
+HOST_TABLES = {  # report type -> (section, column, the part of the host page its links open at)
+    ReportType.LATERAL_POSTURE: {("assets", "asset", "connections"), ("reach", "host", "connections"),
+                                 ("pivots", "host", "connections"), ("detections", "subject", "connections"),
+                                 ("cross_env", "src", "connections"), ("cross_env", "dst", "connections"),
+                                 ("directory", "subject", "connections")},  # its other two: test_lateral_posture
+    ReportType.NEW_CONNECTIONS: {("by_destination", "dst", "connections"), ("admin", "src", "connections"),
+                                 ("admin", "dst", "connections"), ("all", "src", "connections"),
+                                 ("all", "dst", "connections")},
+    ReportType.UNMANAGED_ENDPOINTS: {("admin", "address", "connections"),  # candidates: test_unmanaged
+                                     ("public", "address", "connections"), ("all", "address", "connections")},
+    ReportType.VEN_STATUS: {("offline", "host", "status"), ("online", "host", "status"), ("sync", "host", "status"),
+                            ("tamper", "host", "tamper")},
+    ReportType.RANSOMWARE: {("hosts", "host", "ransomware")},
+    ReportType.NETWORK_INVENTORY: {("hygiene", "host", None)},
+}
+
+
+@pytest.mark.parametrize("report_type", list(HOST_TABLES))
+def test_the_tables_that_name_hosts_carry_their_keys(ctx, report_type):
+    got = {(sid, col, table.host_section) for sid, table in _host_tables(ctx, report_type)
+           for col, keys in table.host_keys.items() if any(keys)}
+    assert got >= HOST_TABLES[report_type], HOST_TABLES[report_type] - got
