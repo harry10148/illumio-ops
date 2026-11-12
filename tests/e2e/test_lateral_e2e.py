@@ -61,11 +61,22 @@ def _seed(live_app, *, critical=True, groups=True, mode="full"):
         conn.commit()
 
 
+def unfold(page):
+    """The sections of detail start folded (purpose-led UI spec §6.5): open them all, as a reader would to read them."""
+    page.wait_for_load_state("networkidle")
+    for _ in range(8):
+        closed = page.locator("[data-role=fold-toggle][aria-expanded=false]")
+        if closed.count() == 0:
+            return
+        closed.first.click()
+
+
 def _open(context, live_app, path="/lateral"):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}{path}")
     page.wait_for_selector("[data-section=status]")
+    unfold(page)
     return page
 
 
@@ -292,7 +303,29 @@ def test_initiators_no_overflow_760_with_a_long_account_name(narrow_context, liv
     page = narrow_context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/detect")
+    unfold(page)
     page.locator("[data-role=init-users] tbody tr").first.wait_for()
     assert no_horizontal_overflow(page)
     cell = page.locator("[data-role=init-users] td.wrap-any", has_text="svc-a-very-long").first
     assert cell.evaluate("e => e.scrollWidth <= e.clientWidth + 1")  # wrapped, not cut
+
+
+# ── a table of contents, and details that start folded (purpose-led UI spec §6.5) ──
+
+def test_the_page_lists_its_sections_and_a_link_opens_a_folded_one(context, live_app):
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/detect")
+    toc = page.locator("[data-role=page-toc] a")
+    expect(toc.first).to_be_visible()
+    for link in toc.all():  # every entry leads to a section that is on the page
+        assert page.locator(link.get_attribute("href")[link.get_attribute("href").index("#"):]).count() == 1
+    reach = page.locator("#lat-reach")
+    expect(reach.locator("[data-role=reach]")).to_be_hidden()   # detail: folded until asked for
+    expect(page.locator("#lat-pivots [data-role=pivots], #lat-pivots li").first).to_be_visible()  # a conclusion: open
+    page.locator("[data-role=page-toc] a[href$='#lat-reach']").click()
+    expect(reach.locator("[data-role=reach]")).to_be_visible()
+    expect(reach).to_be_in_viewport()
+    reach.locator("[data-role=fold-toggle]").click()
+    expect(reach.locator("[data-role=reach]")).to_be_hidden()

@@ -326,6 +326,14 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-st
 /* why an action will not do what its name says, under the action — never inside the button */
 .action-note { flex-basis: 100%; margin: 0; color: var(--text-3); font-size: var(--fs-mini); }
 .table td[data-nowrap] { white-space: nowrap; }
+/* a page's own table of contents: its sections as links on one line */
+.page-toc { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); font-size: var(--fs-body); }
+/* a card of detail that starts folded: only its heading row shows */
+.card[data-folded] > :not(:first-child) { display: none; }
+.card[id] { scroll-margin-top: var(--space-6); }
+/* investigate: a row's own actions show when the row is in hand (pointed at, or reached by keyboard) */
+.wb-dim-item > .wb-dim-host { opacity: 0; transition: opacity .1s; }
+.wb-dim-item:hover > .wb-dim-host, .wb-dim-item:focus-within > .wb-dim-host { opacity: 1; }
 /* a section of the host page that a link landed on: marked for a moment */
 .host-section { scroll-margin-top: var(--space-6); }
 .host-section:empty { display: none; }

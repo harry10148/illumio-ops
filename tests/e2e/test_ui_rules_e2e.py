@@ -78,6 +78,11 @@ def walk(page, base_url: str, paths=PATHS) -> dict[str, list[str]]:
         page.goto(base_url + path)
         page.wait_for_selector("main .page, main section, main h1")
         page.wait_for_load_state("networkidle")
+        for _ in range(8):  # what starts folded is opened: the rules hold for what a reader opens too
+            closed = page.locator("main [data-role=fold-toggle][aria-expanded=false]")
+            if closed.count() == 0:
+                break
+            closed.first.click()
         for rule, items in ui_rules.violations(page).items():
             found.setdefault(rule, []).extend(f"{path}  {item}" for item in items)
     return found

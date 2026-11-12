@@ -3664,5 +3664,8 @@
   "q_page_history": "最近的隔離與解除",
   "q_page_history_none": "本工具還沒有隔離過任何主機。",
   "q_page_col_action": "動作",
-  "q_page_col_by": "由誰"
+  "q_page_col_by": "由誰",
+  "page_toc": "本頁內容",
+  "fold_open": "展開",
+  "fold_close": "收合"
 }

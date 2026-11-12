@@ -95,6 +95,7 @@ def test_a_button_is_as_wide_as_its_words(live_app, fake_pce, browser):
     seed_everything(live_app, fake_pce)
     ctx, page = _wide(browser, live_app)
     page.goto(f"{live_app.url}/detect")
+    page.locator("#lat-reach [data-role=fold-toggle]").click()  # the ranking is a detail: folded until asked for
     more = page.locator("[data-role=lat-more]")
     expect(more).to_be_visible()
     assert more.bounding_box()["width"] < 400

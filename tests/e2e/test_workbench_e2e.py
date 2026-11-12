@@ -247,3 +247,21 @@ def test_archived_period_says_it_came_from_the_archive(context, live_app):
     assert "1,234 rows" in text
     assert "no file for these 1 day(s)" in note.locator("[data-role=archive-missing]").inner_text()
     assert "2026-09-21" in note.locator("[data-role=archive-missing]").inner_text()
+
+
+def test_a_rows_own_actions_show_when_the_row_is_in_hand(context, live_app):
+    """Purpose-led UI spec §6.5: the exclude and open-host marks of the left column are quiet until their row is
+    pointed at or reached by keyboard — and still work from the keyboard."""
+    alert_id = _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/investigate?alert={alert_id}")  # the alert's period: where the seeded traffic is
+    item = page.locator(".wb-dim-item", has=page.locator(".wb-dim-host")).first
+    expect(item).to_be_visible()
+    mark = item.locator(".wb-dim-host").first
+    assert mark.evaluate("(e) => getComputedStyle(e).opacity") == "0"
+    item.hover()
+    expect(mark).to_have_css("opacity", "1")
+    page.mouse.move(0, 0)
+    mark.focus()
+    expect(mark).to_have_css("opacity", "1")

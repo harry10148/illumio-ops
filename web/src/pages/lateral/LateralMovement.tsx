@@ -1,6 +1,6 @@
 // Lateral movement (spec §6.5.1, P6c): what could happen (exposure: reach now and once enforced, paths into critical
 // assets and where to cut them), what is happening (detections), and what a suggested deny rule would block.
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
@@ -106,6 +106,7 @@ export default function LateralMovement() {
   return (
     <section className="page" data-role="lateral">
       <PageHead title={t("nav_detect")} purpose={t("purpose_detect")} />
+      <Toc stamp={page.computed_at ?? ""} />
       <Surface page={page} />
       <div className="card stack" data-section="status">
         {page.state === "not_computed" && (
@@ -186,8 +187,7 @@ export default function LateralMovement() {
         </div>
       )}
       {ex && (
-        <div className="card stack" id="lat-footholds" data-section="footholds">
-          <h2>{t("lat_footholds")}</h2>
+        <FoldCard id="lat-footholds" section="footholds" title={t("lat_footholds")}>
           <p className="hint">{t("lat_footholds_hint")}</p>
           {!page.ransomware_unsupported && page.ransomware_unread > 0 && (
             <p className="notice" data-role="rw-unread">{t("lat_rw_unread", { n: String(page.ransomware_unread),
@@ -205,7 +205,7 @@ export default function LateralMovement() {
                 ))}
               </ul>
             )}
-        </div>
+        </FoldCard>
       )}
       <Happening page={page} />
       <Initiators />
@@ -368,8 +368,7 @@ function Reach({ ex, name, focus }: { ex: ExposureResult; name: (k: string) => s
   });
   return (
     <>
-      <div className="card stack" id="lat-reach" data-section="reach">
-        <h2>{t("lat_reach")}</h2>
+      <FoldCard id="lat-reach" section="reach" title={t("lat_reach")}>
         <p className="hint">{t("lat_reach_hint", { hops: String(ex.hops) })}</p>
         {focus && focusAt < 0 && <p className="hint">{t("lat_host_not_in_graph", { host: name(focus) })}</p>}
         <div className="table-wrap">
@@ -391,7 +390,7 @@ function Reach({ ex, name, focus }: { ex: ExposureResult; name: (k: string) => s
             {t("lat_more", { n: String(ex.hosts.length - HOSTS_SHOWN) })}
           </button>
         )}
-      </div>
+      </FoldCard>
       <div className="card stack" id="lat-pivots" data-section="pivots">
         <h2>{t("lat_pivots")}</h2>
         <p className="hint">{t("lat_pivots_hint")}</p>
@@ -439,10 +438,12 @@ function Groups({ ex }: { ex: ExposureResult }) {
     return { shown, total: ranked.length, cell };
   }, [g]);
   const groupName = (s: string) => (s === "null" ? t("lat_group_none") : s);
+  const fold = useFold("lat-groups");
   return (
-    <div className="card stack" id="lat-groups" data-section="groups">
-      <div className="row">
+    <div className="card stack" id="lat-groups" data-section="groups" data-folded={!fold.open || undefined}>
+      <div className="row card-head">
         <h2>{t("lat_groups")}</h2>
+        {fold.button}
         <select name="group-by" value={by} onChange={(e) => setBy(e.target.value as (typeof GROUP_KEYS)[number])}>
           <option value="app">{t("lat_group_app")}</option>
           <option value="env">{t("lat_group_env")}</option>
@@ -510,8 +511,7 @@ function Initiators() {
     </div>
   );
   return (
-    <div className="card stack" id="lat-initiators" data-section="initiators">
-      <h2>{t("lat_init_title")}</h2>
+    <FoldCard id="lat-initiators" section="initiators" title={t("lat_init_title")}>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {!view && !error && <p className="muted">{t("loading")}</p>}
       {view && view.state === "lightweight" && <div data-role="initiators-need-mode"><NeedsAdvanced what={t("lat_init_need_mode")} /></div>}
@@ -529,7 +529,7 @@ function Initiators() {
           </div>
         </>
       )}
-    </div>
+    </FoldCard>
   );
 }
 
@@ -616,6 +616,58 @@ function Surface({ page }: { page: LateralPage }) {
 function LateralRedirect() {
   const { search } = useLocation();
   return <Navigate to={`/detect${search}`} replace />;
+}
+
+// ── the page's table of contents, and the sections that start folded (purpose-led UI spec §6.5) ──
+
+const TOC: [string, string][] = [
+  ["lat-assets", "lat_assets"], ["lat-pivots", "lat_pivots"], ["lat-cross_env", "lat_cross_env"],
+  ["lat-detections", "lat_happening"], ["lat-reach", "lat_reach"], ["lat-groups", "lat_groups"],
+  ["lat-footholds", "lat_footholds"], ["lat-initiators", "lat_init_title"],
+];
+
+/** The sections this page has now (some depend on the mode and on what was computed), each a link that brings its
+ * section into view — and opens it when it starts folded. */
+function Toc({ stamp }: { stamp: string }) {
+  const { hash } = useLocation();
+  const [have, setHave] = useState<string[]>([]);
+  useEffect(() => { setHave(TOC.map(([id]) => id).filter((id) => document.getElementById(id))); }, [stamp]);
+  useEffect(() => {
+    if (!hash) return;
+    const el = document.getElementById(hash.slice(1));
+    if (el) window.requestAnimationFrame(() => el.scrollIntoView({ block: "start" }));
+  }, [hash, have]);
+  if (have.length === 0) return null;
+  return (
+    <nav className="page-toc" data-role="page-toc" aria-label={t("page_toc")}>
+      {TOC.filter(([id]) => have.includes(id)).map(([id, key]) => <Link key={id} to={{ hash: `#${id}` }}>{t(key)}</Link>)}
+    </nav>
+  );
+}
+
+/** A section of detail that starts folded: its heading stays, with a button that opens it. Arriving at its anchor
+ * opens it. */
+function useFold(id: string) {
+  const { hash } = useLocation();
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (hash === `#${id}`) setOpen(true); }, [hash, id]);
+  const button = (
+    <button type="button" className="btn-text" data-role="fold-toggle" aria-expanded={open} aria-controls={id}
+            onClick={() => setOpen((o) => !o)}>
+      {t(open ? "fold_close" : "fold_open")}
+    </button>
+  );
+  return { open, button };
+}
+
+function FoldCard({ id, section, title, children }: { id: string; section: string; title: string; children: ReactNode }) {
+  const fold = useFold(id);
+  return (
+    <div className="card stack" id={id} data-section={section} data-folded={!fold.open || undefined}>
+      <div className="row card-head"><h2>{title}</h2>{fold.button}</div>
+      {children}
+    </div>
+  );
 }
 
 registerNav({ section: "analyse", path: "/detect", labelKey: "nav_detect", order: 10, component: LateralMovement, needs: "advanced" });

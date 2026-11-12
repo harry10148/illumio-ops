@@ -3664,5 +3664,8 @@
   "q_page_history": "Recent quarantines and releases",
   "q_page_history_none": "This tool has not quarantined any host yet.",
   "q_page_col_action": "Action",
-  "q_page_col_by": "By"
+  "q_page_col_by": "By",
+  "page_toc": "On this page",
+  "fold_open": "Show",
+  "fold_close": "Hide"
 }
