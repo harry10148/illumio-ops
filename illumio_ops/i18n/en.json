@@ -3651,5 +3651,18 @@
   "hosts_start_attention_basic": "The attention list is computed from kept traffic.",
   "hosts_start_more": "and {n} more",
   "alerts_device_filter": "Host: {name}",
-  "alerts_device_clear": "Remove this condition"
+  "alerts_device_clear": "Remove this condition",
+  "nav_quarantine": "Quarantine",
+  "purpose_quarantine": "Which hosts are quarantined now, who did it and when, and how to release them.",
+  "q_page_conclusion": "{n} hosts in quarantine.",
+  "q_page_conclusion_idle": "For {m} of them it has no effect (not blocking yet, or recording only).",
+  "q_page_none": "No host is in quarantine.",
+  "q_page_none_next": "To quarantine a host, start from an alert or from its host page.",
+  "q_page_col_level": "Level",
+  "q_page_col_applied": "Put on, and by whom",
+  "q_page_not_ours": "not put on by this tool",
+  "q_page_history": "Recent quarantines and releases",
+  "q_page_history_none": "This tool has not quarantined any host yet.",
+  "q_page_col_action": "Action",
+  "q_page_col_by": "By"
 }

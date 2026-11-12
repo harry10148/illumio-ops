@@ -10,7 +10,7 @@ RULES: tuple[str, ...] = ("one_primary", "styled_checkbox", "tag_not_button", "c
 
 # every page the navigation reaches, and the rule editor
 PATHS: tuple[str, ...] = (
-    "/", "/detect", "/investigate", "/hosts", "/fleet", "/rule-schedules", "/rule-schedules/rulesets", "/reports",
+    "/", "/detect", "/investigate", "/hosts", "/fleet", "/quarantine", "/rule-schedules", "/rule-schedules/rulesets", "/reports",
     "/reports?tab=schedules", "/reports?tab=produced", "/siem", "/siem/dlq", "/alert-rules", "/alert-rules?tab=channels",
     "/alerts/rules/new", "/system/collection", "/system/pce", "/system/lateral", "/system/jobs", "/system/tls",
     "/system/security", "/system/logs", "/system/display")

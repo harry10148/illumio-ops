@@ -3651,5 +3651,18 @@
   "hosts_start_attention_basic": "關注清單要保留流量才算得出來。",
   "hosts_start_more": "另有 {n} 台",
   "alerts_device_filter": "設備：{name}",
-  "alerts_device_clear": "移除這個條件"
+  "alerts_device_clear": "移除這個條件",
+  "nav_quarantine": "隔離",
+  "purpose_quarantine": "現在有哪些主機被隔離、誰在什麼時候做的，以及怎麼解除。",
+  "q_page_conclusion": "隔離中 {n} 台。",
+  "q_page_conclusion_idle": "其中 {m} 台的隔離不會生效（還沒開始擋，或只記錄、不擋）。",
+  "q_page_none": "目前沒有隔離中的主機。",
+  "q_page_none_next": "要隔離一台主機，從告警或主機頁發動。",
+  "q_page_col_level": "隔離等級",
+  "q_page_col_applied": "何時由誰套上",
+  "q_page_not_ours": "不是由本工具套上",
+  "q_page_history": "最近的隔離與解除",
+  "q_page_history_none": "本工具還沒有隔離過任何主機。",
+  "q_page_col_action": "動作",
+  "q_page_col_by": "由誰"
 }

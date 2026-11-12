@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
 import "./pages/alerts/AlertsHome";
+import "./pages/quarantine/Quarantine";
 import "./pages/alerts/AlertDetail";
 import "./pages/alerts/Rules";
 import "./pages/alerts/RuleEditor";
