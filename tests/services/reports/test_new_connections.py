@@ -118,8 +118,24 @@ def test_findings_critical_first_then_unmanaged(ctx):
     f = build_new_connections(_inp(ctx)).findings
     assert [x.severity.value for x in f] == ["high", "medium"]
     # 6.6.0: one finding per service and kind, counting its connections and naming them in the evidence
-    assert f[0].title == "1 new 3389/TCP management connection(s)" and "fin-db-01" in f[0].why
-    assert "10.9.9.9" in f[1].why
+    assert f[0].title == "1 new 3389/TCP management connection(s)" and f[0].what == "Connections: app-01 → fin-db-01."
+    assert f[0].why == "A management port into a critical asset that the baseline never saw."
+    assert "10.9.9.9" in f[1].what and f[1].why == "A host without a VEN started using a management port."
+    assert f[0].action_focus == "1 new 3389/TCP management connection(s): the earliest is app-01 → fin-db-01."
+
+
+def test_new_connections_of_three_services_are_one_thing_to_do(ctx):
+    """Stage 3a: one finding per service, one thing to do for all of them — the first page names it once."""
+    from illumio_ops.domain.actions import top_actions
+    d = datetime(2026, 10, 23, tzinfo=UTC)
+    _baseline(ctx, [(A, DB, 22, d, "allowed"), (A, DB, 5985, d, "allowed")])
+    found = build_new_connections(_inp(ctx)).findings
+    assert len(found) == 4 and all(f.action_code == "new_connections" and f.action_short for f in found)
+    (action,), more = top_actions(found)
+    assert more == 0 and action.findings == (0, 1, 2, 3) and action.titles_more == 0
+    assert {t.split(" new ")[1].split(" ")[0] for t in action.titles} == {"3389/TCP", "22/TCP", "5985/TCP", "445/TCP"}
+    assert action.short.startswith("Confirm with the owner that the new connections are expected;")
+    assert len(action.focus) == 2 and all("the earliest is" in s for s in action.focus)
 
 
 def _covered(ctx, start, end):

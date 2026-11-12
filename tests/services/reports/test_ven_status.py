@@ -235,6 +235,15 @@ def test_findings_count_what_the_tables_list(ctx):
     assert any(t.startswith("1 ") and "tampering" in t for t in titles)
     assert any(t.startswith(f"{_table(doc, 'sync').total_rows} ") and "policy" in t for t in titles)
     assert any(t.startswith("1 ") and "compatibility" in t for t in titles)
+    by = {f.action_code: f for f in doc.findings}
+    assert set(by) == {"ven_offline", "ven_tamper", "ven_sync", "ven_compat"} and all(f.action_short for f in by.values())
+    off = by["ven_offline"]
+    assert off.what == "Under 24 hours: 1; 24–48 hours: 0; over 48 hours: 1."
+    assert off.why == "A VEN that is not reporting gets no policy updates and sends no traffic."
+    assert off.action_focus == "old has been out of contact the longest."
+    assert by["ven_compat"].what.startswith("Warning: 1; failed: 0,") and "gets in the way" in by["ven_compat"].why
+    assert "no known cause recorded on the host page" in by["ven_tamper"].what and by["ven_tamper"].why
+    assert by["ven_sync"].what == "" and by["ven_sync"].why
 
 
 def test_no_findings_when_nothing_needs_action(ctx):

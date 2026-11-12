@@ -78,6 +78,17 @@ def test_sections_and_kpis(ctx):
     assert any("Quarantine" in f.title for f in doc.findings)
 
 
+def test_findings_name_their_thing_to_do(ctx):
+    """The risky changes are one thing to do (confirm each before provisioning); the items the report does not
+    compare are another (review them in the PCE), not the "provision or discard" of the usage reports."""
+    from illumio_ops.domain.actions import group_actions
+    doc = _build(ctx)
+    risky = [f for f in doc.findings if f.severity.value == "high"]
+    assert len(risky) == 2 and {f.action_code for f in risky} == {"risky_change"}
+    assert all(f.action_short and f.action_code in ("risky_change", "pending_other") for f in doc.findings)
+    assert group_actions(doc.findings)[0].findings == (0, 1)
+
+
 def test_enabled_values_in_words(ctx):
     row = _table(_build(ctx), "rule_sets").rows
     assert any("Off" in str(c) for r in row for c in r) and not any(c == "False" for r in row for c in r)

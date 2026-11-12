@@ -131,6 +131,11 @@ def test_findings_run_from_the_highest_severity_down(tmp_path):
     doc = build_unmanaged(_inp(c))
     assert [f.severity.value for f in doc.findings] == ["high", "medium", "medium"]
     assert "8.8.4.4" in doc.findings[0].title and "10.4.4.4" in doc.findings[1].title
+    # one thing to do for the three endpoints (the findings rules' "unmanaged"), naming the first two
+    from illumio_ops.domain.actions import group_actions
+    assert all(f.action_code == "unmanaged" and f.action_short for f in doc.findings)
+    (action,) = group_actions(doc.findings)
+    assert action.focus == ("8.8.4.4 reaches 1 managed hosts.", "10.4.4.4 reaches 3 managed hosts.")
 
 
 def test_shared_address_space_is_not_called_private(tmp_path):

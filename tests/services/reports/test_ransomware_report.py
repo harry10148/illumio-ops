@@ -229,8 +229,10 @@ def test_protection_states_in_words(ctx):
 
 def test_summary_finding_for_services_in_use(ctx):
     _std(ctx, n_priority=2)
-    [f, *_] = _build(ctx).findings
+    [f, *rest] = _build(ctx).findings
     assert "2" in f.title and "Fix first" in f.action
+    assert f.action_code == "rw_priority" and f.action_short and f.what == ""
+    assert {x.action_code for x in rest} <= {"rw_unsorted", "rw_safe"} and all(x.action_short for x in rest)
 
 
 def test_host_explanation_names_few_services_once(ctx):
@@ -263,6 +265,7 @@ def test_unprotected_with_unknown_traffic_is_a_finding(ctx):
                                                      svc("RDP", 3389, traffic="unknown", sources=None)])]})
     [f] = _build(ctx).findings
     assert "2" in f.title and "alert mode" in f.action
+    assert f.action_code == "rw_unsorted" and "alert mode" in f.action_short
 
 
 def test_host_explanation_does_not_point_to_empty_lists(ctx):

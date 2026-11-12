@@ -248,8 +248,9 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
         first_key, first, _ = closest[0]
         findings = (Finding(severity=Severity.MEDIUM,
                             title=t("rpt_rdy_finding_title", n=values["held_back"], total=values["apps"]),
-                            why=t("rpt_rdy_finding_why", app=name(first_key), explain=explain(first)),
-                            action=t("rpt_rdy_finding_action")),)
+                            what=t("rpt_rdy_finding_what", app=name(first_key), explain=explain(first)),
+                            why=t("rpt_rdy_finding_why"), action=t("rpt_rdy_finding_action"),
+                            action_code="write_rules", action_short=t("rpt_act_write_rules")),)
 
     total = sum(r.connections for r in flows.values())
     unknown = sum(r.unknown for r in flows.values())

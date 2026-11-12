@@ -109,12 +109,15 @@ class _Builder:
             rows = sorted(rows, key=lambda r: r["first_seen"])
             pairs = "; ".join(f"{self.name(r['src_key'])} → {self.name(r['dst_key'])}" for r in rows[:FINDING_PAIRS])
             more = len(rows) - FINDING_PAIRS
+            title = self.t("rpt_new_finding_service", n=len(rows), service=port_text(port, proto))
+            first = f"{self.name(rows[0]['src_key'])} → {self.name(rows[0]['dst_key'])}"
             out.append(Finding(
-                severity=Severity.HIGH if rank == 0 else Severity.MEDIUM,
-                title=self.t("rpt_new_finding_service", n=len(rows), service=port_text(port, proto)),
-                why=self.t("rpt_new_why_critical" if rank == 0 else "rpt_new_why_unmanaged") + " "
-                + (self.t("rpt_new_pairs_more", pairs=pairs, n=more) if more > 0 else self.t("rpt_new_pairs", pairs=pairs)),
-                action=self.t("rpt_new_action")))
+                severity=Severity.HIGH if rank == 0 else Severity.MEDIUM, title=title,
+                what=self.t("rpt_new_pairs_more", pairs=pairs, n=more) if more > 0 else self.t("rpt_new_pairs", pairs=pairs),
+                why=self.t("rpt_new_why_critical" if rank == 0 else "rpt_new_why_unmanaged"),
+                action=self.t("rpt_new_action"), action_code="new_connections",
+                action_short=self.t("rpt_act_new_connections"),
+                action_focus=self.t("rpt_new_focus", finding=title, pair=first)))
         return tuple(out)
 
     def limit_note(self, shown: int, total: int) -> str | None:

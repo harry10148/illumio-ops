@@ -267,23 +267,32 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     # Each finding counts the rows of a table below; none of them means the report says nothing needs action.
     found: list[Finding] = []
     if offline:
+        # the one out of contact the longest, among those whose last heartbeat is known
+        oldest_out = min((w for w in offline if w.last_heartbeat_at), key=lambda w: w.last_heartbeat_at or "",
+                         default=None)
         found.append(Finding(
             severity=Severity.HIGH if counts["long_offline"] else Severity.MEDIUM,
             title=t("rpt_ven_find_offline_title", n=f"{len(offline):,}"),
-            why=t("rpt_ven_find_offline_why", d1=counts["lost_24h"], d2=counts["lost_48h"], old=counts["long_offline"]),
-            action=t("rpt_ven_find_offline_action")))
+            what=t("rpt_ven_find_offline_what", d1=counts["lost_24h"], d2=counts["lost_48h"], old=counts["long_offline"]),
+            why=t("rpt_ven_find_offline_why"), action=t("rpt_ven_find_offline_action"), action_code="ven_offline",
+            action_short=t("rpt_act_ven_offline"),
+            action_focus=t("rpt_ven_find_offline_focus", host=name[oldest_out.href]) if oldest_out else ""))
     if unexplained:
         found.append(Finding(severity=Severity.HIGH, title=t("rpt_ven_find_tamper_title", n=f"{unexplained:,}"),
-                             why=t("rpt_ven_find_tamper_why"), action=t("rpt_ven_find_tamper_action")))
+                             what=t("rpt_ven_find_tamper_what"), why=t("rpt_ven_find_tamper_why"),
+                             action=t("rpt_ven_find_tamper_action"), action_code="ven_tamper",
+                             action_short=t("rpt_act_ven_tamper")))
     if trouble:
         found.append(Finding(severity=Severity.MEDIUM, title=t("rpt_ven_find_sync_title", n=f"{len(trouble):,}"),
-                             why=t("rpt_ven_find_sync_why"), action=t("rpt_ven_find_sync_action")))
+                             why=t("rpt_ven_find_sync_why"), action=t("rpt_ven_find_sync_action"),
+                             action_code="ven_sync", action_short=t("rpt_act_ven_sync")))
     not_passed = compat_counts["warn"] + compat_counts["fail"]
     if not_passed:
         found.append(Finding(
             severity=Severity.MEDIUM, title=t("rpt_ven_find_compat_title", n=f"{not_passed:,}"),
-            why=t("rpt_ven_find_compat_why", warn=compat_counts["warn"], fail=compat_counts["fail"]),
-            action=t("rpt_ven_find_compat_action")))
+            what=t("rpt_ven_find_compat_what", warn=compat_counts["warn"], fail=compat_counts["fail"]),
+            why=t("rpt_ven_find_compat_why"), action=t("rpt_ven_find_compat_action"), action_code="ven_compat",
+            action_short=t("rpt_act_ven_compat")))
     found.sort(key=lambda f: -SEVERITY_ORDER.index(f.severity))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ven_status"), period_start=inp.start,

@@ -82,6 +82,10 @@ def test_pending_changes_said(ctx, monkeypatch):
     doc = _build(ctx)
     assert "differs from the active policy" in _text(doc, "pending") and _table(doc, "pending").rows[0][1] == "G_Deny"
     assert any("provision" in f.title.lower() for f in doc.findings)
+    by = {f.action_code: f for f in doc.findings}
+    assert by["pending_policy"].action_short == ("Check the changes waiting to be provisioned, then provision or "
+                                                 "discard them.")
+    assert all(f.action_code and f.action_short for f in doc.findings)
 
 
 def test_unused_hedged_when_capped(ctx, monkeypatch):
@@ -128,7 +132,8 @@ def test_truncated_unused_hedged_everywhere(ctx, monkeypatch):
     monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage(truncated=[(START, END)]))
     doc = _build(ctx)
     assert {k.key: k for k in doc.kpis}["unused"].note
-    assert any("read" in f.title for f in doc.findings)
+    [f] = [f for f in doc.findings if "read" in f.title]
+    assert f.action_code == "unused_rules" and f.action_short and f.what == ""
 
 
 def test_undetermined_disclosed(ctx, monkeypatch):

@@ -51,6 +51,11 @@ FINDING_KINDS = {FocusKind.DETECTION.value: "rpt_action_detection",
                  FocusKind.EXPOSURE_ASSET.value: "rpt_action_exposure_asset",
                  FocusKind.PIVOT_HOST.value: "rpt_action_pivot_host",
                  FocusKind.CROSS_ENV.value: "rpt_action_cross_env"}
+# The thing to do each kind of finding belongs to: (code, its one sentence).
+FINDING_ACTIONS = {FocusKind.DETECTION.value: ("lat_detection", "rpt_act_lat_detection"),
+                   FocusKind.EXPOSURE_ASSET.value: ("lat_exposure_asset", "rpt_act_lat_exposure_asset"),
+                   FocusKind.PIVOT_HOST.value: ("lat_pivot_host", "rpt_act_lat_pivot_host"),
+                   FocusKind.CROSS_ENV.value: ("lat_cross_env", "rpt_act_lat_cross_env")}
 DIRECTORY_DETECTORS = ("auth_to_non_dc", "new_dc_client", "directory_surge")
 EDGE_STATE_KEYS = {"allowed": "decision_allowed", "potentially_blocked": "decision_potentially_blocked",
                    "unknown": "decision_unknown"}
@@ -76,9 +81,10 @@ def _findings(focus: Mapping[str, Any] | None, hosts: Mapping[str, HostInfo], la
         if action is None:
             continue
         params = {k: shown(v) for k, v in (item.get("params") or {}).items() if not isinstance(v, (dict, list))}
+        code, short = FINDING_ACTIONS[item["kind"]]
         out.append(Finding(severity=Severity(item.get("severity", "medium")),
                            title=tr(lang, item["title_key"], **params), why=tr(lang, item["why_key"], **params),
-                           action=tr(lang, action)))
+                           action=tr(lang, action), action_code=code, action_short=tr(lang, short)))
         if len(out) == 5:
             break
     return tuple(out)

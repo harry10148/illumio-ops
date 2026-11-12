@@ -211,6 +211,12 @@ def test_findings_only_lateral_kinds_max_five(ctx):
     assert len(doc.findings) == 5
     assert next(f.title for f in doc.findings) == "h1 is a pivot: many management-port paths go through it"
     assert all(f.action for f in doc.findings)
+    # the five findings in order: pivot, pivot, detection, exposure asset, cross-environment
+    assert [f.action_code for f in doc.findings] == ["lat_pivot_host", "lat_pivot_host", "lat_detection",
+                                                     "lat_exposure_asset", "lat_cross_env"]
+    assert all(f.action_short and f.what == "" for f in doc.findings)  # their "why" is a reason: no fact to move
+    from illumio_ops.domain.actions import group_actions
+    assert [len(a.findings) for a in group_actions(doc.findings)] == [2, 1, 1, 1]
 
 
 def _dir_flow(i, port, *, day, dst=DB):

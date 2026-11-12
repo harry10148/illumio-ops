@@ -154,10 +154,12 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
     zero_allow = [r for r in zero if rules[r.rule_href].rule_type is RuleAction.ALLOW]
     if zero_allow:
         findings.append(Finding(severity=Severity.LOW, title=t("rpt_rhc_finding_zero", n=len(zero_allow)),
-                                why=t("rpt_rhc_finding_zero_why"), action=t("rpt_rhc_finding_zero_action")))
+                                why=t("rpt_rhc_finding_zero_why"), action=t("rpt_rhc_finding_zero_action"),
+                                action_code="unused_rules", action_short=t("rpt_act_unused_rules")))
     if pending:
         findings.append(Finding(severity=Severity.LOW, title=t("rpt_rhc_finding_pending", n=len(pending)),
-                                why=t("rpt_rhc_finding_pending_why"), action=t("rpt_rhc_finding_pending_action")))
+                                why=t("rpt_rhc_finding_pending_why"), action=t("rpt_rhc_finding_pending_action"),
+                                action_code="pending_policy", action_short=t("rpt_act_pending_policy")))
     quality = [t("rpt_rhc_quality_source")]
     if pull.unparsed:
         quality.append(t("rpt_rhc_quality_unparsed", n=pull.unparsed))

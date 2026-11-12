@@ -271,6 +271,36 @@ def test_every_rule_rendered(ctx):
         assert len(doc.findings) == len(RULES) and "findings" not in {s.id for s in doc.sections}
 
 
+def test_every_finding_names_a_registered_thing_to_do(ctx):
+    """Stage 3a: in every report type the sample builds, a finding that carries an action code carries one the
+    order of the first page knows (ACTION_ORDER), with its sentence; the types whose findings all carry one are
+    named, so a builder that stops setting it is caught. (This sample gives policy usage and readiness no finding:
+    their own test files assert theirs.)"""
+    from illumio_ops.domain.actions import ACTION_ORDER
+    coded: dict[ReportType, set[str]] = {}
+    for report_type in ReportType:
+        cond = APP_DB if specs()[report_type].requires_app else None
+        custom_id = _custom(ctx) if report_type is ReportType.CUSTOM else None
+        for lang in Language:
+            doc = specs()[report_type].build(BuildInput(
+                ctx=ctx, params=ReportParams(report_type=report_type, filter=cond, custom_id=custom_id), start=START,
+                end=END, lang=lang, tz=UTC, now=NOW, pce_label="pce"))
+            for f in doc.findings:
+                if f.action_code is not None:
+                    assert f.action_code in ACTION_ORDER and f.action_short.strip(), (report_type, f.title)
+                    assert not RAW_KEY.findall(f.what + f.why + f.action_short + f.action_focus), (report_type, f.title)
+                    coded.setdefault(report_type, set()).add(f.action_code)
+            if report_type not in (ReportType.POLICY_RESOLVER, ReportType.CUSTOM):
+                assert all(f.action_code for f in doc.findings), report_type
+    with_findings = {t for t, codes in coded.items() if codes}
+    assert with_findings >= {
+        ReportType.SECURITY_RISK, ReportType.TRAFFIC, ReportType.APP_SUMMARY, ReportType.NETWORK_INVENTORY,
+        ReportType.RULE_HIT_COUNT, ReportType.POLICY_DIFF, ReportType.AUDIT, ReportType.NEW_CONNECTIONS, ReportType.UNMANAGED_ENDPOINTS, ReportType.VEN_STATUS,
+        ReportType.RANSOMWARE}, sorted(t.value for t in with_findings)
+    assert coded[ReportType.POLICY_DIFF] == {"risky_change", "pending_other"}
+    assert coded[ReportType.RULE_HIT_COUNT] == {"unused_rules", "pending_policy"}
+
+
 def test_injected_missing_key_is_caught(ctx, monkeypatch):
     from illumio_ops import i18n
     real = i18n.dictionary

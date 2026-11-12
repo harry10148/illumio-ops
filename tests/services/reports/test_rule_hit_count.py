@@ -202,6 +202,10 @@ def test_zero_finding_counts_allow_rules_only(ctx, monkeypatch):
     assert len(_table(doc, "zero").rows) == 2
     [f] = [f for f in doc.findings if "0 hits" in f.title]
     assert f.title.startswith("1 ")
+    # the same thing to do as the policy usage report's unused rules: one code, one sentence
+    assert f.action_code == "unused_rules"
+    assert f.action_short == "Confirm with their owners whether the rules no traffic used are still needed."
+    assert all(x.action_code in ("unused_rules", "pending_policy") and x.action_short for x in doc.findings)
 
 
 def test_rule_provisioned_after_the_period_is_not_zero(ctx, monkeypatch):

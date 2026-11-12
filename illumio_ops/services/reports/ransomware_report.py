@@ -303,14 +303,17 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
     findings: list[Finding] = []
     if ok and lists["priority"]:
         findings.append(Finding(severity=Severity.HIGH, title=t("rpt_rw_finding_priority", n=len(lists["priority"])),
-                                why=t("rpt_rw_finding_priority_why"), action=t("rpt_rw_finding_priority_action")))
+                                why=t("rpt_rw_finding_priority_why"), action=t("rpt_rw_finding_priority_action"),
+                                action_code="rw_priority", action_short=t("rpt_act_rw_priority")))
     unsorted = len(unsorted_rows)
     if ok and unsorted:  # lightweight mode keeps no traffic: the lists stay empty, the services do not go away
         findings.append(Finding(severity=Severity.MEDIUM, title=t("rpt_rw_finding_unsorted", n=unsorted),
-                                why=t("rpt_rw_finding_unsorted_why"), action=t("rpt_rw_finding_unsorted_action")))
+                                why=t("rpt_rw_finding_unsorted_why"), action=t("rpt_rw_finding_unsorted_action"),
+                                action_code="rw_unsorted", action_short=t("rpt_act_rw_unsorted")))
     if ok and lists["safe_to_block"]:
         findings.append(Finding(severity=Severity.MEDIUM, title=t("rpt_rw_finding_safe", n=len(lists["safe_to_block"])),
-                                why=t("rpt_rw_finding_safe_why"), action=t("rpt_rw_finding_safe_action")))
+                                why=t("rpt_rw_finding_safe_why"), action=t("rpt_rw_finding_safe_action"),
+                                action_code="rw_safe", action_short=t("rpt_act_rw_safe")))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ransomware"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(findings),

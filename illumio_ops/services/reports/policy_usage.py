@@ -152,10 +152,12 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
         findings.append(Finding(severity=Severity.LOW,
                                 title=t("rpt_pu_finding_unused_read" if read_only else "rpt_pu_finding_unused",
                                         n=len(unused)),
-                                why=t("rpt_pu_finding_unused_why"), action=t("rpt_pu_finding_unused_action")))
+                                why=t("rpt_pu_finding_unused_why"), action=t("rpt_pu_finding_unused_action"),
+                                action_code="unused_rules", action_short=t("rpt_act_unused_rules")))
     if usage and usage.pending:
         findings.append(Finding(severity=Severity.LOW, title=t("rpt_pu_finding_pending", n=len(usage.pending)),
-                                why=t("rpt_pu_finding_pending_why"), action=t("rpt_pu_finding_pending_action")))
+                                why=t("rpt_pu_finding_pending_why"), action=t("rpt_pu_finding_pending_action"),
+                                action_code="pending_policy", action_short=t("rpt_act_pending_policy")))
 
     quality = [t("rpt_pu_quality_source")]
     if usage and usage.truncated:

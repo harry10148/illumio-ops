@@ -168,7 +168,14 @@ def test_failed_sign_in_then_high_risk_change_same_user(ctx):
     assert table.total_rows == 1
     row = dict(zip([c.key for c in table.columns], table.rows[0], strict=True))
     assert (row["user"], row["change"], row["failures"], row["gap"]) == ("eve", "api_key.create", 2, 7.0)
-    assert doc.findings[0].severity is Severity.HIGH and "eve" in doc.findings[0].why
+    first = doc.findings[0]
+    assert first.severity is Severity.HIGH and "eve" in first.what and "within 30 minutes" in first.what
+    assert first.why == "A guessed or stolen password looks like this."  # the reason, apart from who and when
+    assert first.action_code == "failed_then_change" and first.action_short
+    # the event-type findings: the thing to do follows the sentence each severity carries
+    by_code = {f.title.split(":")[0]: f.action_code for f in doc.findings[1:]}
+    assert by_code["workloads.unpair"] == "review_events" and by_code["api_key.create"] == "change_records"
+    assert all(f.action_short and f.what.startswith("Users behind them: ") for f in doc.findings[1:])
 
 
 def test_failed_then_change_none_says_so(ctx):
@@ -209,9 +216,9 @@ def test_failed_then_change_names_five_users_and_counts_the_rest(ctx):
                           status="failure"),
                     event("api_key.create", D + timedelta(minutes=10), user=f"u{i}", ip=f"10.1.1.{i}")]
     _write(ctx, records)
-    why = _build(ctx, Language.ZH_TW).findings[0].why
-    assert all(f"u{i}" in why for i in range(5)) and "u5" not in why and "另有 2 位" in why
-    assert "2 more" in _build(ctx, Language.EN).findings[0].why
+    what = _build(ctx, Language.ZH_TW).findings[0].what
+    assert all(f"u{i}" in what for i in range(5)) and "u5" not in what and "另有 2 位" in what
+    assert "2 more" in _build(ctx, Language.EN).findings[0].what
 
 
 def test_agent_event_status_reads_as_words(ctx):
@@ -247,4 +254,6 @@ def test_event_type_no_user_made_says_so(ctx):
     _write(ctx, [event("agent.tampering", D, system=True)])
     doc = _build(ctx)
     assert _tables(doc, "attention")[0].rows[0][3] == "None (not made by a user)"
-    assert "None (not made by a user)" in doc.findings[0].why
+    assert doc.findings[0].what == "Users behind them: None (not made by a user)."
+    assert "list of event types with an audit risk" in doc.findings[0].why
+    assert doc.findings[0].action_code == "review_events"  # critical: confirm each event

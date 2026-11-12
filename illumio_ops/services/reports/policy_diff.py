@@ -152,10 +152,12 @@ def build_policy_diff(inp: BuildInput) -> ReportDocument:
             title=t("rpt_pdf_finding_widened" if widened else "rpt_pdf_finding_disabled", kind=label(_KIND, c.kind),
                     name=where(c)),
             why=t("rpt_pdf_finding_widened_why" if widened else "rpt_pdf_finding_disabled_why"),
-            action=t("rpt_pdf_finding_action")))
+            action=t("rpt_pdf_finding_action"), action_code="risky_change", action_short=t("rpt_act_risky_change")))
     if other:
         findings.append(Finding(severity=Severity.LOW, title=t("rpt_pdf_finding_other", n=len(other)),
-                                why=t("rpt_pdf_finding_other_why"), action=t("rpt_pdf_finding_other_action")))
+                                why=t("rpt_pdf_finding_other_why"), action=t("rpt_pdf_finding_other_action"),
+                                # "review before provisioning", not the "provision or discard" of pending_policy
+                                action_code="pending_other", action_short=t("rpt_act_pending_other")))
     summary = t("rpt_pdf_summary_same") if not changes and not other else t("rpt_pdf_summary_some", n=len(changes))
     quality = [t("rpt_pdf_quality_live", at=fmt_time(diff.computed_at.isoformat(), inp.tz)), t("rpt_pdf_quality_who")]
     if diff.attribution_limited:

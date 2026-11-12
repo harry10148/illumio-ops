@@ -8,7 +8,7 @@ in the findings). Nothing here reads a language or translates: every text is one
 
 Length rules: the first page lists TOP_ACTIONS things and is told how many more there are; a thing lists the titles
 of its first ACTION_TITLES_MAX findings and counts the rest (titles_more); it carries at most ACTION_FOCUS_MAX
-"where most of it is" sentences."""
+"where most of it is" sentences, each different (a sentence two findings share is kept once)."""
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -18,8 +18,18 @@ from illumio_ops.domain.report import Finding
 from illumio_ops.domain.values import SEVERITY_ORDER, Severity
 
 # The order codes were registered in: the last thing two equal actions are ordered by. A new code is added here.
-ACTION_ORDER: tuple[str, ...] = ("enforce", "cross_env_rules", "narrow_rules", "write_rules", "unmanaged",
-                                 "accounts", "transfers", "legacy_protocols")
+ACTION_ORDER: tuple[str, ...] = (
+    # the findings rules (domain/findings_rules.py ACTION_CODES)
+    "enforce", "cross_env_rules", "narrow_rules", "write_rules", "unmanaged", "accounts", "transfers",
+    "legacy_protocols",
+    # the other reports, in the order of their builders: policy usage / Rule Hit Count / policy diff, audit,
+    # lateral posture, new connections, VEN status, ransomware
+    "unused_rules", "pending_policy", "pending_other", "risky_change",
+    "review_events", "change_records", "watch_events", "failed_then_change",
+    "lat_detection", "lat_exposure_asset", "lat_pivot_host", "lat_cross_env",
+    "new_connections",
+    "ven_offline", "ven_tamper", "ven_sync", "ven_compat",
+    "rw_priority", "rw_unsorted", "rw_safe")
 TOP_ACTIONS = 3
 ACTION_TITLES_MAX = 4
 ACTION_FOCUS_MAX = 2
@@ -32,7 +42,7 @@ class TopAction:
     findings: tuple[int, ...]  # indexes into the findings given, the most severe first
     titles: tuple[str, ...]  # the titles of the first ACTION_TITLES_MAX of them
     titles_more: int  # findings whose title is not listed
-    focus: tuple[str, ...]  # the first ACTION_FOCUS_MAX non-empty action_focus sentences
+    focus: tuple[str, ...]  # the first ACTION_FOCUS_MAX different non-empty action_focus sentences
 
 
 def _rank(severity: Severity) -> int:
@@ -48,7 +58,8 @@ def group_actions(findings: Sequence[Finding]) -> tuple[TopAction, ...]:
     for (code, _), indexes in members.items():
         ordered = sorted(indexes, key=lambda i: (-_rank(findings[i].severity), i))
         lead = findings[ordered[0]]
-        focus = [findings[i].action_focus for i in ordered if findings[i].action_focus]
+        # the same sentence from two findings is said once (dict keys keep the order they were first seen in)
+        focus = list(dict.fromkeys(findings[i].action_focus for i in ordered if findings[i].action_focus))
         place = ACTION_ORDER.index(code) if code in ACTION_ORDER else len(ACTION_ORDER)
         keyed.append(((-_rank(lead.severity), -len(ordered), place, indexes[0]), TopAction(
             severity=lead.severity, short=lead.action_short if code is not None else lead.title,

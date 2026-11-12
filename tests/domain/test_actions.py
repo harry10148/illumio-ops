@@ -28,8 +28,15 @@ SIX = (f(H, "enforce"), f(M, "enforce", title="e2"), f(C, "narrow_rules"), f(H, 
 
 
 def test_the_registered_codes():
-    assert ACTION_ORDER == ("enforce", "cross_env_rules", "narrow_rules", "write_rules", "unmanaged", "accounts",
-                            "transfers", "legacy_protocols")
+    # the eight of the findings rules first, then the other reports' in the order of their builders
+    assert ACTION_ORDER[:8] == ("enforce", "cross_env_rules", "narrow_rules", "write_rules", "unmanaged", "accounts",
+                                "transfers", "legacy_protocols")
+    assert ACTION_ORDER[8:] == (
+        "unused_rules", "pending_policy", "pending_other", "risky_change", "review_events", "change_records",
+        "watch_events", "failed_then_change", "lat_detection", "lat_exposure_asset", "lat_pivot_host", "lat_cross_env",
+        "new_connections", "ven_offline", "ven_tamper", "ven_sync", "ven_compat", "rw_priority", "rw_unsorted",
+        "rw_safe")
+    assert len(set(ACTION_ORDER)) == len(ACTION_ORDER)
     assert (TOP_ACTIONS, ACTION_TITLES_MAX, ACTION_FOCUS_MAX) == (3, 4, 2)
 
 
@@ -104,3 +111,17 @@ def test_the_fourth_thing_has_no_number_on_the_first_page():
 
 def test_nothing_to_do():
     assert group_actions(()) == () and top_actions(()) == ((), 0) and action_number(()) == {}
+
+
+def test_the_same_focus_sentence_is_said_once():
+    """Two findings of one thing that name the same "most of it" give one sentence, and the next different one
+    takes the freed place (in the order of the findings, the most severe first)."""
+    got = group_actions((f(M, "enforce", title="a", focus="db-01 has the most."),
+                         f(H, "enforce", title="b", focus="db-01 has the most."),
+                         f(M, "enforce", title="c", focus=""),
+                         f(M, "enforce", title="d", focus="web-02 has the most."),
+                         f(M, "enforce", title="e", focus="db-01 has the most."),
+                         f(M, "enforce", title="g", focus="app-03 has the most.")))
+    (action,) = got
+    assert action.focus == ("db-01 has the most.", "web-02 has the most.")
+    assert len(action.focus) <= ACTION_FOCUS_MAX and action.findings == (1, 0, 2, 3, 4, 5)

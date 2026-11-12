@@ -170,7 +170,10 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
     findings = tuple(Finding(severity=Severity.MEDIUM if not is_public(e.address) else Severity.HIGH,
                              title=t("rpt_unm_finding_admin", address=e.address,
                                      ports=", ".join(port_text(p, q) for p, q in e.admin_in), peers=e.admin_peers),
-                             why=t("rpt_unm_why_admin"), action=t("rpt_unm_action_admin")) for e in flagged)
+                             why=t("rpt_unm_why_admin"), action=t("rpt_unm_action_admin"), action_code="unmanaged",
+                             action_short=t("rpt_act_unmanaged"),
+                             action_focus=t("rpt_unm_focus", address=e.address, peers=e.admin_peers))
+                     for e in flagged)
     quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz), t("rpt_quality_utc_days"))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_unmanaged"), period_start=inp.start,

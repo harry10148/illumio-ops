@@ -64,6 +64,12 @@ _KPI_KEYS = {"total": "rpt_aud_kpi_total", "high_risk": "rpt_aud_kpi_high_risk",
 _MATCHED_KEYS = {"user": "rpt_aud_matched_user", "address": "rpt_aud_matched_address"}
 _ACTION_KEYS = {Severity.CRITICAL: "rpt_aud_action_critical", Severity.HIGH: "rpt_aud_action_high",
                 Severity.MEDIUM: "rpt_aud_action_medium", Severity.LOW: "rpt_aud_action_low"}
+# The thing to do each of those sentences belongs to (code, its one sentence): confirming each event, checking the
+# changes against the change records and watching the count are three different things to do.
+_ACTION_OF = {Severity.CRITICAL: ("review_events", "rpt_act_review_events"),
+              Severity.HIGH: ("review_events", "rpt_act_review_events"),
+              Severity.MEDIUM: ("change_records", "rpt_act_change_records"),
+              Severity.LOW: ("watch_events", "rpt_act_watch_events")}
 
 
 def _values(c: AuditCounts) -> dict[str, int]:
@@ -182,8 +188,10 @@ def build_audit(inp: BuildInput) -> ReportDocument:
                    for k, s, n in risky if s is not None),
         total_rows=len(risky), empty_text=t("rpt_aud_none_attention") if counts.total else none)
     findings = tuple(Finding(severity=s, title=t("rpt_aud_finding_title", type=k, n=f"{n:,}"),
-                             why=t("rpt_aud_finding_why", actors=", ".join(actors.get(k, ())) or no_user),
-                             action=t(_ACTION_KEYS[s])) for k, s, n in risky[:ATTENTION_FINDINGS] if s is not None)
+                             what=t("rpt_aud_finding_what", actors=", ".join(actors.get(k, ())) or no_user),
+                             why=t("rpt_aud_finding_why"), action=t(_ACTION_KEYS[s]), action_code=_ACTION_OF[s][0],
+                             action_short=t(_ACTION_OF[s][1]))
+                     for k, s, n in risky[:ATTENTION_FINDINGS] if s is not None)
 
     # ── event types and trend ───────────────────────────────────────────────
     types = sorted(counts.by_type.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -279,9 +287,11 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         if len(who) > USERS_NAMED:
             named = t("rpt_aud_users_more", users=named, n=len(who) - USERS_NAMED)
         findings = (Finding(severity=Severity.HIGH, title=t("rpt_aud_failed_change_title", n=f"{chained_total:,}"),
-                            why=t("rpt_aud_failed_change_why", users=named,
-                                  minutes=FAILED_THEN_CHANGE_MINUTES),
-                            action=t("rpt_aud_failed_change_action")), *findings)[:ATTENTION_FINDINGS]
+                            what=t("rpt_aud_failed_change_what", users=named,
+                                   minutes=FAILED_THEN_CHANGE_MINUTES),
+                            why=t("rpt_aud_failed_change_why"), action=t("rpt_aud_failed_change_action"),
+                            action_code="failed_then_change", action_short=t("rpt_act_failed_then_change")),
+                    *findings)[:ATTENTION_FINDINGS]
 
     quality = [t("rpt_aud_quality_gaps", n=len(counts.coverage.gaps)) if counts.coverage.gaps
                else t("rpt_aud_quality_whole"), t("rpt_aud_quality_actors")]
