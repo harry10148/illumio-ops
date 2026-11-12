@@ -418,6 +418,7 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
             raise _Fail("rpt_err_pce_switched")
         doc = finish(doc)
         doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id),
+                                     "gui_base": settings.reports.gui_external_url.rstrip("/") or None,
                                      "conclusion": conclusion(doc, lambda key, p: translate(doc.lang, key, p), tz=tz)})
         files = _write(out_dir, doc, row.id, params.formats, tz)
         kpis = [{"key": k.key, "label": k.label, "value": k.value, "previous": k.previous} for k in doc.kpis]

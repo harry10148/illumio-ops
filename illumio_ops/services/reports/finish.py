@@ -5,15 +5,19 @@
 - a table column that is blank on every row is not printed;
 - one data note when none of the key numbers has a previous period to compare with (it replaces the "No previous
   period" line that sat under every number);
-- a data note said twice is said once.
+- a data note said twice is said once;
+- the key numbers a report's first page leads with (domain/conclusion.py LEAD_KPIS) come first, in that order; the
+  others follow in the builder's order. No number is added, dropped or changed.
 A part that is missing for another reason (an unset setting, an analysis not run, an unsupported PCE) is not this
 module's: its builder leaves it out and says why in the data notes (hints.py).
 Called by generate (and by the tests that build a report directly)."""
 from __future__ import annotations
 
+from illumio_ops.domain.conclusion import LEAD_KPIS
 from illumio_ops.domain.report import (
     BarBlock,
     Block,
+    Kpi,
     ReportDocument,
     Section,
     TableBlock,
@@ -51,8 +55,17 @@ def _without_empty_columns(block: Block) -> Block:
     keep = [i for i in range(len(block.columns)) if any(r[i] not in (None, "") for r in block.rows)]
     if not keep or len(keep) == len(block.columns):
         return block
-    return block.model_copy(update={"columns": tuple(block.columns[i] for i in keep),
-                                    "rows": tuple(tuple(r[i] for i in keep) for r in block.rows)})
+    columns = tuple(block.columns[i] for i in keep)
+    kept = {c.key for c in columns}
+    return block.model_copy(update={"columns": columns, "rows": tuple(tuple(r[i] for i in keep) for r in block.rows),
+                                    "host_keys": {k: v for k, v in block.host_keys.items() if k in kept}})
+
+
+def _lead_first(report_type: ReportType, kpis: tuple[Kpi, ...]) -> tuple[Kpi, ...]:
+    """The type's lead numbers the report has, in the listed order, then the others as the builder gave them: a
+    lead number the report lacks is filled from the ones after, so the first page is always kpis[:3]."""
+    lead = LEAD_KPIS.get(report_type, ())
+    return (*(k for key in lead for k in kpis if k.key == key), *(k for k in kpis if k.key not in lead))
 
 
 def finish(doc: ReportDocument) -> ReportDocument:
@@ -71,4 +84,5 @@ def finish(doc: ReportDocument) -> ReportDocument:
                             blocks=(TextBlock(paragraphs=tuple(_line(s) for s in folded)),)))
     else:
         kept = list(doc.sections)
-    return doc.model_copy(update={"data_quality": tuple(notes), "sections": tuple(kept)})
+    return doc.model_copy(update={"data_quality": tuple(notes), "sections": tuple(kept),
+                                  "kpis": _lead_first(doc.report_type, doc.kpis)})

@@ -10,6 +10,7 @@ from illumio_ops.domain.conclusion import (
     CONCLUSION_KEYS,
     CONCLUSION_KPIS,
     CONCLUSIONS,
+    LEAD_KPIS,
     conclusion,
 )
 from illumio_ops.domain.report import Kpi, ReportDocument
@@ -79,6 +80,22 @@ def test_declared_kpis_exist_in_builder_output(ctx, report_type):  # noqa: F811
     assert set(CONCLUSION_KPIS[report_type]) <= {k.key for k in doc.kpis}, report_type
     text = conclusion(doc, _tr(Language.EN))
     assert text and "{" not in text and "None" not in text
+
+
+@pytest.mark.parametrize("report_type", sorted(LEAD_KPIS))
+def test_lead_kpis_exist_in_builder_output(ctx, report_type):  # noqa: F811
+    """Stage 3a: the three numbers a report's first page leads with are numbers its builder produces, and after the
+    closing step they are the first three."""
+    from illumio_ops.services.reports.finish import finish
+    cond = APP_DB if specs()[report_type].requires_app else None
+    inp = BuildInput(ctx=ctx, params=ReportParams(report_type=report_type, filter=cond), start=START, end=END,
+                     lang=Language.EN, tz=UTC, now=NOW, pce_label="pce")
+    doc = specs()[report_type].build(inp)
+    assert set(LEAD_KPIS[report_type]) <= {k.key for k in doc.kpis}, report_type
+    done = finish(doc)
+    assert tuple(k.key for k in done.kpis[:3]) == LEAD_KPIS[report_type]
+    rest = [k.key for k in doc.kpis if k.key not in LEAD_KPIS[report_type]]
+    assert [k.key for k in done.kpis[3:]] == rest
 
 
 def test_custom_counts_sections(ctx):  # noqa: F811

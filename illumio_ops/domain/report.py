@@ -5,6 +5,9 @@ email renderers read only this, so the three outputs of one report cannot disagr
 Length rules (project rule: no silent truncation): a table holds every row it has (the XLSX writes them
 all, up to XLSX_ROW_CAP); the HTML shows the first HTML_ROW_CAP and says how many there are and where the
 rest is; a cell longer than CELL_SOFT_MAX characters is cut in the HTML only, with its full length stated.
+A report has at most 2 caveats ("know this before reading the numbers"): a third is refused when the document is
+built, never dropped. One thing to do (domain/actions.py) lists the titles of its first 4 findings and says how many
+more there are; the first page lists the first 3 things to do and says how many more there are.
 """
 from __future__ import annotations
 
@@ -26,6 +29,11 @@ HTML_ROW_CAP = 200
 XLSX_ROW_CAP = 1_000_000
 CELL_SOFT_MAX = 2_000
 BAR_POINT_CAP = 90
+CAVEATS_MAX = 2
+
+# The part of the host page a table's host links open at: the web app's HostSection (components/HostLink.tsx).
+HostSection = Literal["status", "alerts", "different", "usual", "connections", "would-block", "ransomware", "tamper",
+                      "quarantine"]
 
 Cell = str | int | float | None
 
@@ -50,6 +58,18 @@ class Finding(_Model):
     why: str
     action: str
     techniques: tuple[tuple[str, str], ...] = ()  # MITRE ATT&CK (id, official English name), never translated
+    what: str = ""  # what happened (the fact); empty: the card's first part is the title alone
+    # What to do, as a code: findings with the same code are one thing to do (domain/actions.py). action_short is
+    # the one imperative sentence of that thing; action_focus one sentence naming where most of it is (may be empty).
+    action_code: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_]*$")
+    action_short: str = ""
+    action_focus: str = ""
+
+    @model_validator(mode="after")
+    def _action(self) -> Finding:
+        if self.action_code is not None and not self.action_short.strip():
+            raise ValueError("a finding with an action code says what to do (action_short)")
+        return self
 
 
 def techniques_text(techniques: tuple[tuple[str, str], ...]) -> str:
@@ -75,6 +95,11 @@ class TableBlock(_Model):
     # html_note says, in the builder's words, what the rows left out of the HTML are.
     html_rows: int | None = Field(default=None, ge=0)
     html_note: str | None = None
+    # Column key -> the host key of each row's cell in that column, in the order of `rows` (None: that cell names
+    # no host the console has a page for). Only the first HTML_ROW_CAP rows need one: the HTML prints no more and
+    # the XLSX carries no links. Matched to columns by key, never by position (columns are dropped before printing).
+    host_keys: dict[str, tuple[str | None, ...]] = {}
+    host_section: HostSection | None = None  # the part of the host page the links open at
 
     @model_validator(mode="after")
     def _shape(self) -> TableBlock:
@@ -83,6 +108,11 @@ class TableBlock(_Model):
             raise ValueError("every row has one cell per column")
         if self.total_rows < len(self.rows):
             raise ValueError("total_rows counts at least the rows held")
+        keys = {c.key for c in self.columns}
+        if any(k not in keys for k in self.host_keys):
+            raise ValueError("host_keys are given per column key")
+        if any(len(v) > len(self.rows) for v in self.host_keys.values()):
+            raise ValueError("host_keys hold at most one key per row")
         return self
 
 
@@ -132,6 +162,11 @@ class ReportDocument(_Model):
     gui_link: str | None = None
     export: RowsExport | None = None  # the JSON / CSV content, for types that make those formats
     conclusion: str = ""  # the one opening sentence (domain/conclusion.py), filled by the generator
+    # "Know this before reading the numbers", right under the opening sentence: two sentences at most.
+    caveats: tuple[str, ...] = Field(default=(), max_length=CAVEATS_MAX)
+    # The console's external address (settings.reports.gui_external_url, no trailing '/'), filled by the generator
+    # where it fills gui_link. None: no address is set, so the report links nowhere.
+    gui_base: str | None = None
 
     @model_validator(mode="after")
     def _ids(self) -> ReportDocument:

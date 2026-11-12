@@ -48,6 +48,26 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.CUSTOM: ("sections", "period"),
 }
 
+# The three numbers a report's first page leads with (stage 3a), in the order shown. The closing step (finish) moves
+# the ones the report has to the front; a missing one is filled from the numbers after. policy_resolver and custom
+# have no row of numbers on a first page.
+LEAD_KPIS: Mapping[ReportType, tuple[str, ...]] = {
+    ReportType.SECURITY_RISK: ("maturity", "enforced_hosts_pct", "pb_flows"),
+    ReportType.LATERAL_POSTURE: ("assets_reachable", "pivots", "new_detections"),
+    ReportType.NEW_CONNECTIONS: ("new", "admin", "unmanaged_source"),
+    ReportType.UNMANAGED_ENDPOINTS: ("total", "admin_sources", "public"),
+    ReportType.TRAFFIC: ("flows", "sources", "destinations"),
+    ReportType.NETWORK_INVENTORY: ("managed_hosts", "hosts_missing_labels", "apps"),
+    ReportType.APP_SUMMARY: ("inbound_connections", "outbound_connections", "allowed_pct"),
+    ReportType.VEN_STATUS: ("managed", "long_offline", "sync_problems"),
+    ReportType.AUDIT: ("high_risk", "auth_failed", "policy_provisions"),
+    ReportType.RANSOMWARE: ("rated_hosts", "priority", "safe_to_block"),
+    ReportType.READINESS: ("apps", "ready", "predicted_blocked"),
+    ReportType.POLICY_USAGE: ("rules", "unused", "no_rule"),
+    ReportType.RULE_HIT_COUNT: ("rules", "hit", "zero"),  # its own report until 3b folds it into policy usage
+    ReportType.POLICY_DIFF: ("total", "rules", "high"),
+}
+
 
 # The sentence forms of each type, in order: the first whose numbers the report all has (a value, not None) is the
 # one used. A later form leaves out a number an unset optional setting, an analysis not yet run, or an unsupported

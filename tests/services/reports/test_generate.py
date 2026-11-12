@@ -265,3 +265,73 @@ def test_app_required_for_app_reports(ctx, monkeypatch):
     rid2 = generate.enqueue(ctx, ReportParams(report_type=LATERAL, filter=cond), trigger="manual", schedule_id=None,
                             now=NOW)
     assert _row(ctx, rid2).status is ReportStatus.QUEUED
+
+
+# stage 3a: the three lead numbers come first (finish), and the document knows where the console is
+def _kpi_doc(report_type, keys):
+    return ReportDocument(report_type=report_type, lang=Language.EN, title="T", period_start=NOW - timedelta(days=7),
+                          period_end=NOW, generated_at=NOW, pce_label="pce",
+                          kpis=tuple(Kpi(key=k, label=k, value=i, previous=None) for i, k in enumerate(keys)),
+                          findings=(), data_quality=(), sections=())
+
+
+def _finished_keys(report_type, keys):
+    from illumio_ops.services.reports.finish import finish
+    out = finish(_kpi_doc(report_type, keys))
+    assert {k.key: k.value for k in out.kpis} == {k: i for i, k in enumerate(keys)}  # moved, never changed
+    return [k.key for k in out.kpis]
+
+
+def test_finish_puts_the_lead_numbers_first_and_keeps_the_rest_in_order():
+    keys = ["allowed_pct", "pb_flows", "blocked_flows", "enforced_hosts_pct", "critical_high_findings", "maturity"]
+    assert _finished_keys(ReportType.SECURITY_RISK, keys) == [
+        "maturity", "enforced_hosts_pct", "pb_flows", "allowed_pct", "blocked_flows", "critical_high_findings"]
+
+
+def test_finish_fills_a_missing_lead_number_from_the_ones_after():
+    """A ransomware report with only its list has no 'priority': the first page still shows doc.kpis[:3]."""
+    assert _finished_keys(ReportType.RANSOMWARE, ["org_percent", "rated_hosts", "suspicious", "safe_to_block"]) == [
+        "rated_hosts", "safe_to_block", "org_percent", "suspicious"]
+    assert _finished_keys(ReportType.RANSOMWARE, ["org_percent"]) == ["org_percent"]
+
+
+@pytest.mark.parametrize("report_type", [ReportType.POLICY_RESOLVER, ReportType.CUSTOM])
+def test_finish_leaves_the_order_of_a_type_without_lead_numbers(report_type):
+    from illumio_ops.domain.conclusion import LEAD_KPIS
+    assert report_type not in LEAD_KPIS
+    assert _finished_keys(report_type, ["rows", "rules", "maturity", "total"]) == ["rows", "rules", "maturity", "total"]
+
+
+def test_every_other_type_has_three_lead_numbers():
+    from illumio_ops.domain.conclusion import LEAD_KPIS
+    assert set(LEAD_KPIS) == set(ReportType) - {ReportType.POLICY_RESOLVER, ReportType.CUSTOM}
+    assert all(len(keys) == 3 and len(set(keys)) == 3 for keys in LEAD_KPIS.values())
+
+
+def test_finish_keeps_host_keys_only_for_the_columns_it_keeps():
+    from illumio_ops.domain.report import Column, Section, TableBlock
+    from illumio_ops.services.reports.finish import finish
+    cols = (Column(key="src", label="S"), Column(key="blank", label="B"), Column(key="dst", label="D"))
+    block = TableBlock(title="t", columns=cols, rows=(("a", "", "b"), ("c", None, "d")), total_rows=2, empty_text="-",
+                       host_keys={"src": ("ka", "kc"), "blank": (None, None), "dst": ("kb", None)},
+                       host_section="connections")
+    doc = _kpi_doc(ReportType.TRAFFIC, []).model_copy(update={"sections": (Section(id="s", title="S", blocks=(block,)),)})
+    out = finish(doc).sections[0].blocks[0]
+    assert [c.key for c in out.columns] == ["src", "dst"]
+    assert out.host_keys == {"src": ("ka", "kc"), "dst": ("kb", None)} and out.host_section == "connections"
+    TableBlock.model_validate(out.model_dump())  # still a valid table
+
+
+@pytest.mark.parametrize(("external", "base"), [("https://ops.example:5443/", "https://ops.example:5443"),
+                                                ("https://ops.example/ops", "https://ops.example/ops"), ("", None)])
+def test_the_document_carries_the_console_address(ctx, monkeypatch, external, base):
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["reports"].update(gui_external_url=external))
+    _register(monkeypatch, FakeBuilder())
+    seen = []
+    real = generate._write
+    monkeypatch.setattr(generate, "_write", lambda out_dir, doc, *a, **kw: (seen.append(doc), real(out_dir, doc, *a, **kw))[1])
+    rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL), trigger="manual", schedule_id=None, now=NOW)
+    generate.run_queued(ctx, now=NOW)
+    assert _row(ctx, rid).status is ReportStatus.DONE
+    assert seen[0].gui_base == base
+    assert seen[0].gui_link == (f"{base}/reports?id={rid}" if base else None)
