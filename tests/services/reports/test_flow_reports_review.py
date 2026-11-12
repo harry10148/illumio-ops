@@ -85,12 +85,12 @@ def test_lookback_past_flow_days_is_pulled_not_refused(ctx):
 
 def test_coverage_note_uses_flow_retention_for_flow_reports(ctx, monkeypatch):
     seen = []
-    real = generate.coverage_note
+    real = generate.coverage_text
 
     def spy(*a, **k):
         seen.append(k.get("flows"))
         return real(*a, **k)
-    monkeypatch.setattr("illumio_ops.services.reports.traffic.coverage_note", spy)
+    monkeypatch.setattr("illumio_ops.services.reports.traffic.coverage_text", spy)
     _write(ctx, [flow(port=443)])
     _build(ctx, ReportType.TRAFFIC)
     assert seen == [True]

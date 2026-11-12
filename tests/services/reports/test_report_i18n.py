@@ -310,3 +310,25 @@ def test_injected_missing_key_is_caught(ctx, monkeypatch):
     monkeypatch.setattr(i18n, "dictionary", without)
     html = _outputs(ctx, ReportType.SECURITY_RISK, Language.ZH_TW)["html"]
     assert "rpt_rule_b002_name" in RAW_KEY.findall(html.split("</style>", 1)[-1])
+
+
+COVERAGE_BUILDERS = (ReportType.APP_SUMMARY, ReportType.SECURITY_RISK, ReportType.READINESS,
+                     ReportType.NETWORK_INVENTORY, ReportType.LATERAL_POSTURE, ReportType.NEW_CONNECTIONS,
+                     ReportType.UNMANAGED_ENDPOINTS, ReportType.TRAFFIC, ReportType.CUSTOM)
+
+
+@pytest.mark.parametrize("report_type", COVERAGE_BUILDERS)
+def test_a_collection_gap_is_said_under_the_conclusion_and_listed_in_the_notes(ctx, monkeypatch, report_type):
+    """Every builder that reads traffic hands on both halves of coverage_text: the one sentence and the lines."""
+    import sys
+
+    from illumio_ops.services.reports.generate import CoverageText
+    said = CoverageText(lines=("the gap, line by line",), caveats=("the gap, in one sentence",))
+    module = sys.modules[specs()[report_type].build.__module__]
+    monkeypatch.setattr(module, "coverage_text", lambda *a, **k: said)
+    cond = APP_DB if specs()[report_type].requires_app else None
+    custom_id = _custom(ctx) if report_type is ReportType.CUSTOM else None
+    doc = specs()[report_type].build(BuildInput(
+        ctx=ctx, params=ReportParams(report_type=report_type, filter=cond, custom_id=custom_id), start=START, end=END,
+        lang=Language.EN, tz=UTC, now=NOW, pce_label="pce"))
+    assert doc.caveats == said.caveats and said.lines[0] in doc.data_quality

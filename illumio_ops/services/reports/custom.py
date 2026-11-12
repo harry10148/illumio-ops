@@ -31,7 +31,7 @@ from illumio_ops.services.flowsource import FlowRow, field_coverage
 from illumio_ops.services.reports import flowsections
 from illumio_ops.services.reports.common import port_text, tr
 from illumio_ops.services.reports.flowsections import DECISION_KEYS
-from illumio_ops.services.reports.generate import coverage_note
+from illumio_ops.services.reports.generate import coverage_text
 from illumio_ops.services.reports.registry import BuildInput, ReportFailed
 from illumio_ops.services.reports.render_html import fmt_time
 from illumio_ops.services.reports.visibility import visibility_sections
@@ -143,13 +143,15 @@ def build_custom(inp: BuildInput) -> ReportDocument:
         raise ReportFailed("rpt_err_custom_missing")  # deleted after it was queued or scheduled
     sections = tuple(_section(inp, i, s) for i, s in enumerate(rep.sections))
     quality: tuple[str, ...] = ()
+    caveats: tuple[str, ...] = ()
     if any(sec.segment.mode == "flows" for sec in rep.sections):
-        quality += coverage_note(inp.ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz, flows=True)
+        cov = coverage_text(inp.ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz, flows=True)
+        quality, caveats = cov.lines, cov.caveats
     if not inp.ctx.settings.current().reports.gui_external_url:
         quality += (tr(inp.lang, "rpt_cust_no_links"),)
     return ReportDocument(
         report_type=ReportType.CUSTOM, lang=inp.lang, title=rep.name, period_start=inp.start, period_end=inp.end,
-        generated_at=inp.now, pce_label=inp.pce_label, kpis=(), findings=(), data_quality=quality,
+        generated_at=inp.now, pce_label=inp.pce_label, kpis=(), findings=(), data_quality=quality, caveats=caveats,
         sections=(*(sections or (Section(id="empty", title=rep.name, blocks=(TextBlock(paragraphs=(
             tr(inp.lang, "rpt_cust_empty"),)),)),)),
                   *(visibility_sections(inp) if any(sec.segment.mode == "flows" for sec in rep.sections) else ())))

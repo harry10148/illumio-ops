@@ -168,3 +168,17 @@ def test_a_weekly_lateral_posture_report_reads_the_store_too(tmp_path):
     ctx = _ctx(tmp_path)
     _, html = _made(ctx, report_type=ReportType.LATERAL_POSTURE, lookback_days=5)
     assert "from the archive" not in html
+
+
+def test_a_report_read_from_the_archive_says_under_the_conclusion_which_days_it_lacks(tmp_path, monkeypatch):
+    ctx = _ctx(tmp_path)
+    docs = []
+    write = generate._write
+    monkeypatch.setattr(generate, "_write", lambda out, doc, *a, **k: (docs.append(doc), write(out, doc, *a, **k))[1])
+    rid = generate.enqueue(ctx, _params(), trigger="manual", schedule_id=None, now=NOW)
+    assert generate.run_queued(ctx, now=NOW) == rid
+    doc = docs[0]
+    lacking = next(q for q in doc.data_quality if "neither the store nor the archive" in q)
+    n = int(lacking.split(" ", 1)[0])
+    assert n > 0 and len(doc.caveats) == 2  # the collection gap, then the archive
+    assert doc.caveats[1] == f"Days of the period the archive could not supply: {n}; the details are in “Data notes” at the end."

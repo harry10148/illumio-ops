@@ -10,7 +10,7 @@ import json
 import os
 import shutil
 import traceback
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -19,7 +19,7 @@ from loguru import logger
 
 from illumio_ops.domain.conclusion import conclusion
 from illumio_ops.domain.filter import FilterSpec
-from illumio_ops.domain.report import ReportDocument
+from illumio_ops.domain.report import CAVEATS_MAX, ReportDocument
 from illumio_ops.domain.values import (
     CollectionMode,
     IngestSource,
@@ -259,7 +259,8 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
                 spec.ondemand_prepare(arc.ctx, inp.now)
             built = spec.build(dataclasses.replace(inp, ctx=arc.ctx))
         return built.model_copy(update={"data_quality": (*built.data_quality,
-                                                         *_archive_lines(arc, inp.lang, inp.tz))})
+                                                         *_archive_lines(arc, inp.lang, inp.tz)),
+                                        "caveats": archive_caveats(built.caveats, arc, inp.lang)})
     if not pulls_on_demand(ctx, spec, inp.start, inp.now, inp.params):
         return spec.build(inp)
     try:
@@ -445,9 +446,41 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
     return row.id
 
 
-def coverage_note(ctx: AppContext, start: datetime, end: datetime, lang: Language, *, now: datetime,
-                  tz: tzinfo | None, flows: bool = False) -> tuple[str, ...]:
-    """The data-quality lines about traffic in the period: whole period, or where it starts and every gap.
+@dataclasses.dataclass(frozen=True)
+class CoverageText:
+    """What a report says about the traffic it could read: `lines` for the data notes (the whole period, or where it
+    starts and each gap), `caveats` for under the conclusion (one sentence when there is any gap, else nothing)."""
+    lines: tuple[str, ...]
+    caveats: tuple[str, ...]
+
+
+def gap_caveats(gaps: Sequence[tuple[datetime, datetime, str]], lang: Language) -> tuple[str, ...]:
+    """One sentence for every gap there is (not only the MAX_GAP_LINES the notes list): how many, and the hours they
+    cover to one decimal. Two gaps over the same time (a failed read and a truncated one) are that time once."""
+    if not gaps:
+        return ()
+    seconds, upto = 0.0, None
+    for a, b, _ in sorted(gaps, key=lambda g: g[0]):
+        a = a if upto is None or a > upto else upto
+        if b > a:
+            seconds += (b - a).total_seconds()
+            upto = b
+    return (translate(lang, "rpt_caveat_gaps", {"n": str(len(gaps)), "hours": f"{seconds / 3600:.1f}"}),)
+
+
+def archive_caveats(caveats: tuple[str, ...], res: archive_read.ArchiveResult, lang: Language) -> tuple[str, ...]:
+    """The caveats of a report read from the archive: one more sentence when some days are in no archive file (a day
+    lacking for flows and for events is one day), unless the report already has all the caveats it may carry."""
+    days = {day for missing in res.missing_days.values() for day in missing}
+    if not days or len(caveats) >= CAVEATS_MAX:
+        return caveats
+    return (*caveats, translate(lang, "rpt_caveat_archive_missing", {"n": str(len(days))}))
+
+
+def coverage_text(ctx: AppContext, start: datetime, end: datetime, lang: Language, *, now: datetime,
+                  tz: tzinfo | None, flows: bool = False) -> CoverageText:
+    """What the report says about traffic in the period: the data-quality lines (whole period, or where it starts and
+    every gap) and the one sentence for under the conclusion.
     flows: the report reads the flows table (kept flow_days), not the rollups (rollup_days)."""
     settings = ctx.settings.current()
     fdb = ctx.flows()
@@ -466,11 +499,16 @@ def coverage_note(ctx: AppContext, start: datetime, end: datetime, lang: Languag
         lines.append(tr("rpt_quality_alert_mode", days=settings.collection.retention.flow_days))
     if not cov.gaps:
         lines.append(tr("rpt_quality_traffic_whole"))
-        return tuple(lines)
+        return CoverageText(lines=tuple(lines), caveats=())
     for a, b, reason in cov.gaps[:MAX_GAP_LINES]:
         lines.append(tr("rpt_quality_gap", start=fmt_time(a.isoformat(), tz), end=fmt_time(b.isoformat(), tz),
                         reason=tr(GAP_REASON_KEYS.get(reason, "rpt_gap_reason_ingest_failed"))))
     if len(cov.gaps) > MAX_GAP_LINES:
         lines.append(tr("rpt_quality_gaps_more", n=len(cov.gaps) - MAX_GAP_LINES))
-    return tuple(lines)
+    return CoverageText(lines=tuple(lines), caveats=gap_caveats(cov.gaps, lang))
 
+
+def coverage_note(ctx: AppContext, start: datetime, end: datetime, lang: Language, *, now: datetime,
+                  tz: tzinfo | None, flows: bool = False) -> tuple[str, ...]:
+    """coverage_text's data-quality lines alone."""
+    return coverage_text(ctx, start, end, lang, now=now, tz=tz, flows=flows).lines

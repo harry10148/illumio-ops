@@ -33,7 +33,7 @@ from illumio_ops.services.reports.common import (
     tr,
 )
 from illumio_ops.services.reports.generate import (
-    coverage_note,
+    coverage_text,
     previous_period,
     traffic_covered,
 )
@@ -373,9 +373,9 @@ class _Builder:
             parts.append(self.t("rpt_detail_connections", n=summary["connections"]))
         return "; ".join(parts)
 
-    def quality(self, exposure_row: Any) -> tuple[str, ...]:
+    def quality(self, exposure_row: Any, coverage: tuple[str, ...]) -> tuple[str, ...]:
         inp, lc = self.inp, self.lc
-        lines = list(coverage_note(inp.ctx, inp.start, inp.end, self.lang, now=inp.now, tz=inp.tz))
+        lines = list(coverage)
         lines.append(self.t("rpt_quality_utc_days"))
         if not self.critical_set:
             lines.append(hint(self.lang, "rpt_hint_unset_critical_assets"))
@@ -423,11 +423,13 @@ def build_lateral_posture(inp: BuildInput) -> ReportDocument:
         before_count = before
     exposure = json.loads(exposure_row["result_json"]) if exposure_row is not None else None
     focus = json.loads(focus_row["result_json"]) if focus_row is not None else None
+    cov = coverage_text(inp.ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz)
     return ReportDocument(
         report_type=inp.params.report_type, lang=inp.lang, title=b.t("rpt_title_lateral_posture"),
         period_start=inp.start, period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label,
         kpis=b.kpis(exposure, snaps, sum(n for n, _ in counts.values()), before_count),
-        findings=_findings(focus, b.lc.hosts, inp.lang), data_quality=b.quality(exposure_row),
+        findings=_findings(focus, b.lc.hosts, inp.lang), data_quality=b.quality(exposure_row, cov.lines),
+        caveats=cov.caveats,
         sections=tuple(s for s in (
             b.exposure_section(exposure, snaps), b.assets_section(exposure), b.reach_section(exposure),
             b.pivots_section(exposure), b.detections_section(counts, rows, total), b.cross_env_section(exposure),

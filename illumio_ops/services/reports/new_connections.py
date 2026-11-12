@@ -26,7 +26,7 @@ from illumio_ops.services.reports.common import (
     tr,
 )
 from illumio_ops.services.reports.generate import (
-    coverage_note,
+    coverage_text,
     previous_period,
     traffic_covered,
 )
@@ -199,7 +199,8 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
                                   limit_note=b.limit_note(len(gone_rows), gone_total)),)
     else:
         gone_blocks = (TextBlock(paragraphs=(b.t("rpt_new_disappeared_unknown"),)),)
-    quality = [*coverage_note(inp.ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz)]
+    cov = coverage_text(inp.ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz)
+    quality = [*cov.lines]
     if partial:
         quality.append(partial)
     if accumulating:
@@ -209,7 +210,7 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=inp.lang, title=b.t("rpt_title_new_connections"),
         period_start=inp.start, period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=b.findings(admin_rows), data_quality=tuple(quality),
+        findings=b.findings(admin_rows), data_quality=tuple(quality), caveats=cov.caveats,
         sections=(Section(id="by_service", title=b.t("rpt_new_sec_by_service"), intro=b.t("rpt_new_intro"),
                           blocks=(service_table,)),
                   Section(id="by_destination", title=b.t("rpt_new_sec_by_destination"), blocks=(dst_table,)),

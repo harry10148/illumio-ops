@@ -174,6 +174,69 @@ def test_coverage_note_whole_period(ctx):
     assert any("whole period" in n for n in notes)
 
 
+def _gaps(ctx, windows, *, covered=True):
+    start, end = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
+    with ctx.flows().connect() as conn:
+        if covered:
+            ingest_state.add_coverage(conn, IngestSource.TRAFFIC, start - timedelta(days=1), end + timedelta(hours=1))
+        for a, b, kind in windows:
+            ingest_state.record_gap(conn, IngestSource.TRAFFIC, a, b, kind=kind, detail="x", at=NOW)
+    return start, end
+
+
+def _at(day, hour, minute=0):
+    return datetime(2026, 10, day, hour, minute, tzinfo=UTC)
+
+
+def test_two_gaps_are_one_sentence_under_the_conclusion(ctx):
+    start, end = _gaps(ctx, [(_at(22, 3), _at(22, 5), "failed"), (_at(24, 10), _at(24, 13, 30), "failed")])
+    got = generate.coverage_text(ctx, start, end, Language.ZH_TW, now=NOW, tz=UTC)
+    assert got.caveats == ("期間內有 2 段、共 5.5 小時沒有收集到資料；明細在最後的「資料註記」。",)
+    assert got.lines == generate.coverage_note(ctx, start, end, Language.ZH_TW, now=NOW, tz=UTC)
+    assert sum("缺口" in line for line in got.lines) == 2
+    en = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
+    assert len(en.caveats) == 1 and "2" in en.caveats[0] and "5.5 hours" in en.caveats[0]
+
+
+def test_the_sentence_counts_every_gap_though_the_notes_list_ten(ctx):
+    start, end = _gaps(ctx, [(_at(22, h), _at(22, h, 30), "failed") for h in range(12)])
+    got = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
+    assert len(got.caveats) == 1 and ": 12," in got.caveats[0] and "6.0 hours" in got.caveats[0]
+    assert sum("numbers do not include that time" in line for line in got.lines) == generate.MAX_GAP_LINES
+    assert got.lines[-1] == "…and 2 more gaps."
+
+
+def test_hours_of_two_gaps_over_the_same_time_are_counted_once(ctx):
+    start, end = _gaps(ctx, [(_at(22, 3), _at(22, 5), "failed"), (_at(22, 4), _at(22, 6), "truncated")])
+    got = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
+    assert ": 2," in got.caveats[0] and "3.0 hours" in got.caveats[0]  # 03:00-06:00, not 2 + 2
+
+
+def test_no_gap_no_sentence(ctx):
+    start, end = _gaps(ctx, [])
+    got = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
+    assert got.caveats == () and any("whole period" in line for line in got.lines)
+
+
+def _archive(missing):
+    from illumio_ops.services import archive_read
+    return archive_read.ArchiveResult(ctx=None, archived_days={}, missing_days=missing, rows=0, unreadable=0,
+                                      unread_from=None)
+
+
+def test_days_the_archive_lacks_are_a_second_sentence(ctx):
+    res = _archive({"flows": ["2026-10-01", "2026-10-02"], "events": ["2026-10-02", "2026-10-03"]})
+    got = generate.archive_caveats(("the gap sentence",), res, Language.ZH_TW)
+    assert got == ("the gap sentence", "期間內有 3 天的封存讀不到；明細在最後的「資料註記」。")  # a day both lack is one day
+    assert "3" in generate.archive_caveats((), res, Language.EN)[0]
+
+
+def test_no_missing_day_no_sentence_and_never_a_third(ctx):
+    assert generate.archive_caveats(("a",), _archive({"flows": []}), Language.EN) == ("a",)
+    full = generate.archive_caveats(("a", "b"), _archive({"flows": ["2026-10-01"]}), Language.EN)
+    assert full == ("a", "b")
+
+
 def test_period_starts_at_display_midnight_across_dst():
     """Review: the start was the UTC end minus whole days, an hour off when the span crosses a DST change."""
     from zoneinfo import ZoneInfo

@@ -257,3 +257,14 @@ def test_event_type_no_user_made_says_so(ctx):
     assert doc.findings[0].what == "Users behind them: None (not made by a user)."
     assert "list of event types with an audit risk" in doc.findings[0].why
     assert doc.findings[0].action_code == "review_events"  # critical: confirm each event
+
+
+def test_an_event_gap_is_one_sentence_under_the_conclusion(ctx):
+    _write(ctx, [event("user.sign_in", D, user="alice")])
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.EVENTS, START - timedelta(days=1), END + timedelta(hours=1))
+    assert _build(ctx).caveats == ()
+    with ctx.flows().connect() as conn:
+        ingest_state.record_gap(conn, IngestSource.EVENTS, D, D + timedelta(hours=1, minutes=30), kind="failed",
+                                detail="x", at=NOW)
+    assert _build(ctx, Language.ZH_TW).caveats == ("期間內有 1 段、共 1.5 小時沒有收集到資料；明細在最後的「資料註記」。",)

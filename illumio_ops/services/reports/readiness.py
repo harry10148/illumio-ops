@@ -37,7 +37,7 @@ from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.flowsource import UnruledLink, readiness_rows, unruled_inbound
 from illumio_ops.services.reports import flowsections
 from illumio_ops.services.reports.common import port_text, rule_label, tr
-from illumio_ops.services.reports.generate import coverage_note
+from illumio_ops.services.reports.generate import coverage_text
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.visibility import visibility_sections
@@ -255,14 +255,15 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     total = sum(r.connections for r in flows.values())
     unknown = sum(r.unknown for r in flows.values())
     filter_line = flowsections.filter_text(inp.params.filter, lang)
-    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True),
+    cov = coverage_text(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True)
+    quality = (*cov.lines,
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
                t("rpt_rdy_quality_definition"),
                *((t("rpt_rdy_quality_unknown", pct=f"{100 * unknown / total:.1f}"),) if unknown else ()))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_readiness"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=findings,
-        data_quality=quality,
+        data_quality=quality, caveats=cov.caveats,
         sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rdy_how_intro"), blocks=(factors, grades)),
                   Section(id="next", title=t("rpt_rdy_sec_next"), intro=t("rpt_rdy_next_intro"), blocks=(next_steps,)),
                   Section(id="scores", title=t("rpt_rdy_sec_scores"), intro=t("rpt_rdy_scores_intro"), blocks=(scores, basis)),

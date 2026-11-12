@@ -23,7 +23,7 @@ from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import port_text, tr
 from illumio_ops.services.reports.generate import (
-    coverage_note,
+    coverage_text,
     previous_period,
     traffic_covered,
 )
@@ -174,11 +174,12 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
                              action_short=t("rpt_act_unmanaged"),
                              action_focus=t("rpt_unm_focus", address=e.address, peers=e.admin_peers))
                      for e in flagged)
-    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz), t("rpt_quality_utc_days"))
+    cov = coverage_text(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz)
+    quality = (*cov.lines, t("rpt_quality_utc_days"))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_unmanaged"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=findings,
-        data_quality=quality,
+        data_quality=quality, caveats=cov.caveats,
         sections=(Section(id="candidates", title=t("rpt_unm_sec_candidates"),
                           intro=t("rpt_unm_candidates_intro", n=CANDIDATE_MIN_PEERS), blocks=(cand_table,)),
                   Section(id="admin", title=t("rpt_unm_sec_admin"), blocks=(admin_table,)),

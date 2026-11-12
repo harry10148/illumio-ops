@@ -45,7 +45,7 @@ from illumio_ops.services.reports import findings, flowsections, reads
 from illumio_ops.services.reports.common import host_name, port_text, severity_name, tr
 from illumio_ops.services.reports.flowsections import DECISION_KEYS
 from illumio_ops.services.reports.generate import (
-    coverage_note,
+    coverage_text,
     previous_period,
     traffic_covered,
 )
@@ -362,13 +362,14 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     lateral_lines.append(t("rpt_sec_lateral_see", report=t("rpt_title_lateral_posture")))
 
     filter_line = flowsections.filter_text(cond, lang)
-    quality = (*coverage_note(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True),
+    cov = coverage_text(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True)
+    quality = (*cov.lines,
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
                t("rpt_trf_quality_counts"), *flowsections.coverage_lines(inp, fc))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_security_risk"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang),
+        findings=findings.as_findings(outcomes, lang), caveats=cov.caveats,
         data_quality=(*quality, *missing, *flowsections.no_links_note(inp)),
         sections=tuple(s for s in (
             Section(id="how", title=t("rpt_sec_sec_how"), intro=t("rpt_sec_how_intro"),

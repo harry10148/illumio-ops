@@ -45,7 +45,7 @@ from illumio_ops.services.eventsource import (
     failed_then_change,
 )
 from illumio_ops.services.reports.common import event_status_name, severity_name, tr
-from illumio_ops.services.reports.generate import previous_period
+from illumio_ops.services.reports.generate import gap_caveats, previous_period
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.workbench import EventRequest
 
@@ -298,6 +298,7 @@ def build_audit(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_audit"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=findings,
+        caveats=gap_caveats(counts.coverage.gaps, lang),
         data_quality=(*quality, *(() if inp.ctx.settings.current().reports.gui_external_url
                                   else (t("rpt_cust_no_links"),))),
         sections=(Section(id="attention", title=t("rpt_aud_sec_attention"), intro=t("rpt_aud_attention_intro"),
