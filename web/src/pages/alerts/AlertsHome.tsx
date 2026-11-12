@@ -1,7 +1,7 @@
 // The home page: alerts first (UI redesign spec §4.1, sample 01) — the period's counts, the list filtered by kind,
 // and the selected alert beside it with its timeline, what the vendor's tools cannot show, and what to do next.
 import { useEffect, useRef, useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type { AlertDetail, AlertItem, AlertList as AlertListData } from "../../api/generated";
@@ -77,6 +77,9 @@ export function AlertsHome() {
   const [days, setDays] = useState("7");
   const [cat, setCat] = useState<Category>("");
   const [onlyNew, setOnlyNew] = useState(false);
+  // ?device=<key>: only the alerts about one host (the host page's "and N more" leads here)
+  const [params, setParams] = useSearchParams();
+  const device = params.get("device");
   // "New" is measured against when this page was opened BEFORE this visit. Opening it marks everything seen for the
   // next visit and answers that earlier time, which is kept for as long as the page stays open: changing the page,
   // the period or the filter must not age the alerts being looked at.
@@ -100,6 +103,7 @@ export function AlertsHome() {
     const query: Record<string, string> = { days, page: String(page), new_after: seenBefore };
     if (cat) query.category = cat;
     if (onlyNew) query.only_new = "true";
+    if (device) query.device = device;
     void call("alerts.list", undefined, undefined, query).then((env) => {
       if (env.ok && env.data) {
         setData(env.data);
@@ -107,7 +111,7 @@ export function AlertsHome() {
         setSelected((s) => (s !== null && env.data!.items.some((i) => i.id === s) ? s : env.data!.items[0]?.id ?? null));
       } else setError(env.error);
     });
-  }, [days, cat, onlyNew, page, seenBefore]);
+  }, [days, cat, onlyNew, page, seenBefore, device]);
 
   const c = data?.counts;
   const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
@@ -138,6 +142,13 @@ export function AlertsHome() {
         { key: "low", label: t("severity_low"), value: c ? c.low : null },
         { key: "grouped", label: t("alerts_kpi_grouped"), value: c ? c.grouped : null },
       ]} />
+      {device && (
+        <p className="row" data-role="alert-device-filter">
+          <span>{t("alerts_device_filter", { name: data?.items.flatMap((i) => i.devices).find((d) => d.key === device)?.name
+            ?? device.replace(/^ip:/, "") })}</span>
+          <button type="button" className="btn-text" onClick={() => { setParams({}); setPage(1); }}>{t("alerts_device_clear")}</button>
+        </p>
+      )}
       <div className="filter-bar" data-role="alert-filters">
         <div className="chips-row" role="group" aria-label={t("alerts_type")}>
           {categories.map((k) => (

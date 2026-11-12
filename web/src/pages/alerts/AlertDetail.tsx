@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { AlertDetail as Detail, AlertEvidence, PolicyExplanation, RuleRef } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { HostLink } from "../../components/HostLink";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
@@ -30,6 +31,16 @@ function cell(row: Row, column: string, lang: string): string {
   }
   if (column === "last_detected" || column === "timestamp") return formatTime(String(v), lang);
   return String(v);
+}
+
+/** A flow row's source or destination as a link to that host (its workload, else its address). */
+function hostCell(row: Row, column: string) {
+  const side = column === "src_hostname" ? "src" : column === "dst_hostname" ? "dst" : null;
+  if (!side) return null;
+  const href = row[`${side}_href`], ip = row[`${side}_ip`];
+  const key = typeof href === "string" && href ? href : typeof ip === "string" && ip ? `ip:${ip}` : null;
+  const name = String(row[column] ?? ip ?? "");
+  return key && name ? <HostLink hostKey={key} name={name} section="connections" /> : null;
 }
 
 function Rules({ titleKey, rules }: { titleKey: string; rules: RuleRef[] }) {
@@ -102,7 +113,7 @@ function Evidence({ alertId, kind }: { alertId: string; kind: string | null }) {
                 const result = explained[i];
                 return [
                   <tr key={`r${i}`}>
-                    {columns.map((c) => <td key={c}>{cell(row, c, lang)}</td>)}
+                    {columns.map((c) => <td key={c}>{hostCell(row, c) ?? cell(row, c, lang)}</td>)}
                     {ev.kind === "flow" && (
                       <td><button type="button" className="btn-quiet" onClick={() => void explain(i, row)}>{t("explain_button")}</button></td>
                     )}

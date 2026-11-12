@@ -2,7 +2,6 @@
 // hosts the inventory holds, counted and listed; the chosen ones moved forward to a target mode, or asked to report
 // traffic faster, through the write key after a preview; and what was done.
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
@@ -10,6 +9,7 @@ import type {
   RateCheck, Tally,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { HostLink } from "../../components/HostLink";
 import { DataTable, Disclosure, KpiStrip, PageHead, Panel } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { modeWord as plainMode } from "../../terms";
@@ -341,7 +341,7 @@ function History({ actions, lang }: { actions: FleetAction[]; lang: string }) {
       columns={[
         { key: "at", label: t("fleet_col_at"), kind: "time", render: (a) => formatTime(a.at, lang) },
         { key: "by", label: t("fleet_col_by"), render: (a) => a.by },
-        { key: "host", label: t("fleet_col_host"), render: (a) => <Link to={`/hosts?key=${encodeURIComponent(a.workload_href)}`}>{hostName(a.hostname, a.workload_href)}</Link> },
+        { key: "host", label: t("fleet_col_host"), render: (a) => <HostLink hostKey={a.workload_href} name={hostName(a.hostname, a.workload_href)} section="status" /> },
         { key: "action", label: t("fleet_col_action"), render: (a) => (
           <span>{word(ACTION_KEYS, a.action)}{a.action === "enforcement" ? `：${a.previous_mode ? modeWord(a.previous_mode) : "—"} → ${modeWord(a.target_mode)}` : ""}</span>) },
         { key: "result", label: t("fleet_col_result"), render: (a) => (
@@ -482,7 +482,7 @@ function Fleet() {
               <input type="checkbox" aria-label={hostName(h.name, h.key)} checked={chosen.has(h.key)}
                      disabled={!chosen.has(h.key) && chosen.size >= MAX} onChange={() => toggle(h)} />) },
             { key: "host", label: t("fleet_col_host"), render: (h) => (
-              <Link to={`/hosts?key=${encodeURIComponent(h.key)}`}>{hostName(h.name, h.key)}</Link>) },
+              <HostLink hostKey={h.key} name={hostName(h.name, h.key)} section="status" />) },
             { key: "mode", label: t("hosts_mode"), nowrap: true, render: (h) => (h.mode ? plainMode(h.mode) : t("fleet_not_reported")) },
             { key: "online", label: t("fleet_tally_online"), nowrap: true, render: (h) => word(ONLINE_KEYS, h.online) },
             { key: "beat", label: t("fleet_col_heartbeat"), kind: "time", render: (h) => (h.last_heartbeat_at ? formatTime(h.last_heartbeat_at, lang) : "—") },

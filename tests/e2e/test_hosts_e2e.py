@@ -192,3 +192,103 @@ def test_the_enforcement_mode_is_said_in_plain_words_with_the_pce_term_beside(co
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/hosts?key={DB}")
     expect(page.locator("[data-role=host-mode]")).to_have_text("Recording only (Visibility Only)")
+
+
+# ── the host page is where every host name leads (purpose-led UI spec §6.2, §6.3) ──
+
+def _alert_about(ctx, key, *, pack_key="rule_agent_tampering", n=1):
+    from tests.e2e.test_alerts_e2e import AlertRuleType, _about
+    return [_about(ctx, [(key, "subject")], rule_type=AlertRuleType.EVENT, subject=key, pack_key=pack_key) for _ in range(n)]
+
+
+def test_arriving_with_an_anchor_lands_on_that_section(context, live_app):
+    _seed(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key={DB}#tamper")
+    section = page.locator("#tamper")
+    expect(section.locator("[data-role=tamper-readings]")).to_be_visible()
+    expect(section).to_be_in_viewport()
+    box = section.bounding_box()
+    assert 0 <= box["y"] < 900, box
+
+
+def test_the_host_page_says_what_it_comes_to_and_lists_the_alerts_about_this_host(context, live_app):
+    _seed(live_app)
+    ids = _alert_about(live_app.ctx, DB, n=2)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    said = page.locator("[data-role=page-conclusion]")
+    expect(said).to_contain_text("db: Recording only (Visibility Only); VEN ")
+    expect(said).to_contain_text("2 alerts in the last 7 days; not quarantined.")
+    listed = page.locator("#alerts [data-role=host-alert-list] li")
+    expect(listed).to_have_count(2)
+    listed.first.locator("a").click()
+    page.wait_for_url(f"**/alerts/{ids[-1]}")
+
+
+def test_without_a_host_the_page_offers_where_to_start(context, live_app, fake_pce):
+    from tests.e2e import test_fleet_e2e as fleet_e2e
+    from tests.e2e.test_ui_rules_e2e import seed_everything
+    seed_everything(live_app, fake_pce)
+    _alert_about(live_app.ctx, fleet_e2e.DB, n=3)
+    _alert_about(live_app.ctx, fleet_e2e.WEB)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts")
+    alerted = page.locator("[data-role=start-alerted] li")
+    expect(alerted).to_have_count(2)
+    expect(alerted.first).to_contain_text("db")
+    expect(alerted.first).to_contain_text("3 alerts")
+    assert alerted.first.locator("[data-role=host-link]").get_attribute("href").endswith("#alerts")
+    expect(page.locator("[data-role=start-quarantined]")).to_contain_text("No host is in quarantine.")
+    expect(page.locator("[data-role=start-lost]")).to_be_visible()
+    expect(page.locator("[data-role=start-attention]")).to_be_visible()
+    alerted.first.locator("[data-role=host-link]").click()
+    expect(page.locator("h1")).to_have_text("db")
+    # typing a name puts the lists away: the page is then about what is being looked for
+    page.goto(f"{live_app.url}/hosts")
+    page.fill("input[name=host_q]", "we")
+    expect(page.locator("[data-role=host-start]")).to_have_count(0)
+
+
+def test_basic_mode_keeps_the_lists_and_says_what_the_attention_list_needs(context, live_app, fake_pce):
+    from tests.e2e.test_ui_rules_e2e import seed_everything
+    seed_everything(live_app, fake_pce)
+    s = live_app.ctx.settings
+    s.update(s.current().revision, lambda d: d["collection"].update(mode="lightweight"))
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts")
+    expect(page.locator("[data-role=start-alerted]")).to_be_visible()
+    expect(page.locator("[data-role=start-quarantined]")).to_be_visible()
+    expect(page.locator("[data-role=start-attention] [data-role=needs-advanced]")).to_be_visible()
+
+
+def test_a_host_no_longer_in_the_inventory_still_opens_and_says_so(context, live_app):
+    _seed(live_app)
+    gone = "/orgs/1/workloads/gone"
+    _alert_about(live_app.ctx, gone)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    link = page.locator("[data-role=alert-list] [data-role=host-link]").first
+    expect(link).to_be_visible()
+    link.click()
+    expect(page.locator("[data-role=page-conclusion]")).to_contain_text("not in the current inventory")
+    expect(page.locator("[data-role=page-conclusion]")).to_contain_text("1 alerts in the last 7 days")
+    expect(page.locator(".form-error")).to_have_count(0)
+
+
+def test_the_alerts_page_can_be_narrowed_to_one_host_and_widened_again(context, live_app):
+    _seed(live_app)
+    _alert_about(live_app.ctx, DB)
+    from tests.e2e.test_alerts_e2e import seed as seed_alert
+    seed_alert(live_app.ctx)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/?device={DB}")
+    expect(page.locator("[data-role=alert-list] tbody tr")).to_have_count(1)
+    expect(page.locator("[data-role=alert-device-filter]")).to_contain_text("Host: db")
+    page.locator("[data-role=alert-device-filter] button").click()
+    expect(page.locator("[data-role=alert-list] tbody tr")).to_have_count(2)

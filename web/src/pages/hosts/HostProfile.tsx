@@ -1,17 +1,20 @@
 // Host profile (spec §6.5.3, P6b): what the store holds about one host, and its traffic and events as workbench
 // requests (the same numbers as the workbench; lightweight mode reads them from the PCE the same way).
 import { createContext, type FormEvent, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  Coverage, DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostHit, HostProfile as Profile, HostRansomware, HostTamper, PullInfo, QuarantineAction, QuarantineOutcome, RankedValue, SegmentDimension,
+  AlertList, AlertedHosts, Coverage, DimensionTop, EndpointFilter, EventRow, FleetHost, FlowCondition1, FlowRow, HostHit, HostProfile as Profile, HostRansomware, HostTamper, PullInfo, QuarantineAction, QuarantineCurrent, QuarantineOutcome, RankedValue, SegmentDimension,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { HostName, NeedsAdvanced, PageHead, Panel, Purpose, SeverityTag } from "../../components/ui";
+import { HostLink } from "../../components/HostLink";
+import { HostName, NeedsAdvanced, PageHead, Panel, Purpose, SeverityTag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { modeWord } from "../../terms";
 import { registerNav } from "../../shell/nav";
+import { useBasicMode } from "../../shell/status";
+import { Attention } from "../detect/Attention";
 import { SEVERITY_KEYS, word } from "../alerts/common";
 import type { Req } from "../workbench/conditions";
 import { DETAIL_KEYS, LEVEL_KEYS, Outcome, QuarantineDialog, STATUS_KEYS, nonEmpty } from "../quarantine/QuarantineDialog";
@@ -36,6 +39,9 @@ const DETAILS_KEYS: Record<string, string> = {
 const ALLOW_KEYS: Record<string, string> = { error: "rpt_rw_allow_error", partial: "rpt_rw_allow_partial" };
 const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], ["wb_period_7d", 168]];
 const READINGS_SHOWN = 50;
+const ALERT_DAYS = 7;
+const ALERTS_SHOWN = 10;
+const START_ROWS = 10;
 const HISTORY_SHOWN = 10;
 
 function period(hours: number): { start: string; end: string } {
@@ -113,7 +119,7 @@ function HostTop({ title, req, dimension, hostLinks, onPulled }: {
               const label = shownKey(key, r.display[0]);
               return (
                 <tr key={key}>
-                  <td>{hostLinks && key ? <Link to={`/hosts?${new URLSearchParams({ key }).toString()}`}>{label}</Link> : label}</td>
+                  <td>{hostLinks && key ? <HostLink hostKey={key} name={label} section="connections" /> : label}</td>
                   <td className="wb-num">{r.value.toLocaleString()}</td>
                 </tr>
               );
@@ -444,6 +450,29 @@ export function HostProfile() {
   const [pulled, setPulled] = useState<PullInfo | null>(null);
   const span = useMemo(() => period(hours), [hours]);
   const [seenAs, setSeenAs] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<AlertList | null>(null);
+
+  // the alerts about this host in the last 7 days: its own section, and the count in the page's first sentence
+  useEffect(() => {
+    let live = true;
+    setAlerts(null);
+    void call("alerts.list", undefined, undefined, { device: key, days: String(ALERT_DAYS) }).then((env) => {
+      if (live && env.ok && env.data) setAlerts(env.data);
+    });
+    return () => { live = false; };
+  }, [key]);
+  // Arriving with #section (from an alert, a report, a list): that section is brought into view and marked for a
+  // moment — again when the page's data lands, as what comes late moves the sections above it.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash || !profile) return undefined;
+    const el = document.getElementById(hash.slice(1));
+    if (!el) return undefined;
+    el.scrollIntoView({ block: "start" });
+    el.setAttribute("data-arrived", "true");
+    const timer = window.setTimeout(() => el.removeAttribute("data-arrived"), 1500);
+    return () => window.clearTimeout(timer);
+  }, [hash, profile, alerts]);
 
   useEffect(() => {
     let live = true;  // a slower answer for the host left behind must not replace this one
@@ -507,8 +536,12 @@ export function HostProfile() {
           </select>
         </label>
       </div>
+      <p className="page-conclusion" data-role="page-conclusion">{conclusion(profile, seenAs ?? profile.name, alerts)}</p>
+      {alerts?.hosts_recorded_since && (
+        <p className="hint" data-role="alerts-since">{t("host_alerts_since", { date: formatTime(alerts.hosts_recorded_since, lang) })}</p>
+      )}
       {gapNotes.map((g) => <p key={g} className="notice" data-role="caveat">{g}</p>)}
-      <div className="card stack" data-section="identity">
+      <div className="card stack host-section" id="status" data-section="identity">
         {!profile.managed && <p className="notice">{t("hosts_unmanaged")}</p>}
         {profile.managed && !profile.in_inventory && <p className="notice">{t("hosts_not_in_inventory")}</p>}
         {id && (
@@ -533,36 +566,181 @@ export function HostProfile() {
           </p>
         )}
       </div>
-      <Panel title={t("hosts_usual_title")} role="usual"><Usual profile={profile} /></Panel>
-      <Panel title={t("hosts_different_title")} role="different-panel"><Different profile={profile} /></Panel>
+      <div id="alerts" className="host-section">
+        <Panel title={t("hosts_alerts_title")} role="host-alerts"><HostAlerts hostKey={profile.key} alerts={alerts} /></Panel>
+      </div>
+      <div id="different" className="host-section">
+        <Panel title={t("hosts_different_title")} role="different-panel"><Different profile={profile} /></Panel>
+      </div>
+      <div id="usual" className="host-section">
+        <Panel title={t("hosts_usual_title")} role="usual"><Usual profile={profile} /></Panel>
+      </div>
       {pulled && <Pulled info={pulled} />}
-      <div className="host-grid">
+      <div className="host-grid host-section" id="connections">
         <HostTop title={t("hosts_who_connects")} req={into} dimension="src_host" hostLinks onPulled={setPulled} />
         <HostTop title={t("hosts_ports")} req={into} dimension="service" hostLinks={false} onPulled={setPulled} />
         <HostTop title={t("hosts_outbound")} req={flows({ src: side })} dimension="dst_host" hostLinks onPulled={setPulled} />
+      </div>
+      <div className="host-grid host-section" id="would-block">
         <HostTop title={t("hosts_mode_switch")} req={blocked} dimension="src_host" hostLinks onPulled={setPulled} />
         <HostTop title={t("hosts_mode_switch_ports")} req={blocked} dimension="service" hostLinks={false} onPulled={setPulled} />
       </div>
       {mode === "full" && <p className="hint">{t("hosts_mode_switch_full")}</p>}
-      {profile.quarantine?.eligible ? (
-        <QuarantineSection hostKey={profile.key} name={seenAs ?? profile.name} current={profile.labels["Quarantine"] ?? null}
-                           noEffect={profile.quarantine.no_enforcement} />
-      ) : (
-        <p className="card hint" data-role="q-not-eligible">
-          {t(profile.quarantine?.reason === "unmanaged" ? "alert_q_unmanaged" : "alert_q_not_in_inventory")}
-        </p>
-      )}
+      <div id="ransomware" className="host-section stack">
+        {profile.ransomware_unsupported && <p className="notice">{t("rpt_rw_unsupported")}</p>}
+        {profile.ransomware_details && profile.ransomware_details !== "ok" && (
+          <p className="notice" data-role="rw-details">{word(DETAILS_KEYS, profile.ransomware_details)}</p>
+        )}
+        {profile.ransomware && profile.ransomware_details !== "not_rated" && profile.ransomware_details !== "missing" && (
+          <Ransomware hostKey={profile.key} initial={profile.ransomware} />
+        )}
+      </div>
+      <div id="tamper" className="host-section">
+        {profile.tamper && <Tamper hostKey={profile.key} href={profile.key} tamper={profile.tamper} onChange={setProfile} />}
+      </div>
+      <div id="quarantine" className="host-section">
+        {profile.quarantine?.eligible ? (
+          <QuarantineSection hostKey={profile.key} name={seenAs ?? profile.name} current={profile.labels["Quarantine"] ?? null}
+                             noEffect={profile.quarantine.no_enforcement} />
+        ) : (
+          <p className="card hint" data-role="q-not-eligible">
+            {t(profile.quarantine?.reason === "unmanaged" ? "alert_q_unmanaged" : "alert_q_not_in_inventory")}
+          </p>
+        )}
+      </div>
       {profile.managed && <Events href={profile.key} span={span} onPulled={setPulled} />}
-      {profile.tamper && <Tamper hostKey={profile.key} href={profile.key} tamper={profile.tamper} onChange={setProfile} />}
-      {profile.ransomware_unsupported && <p className="notice">{t("rpt_rw_unsupported")}</p>}
-      {profile.ransomware_details && profile.ransomware_details !== "ok" && (
-        <p className="notice" data-role="rw-details">{word(DETAILS_KEYS, profile.ransomware_details)}</p>
-      )}
-      {profile.ransomware && profile.ransomware_details !== "not_rated" && profile.ransomware_details !== "missing" && (
-        <Ransomware hostKey={profile.key} initial={profile.ransomware} />
-      )}
     </section>
     </GapsContext.Provider>
+  );
+}
+
+/** The page's first sentence, from what the profile holds: the mode in plain words, whether its VEN is in contact,
+ * how many alerts of the last 7 days are about it, whether it is quarantined. */
+function conclusion(profile: Profile, name: string, alerts: AlertList | null): string {
+  const n = alerts ? String(alerts.total) : "…";
+  if (!profile.managed) return t("host_conclusion_unmanaged", { name, n });
+  const id = profile.identity;
+  if (!profile.in_inventory || !id) return t("host_conclusion_gone", { name, n });
+  const beat = id.last_heartbeat_at ? new Date(id.last_heartbeat_at).getTime() : null;
+  const hours = beat === null ? null : Math.floor((Date.now() - beat) / 3_600_000);
+  const ven = hours === null ? t("host_ven_unknown")
+    : id.online !== false && hours < 1 ? t("host_ven_online") : t("host_ven_lost", { n: String(Math.max(1, hours)) });
+  const level = profile.labels["Quarantine"];
+  return t("host_conclusion_managed", {
+    name, n, ven, mode: id.enforcement_mode ? modeWord(id.enforcement_mode) : "—",
+    quarantine: level ? t("host_q_in", { level: t(LEVEL_KEYS[level] ?? level) }) : t("host_q_out"),
+  });
+}
+
+function HostAlerts({ hostKey, alerts }: { hostKey: string; alerts: AlertList | null }) {
+  const lang = useLang();
+  if (!alerts) return <p className="muted">{t("loading")}</p>;
+  if (alerts.items.length === 0) return <p className="muted" data-role="host-alerts-none">{t("hosts_alerts_none")}</p>;
+  const shown = alerts.items.slice(0, ALERTS_SHOWN);
+  return (
+    <>
+      <ul className="plain-list" data-role="host-alert-list">
+        {shown.map((a) => (
+          <li key={a.id}>
+            <span className="hint num" title={formatTime(a.fired_at, lang)}>{shortTime(a.fired_at)}</span>{" "}
+            <SeverityTag severity={a.severity} /> <Link to={`/alerts/${a.id}`}>{a.summary}</Link>
+          </li>
+        ))}
+      </ul>
+      {alerts.total > shown.length && (
+        <p><Link to={`/?${new URLSearchParams({ device: hostKey }).toString()}`}>
+          {t("hosts_alerts_more", { n: String(alerts.total - shown.length) })}
+        </Link></p>
+      )}
+    </>
+  );
+}
+
+const LOST_STATES = ["lost_24h", "lost_48h", "long_offline"] as const;
+const LOST_KEYS: Record<string, string> = {
+  lost_24h: "fleet_online_lost_24h", lost_48h: "fleet_online_lost_48h", long_offline: "fleet_online_long_offline",
+};
+
+/** Without a host in hand: where to start (purpose-led UI spec §6.2). */
+function WhereToStart() {
+  const lang = useLang();
+  const basic = useBasicMode();
+  const [alerted, setAlerted] = useState<AlertedHosts | null>(null);
+  const [lost, setLost] = useState<{ hosts: FleetHost[]; total: number; inventory: number } | null>(null);
+  const [held, setHeld] = useState<QuarantineCurrent | null>(null);
+  useEffect(() => {
+    let live = true;
+    void call("hosts.alerted", undefined, undefined, { days: String(ALERT_DAYS) }).then((env) => {
+      if (live && env.ok && env.data) setAlerted(env.data);
+    });
+    void call("quarantine.current").then((env) => { if (live && env.ok && env.data) setHeld(env.data); });
+    void Promise.all([call("fleet.overview"),
+                      ...LOST_STATES.map((online) => call("fleet.hosts", undefined, undefined, { online }))]).then(
+      ([overview, ...lists]) => {
+        if (!live || !overview.ok || !overview.data) return;
+        const got = lists.flatMap((e) => (e.ok && e.data ? e.data.hosts : []));
+        setLost({ hosts: got, total: lists.reduce((n, e) => n + (e.ok && e.data ? e.data.total : 0), 0),
+                  inventory: overview.data.total });
+      });
+    return () => { live = false; };
+  }, []);
+  const more = (n: number) => (n > 0 ? <p className="hint">{t("hosts_start_more", { n: String(n) })}</p> : null);
+  return (
+    <div className="host-grid" data-role="host-start">
+      <Panel title={t("hosts_start_alerted")} role="start-alerted">
+        {!alerted ? <p className="muted">{t("loading")}</p>
+          : alerted.items.length === 0 ? <p className="muted">{t("hosts_start_alerted_none")}</p> : (
+            <>
+              <ul className="plain-list">
+                {alerted.items.slice(0, START_ROWS).map((h) => (
+                  <li key={h.key}>
+                    <HostLink hostKey={h.key} name={h.name} section="alerts" />{" "}
+                    <SeverityTag severity={h.highest} />{" "}
+                    <span className="hint">{t("hosts_start_alerted_row", { n: String(h.alerts) })} · <span className="num" title={formatTime(h.last_at, lang)}>{shortTime(h.last_at)}</span></span>
+                  </li>
+                ))}
+              </ul>
+              {more(alerted.items.length - Math.min(alerted.items.length, START_ROWS) + alerted.more)}
+            </>
+          )}
+      </Panel>
+      <Panel title={t("hosts_start_lost")} role="start-lost">
+        {!lost ? <p className="muted">{t("loading")}</p>
+          : lost.inventory === 0 ? <p className="muted">{t("hosts_start_no_inventory")}</p>
+          : lost.total === 0 ? <p className="muted">{t("hosts_start_lost_none")}</p> : (
+            <>
+              <ul className="plain-list">
+                {lost.hosts.slice(0, START_ROWS).map((h) => (
+                  <li key={h.key}>
+                    <HostLink hostKey={h.key} name={h.name ?? h.key} section="status" />{" "}
+                    <span className="hint">{t(LOST_KEYS[h.online] ?? h.online)}</span>
+                  </li>
+                ))}
+              </ul>
+              {more(lost.total - Math.min(lost.hosts.length, START_ROWS))}
+            </>
+          )}
+      </Panel>
+      <Panel title={t("hosts_start_quarantined")} role="start-quarantined">
+        {!held ? <p className="muted">{t("loading")}</p>
+          : held.items.length === 0 ? <p className="muted">{t("hosts_start_quarantined_none")}</p> : (
+            <>
+              <ul className="plain-list">
+                {held.items.slice(0, START_ROWS).map((h) => (
+                  <li key={h.key}>
+                    <HostLink hostKey={h.key} name={h.name} section="quarantine" />{" "}
+                    <span className="hint">{t(LEVEL_KEYS[h.level] ?? h.level)}</span>
+                  </li>
+                ))}
+              </ul>
+              {more(held.items.length - Math.min(held.items.length, START_ROWS))}
+            </>
+          )}
+      </Panel>
+      <Panel title={t("hosts_start_attention")} role="start-attention">
+        {basic ? <NeedsAdvanced what={t("hosts_start_attention_basic")} /> : <Attention />}
+      </Panel>
+    </div>
   );
 }
 
@@ -601,12 +779,13 @@ function HostSearchPage() {
         <ul className="plain-list spaced" data-role="host-hits">
           {items.map((h) => (
             <li key={h.key}>
-              <Link to={`/hosts?${new URLSearchParams({ key: h.key }).toString()}`}>{h.name}</Link>
+              <HostLink hostKey={h.key} name={h.name} />
               {!h.managed && <span className="hint"> · {t("hosts_unmanaged_short")}</span>}
             </li>
           ))}
         </ul>
       ))}
+      {!q.trim() && <WhereToStart />}
     </section>
   );
 }

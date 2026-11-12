@@ -6,6 +6,7 @@ import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { AssetExposure, Cut, DenyProposal, EndpointFilter, ExposureResult, Initiator, LateralInitiators, LateralPage } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { HostLink } from "../../components/HostLink";
 import { KpiStrip, NeedsAdvanced, PageHead, type Tone } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
@@ -198,7 +199,7 @@ export default function LateralMovement() {
               <ul className="plain-list">
                 {ex.footholds.map((f) => (
                   <li key={`${f.host}|${f.port}/${f.proto}`}>
-                    <Link to={`/hosts?key=${encodeURIComponent(f.host)}`}>{name(f.host)}</Link>　{f.name}（{f.port}/{protoName(f.proto)}）
+                    <HostLink hostKey={f.host} name={name(f.host)} section="connections" />　{f.name}（{f.port}/{protoName(f.proto)}）
                     {f.severity && <span className="badge">{word(SEVERITY_KEYS, f.severity.toLowerCase())}</span>}
                   </li>
                 ))}
@@ -377,7 +378,7 @@ function Reach({ ex, name, focus }: { ex: ExposureResult; name: (k: string) => s
             <tbody>
               {shown.map((h) => (
                 <tr key={h.key} data-host={h.key} className={h.key === focus ? "lat-focus" : undefined}>
-                  <td><Link to={`/hosts?key=${encodeURIComponent(h.key)}`}>{name(h.key)}</Link></td>
+                  <td><HostLink hostKey={h.key} name={name(h.key)} section="connections" /></td>
                   <td className="wb-num">{h.reach_now}</td><td className="wb-num">{h.reach_enforced}</td>
                   <td>{h.pivot_now ? t("lat_pivot_yes") : ""}</td>
                 </tr>
@@ -401,7 +402,7 @@ function Reach({ ex, name, focus }: { ex: ExposureResult; name: (k: string) => s
                 <li key={h.key}>
                   <input type="checkbox" checked={picked.has(h.key)} disabled={!WORKLOAD.test(h.key)}
                     onChange={() => toggle(h.key)} aria-label={name(h.key)} />{" "}
-                  <Link to={`/hosts?key=${encodeURIComponent(h.key)}`}>{name(h.key)}</Link>{" "}
+                  <HostLink hostKey={h.key} name={name(h.key)} section="connections" />{" "}
                   <span className="hint">{h.pivot_enforced ? t("lat_pivot_still") : t("lat_pivot_gone")}</span>
                 </li>
               ))}

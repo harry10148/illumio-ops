@@ -6,6 +6,7 @@ import type {
   AggRow, DimensionTop, EventRow, FlowRow, PeerPrecedent, PullInfo, SegmentDimension, SegmentMetric, SegmentResult, WorkbenchMeta,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { HostLink } from "../../components/HostLink";
 import { Purpose, Reason } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
@@ -218,7 +219,9 @@ const PEER_STATE_KEYS: Record<string, string> = {
 };
 const PEER_ROW_KEYS: Record<string, string> = { no_group: "wb_peer_no_group", group_too_small: "wb_peer_group_too_small" };
 
-function Ranking({ result, heads, peer }: { result: SegmentResult; heads: string[]; peer: PeerPrecedent | null }) {
+function Ranking({ result, heads, peer, dims }: {
+  result: SegmentResult; heads: string[]; peer: PeerPrecedent | null; /** each level's dimension: a host level links to its host */ dims: string[];
+}) {
   const levels = heads.length - 1;
   const rows = result.ranking ?? [];
   if (rows.length === 0) return <p className="muted">{t("wb_empty")}</p>;
@@ -227,6 +230,11 @@ function Ranking({ result, heads, peer }: { result: SegmentResult; heads: string
     const k = r.keys[i];
     const s = r.display[i] ?? (typeof k === "string" && k.startsWith("ip:") ? k.slice(3) : k);
     return s === null || s === undefined || s === "" ? "—" : String(s);
+  };
+  const cell = (r: AggRow, i: number) => {
+    const k = r.keys[i];
+    return typeof k === "string" && HOST_DIMS.has(dims[i] ?? "") && HOST_KEY.test(k)
+      ? <HostLink hostKey={k} name={shownKey(r, i)} section="connections" /> : shownKey(r, i);
   };
   return (
     <div className="table-wrap">
@@ -245,8 +253,8 @@ function Ranking({ result, heads, peer }: { result: SegmentResult; heads: string
             const first = levels === 1 || !prev || shownKey(prev, 0) !== shownKey(r, 0);
             return (
               <tr key={i}>
-                <td className={first ? "" : "muted"}>{first ? shownKey(r, 0) : ""}</td>
-                {levels === 2 && <td>{shownKey(r, 1)}</td>}
+                <td className={first ? "" : "muted"}>{first ? cell(r, 0) : ""}</td>
+                {levels === 2 && <td>{cell(r, 1)}</td>}
                 <td className="wb-num">{r.value.toLocaleString()}</td>
                 {showPeer && (
                   <td className="wb-num" data-role="peer-cell">
@@ -490,7 +498,7 @@ export function Workbench() {
             <>
               <Coverage result={result} bytes={req.mode === "flows" && req.metric === "bytes"} />
               {result.view === "ranking"
-                ? <Ranking result={result} peer={peer} heads={[...(req.group_by ?? []).map((g) => t(DIM_KEYS[g.dimension] ?? g.dimension)),
+                ? <Ranking result={result} peer={peer} dims={(req.group_by ?? []).map((g) => g.dimension)} heads={[...(req.group_by ?? []).map((g) => t(DIM_KEYS[g.dimension] ?? g.dimension)),
                     t(METRIC_KEYS[req.mode === "events" ? "events" : (req.metric ?? "flows")] ?? "")]} />
                 : <Detail result={result} mode={req.mode} />}
             </>
