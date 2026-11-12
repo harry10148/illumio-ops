@@ -139,26 +139,44 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
   );
 }
 
-const UI_GROUPS = ["assessment", "traffic", "policy", "operations"] as const;
 const UI_GROUP_KEYS: Record<string, string> = {
   assessment: "rpt_group_assessment", traffic: "rpt_group_traffic", policy: "rpt_group_policy",
   operations: "rpt_group_operations",
 };
+const TIERS = ["common", "topic"] as const;
+const TIER_KEYS: Record<string, string> = { common: "rpt_tier_common", topic: "rpt_tier_topic" };
+// The common templates in the order they are read (UI redesign spec §9.1); which types are common is the catalog's.
+const COMMON_ORDER = ["security_risk", "ven_status", "new_connections", "audit"];
 
-/** Templates by the four columns of sample 07: each card says what basic mode means for it (§5), how many schedules
- * make it and how many copies are kept. */
+function tierEntries(catalog: Catalog, tier: string): CatalogEntry[] {
+  const found = catalog.entries.filter((e) => e.tier === tier);
+  if (tier !== "common") return found;
+  const place = (e: CatalogEntry) => {
+    const i = COMMON_ORDER.indexOf(e.report_type);
+    return i < 0 ? COMMON_ORDER.length : i;
+  };
+  return [...found].sort((x, y) => place(x) - place(y));
+}
+
+/** Templates in two parts — the common ones, then the ones by topic — each a grid of cards. A card names its kind
+ * (assessment, traffic, policy, operations) in a small tag, says what basic mode means for it (§5), how many
+ * schedules make it and how many copies are kept. */
 function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
-    <div className="rpt-columns" data-role="report-catalog">
-      {UI_GROUPS.filter((g) => catalog.entries.some((e) => e.ui_group === g)).map((g) => (
-        <div key={g} className="stack rpt-column">
-          <h2>{word(UI_GROUP_KEYS, g)}</h2>
-          {catalog.entries.filter((e) => e.ui_group === g).map((e) => (
+    <div className="rpt-tiers" data-role="report-catalog">
+      {TIERS.filter((tier) => catalog.entries.some((e) => e.tier === tier)).map((tier) => (
+        <section key={tier} className="rpt-tier" data-tier={tier}>
+          <h2>{word(TIER_KEYS, tier)}</h2>
+          <div className="rpt-grid">
+          {tierEntries(catalog, tier).map((e) => (
             <div key={e.report_type} className="card stack rpt-card" data-report-type={e.report_type}
                  data-available={String(e.available)}>
               <div>
-                <strong>{word(TYPE_KEYS, e.report_type)}</strong>
+                <div className="rpt-card-head">
+                  <strong>{word(TYPE_KEYS, e.report_type)}</strong>
+                  <span data-role="rpt-group"><Tag tone="muted">{word(UI_GROUP_KEYS, e.ui_group)}</Tag></span>
+                </div>
                 <div className="hint">{word(TYPE_DESC_KEYS, e.report_type)}</div>
               </div>
               <div className="row">
@@ -196,7 +214,8 @@ function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: 
               )}
             </div>
           ))}
-        </div>
+          </div>
+        </section>
       ))}
     </div>
   );

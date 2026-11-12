@@ -121,3 +121,40 @@ def test_sending_shown_between_done_and_sent(tmp_path, monkeypatch):
     monkeypatch.setattr(generate, "deliver", watch)
     _run(ctx, email=True)
     assert seen == ["sending"]
+
+
+def _mail(tmp_path, monkeypatch, *, cap=None, **params):
+    """What deliver hands to send_mail for a report with no external address (so the email has no link)."""
+    ctx = _ctx(tmp_path, 25)
+    _register(monkeypatch, FakeBuilder())
+    sent = {}
+
+    def fake_send(cfg, **kw):
+        sent.update(kw)
+        return True, None
+    monkeypatch.setattr(deliver, "send_mail", fake_send)
+    if cap is not None:
+        monkeypatch.setattr(deliver, "MAX_ATTACHMENTS_BYTES", cap)
+    assert _run(ctx, email=True, **params).email_status == "sent"
+    return sent
+
+
+def test_without_a_link_the_email_points_at_its_attachment(tmp_path, monkeypatch):
+    sent = _mail(tmp_path, monkeypatch)
+    assert len(sent["attachments"]) == 2
+    for part in (sent["text"], sent["html"]):
+        assert "No GUI address is set" in part and "The full findings are in the attached report." in part
+
+
+def test_with_only_the_html_attached_both_sentences_are_said(tmp_path, monkeypatch):
+    sent = _mail(tmp_path, monkeypatch, cap=1)
+    assert len(sent["attachments"]) == 1
+    for part in (sent["text"], sent["html"]):
+        assert "The XLSX is too large to attach" in part and "The full findings are in the attached report." in part
+
+
+def test_with_nothing_attached_only_the_note_is_said(tmp_path, monkeypatch):
+    sent = _mail(tmp_path, monkeypatch, cap=1, formats=("xlsx",))  # no HTML was made: nothing is kept
+    assert sent["attachments"] == []
+    for part in (sent["text"], sent["html"]):
+        assert "The files are too large to attach" in part and "attached report" not in part

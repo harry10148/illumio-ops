@@ -1,6 +1,7 @@
 """Reports in a browser (P5a Tasks 8–9): generate, wait, download, land on a linked report, schedule and run."""
 from pathlib import Path
 
+import pytest
 from playwright.sync_api import expect
 
 from illumio_ops.services.reports import generate
@@ -231,11 +232,42 @@ def test_audit_in_lightweight_mode(context, live_app):
 
 # ── the reports page (UI redesign samples 07, 08) ───────────────────────────
 
-def test_template_groups(context, live_app):
-    page = context.new_page()
+COMMON = ["security_risk", "ven_status", "new_connections", "audit"]
+
+
+@pytest.mark.parametrize("width,columns", [(1440, (3, 4)), (820, (1, 2))])
+def test_templates_are_the_common_ones_then_the_rest(browser, live_app, width, columns):
+    """UI redesign spec §9.1 (stage 3a): two parts — the common templates, then the ones by topic — each a grid of
+    cards; what used to head a column is a small tag on each card."""
+    from tests.e2e import ui_rules
+    from tests.e2e.conftest import no_horizontal_overflow
+    ctx = browser.new_context(locale="en-US", viewport={"width": width, "height": 900})
+    page = ctx.new_page()
     _reports(page, live_app.url)
-    heads = [h.strip() for h in page.locator(".rpt-column > h2").all_text_contents()]
-    assert heads == ["Security assessment", "Traffic analysis", "Policy", "Operations and audit"]
+    tiers = page.locator("[data-role=report-catalog] > [data-tier]")
+    assert [tiers.nth(i).get_attribute("data-tier") for i in range(tiers.count())] == ["common", "topic"]
+    assert [h.strip() for h in page.locator("[data-role=report-catalog] [data-tier] > h2").all_text_contents()] == [
+        "Common", "By topic"]
+    common = page.locator("[data-tier=common] .rpt-card")
+    assert [common.nth(i).get_attribute("data-report-type") for i in range(common.count())] == COMMON
+    topic = page.locator("[data-tier=topic] .rpt-card")
+    kinds = [topic.nth(i).get_attribute("data-report-type") for i in range(topic.count())]
+    assert "rule_hit_count" in kinds and not set(kinds) & set(COMMON) and len(kinds) + len(COMMON) == 16
+    cards = page.locator("[data-role=report-catalog] .rpt-card")
+    tags = page.locator("[data-role=report-catalog] .rpt-card [data-role=rpt-group]")
+    assert tags.count() == cards.count() == 16
+    assert set(tags.all_text_contents()) == {"Security assessment", "Traffic analysis", "Policy", "Operations and audit"}
+    assert page.locator("[data-report-type=audit] [data-role=rpt-group]").inner_text() == "Operations and audit"
+    # cards of one row share a top: the widest row of each part is as many columns as the width allows
+    for tier, n in (("common", 4), ("topic", 12)):
+        tops = page.evaluate(
+            "(t) => [...document.querySelectorAll(`[data-tier=${t}] .rpt-card`)].map((c) => Math.round(c.getBoundingClientRect().top))",
+            tier)
+        widest = max(tops.count(t) for t in set(tops))
+        assert len(tops) == n and columns[0] <= widest <= columns[1], (tier, width, tops)
+    assert no_horizontal_overflow(page)
+    assert ui_rules.violations(page) == {}
+    ctx.close()
 
 
 def test_traffic_card_not_marked_advanced(context, live_app):

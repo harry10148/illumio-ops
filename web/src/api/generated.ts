@@ -2336,6 +2336,7 @@ reason_key: (string | null)
 report_type: ReportType
 requires_app: boolean
 schedules: number
+tier: ("common" | "topic")
 ui_group: ("assessment" | "traffic" | "policy" | "operations")
 }
 /**

@@ -126,7 +126,7 @@ p.badge, div.badge { display: block; padding: var(--space-2) var(--space-4); lin
 .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-5);
               padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--line); }
 /* section names are eyebrows: small, spaced capitals (Chinese is unaffected) */
-.panel-head h2, .card > h2, .card > .row:first-child h2, .card h3, .rpt-column > h2 {
+.panel-head h2, .card > h2, .card > .row:first-child h2, .card h3, .rpt-tier > h2 {
   font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
 .panel-head h2 { margin: 0; }
 .panel-meta { color: var(--text-3); font-size: var(--fs-mini); }
@@ -503,13 +503,17 @@ input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
 .rs-targets li { padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }
 
 /* Reports (sample 07) */
-.rpt-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-5); align-items: start; }
-.rpt-column > h2 { margin-bottom: var(--space-4); }
+/* Templates: the common ones, then the ones by topic; each part a grid of cards (4 across on a wide page, 2 or 1
+   on a narrow one). A card's kind is a tag beside its name; it drops under a name too long to share the line. */
+.rpt-tiers { display: grid; gap: var(--space-7); }
+.rpt-tier > h2 { margin: 0 0 var(--space-4); }
+.rpt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-6); align-items: start; }
+.rpt-grid > .rpt-card { min-width: 0; }
+.rpt-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
 .rpt-card { padding: var(--space-5) var(--space-6); }
 .rpt-card strong { font-family: var(--font-ui); font-weight: 600; }
 /* every template card keeps room for three lines of description, so the cards of a row start and end level */
 .rpt-card > div:first-child > .hint { min-height: 3lh; }
-.rpt-column { gap: var(--space-6); }
 
 /* Lateral movement: the three initiator rankings side by side, one column when narrow. A long account or process
    name wraps inside its cell (never cut, never widening the page). */

@@ -12,6 +12,7 @@ from openpyxl import load_workbook
 from illumio_ops.domain.filter import EndpointFilter, FlowCondition, LabelCond
 from illumio_ops.domain.findings_rules import RULES
 from illumio_ops.domain.values import DataOrigin, Language, ReportType, RhcState
+from illumio_ops.i18n import translate
 from illumio_ops.pce.policy import PendingItem, PolicyNames
 from illumio_ops.services.analysis.policy_resolver import Resolved
 from illumio_ops.services.analysis.predicted_block import (
@@ -405,3 +406,16 @@ def test_a_period_without_traffic_is_not_said_as_nothing_to_do(ctx, report_type)
     assert top.text().startswith("This period has no traffic to evaluate the rules on; see “")
     assert top.find("a")[0].attrs["href"] == "#findings" and len(page.find_attr("id", "findings")) == 1
     assert "Nothing in this report needs action" not in page.text()
+
+
+@pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
+@pytest.mark.parametrize("report_type", list(ReportType))
+def test_no_chapter_repeats_the_heading_of_the_closing_part(ctx, report_type, lang):
+    """The closing part is headed "How to read this report": a chapter under it says what it holds, not that again."""
+    cond = APP_DB if specs()[report_type].requires_app else None
+    custom_id = _custom(ctx) if report_type is ReportType.CUSTOM else None
+    doc = specs()[report_type].build(BuildInput(
+        ctx=ctx, params=ReportParams(report_type=report_type, filter=cond, custom_id=custom_id), start=START, end=END,
+        lang=lang, tz=UTC, now=NOW, pce_label="pce"))
+    part = translate(lang, "rpt_part_how", {})
+    assert part not in [s.title for s in doc.sections]

@@ -1,6 +1,7 @@
-"""ReportDocument -> XLSX: a summary sheet (key metrics, findings, data quality) and one sheet per table with
-every row (up to XLSX_ROW_CAP, stated when hit). Text that a spreadsheet would run as a formula is prefixed
-with an apostrophe."""
+"""ReportDocument -> XLSX: a summary sheet (what to know before the numbers, key metrics, findings under a header
+row, data quality) and one sheet per table with every row (up to XLSX_ROW_CAP, stated when hit). What the summary
+says when there is no finding is render_html.to_do's judgement, the one the HTML's first page and the email print.
+Text that a spreadsheet would run as a formula is prefixed with an apostrophe."""
 from __future__ import annotations
 
 from datetime import tzinfo
@@ -20,7 +21,7 @@ from illumio_ops.domain.report import (
     techniques_text,
 )
 from illumio_ops.domain.values import Language
-from illumio_ops.services.reports.render_html import fmt_time, kpi_trend, tr
+from illumio_ops.services.reports.render_html import fmt_time, kpi_trend, to_do, tr
 from illumio_ops.services.reports.sheets import RESERVED, sheet_names
 
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
@@ -71,29 +72,48 @@ def _sheet(wb: Workbook, title: str, rows: list[list[Cell]], *, bold_rows: set[i
         ws.append(out)
 
 
-def _summary_rows(doc: ReportDocument, tz: tzinfo | None) -> list[list[Cell]]:
+def _summary_rows(doc: ReportDocument, tz: tzinfo | None) -> tuple[list[list[Cell]], set[int]]:
+    """(the rows, which of them are bold: the title and each header — counted from 1)."""
     lang = doc.lang
     rows: list[list[Cell]] = [
         [doc.title], [tr(lang, "rpt_cover_pce"), doc.pce_label],
         [tr(lang, "rpt_cover_period"), period_text(doc.period_start, doc.period_end, tz)],
         [tr(lang, "rpt_cover_generated"), fmt_time(doc.generated_at.isoformat(), tz)], [],
-        [tr(lang, "rpt_xlsx_metric"), tr(lang, "rpt_xlsx_value"), tr(lang, "rpt_xlsx_previous"),
-         tr(lang, "rpt_xlsx_change"), tr(lang, "rpt_xlsx_note")],
     ]
+    bold = {1}
+    if doc.caveats:  # what to know before reading the numbers stands before them
+        rows.append([tr(lang, "rpt_caveats_title")])
+        bold.add(len(rows))
+        rows += [[c] for c in doc.caveats]
+        rows.append([])
+    rows.append([tr(lang, "rpt_xlsx_metric"), tr(lang, "rpt_xlsx_value"), tr(lang, "rpt_xlsx_previous"),
+                 tr(lang, "rpt_xlsx_change"), tr(lang, "rpt_xlsx_note")])
+    bold.add(len(rows))
     rows += [[k.label, k.value if k.value is not None else tr(lang, "rpt_kpi_no_value"),
               k.previous, kpi_trend(k, lang), k.note] for k in doc.kpis]
-    rows += [[], [tr(lang, "rpt_findings_title")]]
-    findings: list[list[Cell]] = [[tr(lang, "severity_" + f.severity.value), f.title, f.why, f.action,
-                                   techniques_text(f.techniques) or None] for f in doc.findings]
-    rows += findings or [[tr(lang, "rpt_findings_none")]]
+    todo = to_do(doc)
+    if todo is not None:  # a custom report has no rules: no findings, and nothing said about there being none
+        rows += [[], [tr(lang, "rpt_findings_title")]]
+        if doc.findings:
+            rows.append([tr(lang, "rpt_col_severity"), tr(lang, "rpt_xlsx_finding"), tr(lang, "rpt_card_what"),
+                         tr(lang, "rpt_card_why"), tr(lang, "rpt_card_do"), tr(lang, "rpt_col_mitre")])
+            bold.add(len(rows))
+            rows += [[tr(lang, "severity_" + f.severity.value), f.title, f.what or None, f.why, f.action,
+                      techniques_text(f.techniques) or None] for f in doc.findings]
+        # the same judgement as the HTML's first page: rules that were not evaluated are never "nothing to do"
+        if todo.nothing:
+            rows.append([tr(lang, "rpt_findings_none")])
+        if todo.held:
+            rows.append([todo.held])
     rows += [[], [tr(lang, "rpt_data_quality_title")]]
     rows += [[q] for q in doc.data_quality]
-    return rows
+    return rows, bold
 
 
 def render_xlsx(doc: ReportDocument, *, tz: tzinfo | None) -> bytes:
     wb = Workbook(write_only=True)
-    _sheet(wb, SUMMARY_SHEET[doc.lang], _summary_rows(doc, tz), bold_rows={1, 6}, freeze_after=None)
+    summary, bold = _summary_rows(doc, tz)
+    _sheet(wb, SUMMARY_SHEET[doc.lang], summary, bold_rows=bold, freeze_after=None)
     tables = doc.tables()
     for (_, t), name in zip(tables, sheet_names([t.title for _, t in tables]), strict=True):
         # Excel caps a sheet name at 31 characters: a shortened one has the table's whole title above it.

@@ -39,7 +39,7 @@ def deliver(ctx: AppContext, report_id: int, doc: ReportDocument, params: Report
             attachments = [a for a in attachments if a[1] == MIME[ReportFormat.HTML.value]]
             note = tr(doc.lang, "rpt_mail_xlsx_too_large" if attachments else "rpt_mail_files_too_large",
                       mb=MAX_ATTACHMENTS_BYTES // (1024 * 1024))
-        rendered = render_email(doc, tz=tz, note=note)
+        rendered = render_email(doc, tz=tz, note=note, attached=bool(attachments))
         ok, error = send_mail(smtp, subject=rendered.subject, text=rendered.text, html=rendered.html,
                               attachments=attachments, recipients=list(params.recipients) or None,
                               timeout=TIMEOUT_SECONDS)

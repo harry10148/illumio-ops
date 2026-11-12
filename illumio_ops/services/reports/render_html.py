@@ -12,6 +12,7 @@ from __future__ import annotations
 import html
 import re
 from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from functools import cache
 from importlib import resources
@@ -445,11 +446,40 @@ def _unevaluated(doc: ReportDocument) -> tuple[Section, int] | None:
     return None
 
 
+@dataclass(frozen=True)
+class ToDo:
+    """What a report says under "what to do first" — the judgement the HTML's first page, the email and the XLSX
+    share, so none of them can say "nothing to do" where another says a rule was not evaluated."""
+    top: tuple[TopAction, ...]  # the first things to do (domain/actions.py)
+    more: int  # things to do beyond those
+    nothing: bool  # no finding and every rule evaluated (or a report without rules): only then "nothing to do"
+    held: str  # the sentence saying rules were not evaluated, or did not run, and in which section; "" when all were
+
+
+def to_do(doc: ReportDocument) -> ToDo | None:
+    """None for a custom report: it has no rules, so nothing is said about things to do — not even "nothing"."""
+    if doc.report_type is ReportType.CUSTOM:
+        return None
+    lang = doc.lang
+    top, more = top_actions(doc.findings)
+    held = _unevaluated(doc)
+    words = ""
+    if held is not None:
+        section, n = held
+        words = (tr(lang, "rpt_actions_unevaluated", n=n, section=section.title) if n
+                 else tr(lang, "rpt_actions_not_run", section=section.title))
+    return ToDo(top=top, more=more, nothing=not top and held is None, held=words)
+
+
+def solves_titles(a: TopAction, lang: Language) -> list[str]:
+    """The findings one thing to do addresses, by title; the last item counts the ones not named."""
+    return [*a.titles, *([tr(lang, "rpt_actions_titles_more", n=a.titles_more)] if a.titles_more else [])]
+
+
 def _action(n: int, a: TopAction, lang: Language) -> str:
     sep = tr(lang, "rpt_list_sep")
     titles = [f'<a href="#finding-{i + 1}">{_esc(title)}</a>' for i, title in zip(a.findings, a.titles, strict=False)]
-    if a.titles_more:
-        titles.append(_esc(tr(lang, "rpt_actions_titles_more", n=a.titles_more)))
+    titles += [_esc(x) for x in solves_titles(a, lang)[len(a.titles):]]
     # the sentence is escaped whole, then the titles (each escaped, each a link to its card) take their place
     solves = _esc(tr(lang, "rpt_actions_solves", n=len(a.findings), titles=_SLOT)).replace(_SLOT, _esc(sep).join(titles))
     focus = "".join(f'<span class="action-focus" data-role="action-focus">{_esc(x)}</span>' for x in a.focus)
@@ -460,26 +490,19 @@ def _action(n: int, a: TopAction, lang: Language) -> str:
             f"{focus}</div></li>")
 
 
-def _top_actions(doc: ReportDocument) -> str:
-    """The things to do first (domain/actions.py: the same ones the XLSX and the email name). A rule that was not
-    evaluated is never said as "nothing to do": the block ends by saying so and pointing at that section."""
-    lang = doc.lang
-    top, more = top_actions(doc.findings)
+def _top_actions(todo: ToDo, lang: Language) -> str:
+    """The things to do first (the same ones the XLSX and the email name: to_do). A rule that was not evaluated is
+    never said as "nothing to do": the block ends by saying so and pointing at that section."""
     parts = []
-    if top:
-        parts.append(f'<h2>{_esc(tr(lang, "rpt_actions_title", n=len(top)))}</h2><ol>'
-                     + "".join(_action(n, a, lang) for n, a in enumerate(top, start=1)) + "</ol>")
-        if more:
-            parts.append(f'<p data-role="actions-more">{_esc(tr(lang, "rpt_actions_more", n=more))}</p>')
-    held = _unevaluated(doc)
-    if not top and held is None:  # no finding and every rule evaluated (or a report without rules): only then
+    if todo.top:
+        parts.append(f'<h2>{_esc(tr(lang, "rpt_actions_title", n=len(todo.top)))}</h2><ol>'
+                     + "".join(_action(n, a, lang) for n, a in enumerate(todo.top, start=1)) + "</ol>")
+        if todo.more:
+            parts.append(f'<p data-role="actions-more">{_esc(tr(lang, "rpt_actions_more", n=todo.more))}</p>')
+    if todo.nothing:
         parts.append(f'<p data-role="actions-none">{_esc(tr(lang, "rpt_findings_none"))}</p>')
-    not_run = held is not None and held[1] == 0
-    if held is not None:
-        section, n = held
-        words = (tr(lang, "rpt_actions_not_run", section=section.title) if not_run
-                 else tr(lang, "rpt_actions_unevaluated", n=n, section=section.title))
-        parts.append(f'<p data-role="actions-unevaluated"><a href="#{UNEVALUATED}">{_esc(words)}</a></p>')
+    if todo.held:
+        parts.append(f'<p data-role="actions-unevaluated"><a href="#{UNEVALUATED}">{_esc(todo.held)}</a></p>')
     return f'<section class="top-actions" data-role="top-actions">{"".join(parts)}</section>'
 
 
@@ -520,7 +543,8 @@ def _first_page(doc: ReportDocument) -> str:
     if doc.caveats:
         caveats = (f'<div class="caveats" data-role="caveats"><strong>{_esc(tr(lang, "rpt_caveats_title"))}</strong>'
                    + "".join(f"<p>{_esc(c)}</p>" for c in doc.caveats) + "</div>")
-    actions = "" if doc.report_type is ReportType.CUSTOM else _top_actions(doc)
+    todo = to_do(doc)
+    actions = "" if todo is None else _top_actions(todo, lang)
     inner = caveats + _lead(doc) + actions
     return f'<section class="first-page" id="summary" data-shell="exec">{inner}</section>' if inner else ""
 

@@ -34745,6 +34745,14 @@
                 "title": "Schedules",
                 "type": "integer"
               },
+              "tier": {
+                "enum": [
+                  "common",
+                  "topic"
+                ],
+                "title": "Tier",
+                "type": "string"
+              },
               "ui_group": {
                 "enum": [
                   "assessment",
@@ -34768,6 +34776,7 @@
               "latest_day",
               "formats",
               "ui_group",
+              "tier",
               "mode",
               "schedules",
               "copies"

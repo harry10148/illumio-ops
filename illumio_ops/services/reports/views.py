@@ -37,6 +37,8 @@ class CatalogEntry(BaseModel):
     latest_day: date
     formats: list[ReportFormat]  # the formats this type makes
     ui_group: Literal["assessment", "traffic", "policy", "operations"]  # the reports page's column (spec §4.7)
+    # common: one of the templates the reports page leads with; topic: the rest (UI redesign spec §9.1)
+    tier: Literal["common", "topic"]
     mode: Literal["basic", "on_demand"]  # on_demand: reads traffic, pulled from the PCE where none is kept (§5)
     schedules: int  # schedules that make this type
     copies: int  # finished reports of this type kept
@@ -78,6 +80,8 @@ class ReportPage(BaseModel):
     page_size: int
 
 
+# The templates the reports page leads with (UI redesign spec §9.1, stage 3a; the weekly overview joins in 3b).
+COMMON = frozenset({ReportType.SECURITY_RISK, ReportType.VEN_STATUS, ReportType.NEW_CONNECTIONS, ReportType.AUDIT})
 UI_GROUPS = {"lateral": "assessment", "assessment": "assessment", "analysis": "traffic", "inventory": "traffic",
              "custom": "traffic", "policy": "policy", "operations": "operations"}
 
@@ -107,6 +111,7 @@ def catalog(ctx: AppContext) -> Catalog:
                                          max_lookback=s.max_lookback(settings) if s.max_lookback else None,
                                          earliest_day=first(s), latest_day=latest,
                                          formats=list(s.formats), ui_group=UI_GROUPS.get(s.group, "traffic"),  # type: ignore[arg-type]
+                                         tier="common" if t in COMMON else "topic",
                                          mode="on_demand" if s.needs_traffic else "basic",
                                          schedules=scheduled.get(t.value, 0), copies=copies.get(t.value, 0))
                             for t, s in specs().items()],

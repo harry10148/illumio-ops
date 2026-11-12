@@ -248,3 +248,12 @@ def test_bulk_delete(client, ctx):
     assert post(client, "/api/reports/bulk-delete", {"ids": list(range(1, 502))}).status_code == 400
     r = client.post("/api/reports/bulk-delete", json={"ids": [a]}, environ_overrides=LOCAL)
     assert r.status_code in (400, 403)  # CSRF
+
+
+def test_the_common_templates_are_these_four(client, ctx):
+    """UI redesign spec §9.1 (stage 3a): the templates page leads with the common ones; the rest are by topic."""
+    login(client)
+    entries = get(client, "/api/reports/catalog").get_json()["data"]["entries"]
+    assert all(e.get("tier") in ("common", "topic") for e in entries)
+    assert sorted(e["report_type"] for e in entries if e.get("tier") == "common") == [
+        "audit", "new_connections", "security_risk", "ven_status"]

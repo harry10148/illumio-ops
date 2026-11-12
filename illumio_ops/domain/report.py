@@ -8,6 +8,9 @@ rest is; a cell longer than CELL_SOFT_MAX characters is cut in the HTML only, wi
 A report has at most 2 caveats ("know this before reading the numbers"): a third is refused when the document is
 built, never dropped. One thing to do (domain/actions.py) lists the titles of its first 4 findings and says how many
 more there are; the first page lists the first 3 things to do and says how many more there are.
+The email is the first page: 3 numbers (the others are in the report), the first 3 things to do and how many more;
+it lists no finding and no data note, and only its subject is ever cut (render_email.SUBJECT_MAX, with an ellipsis).
+The XLSX summary writes every caveat, number and finding whole.
 On paper a table lists its first PRINT_ROW_CAP rows (the first as the reader sorted them) and a sentence under it
 says how many there are and where: the XLSX sheet, or the report on screen. The tables of "how to read this report"
 are printed whole. Every finding is a card (no cap: the rules are 19 at most, a builder adds a handful).
