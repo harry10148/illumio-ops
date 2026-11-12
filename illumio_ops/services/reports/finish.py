@@ -29,6 +29,10 @@ from illumio_ops.domain.values import ReportType
 from illumio_ops.services.reports.common import host_url, tr
 
 NOTHING = "nothing"  # the closing section's id
+# The rules section (services/reports/findings.py unevaluated_section). When the rules did not run its table is
+# empty, and it is not folded with the sections that hold nothing: the first page reads it to say that the rules
+# were not evaluated, instead of "nothing needs action", and links to it.
+UNEVALUATED = "findings"
 
 
 def _empty(block: Block) -> bool:
@@ -40,8 +44,9 @@ def _empty(block: Block) -> bool:
 
 
 def holds_nothing(section: Section) -> bool:
-    """Every block is a table without rows or a chart without a value (a section with words is not judged)."""
-    return bool(section.blocks) and all(_empty(b) for b in section.blocks)
+    """Every block is a table without rows or a chart without a value (a section with words is not judged, and
+    the rules section always stands: see UNEVALUATED)."""
+    return section.id != UNEVALUATED and bool(section.blocks) and all(_empty(b) for b in section.blocks)
 
 
 def _line(section: Section) -> str:

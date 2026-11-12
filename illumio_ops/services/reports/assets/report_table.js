@@ -36,6 +36,18 @@ function sortTable(table, col) {
 /* Auto-fit: measure natural content widths and distribute slack space.
  * Columns are categorised so narrow-value columns (Proto, Yes/No, short enums)
  * don't absorb slack that belongs to long-text columns. */
+/* The width a header needs when it may wrap: its longest unbreakable run. Latin words do not break; a run of CJK
+   breaks anywhere, so it asks for a few characters, not for all of it. */
+function wrappedHeaderWidth(probe, text) {
+  const runs = (text || '').match(/[\x21-\x7e]+|[^\s\x21-\x7e]+/g) || [];
+  let max = 0;
+  runs.forEach(run => {
+    probe.textContent = /^[\x21-\x7e]+$/.test(run) ? run : run.slice(0, 5);
+    max = Math.max(max, probe.offsetWidth);
+  });
+  return max;
+}
+
 function measureColumnWidths(table) {
   const headers = Array.from(table.querySelectorAll('thead th'));
   const body = table.tBodies[0];
@@ -55,6 +67,10 @@ function measureColumnWidths(table) {
 
   const naturalWidths = new Array(nCols).fill(MIN_COL);
   const headerWidths = new Array(nCols).fill(MIN_COL);
+  const headerMinWidths = new Array(nCols).fill(MIN_COL);  /* the header wrapped as far as it goes */
+  const cellWidths = new Array(nCols).fill(MIN_COL);       /* the widest cell on one line, without the header */
+  const cellMinWidths = new Array(nCols).fill(MIN_COL);    /* the widest cell wrapped as far as it goes */
+  const SHARE_BAR_SPARE = 36;  /* report_shell: a share's 72px bar is 36px in a table marked report-table--tight */
   const isNumeric = new Array(nCols).fill(true);
   const maxCellChars = new Array(nCols).fill(0);
   const distinctVals = Array.from({ length: nCols }, () => new Set());
@@ -73,6 +89,7 @@ function measureColumnWidths(table) {
     const hw = probe.offsetWidth + padHead;
     headerWidths[i] = hw;
     naturalWidths[i] = Math.max(naturalWidths[i], hw);
+    headerMinWidths[i] = Math.max(MIN_COL, wrappedHeaderWidth(probe, (label || th).textContent) + padHead);
   });
 
   const sampleRows = rows.slice(0, 30);
@@ -84,7 +101,20 @@ function measureColumnWidths(table) {
                     + (parseFloat(tdStyle.paddingRight) || 0);
       probe.style.font = tdStyle.font;
       probe.textContent = td.textContent;
-      naturalWidths[i] = Math.max(naturalWidths[i], probe.offsetWidth + padCell);
+      let cw = probe.offsetWidth + padCell;
+      if (td.classList.contains('share') && td.firstElementChild) {
+        /* a share is its number and a bar that never wrap: the text alone is half of what the cell needs */
+        const bar = td.lastElementChild.getBoundingClientRect().width;
+        cw = td.lastElementChild.getBoundingClientRect().right - td.firstElementChild.getBoundingClientRect().left
+           + padCell + 2;
+        cellMinWidths[i] = Math.max(cellMinWidths[i], cw - (bar > SHARE_BAR_SPARE ? SHARE_BAR_SPARE : 0));
+      } else if (td.classList.contains('num')) {
+        cellMinWidths[i] = Math.max(cellMinWidths[i], cw);  /* a number never wraps */
+      } else {
+        cellMinWidths[i] = Math.max(cellMinWidths[i], wrappedHeaderWidth(probe, td.textContent) + padCell);
+      }
+      naturalWidths[i] = Math.max(naturalWidths[i], cw);
+      cellWidths[i] = Math.max(cellWidths[i], cw);
       const v = normalizeCellValue(td.textContent);
       if (v.length > maxCellChars[i]) maxCellChars[i] = v.length;
       if (v) distinctVals[i].add(v);
@@ -108,7 +138,7 @@ function measureColumnWidths(table) {
     return 'text';
   });
 
-  return { widths: naturalWidths, headerWidths, category };
+  return { widths: naturalWidths, headerWidths, headerMinWidths, cellWidths, cellMinWidths, category };
 }
 
 function autoFitColumns(table) {
@@ -165,6 +195,32 @@ function autoFitColumns(table) {
       const openTotal = open.reduce((s, i) => s + widths[i], 0) || 1;
       open.forEach(i => { widths[i] = Math.floor(room * widths[i] / openTotal); });
       naturalTotal = widths.reduce((a, b) => a + b, 0);
+    }
+  }
+  /* Still wider (stage 3a: a column named "Recording only (Visibility Only)" was as wide as its name on one line,
+     and four of them pushed the last columns past the edge): the headers wrap too, then the cells. Every column
+     gives up width in proportion to what it can spare, down to a floor, in two steps:
+       1. a text column TEXT_MIN (or its own width when narrower), any other column its widest cell on one line;
+       2. every column the longest word of its cells (a number never wraps; a share keeps its number and a
+          shorter bar: the table is marked report-table--tight);
+     and none less than its header's longest word. Only a table that does not fit at the last floors scrolls. */
+  table.classList.remove('report-table--tight');
+  if (!isWide && naturalTotal > containerWidth) {
+    const shrinkTo = floors => {
+      const spare = widths.map((w, i) => Math.max(0, w - floors[i]));
+      const spareTotal = spare.reduce((a, b) => a + b, 0);
+      const over = naturalTotal - containerWidth;
+      for (let i = 0; i < widths.length; i++) {
+        widths[i] = spareTotal <= over ? Math.min(widths[i], floors[i])
+                                       : Math.floor(widths[i] - over * spare[i] / spareTotal);
+      }
+      naturalTotal = widths.reduce((a, b) => a + b, 0);
+    };
+    shrinkTo(widths.map((w, i) => Math.max(measured.headerMinWidths[i],
+      category[i] === 'text' ? Math.min(w, TEXT_MIN) : measured.cellWidths[i])));
+    if (naturalTotal > containerWidth) {
+      table.classList.add('report-table--tight');
+      shrinkTo(widths.map((w, i) => Math.max(measured.headerMinWidths[i], Math.min(w, measured.cellMinWidths[i]))));
     }
   }
 

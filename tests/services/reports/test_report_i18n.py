@@ -385,3 +385,23 @@ def test_the_tables_that_name_hosts_carry_their_keys(ctx, report_type):
     got = {(sid, col, table.host_section) for sid, table in _host_tables(ctx, report_type)
            for col, keys in table.host_keys.items() if any(keys)}
     assert got >= HOST_TABLES[report_type], HOST_TABLES[report_type] - got
+
+
+@pytest.mark.parametrize("report_type", [ReportType.TRAFFIC, ReportType.SECURITY_RISK, ReportType.NETWORK_INVENTORY,
+                                         ReportType.APP_SUMMARY])
+def test_a_period_without_traffic_is_not_said_as_nothing_to_do(ctx, report_type):
+    """The rules did not run (a period no flow falls in): through finish() and the renderer, the first page says so
+    and points at the rules section — never "nothing needs action" (stage 3a Task 6)."""
+    from illumio_ops.services.reports.finish import finish
+    from tests.services.reports.dom import dom
+    cond = APP_DB if specs()[report_type].requires_app else None
+    early = timedelta(days=60)
+    doc = finish(specs()[report_type].build(BuildInput(
+        ctx=ctx, params=ReportParams(report_type=report_type, filter=cond), start=START - early, end=END - early,
+        lang=Language.EN, tz=UTC, now=NOW, pce_label="pce")))
+    assert doc.findings == () and "findings" in [s.id for s in doc.sections]
+    page = dom(render_html(doc, tz=UTC))
+    top = page.one("data-role", "top-actions")
+    assert top.text().startswith("This period has no traffic to evaluate the rules on; see “")
+    assert top.find("a")[0].attrs["href"] == "#findings" and len(page.find_attr("id", "findings")) == 1
+    assert "Nothing in this report needs action" not in page.text()

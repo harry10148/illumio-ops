@@ -1,6 +1,6 @@
 """ReportDocument -> one self-contained HTML file in the report shell (5.x report_shell.css / report_table.js,
-copied unchanged from src/report/exporters/assets at 9ad38389). Every value from the PCE or the store is
-escaped here; truncation follows the rules in domain.report and is always stated.
+copied from src/report/exporters/assets at 9ad38389; the column fitting in report_table.js is v6's). Every value
+from the PCE or the store is escaped here; truncation follows the rules in domain.report and is always stated.
 
 The page, top to bottom (UI redesign spec §9.1; each part has a data-role): the cover with the one-sentence
 conclusion; "know this before reading the numbers" (caveats); the three lead numbers (lead-kpis, their notes under
@@ -36,7 +36,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.values import Language, ReportType, Severity
 from illumio_ops.i18n import translate
 from illumio_ops.services.reports.common import host_url
-from illumio_ops.services.reports.finish import NOTHING
+from illumio_ops.services.reports.finish import NOTHING, UNEVALUATED
 from illumio_ops.services.reports.sheets import sheet_names
 from illumio_ops.services.reports.svg import bar_svg
 
@@ -48,7 +48,7 @@ WIDE_COLUMNS = 9  # report_shell.css: tables this wide get a landscape print pag
 LEAD_KPIS = 3  # the numbers the first page leads with (finish() puts the type's lead numbers first)
 # Section ids with a fixed place: the rules that were not evaluated close the ordinary sections; `how`, the data
 # notes and the sections that hold nothing are the closing part, in that order.
-HOW, NOTES, UNEVALUATED = "how", "notes", "findings"
+HOW, NOTES = "how", "notes"
 BETTER_KEYS = {"higher": "rpt_kpi_better_higher", "lower": "rpt_kpi_better_lower"}  # neutral: nothing is said
 _SLOT = "\ufffc"  # stands in a translated sentence for markup put in after escaping
 _CSS = """
@@ -134,6 +134,9 @@ html[lang="zh-TW"] .print-btn { letter-spacing: 0; }
 .toc li.toc-part { padding: var(--space-4) 0 var(--space-2); font-size: var(--fs-mini); color: var(--text-3);
   font-weight: 600; }
 .notes-list { margin: 0; padding-left: 1.2em; overflow-wrap: anywhere; }
+/* report_table.js narrows a column to the longest word of its header and cells before it lets a table scroll;
+   a table that only fits that way (it marks it) draws its share bars half as long. */
+.report-table--tight .share-bar { width: 36px; }
 .notes-list li { margin: 0 0 4px; }
 
 /* stage 3a print */
@@ -469,9 +472,9 @@ def _top_actions(doc: ReportDocument) -> str:
         if more:
             parts.append(f'<p data-role="actions-more">{_esc(tr(lang, "rpt_actions_more", n=more))}</p>')
     held = _unevaluated(doc)
-    not_run = held is not None and held[1] == 0
-    if not top and not not_run:
+    if not top and held is None:  # no finding and every rule evaluated (or a report without rules): only then
         parts.append(f'<p data-role="actions-none">{_esc(tr(lang, "rpt_findings_none"))}</p>')
+    not_run = held is not None and held[1] == 0
     if held is not None:
         section, n = held
         words = (tr(lang, "rpt_actions_not_run", section=section.title) if not_run

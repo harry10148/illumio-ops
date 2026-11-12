@@ -127,7 +127,24 @@ def test_no_printed_page_splits_a_card_or_stands_empty(context, tmp_path):
         assert last and set(last) <= set(first), f"card {i} starts on {first}, ends on {last}"
     assert all(len(t) > 200 for t in pages[:-1]), [len(t) for t in pages]  # no blank page, no heading alone
     needed = math.ceil(height / PAPER_H)
-    assert needed <= len(pages) <= needed + 2, (height, len(pages))  # whole cards leave a little white per page
+    assert needed <= len(pages) <= needed + 1, (height, len(pages))  # whole cards leave a little white per page
+
+
+@pytest.mark.skipif(shutil.which("pdftotext") is None, reason="reads the printed PDF's pages with poppler's pdftotext")
+def test_a_short_report_prints_on_one_page(context, tmp_path):
+    """Nothing starts a page of its own: the cover, the first page's sentence, the contents, two sections and the
+    closing part of a short report are one printed page (the shell gave the cover, the contents and every section
+    a page each)."""
+    doc = make_doc(kpis=(), sections=(Section(id="a", title="First", blocks=(table([("QZROWA", 1)]),)),
+                                      Section(id="b", title="Second", blocks=(table([("QZROWB", 2)]),))),
+                   data_quality=("QZNOTE the whole period was collected.",))
+    page = _page(context, render_html(doc, tz=UTC), width=PAPER_W, media="print")
+    assert page.evaluate("document.querySelector('.sheet').getBoundingClientRect().height") < PAPER_H - 100  # it fits
+    pages = _pdf_pages(page, tmp_path)
+    assert len(pages) == 1, [len(t) for t in pages]
+    for word in ("Lateralmovementposture", "Nothinginthisreportneedsaction", "CONTENTS", "QZROWA", "QZROWB",
+                 "Howtoreadthisreport", "QZNOTE"):
+        assert word in pages[0], word
 
 
 LONGEST = ("rpt_sec_kpi_pb_flows", "rpt_sec_kpi_allowed_pct", "rpt_sec_kpi_blocked_flows")
@@ -166,8 +183,8 @@ def test_the_lead_numbers_are_level_at_every_width(context, lang):
 def test_the_longest_names_fit_the_page_and_the_paper(context, lang):
     """The cells and column names that grew when a decision and a mode got plain words (stage 3a Task 5): a
     readiness scores table (four share columns and the modes cell), a table whose columns are the four modes, and a
-    cell holding a decision's name. On screen a table may scroll inside its panel; nothing is cut and the page
-    itself never scrolls sideways; on paper every table is inside the page."""
+    cell holding a decision's name. No table scrolls inside its panel (the headers and the cells wrap instead:
+    report_table.js), nothing is cut, the page never scrolls sideways; on paper every table is inside the page."""
     def t(key, **params):
         return translate(lang, key, {k: str(v) for k, v in params.items()})
     modes = [t(k) for k in ("term_mode_full", "term_mode_selective", "term_mode_visibility_only", "term_mode_idle")]
@@ -181,9 +198,13 @@ def test_the_longest_names_fit_the_page_and_the_paper(context, lang):
                                  Column(key="modes", label="Host modes")),
         rows=tuple((f"CoreServices-{i} (Production)", "12.5%", "100.0%", "4.9%", "66.7%", i, cell) for i in range(4)),
         total_rows=4, empty_text="-")
-    by_mode = TableBlock(title="Modes", columns=(Column(key="os", label="OS"),
-                                                 *(Column(key=f"m{i}", label=m, kind="number") for i, m in enumerate(modes))),
-                         rows=(("Windows", 1, 2, 3, 4), ("Linux", 5, 6, 7, 8)), total_rows=2, empty_text="-")
+    # the security risk report's table of modes by app: seven columns, six of them numbers under a long name
+    by_mode = TableBlock(title="Modes", columns=(Column(key="app", label="App (environment)"),
+                                                 Column(key="hosts", label="Managed hosts", kind="number"),
+                                                 *(Column(key=f"m{i}", label=m, kind="number") for i, m in enumerate(modes)),
+                                                 Column(key="unknown", label="Unknown", kind="number")),
+                         rows=(("CoreServices (Production)", 10, 1, 2, 3, 4, 0), ("DemoApp (Staging)", 26, 5, 6, 7, 8, 0)),
+                         total_rows=2, empty_text="-")
     decisions = TableBlock(title="Decisions", columns=(Column(key="decision", label="Decision"),
                                                        Column(key="n", label="Connections", kind="number"),
                                                        Column(key="note", label="Note")),
@@ -195,11 +216,20 @@ def test_the_longest_names_fit_the_page_and_the_paper(context, lang):
     for width, media in ((1440, "screen"), (820, "screen"), (PAPER_W, "print")):
         page = _page(context, html, width=width, media=media)
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"), (width, media)
-        cut = page.evaluate("""() => [...document.querySelectorAll('.chapter *')].filter(e => {
-            const cs = getComputedStyle(e);
-            return e.scrollWidth > e.clientWidth + 1 && cs.display !== 'inline' && cs.overflowX !== 'visible'
-                && cs.overflowX !== 'auto' && cs.overflowX !== 'scroll'; }).map(e => e.className || e.tagName)""")
-        assert cut == [], (width, media, cut)
+        # the standard of test_long_text_columns_wrap_to_the_page: none of these tables scrolls inside its panel
+        # (they have fewer than 9 columns), and nothing else is wider than its box
+        wider = page.evaluate("""() => [...document.querySelectorAll('.chapter *')].filter(e =>
+            e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).display !== 'inline'
+            && getComputedStyle(e).overflowX !== 'visible').map(e => e.className || e.tagName)""")
+        assert wider == [], (width, media, wider)
+        assert page.evaluate("[...document.querySelectorAll('.report-table-wrap')]"
+                             ".map(w => w.scrollWidth - w.clientWidth)") == [0, 0, 0], (width, media)
+        # a column's name is inside its own header cell (a name that cannot wrap runs over the next column)
+        assert page.evaluate("""() => [...document.querySelectorAll('thead th')].filter(th => {
+            const label = th.querySelector('.th-label') || th;
+            return label.scrollWidth > th.clientWidth + 1
+                || label.getBoundingClientRect().right > th.getBoundingClientRect().right + 1; })
+            .map(th => th.innerText)""") == [], (width, media)
         if media == "print":
             right = page.evaluate("Math.max(...[...document.querySelectorAll('table.report-table')]"
                                   ".map(e => e.getBoundingClientRect().right))")

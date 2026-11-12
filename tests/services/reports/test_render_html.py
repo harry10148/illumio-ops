@@ -447,10 +447,11 @@ def test_a_rule_not_evaluated_is_never_said_as_nothing_to_do():
     assert said.text() == "Rules that could not be evaluated: 1; see “Rules not evaluated”."
     assert said.find("a")[0].attrs["href"] == "#findings"
     assert "Nothing in this report needs action" not in t.text()
-    # no finding, a rule not evaluated (every flow report on a lightweight install): both are said, in that order
+    # no finding, a rule not evaluated (every flow report on a lightweight install): "nothing needs action" is for
+    # a report whose rules were all evaluated, so only the rule left out is said
     t = top((), held)
-    assert t.text() == ("Nothing in this report needs action this period. "
-                        "Rules that could not be evaluated: 1; see “Rules not evaluated”.")
+    assert t.text() == "Rules that could not be evaluated: 1; see “Rules not evaluated”."
+    assert t.find("a")[0].attrs["href"] == "#findings"
     # the rules did not run at all: only that
     t = top((), not_run)
     assert t.text() == "This period has no traffic to evaluate the rules on; see “Rules not evaluated”."
@@ -617,3 +618,21 @@ def test_print_does_not_force_a_page_per_part():
     for rule in (r"\.cover\s*\{[^}]*break-after:\s*auto", r"\.toc\s*\{[^}]*break-after:\s*auto",
                  r"\.chapter\s*\{[^}]*break-before:\s*auto", r"\.finding\s*\{[^}]*break-inside:\s*avoid"):
         assert re.search(rule, tail), rule
+
+
+@pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
+def test_rules_that_did_not_run_are_still_said_after_finish(lang):
+    """finish() folds a section that holds nothing into the closing list. The rules section of a report whose
+    rules did not run is such a section (an empty table) — folded, the first page lost the only thing that told it
+    the rules were never evaluated, and said nothing needs action."""
+    rules = _unevaluated([])
+    doc = finish(make_doc(lang=lang, findings=(), sections=(Section(id="hosts", title="Hosts", blocks=(table([("a", 1)]),)),
+                                                            rules)))
+    assert [s.id for s in doc.sections] == ["hosts", "findings"]
+    page = _dom(render_html(doc, tz=UTC))
+    top = page.one("data-role", "top-actions")
+    assert top.text() == {Language.EN: "This period has no traffic to evaluate the rules on; see “Rules not evaluated”.",
+                          Language.ZH_TW: "這段期間沒有流量可以評估規則，見〈Rules not evaluated〉。"}[lang]
+    assert "Nothing in this report needs action" not in page.text() and "本期沒有需要處理的項目" not in page.text()
+    chapter = page.one("id", "findings")  # where the sentence's link lands: the section, saying why it is empty
+    assert top.find("a")[0].attrs["href"] == "#findings" and "The rules did not run." in chapter.text()
