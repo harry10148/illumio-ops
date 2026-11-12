@@ -69,14 +69,14 @@ def render_email(doc: ReportDocument, *, tz: tzinfo | None, note: str | None = N
     lang = doc.lang
     period = period_text(doc.period_start, doc.period_end, tz)
     n = len(doc.findings)
-    said = to_do(doc)  # the subject never says "nothing to act on" for rules that were not evaluated, or a custom report
+    verdict = to_do(doc)  # the subject never says "nothing to act on" for rules that were not evaluated, or a custom report
     if n:
         subject = tr(lang, "rpt_mail_subject", title=doc.title, period=period, status=tr(lang, "rpt_mail_status_items", n=n))
-    elif said is None:
+    elif verdict is None:
         subject = tr(lang, "rpt_mail_subject_plain", title=doc.title, period=period)
     else:
         subject = tr(lang, "rpt_mail_subject", title=doc.title, period=period,
-                     status=tr(lang, "rpt_mail_status_none" if said.nothing else "rpt_mail_status_held"))
+                     status=tr(lang, "rpt_mail_status_none" if verdict.nothing else "rpt_mail_status_held"))
     if doc.conclusion:  # the one sentence the report opens with; the subject is the one place it may be cut
         subject = f"{subject} — {doc.conclusion}"
         if len(subject) > SUBJECT_MAX:
