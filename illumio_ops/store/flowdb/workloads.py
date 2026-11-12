@@ -34,6 +34,7 @@ class WorkloadRow:
     managed_since: str | None = None
     fw_config_current: int | None = None
     agent_health_json: str | None = None  # agent.status.agent_health as the PCE sent it
+    addresses_json: str | None = None     # the interfaces' addresses, a JSON list (0017); None: not read yet
 
 
 _COLUMNS = ", ".join(f.name for f in fields(WorkloadRow))

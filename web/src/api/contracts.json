@@ -19980,6 +19980,17 @@
         "$defs": {
           "FleetHost": {
             "properties": {
+              "addresses": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Addresses",
+                "type": "array"
+              },
+              "alerts": {
+                "title": "Alerts",
+                "type": "integer"
+              },
               "app": {
                 "anyOf": [
                   {
@@ -20079,6 +20090,17 @@
                 "title": "Problems",
                 "type": "array"
               },
+              "quarantine": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Quarantine"
+              },
               "ven_version": {
                 "anyOf": [
                   {
@@ -20102,13 +20124,46 @@
               "policy_sync_state",
               "problems",
               "env",
-              "app"
+              "app",
+              "addresses",
+              "alerts",
+              "quarantine"
             ],
             "title": "FleetHost",
+            "type": "object"
+          },
+          "UnmanagedAddress": {
+            "properties": {
+              "alerts": {
+                "title": "Alerts",
+                "type": "integer"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "name",
+              "alerts"
+            ],
+            "title": "UnmanagedAddress",
             "type": "object"
           }
         },
         "properties": {
+          "groups": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Groups",
+            "type": "object"
+          },
           "hosts": {
             "items": {
               "$ref": "#/$defs/FleetHost"
@@ -20123,12 +20178,21 @@
           "total": {
             "title": "Total",
             "type": "integer"
+          },
+          "unmanaged": {
+            "items": {
+              "$ref": "#/$defs/UnmanagedAddress"
+            },
+            "title": "Unmanaged",
+            "type": "array"
           }
         },
         "required": [
           "total",
           "hosts",
-          "limit_hit"
+          "limit_hit",
+          "groups",
+          "unmanaged"
         ],
         "title": "FleetHostList",
         "type": "object"
@@ -20676,82 +20740,6 @@
           "sources_status"
         ],
         "title": "FocusView",
-        "type": "object"
-      }
-    },
-    "hosts.alerted": {
-      "method": "GET",
-      "path": "/api/hosts/alerted",
-      "request_schema": null,
-      "response_schema": {
-        "$defs": {
-          "AlertedHost": {
-            "properties": {
-              "alerts": {
-                "title": "Alerts",
-                "type": "integer"
-              },
-              "highest": {
-                "$ref": "#/$defs/Severity"
-              },
-              "key": {
-                "title": "Key",
-                "type": "string"
-              },
-              "last_at": {
-                "format": "date-time",
-                "title": "Last At",
-                "type": "string"
-              },
-              "managed": {
-                "title": "Managed",
-                "type": "boolean"
-              },
-              "name": {
-                "title": "Name",
-                "type": "string"
-              }
-            },
-            "required": [
-              "key",
-              "name",
-              "managed",
-              "alerts",
-              "highest",
-              "last_at"
-            ],
-            "title": "AlertedHost",
-            "type": "object"
-          },
-          "Severity": {
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "critical"
-            ],
-            "title": "Severity",
-            "type": "string"
-          }
-        },
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/$defs/AlertedHost"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "more": {
-            "title": "More",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "items",
-          "more"
-        ],
-        "title": "AlertedHosts",
         "type": "object"
       }
     },

@@ -1,20 +1,18 @@
 // Host profile (spec §6.5.3, P6b): what the store holds about one host, and its traffic and events as workbench
 // requests (the same numbers as the workbench; lightweight mode reads them from the PCE the same way).
 import { createContext, type FormEvent, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  AlertList, AlertedHosts, Coverage, DimensionTop, EndpointFilter, EventRow, FleetHost, FlowCondition1, FlowRow, HostHit, HostProfile as Profile, HostRansomware, HostTamper, PullInfo, QuarantineAction, QuarantineCurrent, QuarantineOutcome, RankedValue, SegmentDimension,
+  AlertList, Coverage, DimensionTop, EndpointFilter, EventRow, FlowCondition1, FlowRow, HostProfile as Profile, HostRansomware, HostTamper, PullInfo, QuarantineAction, QuarantineOutcome, RankedValue, SegmentDimension,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { HostLink } from "../../components/HostLink";
-import { HostName, NeedsAdvanced, PageHead, Panel, Purpose, SeverityTag, shortTime } from "../../components/ui";
+import { HostName, NeedsAdvanced, Panel, Purpose, SeverityTag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { modeWord } from "../../terms";
 import { registerNav } from "../../shell/nav";
-import { useBasicMode } from "../../shell/status";
-import { Attention } from "../detect/Attention";
 import { SEVERITY_KEYS, word } from "../alerts/common";
 import type { Req } from "../workbench/conditions";
 import { DETAIL_KEYS, LEVEL_KEYS, Outcome, QuarantineDialog, STATUS_KEYS, nonEmpty } from "../quarantine/QuarantineDialog";
@@ -41,7 +39,6 @@ const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], 
 const READINGS_SHOWN = 50;
 const ALERT_DAYS = 7;
 const ALERTS_SHOWN = 10;
-const START_ROWS = 10;
 const HISTORY_SHOWN = 10;
 
 function period(hours: number): { start: string; end: string } {
@@ -528,7 +525,7 @@ export function HostProfile() {
   return (
     <GapsContext.Provider value={noteGap}>
     <section className="page" data-role="host-profile">
-      <p><Link to="/hosts">{t("hosts_back_to_search")}</Link></p>
+      <p><Link to="/fleet">{t("hosts_back_to_search")}</Link></p>
       <div className="page-head">
         <div><h1>{seenAs ?? profile.name}</h1><Purpose>{t("purpose_host")}</Purpose></div>
         <label>
@@ -661,150 +658,6 @@ function HostAlerts({ hostKey, alerts }: { hostKey: string; alerts: AlertList | 
   );
 }
 
-const LOST_STATES = ["lost_24h", "lost_48h", "long_offline"] as const;
-const LOST_KEYS: Record<string, string> = {
-  lost_24h: "fleet_online_lost_24h", lost_48h: "fleet_online_lost_48h", long_offline: "fleet_online_long_offline",
-};
-
-/** Without a host in hand: where to start (purpose-led UI spec §6.2). */
-function WhereToStart() {
-  const lang = useLang();
-  const basic = useBasicMode();
-  const [alerted, setAlerted] = useState<AlertedHosts | null>(null);
-  const [lost, setLost] = useState<{ hosts: FleetHost[]; total: number; inventory: number } | null>(null);
-  const [held, setHeld] = useState<QuarantineCurrent | null>(null);
-  const [failed, setFailed] = useState<Record<string, ApiError | null>>({});  // a list that could not be read says so
-  useEffect(() => {
-    let live = true;
-    const fail = (list: string, error: ApiError | null) => { if (live) setFailed((f) => ({ ...f, [list]: error })); };
-    void call("hosts.alerted", undefined, undefined, { days: String(ALERT_DAYS) }).then((env) => {
-      if (live && env.ok && env.data) setAlerted(env.data); else fail("alerted", env.error);
-    });
-    void call("quarantine.current").then((env) => {
-      if (live && env.ok && env.data) setHeld(env.data); else fail("held", env.error);
-    });
-    void Promise.all([call("fleet.overview"),
-                      ...LOST_STATES.map((online) => call("fleet.hosts", undefined, undefined, { online }))]).then(
-      ([overview, ...lists]) => {
-        if (!live) return;
-        if (!overview.ok || !overview.data) { fail("lost", overview.error); return; }
-        const got = lists.flatMap((e) => (e.ok && e.data ? e.data.hosts : []));
-        setLost({ hosts: got, total: lists.reduce((n, e) => n + (e.ok && e.data ? e.data.total : 0), 0),
-                  inventory: overview.data.total });
-      });
-    return () => { live = false; };
-  }, []);
-  const more = (n: number) => (n > 0 ? <p className="hint">{t("hosts_start_more", { n: String(n) })}</p> : null);
-  return (
-    <div className="host-grid" data-role="host-start">
-      <Panel title={t("hosts_start_alerted")} role="start-alerted">
-        {failed.alerted ? <p className="form-error">{t(failed.alerted.message_key, failed.alerted.params)}</p>
-          : !alerted ? <p className="muted">{t("loading")}</p>
-          : alerted.items.length === 0 ? <p className="muted">{t("hosts_start_alerted_none")}</p> : (
-            <>
-              <ul className="plain-list">
-                {alerted.items.slice(0, START_ROWS).map((h) => (
-                  <li key={h.key}>
-                    <HostLink hostKey={h.key} name={h.name} section="alerts" />{" "}
-                    <SeverityTag severity={h.highest} />{" "}
-                    <span className="hint">{t("hosts_start_alerted_row", { n: String(h.alerts) })} · <span className="num" title={formatTime(h.last_at, lang)}>{shortTime(h.last_at)}</span></span>
-                  </li>
-                ))}
-              </ul>
-              {more(alerted.items.length - Math.min(alerted.items.length, START_ROWS) + alerted.more)}
-            </>
-          )}
-      </Panel>
-      <Panel title={t("hosts_start_lost")} role="start-lost">
-        {failed.lost ? <p className="form-error">{t(failed.lost.message_key, failed.lost.params)}</p>
-          : !lost ? <p className="muted">{t("loading")}</p>
-          : lost.inventory === 0 ? <p className="muted">{t("hosts_start_no_inventory")}</p>
-          : lost.total === 0 ? <p className="muted">{t("hosts_start_lost_none")}</p> : (
-            <>
-              <ul className="plain-list">
-                {lost.hosts.slice(0, START_ROWS).map((h) => (
-                  <li key={h.key}>
-                    <HostLink hostKey={h.key} name={h.name ?? h.key} section="status" />{" "}
-                    <span className="hint">{t(LOST_KEYS[h.online] ?? h.online)}</span>
-                  </li>
-                ))}
-              </ul>
-              {more(lost.total - Math.min(lost.hosts.length, START_ROWS))}
-            </>
-          )}
-      </Panel>
-      <Panel title={t("hosts_start_quarantined")} role="start-quarantined">
-        {failed.held ? <p className="form-error">{t(failed.held.message_key, failed.held.params)}</p>
-          : !held ? <p className="muted">{t("loading")}</p>
-          : held.items.length === 0 ? <p className="muted">{t("hosts_start_quarantined_none")}</p> : (
-            <>
-              <ul className="plain-list">
-                {held.items.slice(0, START_ROWS).map((h) => (
-                  <li key={h.key}>
-                    <HostLink hostKey={h.key} name={h.name} section="quarantine" />{" "}
-                    <span className="hint">{t(LEVEL_KEYS[h.level] ?? h.level)}</span>
-                  </li>
-                ))}
-              </ul>
-              {more(held.items.length - Math.min(held.items.length, START_ROWS))}
-            </>
-          )}
-      </Panel>
-      {/* the attention list brings its own card and heading (the detection page shows the same one) */}
-      <div data-role="start-attention">
-        {basic ? <Panel title={t("hosts_start_attention")}><NeedsAdvanced what={t("hosts_start_attention_basic")} /></Panel>
-          : <Attention />}
-      </div>
-    </div>
-  );
-}
-
-function HostSearchPage() {
-  const [q, setQ] = useState("");
-  const [items, setItems] = useState<HostHit[] | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
-  useEffect(() => {
-    const text = q.trim();
-    if (!text) {
-      setItems(null);
-      return;
-    }
-    let live = true;
-    const timer = window.setTimeout(() => {
-      void call("hosts.search", undefined, undefined, { q: text }).then((env) => {
-        if (!live) return;
-        if (env.ok && env.data) {
-          setItems(env.data.items);
-          setError(null);
-        } else setError(env.error);
-      });
-    }, 250);
-    return () => { live = false; window.clearTimeout(timer); };
-  }, [q]);
-  return (
-    <section className="page" data-role="host-search">
-      <PageHead title={t("nav_hosts")} purpose={t("purpose_hosts")} />
-      <label className="block">
-        {t("hosts_search_label")}
-        <input name="host_q" value={q} maxLength={200} placeholder={t("hosts_search_placeholder")}
-               onChange={(e) => setQ(e.target.value)} autoFocus />
-      </label>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
-      {items && (items.length === 0 ? <p className="muted">{t("hosts_search_none")}</p> : (
-        <ul className="plain-list spaced" data-role="host-hits">
-          {items.map((h) => (
-            <li key={h.key}>
-              <HostLink hostKey={h.key} name={h.name} />
-              {!h.managed && <span className="hint"> · {t("hosts_unmanaged_short")}</span>}
-            </li>
-          ))}
-        </ul>
-      ))}
-      {!q.trim() && <WhereToStart />}
-    </section>
-  );
-}
-
 function Usual({ profile }: { profile: Profile }) {
   if (profile.usual_state === "basic_mode") return <NeedsAdvanced what={t("hosts_usual_basic")} />;
   if (!profile.usual) return <p className="muted" data-role="usual-none">{t("hosts_usual_none")}</p>;
@@ -848,7 +701,12 @@ function Different({ profile }: { profile: Profile }) {
 
 function HostRoute() {
   const [params] = useSearchParams();
-  return params.get("key") ? <HostProfile /> : <HostSearchPage />;
+  // No host named: hosts are found on the VEN overview (2026-11-12); an address that led to the old search still opens.
+  if (!params.get("key")) {
+    const q = params.get("q");
+    return <Navigate to={q ? `/fleet?${new URLSearchParams({ q }).toString()}` : "/fleet"} replace />;
+  }
+  return <HostProfile />;
 }
 
-registerNav({ section: "devices", path: "/hosts", labelKey: "nav_hosts", order: 10, component: HostRoute });
+registerNav({ section: "devices", path: "/hosts", labelKey: "nav_hosts", order: 10, component: HostRoute, hidden: true });

@@ -21,7 +21,7 @@ def test_the_navigation_is_grouped_by_what_a_page_is_for(live_app, context):
         groups[title] = [t.strip().rstrip("◆").strip() for t in group.locator(".nav-item").all_inner_texts()]
     assert list(groups) == ["Watch", "Hosts", "Analyse", "Automation", "Settings"]
     assert groups["Watch"] == ["Alerts", "Alert rules and notifications", "Reports"]
-    assert groups["Hosts"] == ["Hosts", "VEN fleet", "Quarantine"]
+    assert groups["Hosts"] == ["VEN fleet", "Quarantine"]  # hosts are found on the VEN overview; a host's page is reached from it
     assert groups["Analyse"] == ["Detection", "Investigate"]
     assert groups["Automation"] == ["Rule schedules"]
     assert groups["Settings"] == ["SIEM forwarding", "System"]
@@ -33,12 +33,14 @@ def test_every_address_that_opened_a_page_still_does(live_app, context):
     page = context.new_page()
     sign_in(page, live_app.url)
     for path in ui_rules.PATHS:
+        if path == "/hosts":
+            continue  # leads on to the VEN overview now (below)
         page.goto(live_app.url + path)
         expect(page.locator("main h1")).to_have_count(1)
         assert page.url.split("?")[0].rstrip("/") == (live_app.url + path.split("?")[0]).rstrip("/"), path
     # the older addresses that lead on to where the page is now
     for old, now in (("/alerts", "/"), ("/lateral", "/detect"), ("/alerts/rules", "/alert-rules"),
-                     ("/system/reports", "/reports"), ("/system/channels", "/alert-rules")):
+                     ("/system/reports", "/reports"), ("/system/channels", "/alert-rules"), ("/hosts", "/fleet")):
         page.goto(live_app.url + old)
         page.wait_for_url(lambda url, now=now: url.split("?")[0].rstrip("/") == (live_app.url + now).rstrip("/"))
         expect(page.locator("main h1")).to_have_count(1)

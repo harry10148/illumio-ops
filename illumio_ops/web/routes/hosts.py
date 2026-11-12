@@ -10,7 +10,7 @@ from illumio_ops.domain.values import TamperPattern
 from illumio_ops.services import hosts
 from illumio_ops.services.analysis.ransomware import HostRansomware
 from illumio_ops.services.collect.guard import BindingMismatch
-from illumio_ops.services.hosts import AlertedHosts, HostProfile, HostSearch
+from illumio_ops.services.hosts import HostProfile, HostSearch
 from illumio_ops.web.auth import get_ctx
 from illumio_ops.web.contract import ApiFailure, api_route, operation
 
@@ -27,7 +27,6 @@ class TamperNoteAdd(HostKey):
 
 OP_PROFILE = operation("hosts.profile", "GET", "/api/hosts/profile", None, HostProfile)
 OP_SEARCH = operation("hosts.search", "GET", "/api/hosts/search", None, HostSearch)
-OP_ALERTED = operation("hosts.alerted", "GET", "/api/hosts/alerted", None, AlertedHosts)
 OP_ALLOWS = operation("hosts.ransomware_allows", "POST", "/api/hosts/ransomware-allows", HostKey, HostRansomware)
 OP_NOTE_ADD = operation("hosts.tamper_note_add", "POST", "/api/hosts/tamper-notes", TamperNoteAdd, HostProfile)
 OP_NOTE_REMOVE = operation("hosts.tamper_note_remove", "POST", "/api/hosts/tamper-notes/<int:note_id>/remove", HostKey,
@@ -52,14 +51,6 @@ def profile() -> HostProfile:
         raise _switched() from None
     except ValueError:
         raise _invalid() from None
-
-
-@api_route(bp, OP_ALERTED)
-def alerted() -> AlertedHosts:
-    raw = request.args.get("days", "7")
-    if not raw.isdigit() or not 1 <= int(raw) <= 3650:
-        raise ApiFailure(400, "invalid_input", "err_invalid_input", field="days")
-    return hosts.alerted(get_ctx(), days=int(raw))
 
 
 @api_route(bp, OP_SEARCH)

@@ -67,6 +67,16 @@ def _map(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
+
+def _addresses(w: Mapping[str, Any]) -> list[str]:
+    """The addresses of a workload's interfaces, once each, in the PCE's order."""
+    seen: dict[str, None] = {}
+    for i in w.get("interfaces") or []:
+        address = i.get("address") if isinstance(i, dict) else None
+        if isinstance(address, str) and address:
+            seen.setdefault(address)
+    return list(seen)
+
 def _row(conn: Any, w: Mapping[str, Any], fetched_at: str) -> workloads.WorkloadRow:
     ven = _map(w.get("ven"))
     status = _map(_map(w.get("agent")).get("status"))
@@ -89,6 +99,7 @@ def _row(conn: Any, w: Mapping[str, Any], fetched_at: str) -> workloads.Workload
         managed_since=_stamp(status.get("managed_since")),
         fw_config_current=None if status.get("fw_config_current") is None else int(bool(status["fw_config_current"])),
         agent_health_json=json.dumps(status["agent_health"]) if isinstance(status.get("agent_health"), list) else None,
+        addresses_json=json.dumps(_addresses(w)),
     )
 
 

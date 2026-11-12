@@ -98,7 +98,7 @@ def overview() -> FleetOverview:
 
 @api_route(bp, OP_HOSTS)
 def hosts() -> FleetHostList:
-    args = {k: request.args[k] for k in ("mode", "env", "online", "q", "no_env") if k in request.args}
+    args = {k: request.args[k] for k in ("mode", "env", "online", "q", "no_env", "group") if k in request.args}
     if any(len(v) > 255 for v in args.values()):
         raise ApiFailure(400, "invalid_input", "err_invalid_input", field="q")
     try:

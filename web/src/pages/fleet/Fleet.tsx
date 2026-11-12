@@ -2,15 +2,17 @@
 // hosts the inventory holds, counted and listed; the chosen ones moved forward to a target mode, or asked to report
 // traffic faster, through the write key after a preview; and what was done.
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  EnforcementPreview, EnforcementPreviewRequest, FleetAction, FleetHost, FleetHostList, FleetOutcome, FleetOverview, FleetTarget, LabelPick,
+  EnforcementPreview, EnforcementPreviewRequest, FleetAction, FleetHost, FleetHostList, FleetOutcome, FleetOverview, FleetTarget, HostHit,
+  LabelPick,
   RateCheck, Tally,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { HostLink } from "../../components/HostLink";
-import { DataTable, Disclosure, KpiStrip, PageHead, Panel } from "../../components/ui";
+import { DataTable, Disclosure, KpiStrip, PageHead, Panel, Segmented, Tag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { modeWord as plainMode } from "../../terms";
 import { registerNav } from "../../shell/nav";
@@ -351,7 +353,11 @@ function History({ actions, lang }: { actions: FleetAction[]; lang: string }) {
   );
 }
 
-interface Filter { mode: string; env: string; online: string; q: string }
+type Group = "" | "alerted" | "lost" | "quarantined";
+interface Filter { mode: string; env: string; online: string; q: string; group: Group }
+const GROUP_KEYS: Record<Exclude<Group, "">, string> = {
+  alerted: "fleet_group_alerted", lost: "fleet_group_lost", quarantined: "fleet_group_quarantined",
+};
 
 function Fleet() {
   const lang = useLang();
@@ -359,7 +365,14 @@ function Fleet() {
   const [list, setList] = useState<FleetHostList | null>(null);
   const [actions, setActions] = useState<FleetAction[]>([]);
   const [error, setError] = useState<ApiError | null>(null);
-  const [filter, setFilter] = useState<Filter>({ mode: "", env: "", online: "", q: "" });
+  // ?q= and ?group=: what another page asked to be found here (the old host search led to /hosts?…)
+  const [params] = useSearchParams();
+  const asked = params.get("group");
+  const [filter, setFilter] = useState<Filter>({
+    mode: "", env: "", online: "", q: params.get("q") ?? "",
+    group: asked === "alerted" || asked === "lost" || asked === "quarantined" ? asked : "" });
+  // a searched address the inventory does not hold: offered as the unmanaged address it then is
+  const [loose, setLoose] = useState<HostHit[]>([]);
   const [chosen, setChosen] = useState<Map<string, FleetHost>>(new Map());
   const [open, setOpen] = useState<"enforce" | "rate" | null>(null);
 
@@ -377,12 +390,20 @@ function Fleet() {
   const loadList = useCallback(async (f: Filter) => {
     const seq = ++latest.current;
     const query: Record<string, string> = { mode: f.mode, online: f.online, q: f.q.trim() };
+    if (f.group) query.group = f.group;
     if (f.env === "\u0000") query.no_env = "true";
     else query.env = f.env;
     const env = await call("fleet.hosts", undefined, undefined, query);
     if (seq !== latest.current) return;
     if (env.ok && env.data) setList(env.data);
     else setError(env.error);
+    let found: HostHit[] = [];
+    if (env.ok && env.data && env.data.total === 0 && env.data.unmanaged.length === 0 && f.q.trim() && !f.group) {
+      const hits = await call("hosts.search", undefined, undefined, { q: f.q.trim() });
+      if (seq !== latest.current) return;
+      found = hits.ok && hits.data ? hits.data.items.filter((h) => !h.managed) : [];
+    }
+    setLoose(found);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -414,6 +435,17 @@ function Fleet() {
     <section className="page" data-role="fleet">
       <PageHead title={t("nav_fleet")} purpose={t("purpose_fleet")} />
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      <div className="fleet-find" data-role="fleet-find">
+        <label>{t("fleet_search_label")}
+          <input name="q" type="search" value={filter.q} placeholder={t("fleet_search_placeholder")} maxLength={200}
+                 onChange={(e) => set("q")(e.target.value)} autoFocus />
+        </label>
+        <Segmented<Group> label={t("fleet_group_label")} role="fleet-groups" value={filter.group}
+                          onChange={(g) => setFilter({ ...filter, group: g })}
+                          options={[{ value: "", label: t("fleet_any"), count: list?.groups.all },
+                                    ...(["alerted", "lost", "quarantined"] as const).map((g) => (
+                                      { value: g as Group, label: t(GROUP_KEYS[g]), count: list?.groups[g] }))]} />
+      </div>
       {o && <p className="hint" data-role="fleet-fetched">{o.fetched_at ? t("fleet_inventory_at", { at: formatTime(o.fetched_at, lang) }) : t("fleet_inventory_never")}</p>}
       <KpiStrip items={[
         { key: "total", label: t("fleet_kpi_total"), value: o ? o.total : null },
@@ -456,9 +488,6 @@ function Fleet() {
               {ONLINE.map((s) => <option key={s} value={s}>{word(ONLINE_KEYS, s)}</option>)}
             </select>
           </label>
-          <label>{t("fleet_filter_q")}
-            <input name="q" value={filter.q} onChange={(e) => set("q")(e.target.value)} />
-          </label>
         </div>
         {list?.limit_hit && <p className="notice">{t("fleet_list_limit", { shown: String(list.hosts.length), n: list.total.toLocaleString() })}</p>}
         <div className="row" data-role="fleet-actions">
@@ -482,7 +511,16 @@ function Fleet() {
               <input type="checkbox" aria-label={hostName(h.name, h.key)} checked={chosen.has(h.key)}
                      disabled={!chosen.has(h.key) && chosen.size >= MAX} onChange={() => toggle(h)} />) },
             { key: "host", label: t("fleet_col_host"), render: (h) => (
-              <HostLink hostKey={h.key} name={hostName(h.name, h.key)} section="status" />) },
+              <div data-host={h.key}>
+                <HostLink hostKey={h.key} name={hostName(h.name, h.key)} section="status" />
+                {h.quarantine && <> <Tag tone="high">{t("fleet_host_quarantined", { level: h.quarantine })}</Tag></>}
+                {h.addresses.length > 0 && <div className="hint mono" data-role="host-addresses">{h.addresses.join("  ")}</div>}
+                {h.alerts > 0 && (
+                  <div className="hint"><Link to={`/?${new URLSearchParams({ device: h.key }).toString()}`}>
+                    {t("fleet_host_alerts", { n: String(h.alerts) })}
+                  </Link></div>
+                )}
+              </div>) },
             { key: "mode", label: t("hosts_mode"), nowrap: true, render: (h) => (h.mode ? plainMode(h.mode) : t("fleet_not_reported")) },
             { key: "online", label: t("fleet_tally_online"), nowrap: true, render: (h) => word(ONLINE_KEYS, h.online) },
             { key: "beat", label: t("fleet_col_heartbeat"), kind: "time", render: (h) => (h.last_heartbeat_at ? formatTime(h.last_heartbeat_at, lang) : "—") },
@@ -494,6 +532,25 @@ function Fleet() {
             { key: "app", label: t("fleet_col_app"), render: (h) => h.app ?? "—" },
           ]}
         />
+        {(list?.unmanaged.length ?? 0) > 0 && (
+          <div className="stack" data-role="fleet-unmanaged">
+            <h3 className="side-h">{t("fleet_unmanaged_title")}</h3>
+            <ul className="plain-list">
+              {list?.unmanaged.map((u) => (
+                <li key={u.key}>
+                  <HostLink hostKey={u.key} name={u.name} section="alerts" />{" "}
+                  <span className="hint">{t("fleet_host_alerts", { n: String(u.alerts) })}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {loose.length > 0 && (
+          <p data-role="fleet-open-unmanaged">
+            {t("fleet_open_unmanaged")}{" "}
+            {loose.map((h) => <HostLink key={h.key} hostKey={h.key} name={h.name} />)}
+          </p>
+        )}
       </Panel>
       <Panel title={t("fleet_history_title")} role="fleet-history"><History actions={actions} lang={lang} /></Panel>
     </section>

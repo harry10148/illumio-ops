@@ -102,3 +102,87 @@ def test_a_slow_answer_to_an_earlier_filter_does_not_replace_the_newer_list(cont
     rows = fleet.locator("[data-role=fleet-list] tbody tr")
     expect(rows).to_have_count(1)
     expect(rows.first).to_contain_text("web")
+
+
+# ── the VEN overview is the way in to hosts (2026-11-12): a search across what names a host, and where to start ──
+
+def _find(live_app, fake_pce):
+    from dataclasses import replace
+
+    from tests.e2e.test_alerts_e2e import AlertRuleType, _about
+    _setup(live_app, fake_pce)
+    ctx = live_app.ctx
+    now = datetime.now(UTC)
+    with ctx.flows().connect() as conn:
+        prod = label_store.label_set_id(conn, (("app", "DB"), ("env", "Prod")))
+        held = label_store.label_set_id(conn, (("Quarantine", "Severe"),))
+        workloads.replace_inventory(conn, [
+            replace(_wl(DB, "db", "visibility_only", prod, now), addresses_json='["10.1.2.3"]'),
+            replace(_wl(WEB, "web", "selective", held, now), last_heartbeat_at=db_time(now - timedelta(hours=30))),
+            _wl("/orgs/1/workloads/app", "app", "selective", None, now)])
+        conn.commit()
+    for _ in range(2):
+        _about(ctx, [(DB, "subject"), ("ip:192.168.20.99", "subject")], rule_type=AlertRuleType.EVENT, subject=DB,
+               pack_key="rule_agent_tampering")
+
+
+def _rows(page):
+    return page.locator("[data-role=fleet-list] tbody tr")
+
+
+def test_a_host_is_found_by_its_address_and_opened(context, live_app, fake_pce):
+    _find(live_app, fake_pce)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.click(".sidenav .nav-item[data-nav='/fleet']")
+    expect(_rows(page)).to_have_count(3)
+    page.fill("[data-role=fleet-find] input[name=q]", "10.1.2")
+    expect(_rows(page)).to_have_count(1)
+    row = page.locator(f"[data-role=fleet-list] [data-host='{DB}']")
+    expect(row.locator("[data-role=host-addresses]")).to_have_text("10.1.2.3")
+    expect(row).to_contain_text("2 alerts in the last 7 days")
+    row.locator("[data-role=host-link]").click()
+    expect(page.locator("h1")).to_have_text("db")
+    page.click("[data-role=host-profile] >> text=← VEN fleet")
+    expect(page.locator("[data-role=fleet-find]")).to_be_visible()
+
+
+def test_the_quick_filters_say_how_many_and_list_them(context, live_app, fake_pce):
+    _find(live_app, fake_pce)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/fleet")
+    groups = page.locator("[data-role=fleet-groups]")
+    expect(groups.locator("button[data-value=alerted]")).to_have_text("With alerts1")
+    expect(groups.locator("button[data-value=lost]")).to_have_text("Lost contact1")
+    expect(groups.locator("button[data-value=quarantined]")).to_have_text("In quarantine1")
+    groups.locator("button[data-value=quarantined]").click()
+    expect(_rows(page)).to_have_count(1)
+    expect(_rows(page).first).to_contain_text("In quarantine: Severe")
+    groups.locator("button[data-value=alerted]").click()
+    expect(_rows(page)).to_have_count(1)
+    # an address with alerts that the PCE does not manage is not a row of this list: it is named under it
+    loose = page.locator("[data-role=fleet-unmanaged] [data-role=host-link]")
+    expect(loose).to_have_text("192.168.20.99")
+    assert loose.get_attribute("href").endswith("#alerts")
+
+
+def test_an_address_the_inventory_does_not_hold_is_offered_as_unmanaged(context, live_app, fake_pce):
+    _find(live_app, fake_pce)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/fleet")
+    page.fill("[data-role=fleet-find] input[name=q]", "203.0.113.7")
+    offer = page.locator("[data-role=fleet-open-unmanaged] [data-role=host-link]")
+    expect(offer).to_have_text("203.0.113.7")
+    offer.click()
+    expect(page.locator("[data-role=page-conclusion]")).to_contain_text("an unmanaged address")
+
+
+def test_the_old_host_search_address_leads_to_the_overview_with_what_was_asked(context, live_app, fake_pce):
+    _find(live_app, fake_pce)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?q=web")
+    page.wait_for_url("**/fleet?q=web")
+    expect(_rows(page)).to_have_count(1)

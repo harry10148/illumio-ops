@@ -71,3 +71,18 @@ def test_old_rows_have_unknown_status(tmp_path):
         conn.commit()
         r = next(w for w in workloads.all_workloads(conn) if w.href == "/orgs/1/workloads/old")
     assert (r.agent_status, r.last_heartbeat_at, r.fw_config_current) == (None, None, None)
+
+
+@responses.activate
+def test_the_addresses_of_a_workloads_interfaces_are_kept_once_each(tmp_path):
+    """6.8.0: a host is found by its IP on the VEN overview."""
+    ctx = configured_ctx(tmp_path)
+    w = _workload(1, risk=None)
+    w["interfaces"] = [{"name": "eth0", "address": "10.1.2.3"}, {"name": "eth0", "address": "fe80::1"},
+                       {"name": "eth1", "address": "10.1.2.3"}, {"name": "lo"}]
+    bare = _workload(2, risk=None)
+    responses.add(responses.GET, WL, json=[w, bare])
+    responses.add(responses.GET, SUMMARY, json={})
+    run_inventory_cycle(ctx, now=NOW)
+    assert json.loads(_row(ctx, "/orgs/1/workloads/w-1").addresses_json) == ["10.1.2.3", "fe80::1"]
+    assert json.loads(_row(ctx, "/orgs/1/workloads/w-2").addresses_json) == []
