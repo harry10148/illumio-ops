@@ -1,6 +1,7 @@
 """The one sentence a report opens with (UI redesign spec §6.5, §8): a fixed template per report type whose every
 placeholder is one of that report's own key numbers (Kpi.key). A type may have shorter forms for when a number is
-not there (CONCLUSIONS); when no form applies the sentence says which numbers are missing and why, never a 0. Custom reports have no key numbers: their sentence counts their sections."""
+not there (CONCLUSIONS); when no form applies the sentence says which numbers are missing and why, never a 0. Custom reports have no key numbers: their sentence counts their sections.
+A type that is no longer a report of its own (rule_hit_count: a chapter of policy usage, §9.2) has no entry here."""
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -23,8 +24,7 @@ CONCLUSION_KEYS: Mapping[ReportType, str] = {
     ReportType.AUDIT: "rpt_conclusion_audit",
     ReportType.RANSOMWARE: "rpt_conclusion_ransomware",
     ReportType.READINESS: "rpt_conclusion_readiness",
-    ReportType.POLICY_USAGE: "rpt_conclusion_policy_usage",
-    ReportType.RULE_HIT_COUNT: "rpt_conclusion_rule_hit_count",
+    ReportType.POLICY_USAGE: "rpt_conclusion_policy_usage_hits",
     ReportType.POLICY_DIFF: "rpt_conclusion_policy_diff",
     ReportType.POLICY_RESOLVER: "rpt_conclusion_policy_resolver",
     ReportType.CUSTOM: "rpt_conclusion_custom",
@@ -41,8 +41,7 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.AUDIT: ("total", "high_risk", "auth_failed", "authz_denied", "policy_provisions"),
     ReportType.RANSOMWARE: ("rated_hosts", "priority", "safe_to_block"),
     ReportType.READINESS: ("apps", "ready", "held_back", "predicted_blocked"),
-    ReportType.POLICY_USAGE: ("rules", "used", "unused", "disabled", "no_rule"),
-    ReportType.RULE_HIT_COUNT: ("rules", "hit", "zero", "no_record"),
+    ReportType.POLICY_USAGE: ("rules", "used", "unused", "disabled", "no_rule", "rhc_hit", "rhc_zero"),
     ReportType.POLICY_DIFF: ("total", "rule_sets", "rules", "objects", "high"),
     ReportType.POLICY_RESOLVER: ("rules", "rulesets", "rows", "not_expanded", "no_address"),
     ReportType.CUSTOM: ("sections", "period"),
@@ -64,7 +63,6 @@ LEAD_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.RANSOMWARE: ("rated_hosts", "priority", "safe_to_block"),
     ReportType.READINESS: ("apps", "ready", "predicted_blocked"),
     ReportType.POLICY_USAGE: ("rules", "unused", "no_rule"),
-    ReportType.RULE_HIT_COUNT: ("rules", "hit", "zero"),  # its own report until 3b folds it into policy usage
     ReportType.POLICY_DIFF: ("total", "rules", "high"),
 }
 
@@ -83,6 +81,12 @@ CONCLUSIONS: Mapping[ReportType, tuple[tuple[tuple[str, ...], str], ...]] = {
         (CONCLUSION_KPIS[ReportType.APP_SUMMARY], CONCLUSION_KEYS[ReportType.APP_SUMMARY]),
         # none of the app's flows carries a decision: no share to say (the number's own note says why)
         (("inbound_connections", "outbound_connections", "intra_connections"), "rpt_conclusion_app_summary_no_share"),
+    ),
+    ReportType.POLICY_USAGE: (
+        (CONCLUSION_KPIS[ReportType.POLICY_USAGE], CONCLUSION_KEYS[ReportType.POLICY_USAGE]),
+        # no hit counts (Rule Hit Count off, not on this PCE, or the PCE did not give them): the sentence the
+        # report had before their chapter joined it
+        (("rules", "used", "unused", "disabled", "no_rule"), "rpt_conclusion_policy_usage"),
     ),
     ReportType.LATERAL_POSTURE: (
         (CONCLUSION_KPIS[ReportType.LATERAL_POSTURE], CONCLUSION_KEYS[ReportType.LATERAL_POSTURE]),

@@ -29,7 +29,7 @@ from illumio_ops.domain.values import (
     ReportType,
 )
 from illumio_ops.i18n import translate
-from illumio_ops.services import archive_read, custom_reports, rhc
+from illumio_ops.services import archive_read, custom_reports
 from illumio_ops.services.collect.guard import (
     BindingMismatch,
     normalize_target,
@@ -42,7 +42,7 @@ from illumio_ops.services.ondemand import OnDemandFailed, OnDemandResult, pull_p
 from illumio_ops.services.reports.deliver import deliver, gui_link
 from illumio_ops.services.reports.finish import finish
 from illumio_ops.services.reports.registry import (
-    RHC_UNAVAILABLE,
+    RETIRED,
     BuildInput,
     ReportFailed,
     ReportParams,
@@ -164,12 +164,11 @@ def traffic_covered(ctx: AppContext, start: datetime, end: datetime, *, now: dat
 
 def availability(ctx: AppContext) -> dict[ReportType, str | None]:
     """Each built type -> None when it can be generated now, else the message key saying why not. Every mode
-    can make every type: a flow report the install keeps no traffic for pulls it from the PCE (spec §6.4) — except
-    rule_hit_count, greyed out until Rule Hit Count is on (spec §6.5 RHC; a recent check, not one per call)."""
-    out: dict[ReportType, str | None] = {t: None for t in specs()}
-    if ReportType.RULE_HIT_COUNT in out:
-        out[ReportType.RULE_HIT_COUNT] = RHC_UNAVAILABLE.get(rhc.cached_status(ctx).state)
-    return out
+    can make every type: a flow report the install keeps no traffic for pulls it from the PCE (spec §6.4), and the
+    policy usage report is made whether or not Rule Hit Count is on (its chapter then says why it has no counts;
+    until 6.10.0 the Rule Hit Count report was greyed out here). A type that is no longer made is not listed:
+    refusal() says where it went."""
+    return {t: None for t in specs()}
 
 
 def pulls_on_demand(ctx: AppContext, spec: ReportSpec, start: datetime, now: datetime,
@@ -278,11 +277,17 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
 
 
 # The parameter each refusal is about, for the API's field name.
-REFUSAL_FIELDS = {"rpt_err_custom_required": "custom_id", "rpt_err_custom_not_supported": "custom_id",
+REFUSAL_FIELDS = {"rpt_err_rhc_merged": "report_type", "rpt_unavailable_not_built": "report_type",
+                  "rpt_err_custom_required": "custom_id", "rpt_err_custom_not_supported": "custom_id",
                   "rpt_err_custom_missing": "custom_id", "rpt_err_lookback_beyond_retention": "lookback_days", "rpt_err_app_required": "filter",
                   "rpt_err_filter_not_supported": "filter", "rpt_err_app_filter_shape": "filter",
                   "rpt_err_format_unsupported": "formats", "rpt_err_before_archive": "period_from",
                   "rpt_err_period_not_over": "period_to"}
+
+
+def unbuilt_reason(report_type: ReportType) -> str:
+    """Why a type without a builder cannot be made."""
+    return RETIRED.get(report_type, "rpt_unavailable_not_built")
 
 
 def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = None,
@@ -291,8 +296,8 @@ def refusal(settings: Settings, params: ReportParams, *, now: datetime | None = 
     `now`, the period's actual start is checked against earliest_start (a DST change or a short retention can put
     it a few hours past what the lookback limit allows); `reached` is reach(), where the archive goes further."""
     spec = specs().get(params.report_type)
-    if spec is None:
-        return None
+    if spec is None:  # no longer a report of its own: where it went; any other type this build has no builder for
+        return unbuilt_reason(params.report_type)
     if not set(params.formats) <= set(spec.formats):
         return "rpt_err_format_unsupported"
     tz = settings.display.zone()
@@ -330,7 +335,7 @@ def enqueue(ctx: AppContext, params: ReportParams, *, trigger: str, schedule_id:
     """A queued report, or a failed one at once when it cannot be made (the reason is stored, no files)."""
     settings = ctx.settings.current()
     start, end = params_period(params, now, settings.display.zone())
-    reason = availability(ctx).get(params.report_type, "rpt_unavailable_not_built") or refusal(
+    reason = availability(ctx).get(params.report_type) or refusal(
         settings, params, now=now, reached=reach(ctx, now))
     if reason is None and params.report_type is ReportType.CUSTOM and custom_reports.get(ctx, params.custom_id or 0) is None:
         reason = "rpt_err_custom_missing"
@@ -408,8 +413,8 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
         if row.pce_target != pce_target(settings.pce):
             raise _Fail("rpt_err_pce_switched")
         spec = specs().get(params.report_type)
-        if spec is None:
-            raise _Fail("rpt_unavailable_not_built")
+        if spec is None:  # queued before the upgrade that took the type away
+            raise _Fail(unbuilt_reason(params.report_type))
         reason = availability(ctx).get(params.report_type)
         if reason:
             raise _Fail(reason)

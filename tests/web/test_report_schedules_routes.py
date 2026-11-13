@@ -100,18 +100,41 @@ def test_schedule_lookback_validated(client, ctx, monkeypatch):
     assert r.status_code == 400 and r.get_json()["error"]["field"] == "schedule.lookback_days"
 
 
-def test_rhc_schedule_refused_while_off(client, monkeypatch):
-    """Spec §6.5 RHC: greyed out until it is on — cannot be scheduled either; a paused one can be saved."""
-    from illumio_ops.domain.values import RhcState
-    from illumio_ops.services import rhc
-    from illumio_ops.services.rhc import RhcStatus
-    monkeypatch.setattr(rhc, "cached_status", lambda ctx: RhcStatus(
-        state=RhcState.DISABLED, pce_report=False, ven_scopes=False, reason_key=None, detail=None, write_key=True,
-        saas=False))
+RHC_SCHEDULE = SCHEDULE | {"name": "Weekly hits", "report_type": "rule_hit_count", "lookback_days": 30}
+
+
+def test_a_rule_hit_count_schedule_cannot_be_saved(client):
+    """UI redesign spec §9.2: Rule Hit Count is a chapter of the policy usage report; a schedule of the old type
+    could never run, so it is not saved — enabled or paused — and the reason says where it went."""
     login(client)
-    r = _create(client, SCHEDULE | {"report_type": "rule_hit_count", "lookback_days": 30})
-    err = r.get_json()["error"]
-    assert r.status_code == 400 and err["message_key"] == "rpt_unavailable_rhc_off"
-    assert err["field"] == "schedule.report_type"
-    assert _create(client, SCHEDULE | {"report_type": "rule_hit_count", "lookback_days": 30,
-                                       "enabled": False}).status_code == 200
+    for schedule in (RHC_SCHEDULE, RHC_SCHEDULE | {"enabled": False}):
+        r = _create(client, schedule)
+        err = r.get_json()["error"]
+        assert r.status_code == 400 and err["message_key"] == "rpt_err_rhc_merged"
+        assert err["field"] == "schedule.report_type"
+    assert get(client, "/api/report-schedules").get_json()["data"]["items"] == []
+
+
+def test_a_rule_hit_count_schedule_in_the_file_is_listed_run_and_removed(client, ctx):
+    """A settings file written by hand can still hold one (an upgraded file has none): the list shows it, running
+    it makes a failed report that says why, it cannot be saved again as it is, and it can be deleted."""
+    sid = "d" * 32
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["reports"].update(schedules=[RHC_SCHEDULE | {"id": sid}]))
+    login(client)
+    view = get(client, "/api/report-schedules").get_json()["data"]
+    [item] = view["items"]
+    assert item["schedule"]["report_type"] == "rule_hit_count" and item["next_run"] is not None
+    ran = post(client, f"/api/report-schedules/{sid}/run", {})
+    made = ran.get_json()["data"]
+    assert ran.status_code == 200 and (made["status"], made["error_key"]) == ("failed", "rpt_err_rhc_merged")
+    assert made["report_type"] == "rule_hit_count" and made["schedule_name"] == "Weekly hits"
+    paused = put(client, f"/api/report-schedules/{sid}", {"revision": view["revision"],
+                                                          "schedule": RHC_SCHEDULE | {"enabled": False}})
+    assert paused.status_code == 400 and paused.get_json()["error"]["message_key"] == "rpt_err_rhc_merged"
+    as_usage = put(client, f"/api/report-schedules/{sid}", {"revision": view["revision"],
+                                                            "schedule": RHC_SCHEDULE | {"report_type": "policy_usage"}})
+    assert as_usage.status_code == 200
+    assert as_usage.get_json()["data"]["items"][0]["schedule"]["report_type"] == "policy_usage"
+    rev = as_usage.get_json()["data"]["revision"]
+    assert delete(client, f"/api/report-schedules/{sid}", {"revision": rev}).get_json()["data"]["items"] == []

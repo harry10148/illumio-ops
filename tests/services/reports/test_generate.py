@@ -389,7 +389,9 @@ def test_finish_leaves_the_order_of_a_type_without_lead_numbers(report_type):
 
 def test_every_other_type_has_three_lead_numbers():
     from illumio_ops.domain.conclusion import LEAD_KPIS
-    assert set(LEAD_KPIS) == set(ReportType) - {ReportType.POLICY_RESOLVER, ReportType.CUSTOM}
+    # rule_hit_count is a chapter of policy usage since stage 3b: no first page of its own
+    assert set(LEAD_KPIS) == set(ReportType) - {ReportType.POLICY_RESOLVER, ReportType.CUSTOM,
+                                                ReportType.RULE_HIT_COUNT}
     assert all(len(keys) == 3 and len(set(keys)) == 3 for keys in LEAD_KPIS.values())
 
 

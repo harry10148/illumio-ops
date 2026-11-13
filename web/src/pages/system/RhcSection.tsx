@@ -23,8 +23,8 @@ function half(on: boolean | null): string {
   return t(on === null ? "rhc_half_unknown" : on ? "rhc_half_on" : "rhc_half_off");
 }
 
-/** Rule Hit Count (spec §6.5 RHC): the report needs it on in two places; turning it on provisions firewall_settings,
- * so it runs only after the person confirms the listed steps. */
+/** Rule Hit Count (spec §6.5 RHC): the policy usage report's chapter of rule hits needs it on in two places; turning
+ * it on provisions firewall_settings, so it runs only after the person confirms the listed steps. */
 export function RhcSection() {
   const [status, setStatus] = useState<RhcStatus | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -64,7 +64,7 @@ export function RhcSection() {
   return (
     <div className="card stack" data-role="rhc">
       <h2>Rule Hit Count</h2>
-      <p className="hint">{t("rhc_intro")}</p>
+      <p className="hint">{t("rhc_intro", { report: t("rpt_title_policy_usage"), chapter: t("rpt_rhc_sec") })}</p>
       {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {status && (
         <>

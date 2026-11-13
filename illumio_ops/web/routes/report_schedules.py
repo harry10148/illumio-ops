@@ -89,7 +89,8 @@ def _check(fields: ReportScheduleFields) -> None:
         reason = "rpt_err_custom_missing"
     if reason:
         raise ApiFailure(400, "invalid_input", reason, field=f"schedule.{REFUSAL_FIELDS[reason]}")
-    # A type greyed out (rule_hit_count until Rule Hit Count is on) cannot be scheduled; a paused one can be saved.
+    # A type greyed out cannot be scheduled; a paused one can be saved. (None is greyed out since Rule Hit Count
+    # became a chapter of the policy usage report; a schedule of that old type is refused above, paused or not.)
     unavailable = availability(get_ctx()).get(params.report_type) if fields.enabled else None
     if unavailable:
         raise ApiFailure(400, "invalid_input", unavailable, field="schedule.report_type")

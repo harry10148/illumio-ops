@@ -190,9 +190,7 @@ function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: 
               {!e.available && e.reason_key && (
                 <div className="notice" data-role="unavailable">
                   {t(e.reason_key)}{" "}
-                  {e.report_type === "rule_hit_count"
-                    ? <Link to="/reports?tab=schedules">{t("nav_system_reports")}</Link>
-                    : <Link to="/system/collection">{t("gui_reports_collection_link")}</Link>}
+                  <Link to="/system/collection">{t("gui_reports_collection_link")}</Link>
                 </div>
               )}
               {e.report_type !== "custom" && (

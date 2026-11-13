@@ -4,7 +4,11 @@ sample installs the report tests already have: the one with every setting and an
 with none of the optional ones (test_reads_without_optional_settings). The order of the numbers is not pinned (the
 lead three move to the front); which numbers there are, their values and their types are.
 
-No task of stage 3a may edit an expected value in this file."""
+No task of stage 3a may edit an expected value in this file.
+
+Stage 3b, Task 5: Rule Hit Count became a chapter of the policy usage report. Its own entry is gone (the type is no
+longer built) and policy usage has three numbers more — rhc_hit, rhc_zero, rhc_no_record, the values that entry had
+for hit, zero and no_record. The other numbers of policy usage are as they were."""
 import pytest
 
 from illumio_ops.domain.values import Language, ReportType
@@ -65,9 +69,7 @@ PINNED: dict[str, dict[str, Numbers]] = {
         "policy_usage": {
             "rules": (None, None), "used": (None, None), "unused": (None, None), "disabled": (None, None),
             "deny_hit": (None, None), "no_rule": (None, None),
-        },
-        "rule_hit_count": {
-            "rules": (4, None), "hit": (2, None), "zero": (1, None), "no_record": (2, None),
+            "rhc_hit": (2, None), "rhc_zero": (1, None), "rhc_no_record": (2, None),
         },
         "policy_diff": {
             "total": (21, None), "high": (10, None), "rule_sets": (2, None), "rules": (1, None),
@@ -124,9 +126,7 @@ PINNED: dict[str, dict[str, Numbers]] = {
         "policy_usage": {
             "rules": (3, None), "used": (1, None), "unused": (1, None), "disabled": (1, None),
             "deny_hit": (1, None), "no_rule": (9, None),
-        },
-        "rule_hit_count": {
-            "rules": (4, None), "hit": (2, None), "zero": (1, None), "no_record": (2, None),
+            "rhc_hit": (2, None), "rhc_zero": (1, None), "rhc_no_record": (2, None),
         },
         "policy_diff": {
             "total": (21, None), "high": (10, None), "rule_sets": (2, None), "rules": (1, None),
@@ -144,7 +144,7 @@ PINNED: dict[str, dict[str, Numbers]] = {
 def _numbers(ctx) -> tuple[dict[str, Numbers], dict[str, int]]:
     out: dict[str, Numbers] = {}
     counts: dict[str, int] = {}
-    for rt in ReportType:
+    for rt in rich.GENERATED:
         cond = rich.APP_DB if specs()[rt].requires_app else None
         custom_id = rich._custom(ctx) if rt is ReportType.CUSTOM else None
         doc = finish(specs()[rt].build(BuildInput(
@@ -173,8 +173,13 @@ def _typed(numbers: Numbers) -> dict[str, tuple[str, str]]:
 
 
 @pytest.mark.parametrize("install", ["full", "bare"])
-@pytest.mark.parametrize("rt", [t.value for t in ReportType])
+@pytest.mark.parametrize("rt", [t.value for t in rich.GENERATED])
 def test_key_numbers_are_what_they_were(built, install, rt):
     numbers, counts = built[install]
     assert _typed(numbers[rt]) == _typed(PINNED[install][rt])
     assert counts[rt] == len(PINNED[install][rt]), "a key number is listed twice"
+
+
+@pytest.mark.parametrize("install", ["full", "bare"])
+def test_every_generated_type_is_pinned_and_no_other(install):
+    assert set(PINNED[install]) == {t.value for t in rich.GENERATED}

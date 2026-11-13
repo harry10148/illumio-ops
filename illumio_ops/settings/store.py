@@ -3,6 +3,11 @@
 Load is fail-closed (an invalid file is reported, never defaulted or
 rewritten). Writes are optimistic-concurrency (revision), validated before
 touching disk, atomic (temp file + fsync + rename) and 0600.
+
+A file at an older schema is upgraded in memory on every load (settings/upgrade.py)
+and reaches disk at the first write after it: an update(), or persist_upgrade() at
+the service start. That write is the one place that says what the upgrade changed of
+the operator's own (report schedules, schema 13 → 14), once.
 """
 from __future__ import annotations
 
@@ -19,7 +24,13 @@ from loguru import logger
 from pydantic import ValidationError
 
 from illumio_ops.settings.schema import Settings, default_settings
-from illumio_ops.settings.upgrade import NewerSchema, upgrade
+from illumio_ops.settings.upgrade import (
+    NewerSchema,
+    ScheduleChange,
+    change_text,
+    rhc_schedule_changes,
+    upgrade,
+)
 
 
 class SettingsInvalid(Exception):
@@ -68,6 +79,8 @@ class SettingsStore:
         self._lock = threading.Lock()
         self._current: Settings | None = None
         self._disk_digest: str | None = None  # what we last read or wrote
+        # Report schedules the upgrade changed in the file last read, not on disk yet (and not said yet).
+        self._unwritten: list[ScheduleChange] = []
 
     @property
     def path(self) -> Path:
@@ -85,6 +98,7 @@ class SettingsStore:
         with self._lock:
             self._current = s
             self._disk_digest = hashlib.sha256(raw).hexdigest()
+            self._unwritten = rhc_schedule_changes(data)
         return s
 
     def current(self) -> Settings:
@@ -105,8 +119,34 @@ class SettingsStore:
             new = validate_settings(cand)
             self._write(new, replace=True)
             self._current = new  # the file now holds `new`: memory must follow it
+            self._say_upgrade()
             self._sync_dir()
             return new
+
+    def persist_upgrade(self) -> list[ScheduleChange]:
+        """For the service start, once its log file is open (runtime.write_back_settings_upgrade): when the upgrade
+        changed report schedules of the file last loaded, write the upgraded settings back now — the same revision:
+        they are the settings already in force — log each change, and return them. Otherwise nothing is written and
+        [] returned: a file at the current schema; one whose upgrade only added what the program brings (it reaches
+        disk on the next update(), as before); a second call; or a file changed by hand since it was read (it is
+        not overwritten; the next load reads it)."""
+        with self._lock:
+            changes = list(self._unwritten)
+            if not changes:
+                return []
+            if hashlib.sha256(self._path.read_bytes()).hexdigest() != self._disk_digest:
+                self._unwritten = []
+                return []
+            self._write(self.current(), replace=True)
+            self._say_upgrade()
+            self._sync_dir()
+            return changes
+
+    def _say_upgrade(self) -> None:
+        """The upgraded file was just written: what the upgrade changed is on disk now, and is said here, once."""
+        changes, self._unwritten = self._unwritten, []
+        for c in changes:
+            logger.info("{}", change_text(c))
 
     def _adopt_outside_edit(self) -> None:
         """If someone changed the file by hand since we last read or wrote it, take their
@@ -125,6 +165,7 @@ class SettingsStore:
         stale = self.current().revision
         self._current = disk
         self._disk_digest = hashlib.sha256(raw).hexdigest()
+        self._unwritten = rhc_schedule_changes(data)
         raise SettingsConflict(stale, disk.revision)
 
     def create(self, s: Settings) -> Settings:

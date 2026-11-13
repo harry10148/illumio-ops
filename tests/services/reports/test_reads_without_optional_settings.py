@@ -66,7 +66,7 @@ def _doc(ctx, rt, lang=Language.EN):
     return finish(specs()[rt].build(inp))
 
 
-TYPES = list(ReportType)
+TYPES = rich.GENERATED
 
 
 @pytest.mark.parametrize("rt", TYPES)

@@ -66,6 +66,19 @@ def load_settings(store: SettingsStore) -> Settings:
                                         f"{lines}") from None
 
 
+def write_back_settings_upgrade(store: SettingsStore) -> None:
+    """Once per installation, at the first start on a settings file whose upgrade changed report schedules (a Rule
+    Hit Count schedule becomes a policy usage one, schema 13 → 14): the file is written at the current schema and
+    each change logged (SettingsStore.persist_upgrade). Called after configure_logging(paths, ...), so the lines
+    are in the log file as well as the journal. A file that cannot be written does not stop the service: the
+    upgraded settings are the ones in force either way, and the next start tries again."""
+    try:
+        store.persist_upgrade()
+    except OSError as exc:
+        logger.error("the upgraded settings could not be written back to {} ({}); the report schedules run as "
+                     "upgraded, and the next start tries again", store.path, exc.strerror or type(exc).__name__)
+
+
 @dataclass
 class Runtime:
     paths: InstallPaths

@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import quote_plus
 
 from illumio_ops.domain.lateral import HostInfo
+from illumio_ops.domain.policy import ActorRef, RuleRef
 from illumio_ops.domain.report import HTML_ROW_CAP
 from illumio_ops.domain.tamper import TAMPER_PATTERN_KEYS
 from illumio_ops.domain.values import DetectorKind, Language, PortClass
@@ -165,3 +166,20 @@ def rule_label(lang: Language, ruleset_name: str, description: str | None, href:
     if description:
         return f"{ruleset_name}: {description}"
     return tr(lang, "rpt_rule_no_description", ruleset=ruleset_name, id=href.rsplit("/", 1)[-1])
+
+
+def rule_id(r: RuleRef) -> str:
+    return f"#{r.href.rsplit('/', 1)[-1]}"
+
+
+def _actor(a: ActorRef) -> str:
+    text = a.name or (f"{a.key}={a.value}" if a.key else None) or a.kind
+    return f"−{text}" if a.exclusion else text
+
+
+def rule_scope(r: RuleRef, any_text: str) -> str:
+    """'consumers → providers：services' of a rule, as the policy usage report's tables say what a rule covers."""
+    consumers = ", ".join(_actor(a) for a in r.consumers) or any_text
+    providers = ", ".join(_actor(a) for a in r.providers) or any_text
+    services = ", ".join(s.name or port_text(s.port, s.proto or 0) for s in r.services) or any_text
+    return f"{consumers} → {providers}：{services}"

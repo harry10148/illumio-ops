@@ -214,3 +214,63 @@ def test_startup_sweeps_ondemand_leftovers(tmp_path):
         assert list(d.iterdir()) == []
     finally:
         rt.release()
+
+
+def _serve_until_listening(root: Path, port: int) -> str:
+    """Start the service, wait until it answers, stop it; returns what it wrote to stderr."""
+    env = os.environ | {"PYTHONPATH": str(REPO), "ILLUMIO_OPS_RATELIMIT_URI": "memory://"}
+    proc = subprocess.Popen([sys.executable, "-m", "illumio_ops", "serve", "--root", str(root)],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, cwd="/")
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        up = False
+        for _ in range(100):
+            try:
+                with urllib.request.urlopen(f"https://127.0.0.1:{port}/api/auth/csrf", context=ctx, timeout=2):
+                    up = True
+                break
+            except OSError:
+                time.sleep(0.1)
+        assert up
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        _out, err = proc.communicate(timeout=30)
+    assert proc.returncode == 0, err[-2000:]
+    return err
+
+
+def test_first_start_on_a_file_with_rule_hit_count_schedules_writes_it_back_and_says_so_once(tmp_path):
+    """UI redesign spec §9.2: the upgrade turns a Rule Hit Count schedule into a policy usage one in memory on every
+    load; the first service start writes that to the file and names each changed schedule in the log — once, in the
+    log file too (not only the journal), and never again at a later start."""
+    port = _free_port()
+    f = _initial(tmp_path, port=port)
+    d = json.loads(f.read_text())
+    d["schema_version"] = 13  # what 6.9 wrote: the same shape, Rule Hit Count still a report of its own
+    base = {"enabled": True, "report_type": "rule_hit_count", "lookback_days": 90, "frequency": "weekly",
+            "day_of_week": 0, "day_of_month": None, "hour": 8, "minute": 0, "formats": ["html", "xlsx"],
+            "email": False, "recipients": [], "lang": None, "keep": 30, "filter": None, "custom_id": None}
+    d["reports"]["schedules"] = [
+        base | {"id": "b" * 32, "name": "Hits {weekly}"},
+        base | {"id": "a" * 32, "name": "Usage weekly", "report_type": "policy_usage", "lookback_days": 30},
+        base | {"id": "c" * 32, "name": "Hits daily", "frequency": "daily", "day_of_week": None, "lookback_days": 7}]
+    f.write_text(json.dumps(d))
+    first = _serve_until_listening(tmp_path, port)
+    on_disk = json.loads(f.read_text())
+    assert on_disk["schema_version"] == 14 and on_disk["revision"] == d["revision"]
+    assert [(s["id"][0], s["report_type"], s["lookback_days"]) for s in on_disk["reports"]["schedules"]] == [
+        ("a", "policy_usage", 30), ("c", "policy_usage", 7)]
+    log = (resolve_paths(tmp_path).logs_dir / "illumio-ops.log").read_text(encoding="utf-8")
+    for said in (first, log):
+        lines = [x for x in said.splitlines() if "report schedule" in x and "Rule Hit Count" in x]
+        assert len(lines) == 2, said[-3000:]
+        removed = next(x for x in lines if "Hits {weekly}" in x)
+        assert "90 -> 30" in removed and "removed" in removed and "Usage weekly" in removed and "b" * 32 in removed
+        kept = next(x for x in lines if "Hits daily" in x)
+        assert "7 -> 7" in kept and "removed" not in kept and "policy usage" in kept
+    second = _serve_until_listening(tmp_path, port)
+    assert "Rule Hit Count" not in second and json.loads(f.read_text()) == on_disk
+    log = (resolve_paths(tmp_path).logs_dir / "illumio-ops.log").read_text(encoding="utf-8")
+    assert len([x for x in log.splitlines() if "report schedule" in x and "Rule Hit Count" in x]) == 2

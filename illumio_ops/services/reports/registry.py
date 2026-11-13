@@ -2,7 +2,7 @@
 report stores its type and parameters, so later improvements apply to schedules automatically)."""
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
 from typing import Literal
@@ -117,14 +117,18 @@ REGISTRY: dict[ReportType, ReportSpec] = {}
 # limit (90 days); the floor is two days more, so a period starting at a local midnight, across a DST change,
 # is never refused for an hour.
 ONDEMAND_LOOKBACK = 90
-POLICY_USAGE_MAX_DAYS = 30
-RHC_MAX_DAYS = 90  # the PCE keeps rule hits 90 days
+POLICY_USAGE_MAX_DAYS = 30  # a day per recompute; its chapter of rule hits reads the same period (the PCE keeps 90)
 POLICY_DIFF_MAX_DAYS = 90  # the period only bounds the events read for "who changed it"
 
-# Why rule_hit_count is greyed out, by Rule Hit Count's state (spec §6.5 RHC).
+# Why the policy usage report's chapter of rule hits has no counts, by Rule Hit Count's state (spec §6.5 RHC).
 RHC_UNAVAILABLE: dict[RhcState, str | None] = {
     RhcState.ENABLED: None, RhcState.PARTIAL: "rpt_unavailable_rhc_off", RhcState.DISABLED: "rpt_unavailable_rhc_off",
     RhcState.UNSUPPORTED: "rpt_unavailable_rhc_unsupported", RhcState.UNKNOWN: "rpt_unavailable_rhc_unknown"}
+
+# Types that are no longer a report of their own, each with the message saying where it went (UI redesign spec
+# §9.2: Rule Hit Count is a chapter of the policy usage report). They stay in ReportType so the reports made and the
+# schedules saved before still read; they are not in specs(), so none is offered, queued or built (generate.refusal).
+RETIRED: Mapping[ReportType, str] = {ReportType.RULE_HIT_COUNT: "rpt_err_rhc_merged"}
 
 
 def flow_retention(settings: Settings) -> int:
@@ -162,7 +166,6 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.policy_usage import build_policy_usage
     from illumio_ops.services.reports.ransomware_report import build_ransomware
     from illumio_ops.services.reports.readiness import build_readiness
-    from illumio_ops.services.reports.rule_hit_count import build_rule_hit_count
     from illumio_ops.services.reports.security_risk import build_security_risk
     from illumio_ops.services.reports.traffic import build_traffic
     from illumio_ops.services.reports.unmanaged import build_unmanaged
@@ -189,12 +192,10 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         ReportType.AUDIT: ReportSpec(ReportType.AUDIT, "operations", False, build_audit, reads_events=True),
         ReportType.RANSOMWARE: ReportSpec(ReportType.RANSOMWARE, "assessment", False, build_ransomware),
         # Reads the PCE's draft recompute, not the install's traffic: the same in every collection mode; a day per
-        # recompute, so a month at most.
+        # recompute, so a month at most. Its chapter of the provisioned rules' hits is the PCE's own Rule Hit Count
+        # report (rule_hit_count.py); the report is made with or without it.
         ReportType.POLICY_USAGE: ReportSpec(ReportType.POLICY_USAGE, "policy", False, build_policy_usage,
                                             max_lookback=lambda settings: POLICY_USAGE_MAX_DAYS),
-        # The PCE's own report of provisioned rules' hits: greyed out until Rule Hit Count is on (availability).
-        ReportType.RULE_HIT_COUNT: ReportSpec(ReportType.RULE_HIT_COUNT, "policy", False, build_rule_hit_count,
-                                              max_lookback=lambda settings: RHC_MAX_DAYS),
         # Draft against active, read when the report runs; the period bounds the events used for attribution.
         ReportType.POLICY_DIFF: ReportSpec(ReportType.POLICY_DIFF, "policy", False, build_policy_diff,
                                            max_lookback=lambda settings: POLICY_DIFF_MAX_DAYS),
@@ -212,7 +213,8 @@ def _builtin() -> dict[ReportType, ReportSpec]:
 
 
 def specs() -> dict[ReportType, ReportSpec]:
-    """Every type this build generates (filled on first use: the builders import this module)."""
+    """Every type this build generates — each ReportType but the RETIRED ones (filled on first use: the builders
+    import this module)."""
     if not REGISTRY:
         REGISTRY.update(_builtin())
     return REGISTRY

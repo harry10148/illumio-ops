@@ -20,6 +20,7 @@ from illumio_ops.services.reports.registry import BuildInput, ReportParams, spec
 from tests.services.reports.test_report_i18n import (  # noqa: F401 - fixture
     APP_DB,
     END,
+    GENERATED,
     NOW,
     START,
     _custom,
@@ -36,12 +37,14 @@ def _tr(lang):
 @pytest.mark.parametrize("lang", list(Language))
 def test_every_type_has_template(lang):
     words = dictionary(lang)
-    assert set(CONCLUSION_KEYS) == set(ReportType)
-    assert all(CONCLUSION_KEYS[t] in words for t in ReportType)
+    # every type that is generated, and only those: rule_hit_count has no report of its own to open with a sentence
+    assert set(CONCLUSION_KEYS) == set(CONCLUSION_KPIS) == set(CONCLUSIONS) == set(GENERATED)
+    assert set(GENERATED) == set(ReportType) - {ReportType.RULE_HIT_COUNT}
+    assert all(CONCLUSION_KEYS[t] in words for t in GENERATED)
     assert "rpt_conclusion_incomplete" in words
 
 
-@pytest.mark.parametrize("report_type", list(ReportType))
+@pytest.mark.parametrize("report_type", GENERATED)
 def test_placeholders_match_declared_kpis(report_type):
     for lang in Language:
         found = set(PH.findall(dictionary(lang)[CONCLUSION_KEYS[report_type]]))
@@ -71,7 +74,7 @@ def test_a_sentence_form_without_the_missing_number_is_used(monkeypatch):
     assert mod.incomplete(_doc(none)) and not mod.incomplete(_doc(full[:2]))
 
 
-@pytest.mark.parametrize("report_type", [t for t in ReportType if t is not ReportType.CUSTOM])
+@pytest.mark.parametrize("report_type", [t for t in GENERATED if t is not ReportType.CUSTOM])
 def test_declared_kpis_exist_in_builder_output(ctx, report_type):  # noqa: F811
     cond = APP_DB if specs()[report_type].requires_app else None
     inp = BuildInput(ctx=ctx, params=ReportParams(report_type=report_type, filter=cond), start=START, end=END,

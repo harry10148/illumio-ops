@@ -82,6 +82,10 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
                   formats: (s.formats.filter((f) => next?.formats.includes(f)).length
                     ? s.formats.filter((f) => next?.formats.includes(f)) : next?.formats ?? s.formats) as ReportScheduleFields["formats"] });
           }}>
+          {/* a schedule of a type that is no longer made (Rule Hit Count): shown as what it is, to be changed */}
+          {!catalog.entries.some((c) => c.report_type === s.report_type) && (
+            <option value={s.report_type} disabled>{word(TYPE_KEYS, s.report_type)}</option>
+          )}
           {catalog.entries.map((c) => (
             <option key={c.report_type} value={c.report_type} disabled={!c.available && c.report_type !== initial.report_type}>
               {word(TYPE_KEYS, c.report_type)}

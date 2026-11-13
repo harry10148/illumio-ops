@@ -1,17 +1,19 @@
 """policy_usage (P5c-1): which rules the period's traffic used and which it did not, from the PCE's draft
-recompute; says whether the draft is the active policy (pending changes)."""
+recompute; says whether the draft is the active policy (pending changes). Its chapter of the PCE's own hit counts is
+tests/services/reports/test_rule_hit_count.py; here Rule Hit Count reads as off, so the PCE is never asked for them."""
 from datetime import UTC, datetime
 
 import pytest
 
 from illumio_ops.domain.policy import index_rules
 from illumio_ops.domain.report import TableBlock, TextBlock
-from illumio_ops.domain.values import Language, ReportType
+from illumio_ops.domain.values import Language, ReportType, RhcState
 from illumio_ops.pce.async_query import PceQueryError
 from illumio_ops.pce.policy import PendingItem
 from illumio_ops.services.analysis.rule_usage import NoRuleGroup, RuleHits, RuleUsage
-from illumio_ops.services.reports import policy_usage
+from illumio_ops.services.reports import policy_usage, rule_hit_count
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
+from illumio_ops.services.rhc import RhcStatus
 from tests.services.analysis.test_rule_usage import ALLOW, DENY, IDLE, RULE_SETS
 from tests.services.collect.conftest import configured_ctx
 
@@ -31,9 +33,21 @@ def usage(**kw):
     return RuleUsage(**{**base, **kw})
 
 
+def rhc_off(monkeypatch):
+    """Rule Hit Count reads as off, and asking the PCE to produce its report fails the test: these tests have no
+    PCE, and with it off the report must not ask."""
+    def asked(ctx, start, end):
+        raise AssertionError("the PCE was asked to produce its Rule Hit Count report while it is off")
+    monkeypatch.setattr(rule_hit_count, "rhc_status", lambda ctx: RhcStatus(
+        state=RhcState.DISABLED, pce_report=False, ven_scopes=False, reason_key=None, detail=None, write_key=False,
+        saas=False))
+    monkeypatch.setattr(rule_hit_count, "pull_rhc", asked)
+
+
 @pytest.fixture
 def ctx(tmp_path, monkeypatch):
     monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage())
+    rhc_off(monkeypatch)
     return configured_ctx(tmp_path)
 
 
@@ -58,6 +72,10 @@ def _text(doc, sid):
 def test_how_to_read_first(ctx):
     doc = _build(ctx)
     assert doc.sections[0].id == "how" and "Rule Hit Count" in doc.sections[0].intro
+    # the intro points at the chapter by the title it has, in both languages
+    for lang in Language:
+        built = _build(ctx, lang)
+        assert next(s for s in built.sections if s.id == "rhc").title in built.sections[0].intro
 
 
 def test_sections_and_kpis(ctx):

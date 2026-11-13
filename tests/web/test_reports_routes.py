@@ -49,7 +49,8 @@ def test_catalog_lists_built_types(client, ctx):
     login(client)
     data = get(client, "/api/reports/catalog").get_json()["data"]
     types = {e["report_type"]: e for e in data["entries"]}
-    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness", "policy_usage", "rule_hit_count", "policy_diff", "policy_resolver", "custom"}
+    # rule_hit_count is a chapter of policy_usage since stage 3b: no card of its own
+    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness", "policy_usage", "policy_diff", "policy_resolver", "custom"}
     assert all(e["available"] for e in types.values()) and data["smtp_enabled"] is False
 
 
@@ -257,3 +258,50 @@ def test_the_common_templates_are_these_four(client, ctx):
     assert all(e.get("tier") in ("common", "topic") for e in entries)
     assert sorted(e["report_type"] for e in entries if e.get("tier") == "common") == [
         "audit", "new_connections", "security_risk", "ven_status"]
+
+
+# ── Rule Hit Count joined the policy usage report (stage 3b): nothing new of the type, the old ones still read ──
+
+def test_a_rule_hit_count_report_cannot_be_asked_for(client, ctx):
+    _configure(ctx)
+    login(client)
+    r = post(client, "/api/reports", {"report_type": "rule_hit_count"})
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and err["message_key"] == "rpt_err_rhc_merged" and err["field"] == "report.report_type"
+    assert get(client, "/api/reports").get_json()["data"]["total"] == 0  # refused, not a failed report left behind
+
+
+def _old_rule_hit_count_report(ctx):
+    now = datetime.now(UTC)
+    with ctx.db() as conn:
+        rid = store.insert(conn, report_type="rule_hit_count", params_json='{"report_type": "rule_hit_count"}',
+                           status=ReportStatus.QUEUED, trigger="manual", schedule_id=None, pce_label="pce",
+                           period_start=now, period_end=now, created_at=now)
+        name = f"rule_hit_count-20261101-{rid}.html"
+        store.finish(conn, rid, status=ReportStatus.DONE, at=now, files=[name], kpis=[],
+                     conclusion="Provisioned enabled rules: 4.")
+    out = ctx.paths.reports_dir / str(rid)
+    out.mkdir(parents=True)
+    (out / name).write_text("<html>old</html>", encoding="utf-8")
+    return rid, name
+
+
+def test_an_old_rule_hit_count_report_is_listed_opened_downloaded_and_deleted(client, ctx):
+    _configure(ctx)
+    login(client)
+    rid, name = _old_rule_hit_count_report(ctx)
+    other, _ = _old_rule_hit_count_report(ctx)
+    listed = get(client, "/api/reports").get_json()["data"]["items"]
+    assert [(i["id"], i["report_type"], i["status"]) for i in listed] == [
+        (other, "rule_hit_count", "done"), (rid, "rule_hit_count", "done")]
+    item = get(client, f"/api/reports/{rid}").get_json()["data"]
+    assert item["files"] == [name] and item["conclusion"] == "Provisioned enabled rules: 4."
+    down = get(client, f"/reports/files/{rid}/{name}")
+    assert down.status_code == 200 and down.data == b"<html>old</html>"
+    shown = get(client, f"/reports/view/{rid}/{name}")
+    assert shown.status_code == 200 and "attachment" not in shown.headers.get("Content-Disposition", "")
+    assert get(client, "/api/reports/catalog").status_code == 200
+    assert delete(client, f"/api/reports/{rid}").status_code == 200
+    gone = post(client, "/api/reports/bulk-delete", {"ids": [rid, other]}).get_json()["data"]
+    assert gone == {"removed": [other], "running": [], "missing": [rid]}
+    assert not (ctx.paths.reports_dir / str(other)).exists()

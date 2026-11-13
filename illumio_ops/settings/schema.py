@@ -41,7 +41,7 @@ from illumio_ops.domain.values import (
     SiemTransport,
 )
 
-SCHEMA_VERSION: Literal[13] = 13
+SCHEMA_VERSION: Literal[14] = 14
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -639,7 +639,7 @@ class SiemSettings(StrictModel):
 
 
 class Settings(StrictModel):
-    schema_version: Literal[13]
+    schema_version: Literal[14]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings

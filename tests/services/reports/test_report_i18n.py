@@ -53,6 +53,10 @@ PCE_TERMS = frozenset({"Rule Hit Count", "Override Deny"})
 APP_DB = FlowCondition(dst=EndpointFilter(labels=(LabelCond(key="app", values=("DB",)),)))
 EN = json.loads((Path(__file__).resolve().parents[3] / "illumio_ops/i18n/en.json")
                 .read_text(encoding="utf-8"))
+# The types this build generates, written out. rule_hit_count stays in ReportType for the reports made before its
+# counts became a chapter of policy usage (stage 3b) and has no builder; that this is exactly the registry's set is
+# pinned in test_retired_type.py.
+GENERATED = [t for t in ReportType if t is not ReportType.RULE_HIT_COUNT]
 
 
 @pytest.fixture(scope="module")
@@ -93,7 +97,8 @@ def ctx(tmp_path_factory):
 
 
 def _rhc_sample(mp):
-    """Rule Hit Count on, one rule hit, one at 0, one with no record, one pending change (P5c-2)."""
+    """Rule Hit Count on, for the policy usage report's chapter of it: two rules hit (one no longer in the policy),
+    one at 0, two with no record, a row the PCE could not count (P5c-2; a chapter since stage 3b)."""
     a = "/orgs/1/sec_policy/active/rule_sets/1"
     mp.setattr(rule_hit_count, "rhc_status", lambda ctx: RhcStatus(
         state=RhcState.ENABLED, pce_report=True, ven_scopes=True, reason_key=None, detail=None, write_key=True,
@@ -110,9 +115,6 @@ def _rhc_sample(mp):
          "deny_rules": [{**rule, "href": f"{a}/deny_rules/4", "override": True}]}])
     mp.setattr(rule_hit_count, "fetch_policy_names",
                lambda client, pversion, *, deadline: PolicyNames(labels={}, names={}))
-    mp.setattr(rule_hit_count, "fetch_pending", lambda client, *, deadline: [PendingItem(
-        kind="rule_sets", href="/orgs/1/sec_policy/draft/rule_sets/7", name="New", update_type="create",
-        updated_at="2026-10-26T00:00:00Z")])
 
 
 def _pdf_sample(mp):
@@ -251,14 +253,14 @@ def _english_copy():
 
 
 @pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
-@pytest.mark.parametrize("report_type", list(ReportType))
+@pytest.mark.parametrize("report_type", GENERATED)
 def test_no_raw_keys_in_output(ctx, report_type, lang):
     for kind, text in _outputs(ctx, report_type, lang).items():
         found = _raw_keys(text)
         assert found == [], f"{report_type} {lang} {kind}: {found}"
 
 
-@pytest.mark.parametrize("report_type", list(ReportType))
+@pytest.mark.parametrize("report_type", GENERATED)
 def test_zh_tw_has_no_english_report_copy(ctx, report_type):
     english = _english_copy()
     for kind, text in _outputs(ctx, report_type, Language.ZH_TW).items():
@@ -285,11 +287,12 @@ def test_every_rule_rendered(ctx):
 def test_every_finding_names_a_registered_thing_to_do(ctx):
     """Stage 3a: in every report type the sample builds, a finding that carries an action code carries one the
     order of the first page knows (ACTION_ORDER), with its sentence; the types whose findings all carry one are
-    named, so a builder that stops setting it is caught. (This sample gives policy usage and readiness no finding:
-    their own test files assert theirs.)"""
+    named, so a builder that stops setting it is caught. (This sample gives readiness no finding, and policy usage
+    only the one of its Rule Hit Count chapter — its draft recompute is not answered here: their own test files
+    assert theirs.)"""
     from illumio_ops.domain.actions import ACTION_ORDER
     coded: dict[ReportType, set[str]] = {}
-    for report_type in ReportType:
+    for report_type in GENERATED:
         cond = APP_DB if specs()[report_type].requires_app else None
         custom_id = _custom(ctx) if report_type is ReportType.CUSTOM else None
         for lang in Language:
@@ -306,10 +309,12 @@ def test_every_finding_names_a_registered_thing_to_do(ctx):
     with_findings = {t for t, codes in coded.items() if codes}
     assert with_findings >= {
         ReportType.SECURITY_RISK, ReportType.TRAFFIC, ReportType.APP_SUMMARY, ReportType.NETWORK_INVENTORY,
-        ReportType.RULE_HIT_COUNT, ReportType.POLICY_DIFF, ReportType.AUDIT, ReportType.NEW_CONNECTIONS, ReportType.UNMANAGED_ENDPOINTS, ReportType.VEN_STATUS,
+        ReportType.POLICY_USAGE, ReportType.POLICY_DIFF, ReportType.AUDIT, ReportType.NEW_CONNECTIONS, ReportType.UNMANAGED_ENDPOINTS, ReportType.VEN_STATUS,
         ReportType.RANSOMWARE}, sorted(t.value for t in with_findings)
     assert coded[ReportType.POLICY_DIFF] == {"risky_change", "pending_other"}
-    assert coded[ReportType.RULE_HIT_COUNT] == {"unused_rules", "pending_policy"}
+    # the allow rules at 0 hits, from the chapter that was the Rule Hit Count report (its "waiting to be provisioned"
+    # finding did not come along: policy usage has its own, from the draft recompute)
+    assert coded[ReportType.POLICY_USAGE] == {"unused_rules"}
 
 
 def test_injected_missing_key_is_caught(ctx, monkeypatch):
@@ -373,7 +378,7 @@ def _check_host_columns(ctx, tables):
                                       unnamed_host(key, Language.EN)), (sid, table.title, col, key, row[i])
 
 
-@pytest.mark.parametrize("report_type", list(ReportType))
+@pytest.mark.parametrize("report_type", GENERATED)
 def test_every_host_column_knows_which_host_each_row_names(ctx, report_type):
     _check_host_columns(ctx, _host_tables(ctx, report_type))
 
@@ -423,7 +428,7 @@ def test_a_period_without_traffic_is_not_said_as_nothing_to_do(ctx, report_type)
 
 
 @pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
-@pytest.mark.parametrize("report_type", list(ReportType))
+@pytest.mark.parametrize("report_type", GENERATED)
 def test_no_chapter_repeats_the_heading_of_the_closing_part(ctx, report_type, lang):
     """The closing part is headed "How to read this report": a chapter under it says what it holds, not that again."""
     cond = APP_DB if specs()[report_type].requires_app else None

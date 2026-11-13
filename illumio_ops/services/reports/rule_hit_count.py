@@ -1,22 +1,27 @@
-"""The Rule Hit Count report (spec §6.5 rule_hit_count, P5c-2): the PCE's own count of how often each provisioned
-rule was hit, from its native report. Rule Hit Count records provisioned rules only (user, 2026-10-24): a rule with
-no record (provisioned during or after the period, or not yet provisioned) is never shown as 0, and Draft changes
-point to the policy usage report. Greyed out until Rule Hit Count is on; checked again when the report runs, so a
-schedule never produces an empty report."""
+"""Rule Hit Count as a chapter of the policy usage report (UI redesign spec §9.2; a report of its own until 6.10.0,
+spec §6.5 rule_hit_count, P5c-2): the PCE's own count of how often each provisioned rule was hit, from its native
+report. Rule Hit Count records provisioned rules only (user, 2026-10-24): a rule with no record (provisioned during
+or after the period, or not yet provisioned) is never shown as 0.
+
+The report is made whether or not the counts can be had. Without them — Rule Hit Count off or half on, not on this
+PCE, its state unreadable, the PCE refusing or failing to produce its report — the chapter is the reason in words,
+its three numbers are blank with that reason, and the data notes say so. The PCE is asked to produce its report only
+when Rule Hit Count reads as on: producing one writes to the PCE (POST /reports)."""
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from loguru import logger
 
 from illumio_ops.domain.policy import RuleRef, index_rules
 from illumio_ops.domain.report import (
+    Block,
     Column,
     Finding,
     Kpi,
-    ReportDocument,
     Section,
     TableBlock,
     TextBlock,
@@ -25,24 +30,39 @@ from illumio_ops.domain.values import RhcState, RuleAction, Severity
 from illumio_ops.pce.async_query import PceQueryError
 from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.pce.collections import PceCollectionIncomplete
-from illumio_ops.pce.policy import fetch_pending, fetch_policy_names, fetch_rule_sets
+from illumio_ops.pce.policy import fetch_policy_names, fetch_rule_sets
 from illumio_ops.services.collect.traffic import PCE_FAILURES
-from illumio_ops.services.reports.common import tr
-from illumio_ops.services.reports.policy_usage import rule_id, rule_scope
-from illumio_ops.services.reports.registry import (
-    RHC_UNAVAILABLE,
-    BuildInput,
-    ReportFailed,
-)
+from illumio_ops.services.reports.common import rule_id, rule_scope, tr
+from illumio_ops.services.reports.registry import RHC_UNAVAILABLE, BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
-from illumio_ops.services.rhc import RhcPullError, RhcRow, pull_rhc, rhc_status
+from illumio_ops.services.rhc import (
+    RhcPullError,
+    RhcRow,
+    RhcStatus,
+    pull_rhc,
+    rhc_status,
+)
 
+SECTION = "rhc"
 ROWS = 200
 POLICY_DEADLINE_SECONDS = 300
+ERROR_MAX = 200
 _TYPE_KEYS = {RuleAction.ALLOW: "rpt_rhc_type_allow", RuleAction.DENY: "rpt_rhc_type_deny",
               RuleAction.OVERRIDE_DENY: "rpt_rhc_type_override_deny"}
-_KPI_KEYS = {"rules": "rpt_rhc_kpi_rules", "hit": "rpt_rhc_kpi_hit", "zero": "rpt_rhc_kpi_zero",
-             "no_record": "rpt_rhc_kpi_no_record"}
+# The chapter's numbers among the report's own (Kpi.key): what its three tables list.
+_KPI_KEYS = {"rhc_hit": "rpt_rhc_kpi_hit", "rhc_zero": "rpt_rhc_kpi_zero", "rhc_no_record": "rpt_rhc_kpi_no_record"}
+_KPI_BETTER: dict[str, Literal["lower", "higher", "neutral"]] = {
+    "rhc_hit": "higher", "rhc_zero": "lower", "rhc_no_record": "neutral"}
+
+
+@dataclass(frozen=True)
+class RhcChapter:
+    """What the policy usage report takes from Rule Hit Count."""
+    section: Section
+    kpis: tuple[Kpi, ...]  # rhc_hit, rhc_zero, rhc_no_record: blank, each with the reason, when there are no counts
+    findings: tuple[Finding, ...]
+    data_quality: tuple[str, ...]
+    counted: bool  # the PCE's counts were read (the chapter holds its tables); False: it holds the reason
 
 
 def _created(sets: list[dict[str, Any]]) -> dict[str, datetime | None]:
@@ -58,28 +78,57 @@ def _created(sets: list[dict[str, Any]]) -> dict[str, datetime | None]:
     return out
 
 
-def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
+def _why_not_on(inp: BuildInput, status: RhcStatus) -> tuple[str, ...]:
+    """Rule Hit Count does not read as on: what its state is and where it is turned on, then what the check itself
+    found (which half is off, or why the state could not be read), then — on SaaS — who turns it on. An unsupported
+    PCE has nothing to turn on: one sentence."""
+    said = [tr(inp.lang, RHC_UNAVAILABLE[status.state] or "rpt_unavailable_rhc_unknown")]
+    if status.state is not RhcState.UNSUPPORTED:
+        if status.reason_key:
+            said.append(tr(inp.lang, status.reason_key))
+        if status.saas:
+            said.append(tr(inp.lang, "rhc_saas_note"))
+    return tuple(said)
+
+
+def _without(inp: BuildInput, said: tuple[str, ...]) -> RhcChapter:
+    """The chapter when there are no counts: `said`, its first sentence being the reason the numbers and the data
+    notes repeat."""
+    lang = inp.lang
+    title = tr(lang, "rpt_rhc_sec")
+    kpis = tuple(Kpi(key=k, label=tr(lang, label), value=None, previous=None, unit="count", better=_KPI_BETTER[k],
+                     note=said[0]) for k, label in _KPI_KEYS.items())
+    return RhcChapter(
+        section=Section(id=SECTION, title=title, intro=tr(lang, "rpt_rhc_intro"),
+                        blocks=(TextBlock(paragraphs=said),)),
+        kpis=kpis, findings=(), data_quality=(tr(lang, "rpt_rhc_quality_none", chapter=title, reason=said[0]),),
+        counted=False)
+
+
+def rhc_chapter(inp: BuildInput) -> RhcChapter:
+    """Never raises for a PCE that does not give the counts: the chapter then says why (see the module)."""
     lang = inp.lang
 
     def t(msg: str, /, **params: object) -> str:
         return tr(lang, msg, **params)
 
-    status = rhc_status(inp.ctx)  # fresh: the catalog's answer may be minutes old
+    status = rhc_status(inp.ctx)  # two reads of the PCE; asked when the report runs, not when it was queued
     if status.state is not RhcState.ENABLED:
-        raise ReportFailed(RHC_UNAVAILABLE[status.state] or "rpt_unavailable_rhc_unknown")
+        return _without(inp, _why_not_on(inp, status))
     try:
         pull = pull_rhc(inp.ctx, inp.start, inp.end)
         settings = inp.ctx.settings.current()
         deadline = time.monotonic() + POLICY_DEADLINE_SECONDS
         with inp.ctx.pce_client(settings.pce) as client:
+            # the counts are of the provisioned rules: the active policy, not the draft the rest of the report reads
             sets = fetch_rule_sets(client, "active", deadline=deadline)
             rules = index_rules(sets, **fetch_policy_names(client, "active", deadline=deadline).__dict__)
-            pending = fetch_pending(client, deadline=deadline)
     except RhcPullError as exc:
-        raise ReportFailed(exc.key, exc.detail) from exc
+        logger.warning("policy usage report: the PCE gave no Rule Hit Count report: {}", exc)
+        return _without(inp, (t(exc.key), *((t("rpt_rhc_detail", detail=exc.detail),) if exc.detail else ())))
     except (PceQueryError, PceCollectionIncomplete, PceNotConfigured, *PCE_FAILURES) as exc:
-        logger.warning("rule hit count report: PCE read failed: {}", exc)
-        raise ReportFailed("rhc_err_unreachable", f"{type(exc).__name__}: {exc}"[:200]) from exc
+        logger.warning("policy usage report: the rule hit counts could not be read from the PCE: {}", exc)
+        return _without(inp, (t("rpt_rhc_failed", error=f"{type(exc).__name__}: {exc}"[:ERROR_MAX]),))
 
     any_text = t("rpt_pu_any")
     by_href = {r.rule_href: r for r in pull.rows}
@@ -135,19 +184,9 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
                     rule_scope(r, any_text)) for r in no_record[:ROWS]),
         total_rows=len(no_record), empty_text=t("rpt_rhc_none_no_record"), limit_note=limit(len(no_record)))
 
-    if pending:
-        # the list itself is the policy usage report's (6.6.0: the same table was printed in both)
-        pending_blocks: tuple[TextBlock | TableBlock, ...] = (
-            TextBlock(paragraphs=(t("rpt_rhc_pending_some", n=len(pending)),
-                                  t("rpt_rhc_pending_see", report=t("rpt_title_policy_usage")))),)
-    else:
-        pending_blocks = (TextBlock(paragraphs=(t("rpt_rhc_pending_none"),)),)
-
-    enabled_rules = sum(1 for r in rules.values() if r.enabled)
-    values = {"rules": enabled_rules, "hit": len(hit), "zero": len(zero),
-              "no_record": len(no_record)}  # what its table lists: Draft-only, deleted or later rules are no rule here
-    kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None, unit="count",
-                     better="neutral" if k in ("rules", "no_record") else "higher" if k == "hit" else "lower")
+    # what its table lists: a Draft-only, deleted or later rule is no rule here
+    values = {"rhc_hit": len(hit), "rhc_zero": len(zero), "rhc_no_record": len(no_record)}
+    kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None, unit="count", better=_KPI_BETTER[k])
                  for k, label in _KPI_KEYS.items())
     findings: list[Finding] = []
     # An allow rule at 0 still opens a path; a Deny Rule at 0 only means nothing tried the path it blocks.
@@ -156,26 +195,18 @@ def build_rule_hit_count(inp: BuildInput) -> ReportDocument:
         findings.append(Finding(severity=Severity.LOW, title=t("rpt_rhc_finding_zero", n=len(zero_allow)),
                                 why=t("rpt_rhc_finding_zero_why"), action=t("rpt_rhc_finding_zero_action"),
                                 action_code="unused_rules", action_short=t("rpt_act_unused_rules")))
-    if pending:
-        findings.append(Finding(severity=Severity.LOW, title=t("rpt_rhc_finding_pending", n=len(pending)),
-                                why=t("rpt_rhc_finding_pending_why"), action=t("rpt_rhc_finding_pending_action"),
-                                action_code="pending_policy", action_short=t("rpt_act_pending_policy")))
-    quality = [t("rpt_rhc_quality_source")]
+    title = t("rpt_rhc_sec")
+    quality = [t("rpt_rhc_quality_source", chapter=title)]
     if pull.unparsed:
         quality.append(t("rpt_rhc_quality_unparsed", n=pull.unparsed))
     gone = sum(1 for r in pull.rows if r.rule_href not in rules and r.hit_count > 0)
     if gone:
         quality.append(t("rpt_rhc_quality_gone", n=gone))
-    return ReportDocument(
-        report_type=inp.params.report_type, lang=lang, title=t("rpt_title_rule_hit_count"), period_start=inp.start,
-        period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(findings),
-        data_quality=tuple(quality),
-        sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rhc_how_intro"),
-                          blocks=(TextBlock(paragraphs=(t("rpt_rhc_how_terms"),)),)),
-                  Section(id="hit", title=t("rpt_rhc_sec_hit"), intro=t("rpt_rhc_hit_intro"), blocks=(hit_table,)),
-                  Section(id="zero", title=t("rpt_rhc_sec_zero"), intro=t("rpt_rhc_zero_intro"),
-                          blocks=(zero_table,)),
-                  Section(id="no_record", title=t("rpt_rhc_sec_no_record"), intro=t("rpt_rhc_no_record_intro"),
-                          blocks=(no_record_table, *((unprovisioned_table,) if unprovisioned else ()))),
-                  Section(id="pending", title=t("rpt_rhc_sec_pending"), intro=t("rpt_rhc_pending_intro"),
-                          blocks=pending_blocks)))
+    # each table under the sentence that says how to read it, as each had when it was a section of its own report
+    blocks: tuple[Block, ...] = (
+        TextBlock(paragraphs=(t("rpt_rhc_hit_intro"),)), hit_table,
+        TextBlock(paragraphs=(t("rpt_rhc_zero_intro"),)), zero_table,
+        TextBlock(paragraphs=(t("rpt_rhc_no_record_intro", table=unprovisioned_table.title),)), no_record_table,
+        *((unprovisioned_table,) if unprovisioned else ()))
+    return RhcChapter(section=Section(id=SECTION, title=title, intro=t("rpt_rhc_intro"), blocks=blocks), kpis=kpis,
+                      findings=tuple(findings), data_quality=tuple(quality), counted=True)

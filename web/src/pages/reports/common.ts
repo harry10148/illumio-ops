@@ -14,6 +14,8 @@ export const TYPE_KEYS: Record<string, string> = {
   ransomware: "rpt_title_ransomware",
   readiness: "rpt_title_readiness",
   policy_usage: "rpt_title_policy_usage",
+  // No template of its own since it became a chapter of policy usage: the name of the reports made before, and of
+  // a schedule of the old type a settings file may still hold.
   rule_hit_count: "rpt_title_rule_hit_count",
   policy_diff: "rpt_title_policy_diff",
   policy_resolver: "rpt_title_policy_resolver",
@@ -32,7 +34,6 @@ export const TYPE_DESC_KEYS: Record<string, string> = {
   ransomware: "gui_reports_desc_ransomware",
   readiness: "gui_reports_desc_readiness",
   policy_usage: "gui_reports_desc_policy_usage",
-  rule_hit_count: "gui_reports_desc_rule_hit_count",
   policy_diff: "gui_reports_desc_policy_diff",
   policy_resolver: "gui_reports_desc_policy_resolver",
   custom: "gui_reports_desc_custom",

@@ -17,6 +17,7 @@ from illumio_ops.runtime import (
     StartupError,
     configure_logging,
     prepare,
+    write_back_settings_upgrade,
 )
 from illumio_ops.web.app import create_app
 from illumio_ops.web.ipallow import is_allowed
@@ -36,6 +37,7 @@ def cmd_serve(root: Path | None) -> int:
         return EXIT_UNAVAILABLE
     s = rt.ctx.settings.current()
     configure_logging(paths, s.logging.level)
+    write_back_settings_upgrade(rt.ctx.settings)  # after the log file is open: what it changed is said there, once
     stop = threading.Event()
 
     def on_signal(signum: int, _frame: FrameType | None) -> None:

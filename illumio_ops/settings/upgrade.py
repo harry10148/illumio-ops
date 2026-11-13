@@ -1,13 +1,17 @@
 """Bring a settings file written by an older v6 up to the current schema, in memory only.
 
 validate_settings() calls upgrade() first, so the service, the rescue command, the 5.x
-migrator and the installer preflight all read old files the same way. Nothing here writes:
-the upgraded shape reaches disk on the next SettingsStore.update().
+migrator and the installer preflight all read old files the same way. Nothing here writes
+or logs: every step is a pure function of the file's data, run again on every load until
+the upgraded shape reaches disk — on the next SettingsStore.update(), or at the service
+start when a step changed something the operator made (SettingsStore.persist_upgrade,
+which is also where what was changed is said, once).
 """
 from __future__ import annotations
 
 import copy
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from illumio_ops.domain.alertpack import ANOMALY_BATCH2, anomaly_rules, system_rule
@@ -141,6 +145,100 @@ def _v12_to_v13(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+RHC_REPORT, USAGE_REPORT = "rule_hit_count", "policy_usage"
+# The most days back the policy usage report reads when this step was written (services/reports/registry.py
+# POLICY_USAGE_MAX_DAYS): a step is what one release did to a file, so the number is written here, not imported.
+USAGE_MAX_DAYS = 30
+
+
+@dataclass(frozen=True)
+class ScheduleChange:
+    """What the v13 → v14 step does to one report schedule."""
+    id: str
+    name: str
+    converted: bool  # it made the Rule Hit Count report and makes the policy usage report now
+    lookback_before: int
+    lookback_after: int
+    # (id, name) of the schedule it was the same as once converted, which stays in its place; None: this one stays
+    same_as: tuple[str, str] | None
+
+
+def change_text(c: ScheduleChange) -> str:
+    """One log line for one changed schedule: its name, the lookback before and after, whether it was removed as the
+    same as another — and that the reports a removed one made stay its own. Names are printed escaped (repr)."""
+    who = f"report schedule {c.name!r} ({c.id})"
+    days = f"lookback {c.lookback_before} -> {c.lookback_after} days"
+    if c.same_as is None:
+        return (f"settings upgraded: {who} made the Rule Hit Count report, now a chapter of the policy usage report; "
+                f"it makes the policy usage report now, {days}")
+    other = f"{c.same_as[1]!r} ({c.same_as[0]})"
+    kept = "the reports it made are kept (listed as from a deleted schedule) and are not handed to the other schedule"
+    if c.converted:
+        return (f"settings upgraded: {who} made the Rule Hit Count report, now a chapter of the policy usage report; "
+                f"as a policy usage schedule ({days}) it is the same as {other}, so it was removed; {kept}")
+    return (f"settings upgraded: {who} was removed: it is the same as {other}, which made the Rule Hit Count report "
+            f"and makes the policy usage report now; {kept}")
+
+
+def _same(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """The same schedule but for its id and its name (a key one of them lacks reads as null)."""
+    keys = (set(a) | set(b)) - {"id", "name"}
+    return all(a.get(k) == b.get(k) for k in keys)
+
+
+def _merge_rhc_schedules(schedules: list[Any]) -> tuple[list[Any], list[ScheduleChange]]:
+    """Rule Hit Count is a chapter of the policy usage report (UI redesign spec §9.2): each schedule for the old
+    report becomes one for this, within the days it reads. A converted schedule that is then the same as another
+    (id and name apart) is kept once — the one of the two with the smaller id stays; the other's reports already
+    made stay its own. Two schedules that were the same before are not compared: the operator had both.
+    Returns the new list (new dicts where one changed; the given ones are not touched) and what changed, in the
+    order of the file. Pure, and nothing left to do on its own output."""
+    out: list[Any] = []
+    converted: list[str] = []
+    before: dict[str, int] = {}
+    for s in schedules:
+        if isinstance(s, dict) and s.get("report_type") == RHC_REPORT and isinstance(s.get("id"), str):
+            days = s.get("lookback_days")
+            capped = min(days, USAGE_MAX_DAYS) if isinstance(days, int) and not isinstance(days, bool) else days
+            out.append({**s, "report_type": USAGE_REPORT, "lookback_days": capped})
+            converted.append(s["id"])
+            before[s["id"]] = days if isinstance(days, int) else 0
+        else:
+            out.append(s)
+    removed: dict[str, tuple[str, str]] = {}  # id -> (id, name) of the one kept in its place
+    for cid in converted:
+        if cid in removed:
+            continue
+        mine = next(s for s in out if isinstance(s, dict) and s.get("id") == cid)
+        for other in out:
+            # a second schedule under the same id is an invalid file: left for validation to refuse, not tidied away
+            if other is mine or not isinstance(other, dict) or not isinstance(other.get("id"), str) \
+                    or other["id"] == cid or other["id"] in removed or not _same(mine, other):
+                continue
+            loser, winner = (mine, other) if other["id"] < cid else (other, mine)
+            removed[loser["id"]] = (winner["id"], str(winner.get("name", "")))
+            if loser is mine:
+                break
+    kept = [s for s in out if not (isinstance(s, dict) and s.get("id") in removed)]
+    changes = []
+    for s in out:
+        if not isinstance(s, dict) or not (s.get("id") in before or s.get("id") in removed):
+            continue
+        days = s.get("lookback_days")
+        after = days if isinstance(days, int) else 0
+        changes.append(ScheduleChange(id=s["id"], name=str(s.get("name", "")), converted=s["id"] in before,
+                                      lookback_before=before.get(s["id"], after), lookback_after=after,
+                                      same_as=removed.get(s["id"])))
+    return kept, changes
+
+
+def _v13_to_v14(data: dict[str, Any]) -> dict[str, Any]:
+    reports = data.get("reports")
+    if isinstance(reports, dict) and isinstance(reports.get("schedules"), list):
+        reports["schedules"] = _merge_rhc_schedules(reports["schedules"])[0]
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -155,6 +253,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     10: _v10_to_v11,
     11: _v11_to_v12,
     12: _v12_to_v13,
+    13: _v13_to_v14,
 }
 
 
@@ -170,12 +269,34 @@ def upgrade(data: Any) -> Any:
         raise NewerSchema()
     if version == SCHEMA_VERSION:
         return data
+    out = _upto(data, version, SCHEMA_VERSION)
+    return data if out is None else out  # no path from this version: let validation report it
+
+
+def _upto(data: dict[str, Any], version: int, target: int) -> dict[str, Any] | None:
+    """A copy of `data` (at schema `version`) taken up to schema `target`; None when a step on the way is missing."""
     out = copy.deepcopy(data)
-    while version < SCHEMA_VERSION:
+    while version < target:
         step = UPGRADES.get(version)
         if step is None:
-            return data  # no path from this version: let validation report it
+            return None
         out = step(out)
         version += 1
         out["schema_version"] = version
     return out
+
+
+def rhc_schedule_changes(data: Any) -> list[ScheduleChange]:
+    """The report schedules upgrade() changes in this file because Rule Hit Count joined the policy usage report
+    (the v13 → v14 step): nothing for a file already at schema 14 or later, or one upgrade() does not take. Pure:
+    the step itself says nothing, and the service start says this once when it writes the upgraded file back."""
+    if not isinstance(data, dict):
+        return []
+    version = data.get("schema_version")
+    if not isinstance(version, int) or isinstance(version, bool) or version > 13:
+        return []
+    at_13 = _upto(data, version, 13)
+    reports = at_13.get("reports") if at_13 is not None else None
+    if not isinstance(reports, dict) or not isinstance(reports.get("schedules"), list):
+        return []
+    return _merge_rhc_schedules(reports["schedules"])[1]

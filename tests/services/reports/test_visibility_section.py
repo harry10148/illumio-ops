@@ -16,7 +16,7 @@ from illumio_ops.services.reports.registry import BuildInput, ReportParams, spec
 from illumio_ops.services.workbench import FlowRequest
 from illumio_ops.store.flowdb import analysis, workloads
 from tests.services.collect.conftest import configured_ctx
-from tests.services.reports.test_policy_usage import usage
+from tests.services.reports.test_policy_usage import rhc_off, usage
 from tests.services.reports.test_readiness import summary
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
@@ -40,6 +40,7 @@ def ctx(tmp_path, monkeypatch):
     from illumio_ops.services.analysis.ransomware import HostRansomware
     monkeypatch.setattr(readiness_report, "predicted_summary", lambda ctx, spec, **kw: summary())
     monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage())
+    rhc_off(monkeypatch)  # policy usage asks whether Rule Hit Count is on: there is no PCE here
     monkeypatch.setattr(ransomware_report, "host_ransomware", lambda ctx, href, **kw: HostRansomware.model_construct(
         breakdown=None, allow_rules={}, allow_status={}))
     c = configured_ctx(tmp_path)

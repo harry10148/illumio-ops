@@ -14,13 +14,14 @@ from illumio_ops.migrate.report import MigrationItem
 from illumio_ops.services.reports.registry import specs
 from illumio_ops.settings.schema import Settings
 
-# 5.x report type -> v6 (audit_summary: the .106 config's older name for the audit report)
+# 5.x report type -> v6 (audit_summary: the .106 config's older name for the audit report; rule_hit_count: its
+# counts are a chapter of the v6 policy usage report, UI redesign spec §9.2, so its schedule becomes one for that)
 TYPES = {"traffic": ReportType.TRAFFIC, "security_risk": ReportType.SECURITY_RISK,
          "network_inventory": ReportType.NETWORK_INVENTORY, "audit": ReportType.AUDIT,
          "audit_summary": ReportType.AUDIT, "ven_status": ReportType.VEN_STATUS,
          "policy_usage": ReportType.POLICY_USAGE, "policy_diff": ReportType.POLICY_DIFF,
          "policy_resolver": ReportType.POLICY_RESOLVER, "app_summary": ReportType.APP_SUMMARY,
-         "rule_hit_count": ReportType.RULE_HIT_COUNT, "readiness": ReportType.READINESS}
+         "rule_hit_count": ReportType.POLICY_USAGE, "readiness": ReportType.READINESS}
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 REPORT_KEYS: dict[str, tuple[str | None, str, str]] = {  # report.<key> -> (target, action, reason)
     "retention_days": ("reports.retention_days", "carried", "migrate_carried"),
@@ -117,6 +118,8 @@ def _schedule(s: Any, name: str, label: str, settings: Settings,
                            type=str(s.get("report_type")))
     spec = specs()[kind]
     changed: list[str] = []
+    if str(s.get("report_type")) == "rule_hit_count":  # another report than 5.x made: said, never silent
+        changed.append("report type: policy usage (it holds the Rule Hit Count chapter)")
     paused = ""
     flt = None
     if kind is ReportType.APP_SUMMARY:

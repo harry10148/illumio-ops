@@ -105,3 +105,18 @@ def test_report_section():
     assert items["report.retention_days"].action == "carried" and items["report.output_dir"].action == "dropped"
     assert items["web_gui.public_url"].target == "reports.gui_external_url"
     assert items["report.max_top_n"].reason_key == "migrate_not_in_v6"
+
+
+def test_a_rule_hit_count_schedule_becomes_a_policy_usage_one():
+    """UI redesign spec §9.2: v6 has no Rule Hit Count report of its own (its counts are a chapter of policy usage),
+    so the 5.x schedule is carried as a policy usage one, within the 30 days that report reads — and said."""
+    reports, items = _run(_raw(schedules=[_sched(report_type="rule_hit_count", lookback_days=90, format=["html"]),
+                                          _sched(id=2, name="Short", report_type="rule_hit_count")]))
+    long, short = reports.schedules
+    assert (long.report_type.value, long.lookback_days, long.enabled, long.formats) == ("policy_usage", 30, True, ("html",))
+    assert (short.report_type.value, short.lookback_days) == ("policy_usage", 7)
+    for source, what in (("report_schedules[0] Weekly", {"report type", "lookback"}), ("report_schedules[1] Short", {"report type"})):
+        item = items[source]
+        assert (item.action, item.reason_key) == ("rewritten", "migrate_schedule_rewritten")
+        said = item.params["what"]
+        assert {w.split(":")[0] for w in said.split(", ")} == what and "policy usage" in said
