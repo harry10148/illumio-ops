@@ -70,7 +70,7 @@ def test_retention_prunes_rollups_and_snapshots(tmp_path):
     ctx = configured_ctx(tmp_path)
     with ctx.flows().connect() as conn:
         conn.execute("INSERT INTO flow_rollup_daily VALUES ('2026-01-01','a','b',22,6,'allowed','','',1,1,0,0,0)")
-        conn.execute("INSERT INTO workload_snapshot_daily VALUES ('2026-01-01','/w',NULL,NULL,NULL,NULL)")
+        conn.execute("INSERT INTO workload_snapshot_daily VALUES ('2026-01-01','/w',NULL,NULL,NULL,NULL,1)")
         conn.execute("INSERT INTO org_risk_snapshot_daily VALUES ('2026-01-01','{}')")
         conn.commit()
     counts = run_retention(ctx, now=NOW)  # rollup_days 90

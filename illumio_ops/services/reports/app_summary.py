@@ -132,7 +132,9 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
                            ("intra_connections", "rpt_app_kpi_intra"), ("allowed_pct", "rpt_sec_kpi_allowed_pct"),
                            ("pb_flows", "rpt_sec_kpi_pb_flows"))),
         Kpi(key="hosts", label=t("rpt_app_kpi_hosts"), value=len(hosts), previous=None),
-        # a share of no hosts is not a number: left out, and the data notes say the app has no managed host (6.6.0)
+        # a share of no hosts is not a number: left out, and the data notes say the app has no managed host (6.6.0).
+        # No previous period: the daily snapshot the security risk report compares with holds no labels, so the
+        # app's hosts of that day cannot be told (this report always has a filter).
         *((Kpi(key="enforced_hosts_pct", label=t("rpt_sec_kpi_enforced_hosts"), unit="percent", better="higher",
                value=round(100 * (modes["full"] + modes["selective"]) / len(hosts), 1), previous=None),)
           if hosts else ()),

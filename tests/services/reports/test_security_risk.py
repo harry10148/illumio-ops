@@ -379,3 +379,214 @@ def test_a_collection_gap_comes_before_the_undecided_sentence(ctx, monkeypatch):
     doc = _build(ctx)
     assert len(doc.caveats) == 2 and doc.caveats[0] == "the gap sentence"
     assert doc.caveats[1].startswith("Flows without a decision: 55.6%")
+
+
+# ── stage 3b: the maturity score and the enforced share are compared with the previous period ────────────────
+# The inventory is today's. What it was on the previous period's last day is the daily snapshot of that day, which
+# knows since migration 0018 which hosts were managed. The sample: on 2026-10-19, the last day before the period,
+# three managed hosts (one Full) and an address without a VEN; today the second host is in Selective. Both periods
+# hold 3 allowed and 1 potentially blocked connections.
+
+PREVIOUS_DAY = "2026-10-19"
+WEEK = END - START
+# enforcement 1 of 3 hosts in Full, policy 3 of 4 connections, nothing on management ports or from unmanaged
+# sources, no ransomware data: of the 90 points that have data
+MATURITY_BEFORE = round(100 * (40 * (1 / 3) + 25 * 0.75 + 15 + 10) / 90)   # 63
+MATURITY_NOW = round(100 * (40 * (1.5 / 3) + 25 * 0.75 + 15 + 10) / 90)    # 71: the second host counts half
+NO_PREVIOUS_PARTS = ("The previous period has no record of the ransomware part, so the two scores rest on "
+                     "different parts and are not compared.")
+
+
+def _hosts(ctx, hosts, *, snapshot=None):
+    """hosts: (name, mode, managed). snapshot: the day this inventory is also the snapshot of."""
+    with ctx.flows().connect() as conn:
+        ls = labels.label_set_id(conn, (("app", "Web"), ("env", "Prod")))
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href=f"/orgs/1/workloads/{name}", hostname=name, name=None, managed=managed, enforcement_mode=mode,
+            visibility_level=None, os_id=None, ven_version=None, ven_href=None, label_set=ls, online=1,
+            risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at="x")
+            for name, mode, managed in hosts])
+        if snapshot:
+            workloads.snapshot_day(conn, snapshot)
+        conn.commit()
+
+
+def _earlier(f, by=WEEK):
+    """The flow, seen `by` earlier: in the period before."""
+    for name in ("first_detected", "last_detected"):
+        object.__setattr__(f, name, getattr(f, name) - by)
+    return f
+
+
+def _two_periods(ctx, *, snapshot=PREVIOUS_DAY, previous_covered=True, previous=None, current=None):
+    """The sample above. snapshot: the day the earlier inventory is the snapshot of (None: no snapshot);
+    previous, current: the two periods' flows, when not the sample's."""
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    _hosts(ctx, [("a1", "full", 1), ("a2", "visibility_only", 1), ("a3", "idle", 1), ("u1", "full", 0)],
+           snapshot=snapshot)
+    _hosts(ctx, [("a1", "full", 1), ("a2", "selective", 1), ("a3", "idle", 1), ("u1", "full", 0)])
+    if previous is None:
+        previous = [flow(port=443, conns=3), flow(port=8080, decision="potentially_blocked", conns=1)]
+    if current is None:
+        current = [flow(port=443, conns=3), flow(port=8080, decision="potentially_blocked", conns=1)]
+    _write(ctx, [*current, *(_earlier(f) for f in previous)])
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, START - WEEK if previous_covered else START, END)
+        conn.commit()
+
+
+def _compared(doc):
+    kpi = {k.key: k for k in doc.kpis}
+    return kpi["maturity"], kpi["enforced_hosts_pct"]
+
+
+def test_both_numbers_are_compared_once_a_snapshot_knows_the_managed_hosts(ctx):
+    _two_periods(ctx)
+    maturity, enforced = _compared(_build(ctx))
+    assert (maturity.value, maturity.previous) == (MATURITY_NOW, MATURITY_BEFORE) == (71, 63)
+    # 2 of the 3 managed hosts enforced now, 1 of 3 on the previous period's last day; the address without a VEN
+    # is in neither
+    assert (enforced.value, enforced.previous) == (66.7, 33.3)
+    assert NO_PREVIOUS_PARTS not in maturity.note
+
+
+def test_no_snapshot_on_the_previous_periods_last_day_is_no_comparison(ctx):
+    _two_periods(ctx, snapshot="2026-10-18")  # the day before the one the report reads
+    maturity, enforced = _compared(_build(ctx))
+    assert (maturity.value, maturity.previous) == (MATURITY_NOW, None)
+    assert (enforced.value, enforced.previous) == (66.7, None)
+    assert NO_PREVIOUS_PARTS not in maturity.note  # the snapshot is what is missing: no word of ransomware
+
+
+def test_a_snapshot_from_before_the_upgrade_is_no_comparison(ctx):
+    """The first report after the upgrade: the snapshot of that day does not say which hosts were managed. One
+    such row is enough — the hosts that do say would be another set than the day's (here 1 of 2 in Full: 50%)."""
+    _two_periods(ctx)
+    with ctx.flows().connect() as conn:
+        conn.execute("UPDATE workload_snapshot_daily SET managed = NULL WHERE day = ? AND href LIKE '%/a3'",
+                     (PREVIOUS_DAY,))
+        assert conn.execute("SELECT COUNT(*), COUNT(managed) FROM workload_snapshot_daily").fetchone()[:] == (4, 3)
+        conn.commit()
+    maturity, enforced = _compared(_build(ctx))
+    assert (maturity.previous, enforced.previous) == (None, None)
+
+
+def test_a_filtered_report_does_not_compare_the_two(ctx):
+    """A snapshot holds no labels: the hosts of a filtered report on that day cannot be told."""
+    _two_periods(ctx)
+    doc = _build(ctx, cond=FlowCondition(dst=EndpointFilter(labels=(LabelCond(key="app", values=("DB",)),))))
+    maturity, enforced = _compared(doc)
+    assert (maturity.previous, enforced.previous) == (None, None)
+    # the numbers read from the flows are compared as before: both periods are filtered alike
+    assert {k.key: k.previous for k in doc.kpis}["pb_flows"] == 1
+
+
+def test_a_previous_period_not_wholly_collected_is_no_maturity_to_compare(ctx):
+    """The score rests on the period's connections: without all of the previous period's there is none. The
+    enforced share rests on the snapshot alone and is compared."""
+    _two_periods(ctx, previous_covered=False)
+    maturity, enforced = _compared(_build(ctx))
+    assert (maturity.value, maturity.previous) == (MATURITY_NOW, None)
+    assert (enforced.value, enforced.previous) == (66.7, 33.3)
+
+
+def test_a_score_with_the_ransomware_part_is_not_compared_and_says_why(ctx):
+    """The ransomware part has no record for the previous period: its score would rest on four parts, this period's
+    on five. Two scores on different parts are not subtracted."""
+    _two_periods(ctx)
+    _ransomware_result(ctx)
+    doc = _build(ctx)
+    maturity, enforced = _compared(doc)
+    assert maturity.value is not None and maturity.previous is None
+    assert maturity.note.endswith(NO_PREVIOUS_PARTS) and maturity.note.startswith("Grade ")
+    assert (enforced.value, enforced.previous) == (66.7, 33.3)  # the share of hosts has both its values
+    zh, _ = _compared(_build(ctx, lang=Language.ZH_TW))
+    assert zh.note.endswith("上期沒有勒索防護那一部分的紀錄，計分的部分不同，所以不比較。")
+
+
+def test_the_ransomware_sentence_is_said_only_when_ransomware_is_what_sets_the_scores_apart(ctx):
+    """With no snapshot to compare with, the missing ransomware record is not why: the sentence is not said (the
+    first report after the upgrade must not blame ransomware for what the snapshot lacks)."""
+    _two_periods(ctx, snapshot="2026-10-18")
+    _ransomware_result(ctx)
+    maturity, enforced = _compared(_build(ctx))
+    assert (maturity.previous, enforced.previous) == (None, None) and maturity.value is not None
+    assert NO_PREVIOUS_PARTS not in maturity.note
+
+
+def test_a_previous_period_without_traffic_has_no_score_even_on_the_same_parts(tmp_path):
+    """This period: flows, none with a decision — the score rests on the hosts alone. A previous period with no
+    flow would rest on that same one part; but a period without traffic has no score (the rule this period's own
+    number follows), so there is none to compare with. One with flows, none decided, has: 1 of 3 hosts in Full."""
+    quiet = configured_ctx(tmp_path / "quiet")
+    _two_periods(quiet, previous=[], current=[flow(port=443, decision="unknown", conns=5)])
+    maturity, _ = _compared(_build(quiet))
+    assert (maturity.value, maturity.previous) == (50, None)  # 1.5 of 3 hosts, the only part with data
+    both = configured_ctx(tmp_path / "both")
+    _two_periods(both, previous=[flow(port=22, decision="unknown", conns=2)],
+                 current=[flow(port=443, decision="unknown", conns=5)])
+    maturity, _ = _compared(_build(both))
+    assert (maturity.value, maturity.previous) == (50, 33)
+
+
+@pytest.mark.parametrize("previous", [
+    [],                                                       # no traffic at all: no score to speak of
+    [flow(port=443, decision="unknown", conns=5)],            # traffic, none with a decision: three parts fewer
+], ids=["no_traffic", "no_decided_traffic"])
+def test_a_previous_score_on_other_parts_is_not_compared(ctx, previous):
+    _two_periods(ctx, previous=previous)
+    maturity, enforced = _compared(_build(ctx))
+    assert (maturity.value, maturity.previous) == (MATURITY_NOW, None)
+    assert NO_PREVIOUS_PARTS not in maturity.note and enforced.previous == 33.3
+
+
+@pytest.mark.parametrize(("days_after", "compared"), [(0, True), (1, True), (2, False), (3, False)])
+def test_only_a_period_that_ends_today_or_yesterday_is_compared(ctx, days_after, compared):
+    """This period's two numbers are read from the inventory as it is now: for a period that ended days ago they
+    are not that period's. The period's end (exclusive, a midnight of the display zone) is today's date when the
+    report covers up to yesterday — the scheduled case — and yesterday's when it covers up to the day before."""
+    from datetime import timedelta
+    _two_periods(ctx)
+    doc = specs()[ReportType.SECURITY_RISK].build(BuildInput(
+        ctx=ctx, params=ReportParams(report_type=ReportType.SECURITY_RISK), start=START, end=END, lang=Language.EN,
+        tz=UTC, now=NOW + timedelta(days=days_after), pce_label="pce"))
+    maturity, enforced = _compared(doc)
+    assert (maturity.previous, enforced.previous) == ((MATURITY_BEFORE, 33.3) if compared else (None, None))
+
+
+@pytest.mark.parametrize(("zone", "day"), [("Asia/Taipei", "2026-10-19"), ("America/New_York", "2026-10-20")])
+def test_the_snapshot_read_is_the_utc_day_the_previous_period_ends_in(tmp_path, zone, day):
+    """The daily snapshot's day is a UTC day (the collector's db_day), the report's period a span of the display
+    zone's days: the snapshot read is the one of the UTC day that holds the previous period's last instant. East of
+    UTC that is the day before the period's first; west of it, the period's first day itself."""
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(zone)
+    start, end = datetime(2026, 10, 20, tzinfo=tz), datetime(2026, 10, 27, tzinfo=tz)
+
+    def build(c):
+        return specs()[ReportType.SECURITY_RISK].build(BuildInput(
+            ctx=c, params=ReportParams(report_type=ReportType.SECURITY_RISK), start=start, end=end, lang=Language.EN,
+            tz=tz, now=end + timedelta(hours=1), pce_label="pce"))
+    on_the_day = configured_ctx(tmp_path / "on")
+    _two_periods(on_the_day, snapshot=day)
+    assert _compared(build(on_the_day))[1].previous == 33.3
+    beside = configured_ctx(tmp_path / "beside")
+    _two_periods(beside, snapshot="2026-10-20" if day == "2026-10-19" else "2026-10-19")
+    assert _compared(build(beside))[1].previous is None
+
+
+def test_managed_means_the_same_in_the_snapshot_and_in_the_report(ctx):
+    """One inventory, read both ways: the enforced share the report prints for this period equals the share a
+    snapshot of the same inventory gives — the hosts counted are the same ones (a host with a VEN and no mode is
+    one of them, an address without a VEN is not)."""
+    hosts = [("a1", "full", 1), ("a2", "selective", 1), ("a3", "visibility_only", 1), ("a4", "idle", 1),
+             ("a5", None, 1), ("u1", "full", 0), ("u2", "selective", 0)]
+    _hosts(ctx, hosts, snapshot="2026-10-26")
+    _write(ctx, [flow(port=443)])
+    with ctx.flows().connect() as conn:
+        counts = workloads.mode_counts_on(conn, "2026-10-26")
+    _, enforced = _compared(_build(ctx))
+    assert counts.hosts == 5
+    assert enforced.value == round(100 * (counts.modes["full"] + counts.modes["selective"]) / counts.hosts, 1) == 40.0

@@ -4,12 +4,15 @@ enforcement progress by app, potentially blocked traffic with the rule it needs,
 numbers are the flow store's primary rows under the report's filter.
 What other reports hold is named, not repeated (UI redesign spec §9.2): ransomware protection is one number whose
 note names the ransomware report, lateral movement one sentence that names the lateral posture report, and users
-and processes are a chapter of the traffic report (flowsections.users_section)."""
+and processes are a chapter of the traffic report (flowsections.users_section).
+The maturity score and the enforced share of hosts are today's inventory; their previous-period values come from the
+daily snapshot of the previous period's last day, when that day can be compared with (see build_security_risk)."""
 from __future__ import annotations
 
 import json
 from collections import Counter
 from collections.abc import Mapping
+from datetime import timedelta
 from typing import Any
 
 from illumio_ops.domain.findings_rules import (
@@ -20,6 +23,7 @@ from illumio_ops.domain.findings_rules import (
 )
 from illumio_ops.domain.maturity import WEIGHTS as MATURITY_WEIGHTS
 from illumio_ops.domain.maturity import (
+    Maturity,
     MaturityInputs,
     losing_most,
     maturity,
@@ -54,7 +58,8 @@ from illumio_ops.services.reports.generate import (
 )
 from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.registry import BuildInput
-from illumio_ops.store.flowdb import analysis
+from illumio_ops.store.flowdb import analysis, workloads
+from illumio_ops.store.flowdb.db import db_day
 
 TOP = 20
 APP = "app"  # the app label key
@@ -96,6 +101,29 @@ def _flow_kpis(t: FlowTotals) -> dict[str, float | int | None]:
             "unmanaged_connections": t.from_unmanaged_connections, "admin_open_connections": t.admin_open_connections}
 
 
+def _score(*, hosts: int, full: int, selective: int, flows: FlowTotals, rw: tuple[int, int] | None) -> Maturity:
+    """The maturity score of a set of managed hosts (how many, and of them in Full and in Selective), a period's
+    connections and the ransomware services counted (_ransomware_counts)."""
+    by = {d.decision: d for d in flows.by_decision}
+    return maturity(MaturityInputs(
+        hosts_managed=hosts, hosts_full=full, hosts_selective=selective, connections=flows.connections,
+        allowed_connections=by["allowed"].connections if "allowed" in by else 0,
+        undecided_connections=flows.connections - flows.decided_connections,
+        admin_open_connections=flows.admin_open_connections,
+        unmanaged_source_connections=flows.from_unmanaged_connections,
+        ransomware_services=rw[0] if rw else None, ransomware_protected=rw[1] if rw else None))
+
+
+def _scored(score: Maturity) -> frozenset[str]:
+    """The parts a score rests on: the ones that have data."""
+    return frozenset(part for part, value in score.parts.items() if value is not None)
+
+
+def _enforced_pct(full: int, selective: int, hosts: int) -> float | None:
+    """Of the managed hosts, the share in Full or Selective; None without a host."""
+    return round(100 * (full + selective) / hosts, 1) if hosts else None
+
+
 def _ransomware_counts(result: Mapping[str, Any] | None, hrefs: set[str] | None) -> tuple[int, int] | None:
     """(critical/high services the PCE rated, of them protected); None without ransomware data."""
     if not result or result.get("unsupported"):
@@ -128,27 +156,40 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     totals = flow_totals(inp.ctx, spec, admin_ports=admin)
     saw = flowsections.seen(totals)
     prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
-    before = (_flow_kpis(flow_totals(inp.ctx, spec.model_copy(update={"start": prev_start, "end": inp.start}),
-                                     admin_ports=admin))
-              if traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now, flows=True) else None)
+    prev_totals = (flow_totals(inp.ctx, spec.model_copy(update={"start": prev_start, "end": inp.start}),
+                               admin_ports=admin)
+                   if traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now, flows=True) else None)
+    before = _flow_kpis(prev_totals) if prev_totals is not None else None
     no_flows = t("rpt_no_flows_filtered" if cond is not None else "rpt_no_flows")
     scope_groups = flowsections.label_groups_of(inp.ctx, cond)
     hosts = [h for h in lc.hosts.values() if flowsections.host_in_scope(h, cond, label_groups=scope_groups)]
     modes = Counter(h.enforcement_mode for h in hosts)
+    # The hosts' numbers (the enforced share, and through it the score) are read from the inventory as it is now.
+    # What they were is the daily snapshot of the previous period's last day, and it is read only when it speaks of
+    # the same thing: the period ends now — its end, a midnight of the display zone, is today's or yesterday's (the
+    # hosts of a period that ended earlier are not today's inventory) — and the report has no filter (a snapshot
+    # holds no labels to tell a filtered report's hosts by).
+    ends_now = (inp.now.astimezone(inp.tz).date() - inp.end.astimezone(inp.tz).date()).days <= 1
     with reads.reading(inp.ctx) as conn:
         rw_row = analysis.read_result(conn, "ransomware")
+        # a snapshot's day is the collector's, a UTC day: the one that holds the previous period's last instant
+        hosts_before = (workloads.mode_counts_on(conn, db_day(inp.start - timedelta(microseconds=1)))
+                        if cond is None and ends_now else None)
     rw = json.loads(rw_row["result_json"]) if rw_row is not None else None
     rw_counts = _ransomware_counts(rw, {h.href for h in hosts if h.href} if cond is not None else None)
     by = {d.decision: d for d in totals.by_decision}
-    allowed_connections = by["allowed"].connections if "allowed" in by else 0
-    score = maturity(MaturityInputs(
-        hosts_managed=len(hosts), hosts_full=modes["full"], hosts_selective=modes["selective"],
-        connections=totals.connections, allowed_connections=allowed_connections,
-        undecided_connections=totals.connections - totals.decided_connections,
-        admin_open_connections=totals.admin_open_connections,
-        unmanaged_source_connections=totals.from_unmanaged_connections,
-        ransomware_services=rw_counts[0] if rw_counts else None,
-        ransomware_protected=rw_counts[1] if rw_counts else None))
+    score = _score(hosts=len(hosts), full=modes["full"], selective=modes["selective"], flows=totals, rw=rw_counts)
+    # The previous period's score, worked out the same way from that day's hosts and that period's connections (all
+    # of them collected, and at least one flow: a score on the inventory alone is not shown for this period either).
+    # Nothing records what the PCE rated then, so it has no ransomware part. A part without data is left out and
+    # the others scaled up: two scores are compared only when they rest on the same parts, never across two scales.
+    score_before = (_score(hosts=hosts_before.hosts, full=hosts_before.modes.get("full", 0),
+                           selective=hosts_before.modes.get("selective", 0), flows=prev_totals, rw=None)
+                    if hosts_before is not None and prev_totals is not None and prev_totals.flows else None)
+    same_parts = score_before is not None and _scored(score_before) == _scored(score)
+    # the ransomware part (which the previous score never has) is all that sets the two apart: the number's note
+    # says why there is no change to read
+    ransomware_apart = score_before is not None and _scored(score) == _scored(score_before) | {"ransomware"}
     outcomes = findings.run_rules(inp.ctx, spec, inp.ctx.settings.current().reports.rule_thresholds, lang,
                                   now=inp.now, scoped=cond is not None) if totals.flows else []
     fired = [o for o in outcomes if o.severity in (Severity.CRITICAL, Severity.HIGH)]
@@ -159,7 +200,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         # Without matching traffic the score would rest on the inventory alone: not shown (Review Focus 1).
         # whole points, as the explanation says them
         "maturity": round(score.score) if score.score is not None and totals.flows else None,
-        "enforced_hosts_pct": round(100 * (modes["full"] + modes["selective"]) / len(hosts), 1) if hosts else None,
+        "enforced_hosts_pct": _enforced_pct(modes["full"], modes["selective"], len(hosts)),
         **{k: (now_flow[k] if totals.flows else None) for k in _FLOW_KPIS},
         "critical_high_findings": len(fired) if totals.flows else None,
         "ransomware_protected_pct": round(100 * rw_counts[1] / rw_counts[0], 1) if rw_counts else None,
@@ -178,16 +219,24 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                                     for k in _FLOW_KPIS}
     if totals.undecided.flows:  # these two count decided connections: say where the others are
         notes.update(dict.fromkeys(("unmanaged_connections", "admin_open_connections"), t("rpt_kpi_decided_only")))
+    maturity_said = no_flows if not totals.flows else maturity_note() if score.grade else t("rpt_sec_maturity_none")
+    if ransomware_apart and totals.flows:
+        maturity_said = " ".join((maturity_said, t("rpt_sec_no_previous_parts")))
     notes.update(
-        maturity=(no_flows if not totals.flows else maturity_note() if score.grade else t("rpt_sec_maturity_none")),
+        maturity=maturity_said,
         enforced_hosts_pct=None if hosts else t("rpt_sec_no_hosts"),
         critical_high_findings=None if totals.flows else no_flows,
         # the one number this report keeps of ransomware protection: where each host and service is listed
         ransomware_protected_pct=t("rpt_sec_see_ransomware", report=t("rpt_title_ransomware")))
     percent = {"enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
     higher = {"maturity", "enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
-    kpis = tuple(Kpi(key=k, label=t(label), value=values[k],
-                     previous=before[k] if before is not None and k in before else None,
+    previous: dict[str, float | int | None] = dict(before or {})
+    if hosts_before is not None:
+        previous["enforced_hosts_pct"] = _enforced_pct(hosts_before.modes.get("full", 0),
+                                                       hosts_before.modes.get("selective", 0), hosts_before.hosts)
+    if same_parts and score_before is not None and score_before.score is not None and values["maturity"] is not None:
+        previous["maturity"] = round(score_before.score)
+    kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=previous.get(k),
                      unit="percent" if k in percent else "count", better="higher" if k in higher else "lower",
                      note=notes.get(k)) for k, label in _KPI_KEYS.items()
                  # a number another analysis has not produced is left out; the data notes say why (6.6.0)

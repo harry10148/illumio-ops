@@ -60,13 +60,34 @@ def all_workloads(conn: sqlite3.Connection) -> list[WorkloadRow]:
 
 
 def snapshot_day(conn: sqlite3.Connection, day: str) -> int:
-    """The day's snapshot is the inventory at its latest run: replaced whole, never merged."""
+    """The day's snapshot is the inventory at its latest run: replaced whole, never merged. `day` is the
+    collector's: a UTC day (db_day)."""
     with transaction(conn):
         conn.execute("DELETE FROM workload_snapshot_daily WHERE day = ?", (day,))
         return conn.execute(
             "INSERT INTO workload_snapshot_daily (day, href, enforcement_mode, visibility_level, "
-            "risk_exposure, risk_percent) SELECT ?, href, enforcement_mode, visibility_level, risk_exposure, "
-            "risk_percent FROM workloads", (day,)).rowcount
+            "risk_exposure, risk_percent, managed) SELECT ?, href, enforcement_mode, visibility_level, "
+            "risk_exposure, risk_percent, managed FROM workloads", (day,)).rowcount
+
+
+@dataclass(frozen=True)
+class ModeCounts:
+    """The managed hosts of one day's snapshot."""
+    hosts: int             # every managed host, the ones the PCE gave no mode for among them
+    modes: dict[str, int]  # enforcement mode -> hosts in it
+
+
+def mode_counts_on(conn: sqlite3.Connection, day: str) -> ModeCounts | None:
+    """The managed hosts of `day`'s snapshot (a UTC day), by enforcement mode. None when the day cannot be compared
+    with: it has no snapshot, or a row of it was written before the snapshot said which hosts were managed
+    (migration 0018) — counting the rest would count another set of hosts than the day's."""
+    total, unknown = conn.execute("SELECT COUNT(*), COALESCE(SUM(managed IS NULL), 0) FROM workload_snapshot_daily "
+                                  "WHERE day = ?", (day,)).fetchone()
+    if not total or unknown:
+        return None
+    rows = conn.execute("SELECT enforcement_mode, COUNT(*) FROM workload_snapshot_daily "
+                        "WHERE day = ? AND managed = 1 GROUP BY enforcement_mode", (day,)).fetchall()
+    return ModeCounts(hosts=sum(n for _, n in rows), modes={mode: n for mode, n in rows if mode is not None})
 
 
 
@@ -76,6 +97,8 @@ def delete_snapshots_before(conn: sqlite3.Connection, day: str) -> int:
 
 
 def copy_from(conn: sqlite3.Connection, schema: str) -> None:
-    """Copy the inventory from an attached store (an on-demand store starts from the install's, ondemand.py)."""
+    """Copy the inventory and its snapshots from an attached store (an on-demand store starts from the install's,
+    ondemand.py). Every column goes along, the snapshot's `managed` among them: both stores are made by the same
+    migrations."""
     conn.execute(f"INSERT INTO workloads SELECT * FROM {schema}.workloads")
     conn.execute(f"INSERT INTO workload_snapshot_daily SELECT * FROM {schema}.workload_snapshot_daily")

@@ -106,6 +106,27 @@ def test_hosts_of_the_app(ctx):
     assert {k.key: k.value for k in doc.kpis}["enforced_hosts_pct"] == 100.0
 
 
+def test_the_enforced_share_of_an_apps_hosts_is_not_compared_with_the_previous_period(ctx):
+    """The security risk report compares its enforced share with the snapshot of the previous period's last day
+    (stage 3b). A snapshot holds no labels, so the hosts of one app on that day cannot be told: this report, which
+    is always about one app, never compares the number — whatever snapshots there are."""
+    from illumio_ops.domain.values import IngestSource
+    from illumio_ops.store.flowdb import ingest_state
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href=f"/orgs/1/workloads/{n}", hostname=n, name=None, managed=1, enforcement_mode=mode,
+            visibility_level=None, os_id=None, ven_version=None, ven_href=None,
+            label_set=labels.label_set_id(conn, (("app", "Finance"), ("env", "Prod"))), online=1, risk_exposure=None,
+            risk_percent=None, risk_updated_at=None, fetched_at="x") for n, mode in (("f1", "full"), ("f2", "idle"))])
+        workloads.snapshot_day(conn, "2026-10-19")  # the last day of the period before
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, START - (END - START), END)
+        conn.commit()
+    _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443)])
+    kpi = {k.key: k for k in _build(ctx, _app("Finance")).kpis}
+    assert (kpi["enforced_hosts_pct"].value, kpi["enforced_hosts_pct"].previous) == (50.0, None)
+    assert kpi["inbound_connections"].previous == 0  # the numbers read from the flows have their previous period
+
+
 def test_findings_only_this_app(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="Other", port=5900), flow(src_app="Web", dst_app="Finance", port=443)])
     doc = _build(ctx, _app("Finance"))

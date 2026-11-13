@@ -1808,6 +1808,7 @@
   "rpt_rdy_finding_action": "Follow “What to do first”: it lists, for the closest apps, the connections to write rules for.",
   "rpt_sec_maturity_note": "Grade {grade}: the most is lost on “{part}” ({got} of its {weight} points). With it at full marks: about {fixed} points. How it is worked out: “How the maturity score is worked out”.",
   "rpt_sec_maturity_full": "Grade {grade}: nothing loses points.",
+  "rpt_sec_no_previous_parts": "The previous period has no record of the ransomware part, so the two scores rest on different parts and are not compared.",
   "rpt_sec_sec_how": "How the maturity score is worked out",
   "rpt_sec_how_intro": "One score from 0 to 100 for how far segmentation has come: are hosts enforced, does policy cover the traffic, are management ports and unmanaged sources kept in check. It adds up the five parts below by their points; a part without data is left out and the others scaled up. “This period” shows where the points were lost.",
   "rpt_sec_tbl_parts": "The five parts",

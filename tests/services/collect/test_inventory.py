@@ -155,6 +155,9 @@ def test_daily_snapshot_written_once_per_day(tmp_path):
     assert len(_rows(ctx, "SELECT * FROM ransomware_snapshot_daily")) == 2
     run_inventory_cycle(ctx, now=NOW + timedelta(days=1))
     assert len(_rows(ctx, "SELECT * FROM workload_snapshot_daily")) == 2
+    # each day's snapshot says the host was managed, as the inventory does (the security risk report's
+    # previous-period numbers read it)
+    assert [r["managed"] for r in _rows(ctx, "SELECT managed FROM workload_snapshot_daily")] == [1, 1]
 
 
 @responses.activate
