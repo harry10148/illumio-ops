@@ -417,6 +417,35 @@ def test_on_a_pull_the_previous_period_is_given_only_when_the_pce_reaches_back_o
     assert _kpi(doc, "pb_connections").previous == 2 and _kpi(doc, "new_connections").previous == 1
 
 
+def test_on_a_pull_a_previous_period_the_pce_keeps_by_the_week_is_not_compared(tmp_path, pce):
+    """Lab 26.2 and SaaS 26.30, 2026-11-14: traffic older than about two weeks comes back as records running Monday
+    to Sunday that hold the week's count. A count of the previous period would be of whole weeks (on the SaaS box:
+    ten days' connections given as the seven before), so none is given and the chapters say why."""
+    week = od.raw(10, day=13, port=22, decision="potentially_blocked", conns=70)
+    week["timestamp_range"]["last_detected"] = "2026-10-19T23:55:00Z"
+    pce.rows = [*od.ROWS, od.raw(9, day=5), week]
+    doc = _build(_light(tmp_path))
+    assert _kpi(doc, "pb_connections").value == 5 and _kpi(doc, "pb_connections").previous is None
+    assert _kpi(doc, "new_connections").previous is None
+    for sid in ("flows", "new_connections"):
+        said = " ".join(p for b in _section(doc, sid).blocks if isinstance(b, TextBlock) for p in b.paragraphs)
+        assert "records longer than a day (the longest spans 7 days)" in said, sid
+        assert "The PCE returned no flow" not in said and "not collected whole" not in said
+    assert not any("records longer than a day" in q for q in doc.data_quality)  # this period's are records of a day
+
+
+def test_a_period_the_pce_keeps_by_the_week_says_its_counts_are_of_whole_records(tmp_path, pce):
+    """Any report read from the PCE: a record of the period that spans a week is counted whole, and a data note
+    says so."""
+    week = od.raw(3, port=22, decision="potentially_blocked", conns=70)
+    week["timestamp_range"].update(first_detected="2026-10-19T00:05:00Z", last_detected="2026-10-25T23:55:00Z")
+    pce.rows = [*od.ROWS[:2], week]
+    doc = _build(_light(tmp_path))
+    assert _kpi(doc, "pb_connections").value == 70
+    assert any("records longer than a day (the longest spans 7 days)" in q and "counted whole" in q
+               for q in doc.data_quality)
+
+
 def test_a_pce_switched_during_the_pull_fails_the_report(tmp_path, pce, monkeypatch):
     """Not a report of PCE A's alerts and PCE B's traffic, and not "the traffic could not be had" either."""
     ctx = _light(tmp_path)

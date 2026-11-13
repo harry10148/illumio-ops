@@ -46,7 +46,12 @@ from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.collect.guard import normalize_target, require_same_pce
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.eventsource import audit_counts
-from illumio_ops.services.flowsource import FlowTotals, flow_totals
+from illumio_ops.services.flowsource import (
+    LONG_RECORD_DAYS,
+    FlowTotals,
+    flow_totals,
+    longest_record_days,
+)
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.ondemand import (
     ONDEMAND_MAX_ROWS,
@@ -112,6 +117,9 @@ class Traffic:
     # False: a pull whose first flow is later than the previous period's start — nothing says the PCE still keeps
     # that period, and no number of it is given
     reaches: bool = True
+    # A pull whose records of the previous period span this many days (the PCE keeps traffic that old by the week):
+    # a count of the period would be of whole weeks, and no number of it is given. 0: they are records of a day
+    long_before: int = 0
 
 
 @dataclass(frozen=True)
@@ -174,20 +182,24 @@ def _read_traffic(inp: BuildInput, ctx: AppContext, prev_start: datetime, pulled
     # A pulled store counts its whole range as collected: the previous period is known only when the PCE returned a
     # flow from before it started (it still keeps that far back).
     reaches = pulled is None or (pulled.earliest is not None and pulled.earliest <= prev_start)
+    # ... and only when the PCE keeps that period by the day: records of a week would count the week (flowsource)
+    longest = longest_record_days(ctx, prev_start, inp.start) if pulled is not None and reaches else 0
+    long_before = longest if longest > LONG_RECORD_DAYS else 0
     before = (flow_totals(ctx, spec.model_copy(update={"start": prev_start, "end": inp.start}))
-              if reaches and traffic_covered(ctx, prev_start, inp.start, now=inp.now, flows=True) else None)
+              if reaches and not long_before and traffic_covered(ctx, prev_start, inp.start, now=inp.now, flows=True)
+              else None)
     lc = load_lateral_context(ctx, now=inp.now)
     with reads.reading(ctx) as conn:
         new = count_new(ctx, conn, lc, start=inp.start, end=inp.end, tz=inp.tz, now=inp.now, lang=inp.lang,
                         kinds=NEW_KINDS)
-    if not reaches:
+    if not reaches or long_before:
         new = dataclasses.replace(new, before=dict.fromkeys(NEW_KINDS), prev_known=False)
     outcomes = (findings.run_rules(ctx, spec, ctx.settings.current().reports.rule_thresholds, inp.lang, now=inp.now)
                 if totals.flows else [])
     return Traffic(totals=totals, before=before, new=new, outcomes=outcomes,
                    coverage=coverage_text(ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz, flows=True),
-                   notes=ondemand_lines(pulled, inp.start, inp.lang, inp.tz) if pulled is not None else (),
-                   reaches=reaches)
+                   notes=ondemand_lines(pulled, inp.start, inp.end, inp.lang, inp.tz) if pulled is not None else (),
+                   reaches=reaches, long_before=long_before)
 
 
 def read_traffic(inp: BuildInput, base: AppContext, prev_start: datetime) -> Traffic | NoTraffic:
@@ -355,6 +367,12 @@ def build_weekly_overview(inp: BuildInput) -> ReportDocument:
             [], lang, title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_trf_findings_intro"),
             table_title=t("rpt_rules_tbl_unevaluated"), evaluated=False, not_run_key="rpt_wk_rules_no_flows")
     else:
+        def no_previous(key: str) -> str:
+            """Why a chapter gives no previous period: the PCE's reason when the traffic came from it."""
+            if not traffic.reaches:
+                return t("rpt_wk_no_previous_pce")
+            return t("rpt_wk_no_previous_long", n=traffic.long_before) if traffic.long_before else t(key)
+
         totals = traffic.totals
         saw = flowsections.seen(totals)
         by_before = {d.decision: d for d in traffic.before.decided()} if traffic.before is not None else None
@@ -376,8 +394,7 @@ def build_weekly_overview(inp: BuildInput) -> ReportDocument:
         flow_blocks = (decisions_table,
                        TextBlock(paragraphs=(*flow_words,
                                              *(() if traffic.before is not None or not totals.flows
-                                               else (t("rpt_wk_flows_no_previous" if traffic.reaches
-                                                       else "rpt_wk_no_previous_pce"),)))),
+                                               else (no_previous("rpt_wk_flows_no_previous"),)))),
                        see("rpt_title_traffic", "rpt_title_security_risk"))
         by_now = {d.decision: d for d in decided}
         pb = by_now["potentially_blocked"].connections if totals.flows else None
@@ -393,8 +410,7 @@ def build_weekly_overview(inp: BuildInput) -> ReportDocument:
         new_blocks = (new_table,
                       TextBlock(paragraphs=tuple(x for x in (
                           new.partial, new.accumulating,
-                          None if new.prev_known else t("rpt_wk_new_no_previous" if traffic.reaches
-                                                        else "rpt_wk_no_previous_pce")) if x)),
+                          None if new.prev_known else no_previous("rpt_wk_new_no_previous")) if x)),
                       see("rpt_title_new_connections"))
         rule_findings = findings.as_findings(traffic.outcomes, lang)
         rules_section = findings.unevaluated_section(

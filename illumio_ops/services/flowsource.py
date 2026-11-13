@@ -8,6 +8,7 @@ never written to the store.
 """
 from __future__ import annotations
 
+import math
 import sys
 import time
 from collections.abc import Collection, Sequence
@@ -577,6 +578,25 @@ def _ports_sql(ports: Collection[tuple[int, int | None]], alias: str = "f") -> t
         parts.append(f"({alias}.port = ?)" if proto is None else f"({alias}.port = ? AND {alias}.proto = ?)")
         params += [port] if proto is None else [port, proto]
     return f"({' OR '.join(parts)})", params
+
+# A record of one UTC day spans less than a day (one collected live may reach a little into the next). The PCE keeps
+# older traffic by the week — lab 26.2 and SaaS 26.30, 2026-11-14: a day of the week before last, asked alone, came
+# back as records running Monday to Sunday and holding the week's count — so a period read from the PCE counts those
+# weeks whole, and says so (reports/generate.py ondemand_lines).
+LONG_RECORD_DAYS = 2
+
+
+def longest_record_days(ctx: AppContext, start: datetime, end: datetime) -> int:
+    """The days the longest record overlapping [start, end) spans, rounded up (0: no record there)."""
+    fdb, gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        r = conn.execute("SELECT MAX(julianday(last_detected) - julianday(first_detected)) FROM flows "
+                         "WHERE last_detected >= ? AND first_detected < ?", (db_time(start), db_time(end))).fetchone()
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return math.ceil(r[0]) if r[0] else 0
+
 
 def flow_totals(ctx: AppContext, spec: FilterSpec, *,
                 admin_ports: Collection[tuple[int, int | None]] = ()) -> FlowTotals:

@@ -38,6 +38,7 @@ from illumio_ops.services.collect.guard import (
 from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import store_coverage
+from illumio_ops.services.flowsource import LONG_RECORD_DAYS, longest_record_days
 from illumio_ops.services.ondemand import OnDemandFailed, OnDemandResult, pull_period
 from illumio_ops.services.reports.deliver import deliver, gui_link
 from illumio_ops.services.reports.finish import finish
@@ -191,7 +192,8 @@ def keeps_traffic(ctx: AppContext, start: datetime, now: datetime) -> bool:
     return start >= now - timedelta(days=settings.collection.retention.flow_days)
 
 
-def ondemand_lines(res: OnDemandResult, start: datetime, lang: Language, tz: tzinfo | None) -> tuple[str, ...]:
+def ondemand_lines(res: OnDemandResult, start: datetime, end: datetime, lang: Language,
+                   tz: tzinfo | None) -> tuple[str, ...]:
     def tr(key: str, **params: object) -> str:
         return translate(lang, key, {k: str(v) for k, v in params.items()})
 
@@ -207,6 +209,9 @@ def ondemand_lines(res: OnDemandResult, start: datetime, lang: Language, tz: tzi
     if res.unread_from is not None:
         lines.append(tr("rpt_quality_ondemand_capped", n=f"{res.rows:,}",
                         start=fmt_time(res.unread_from.isoformat(), tz)))
+    longest = longest_record_days(res.ctx, start, end)
+    if longest > LONG_RECORD_DAYS:  # traffic this old is kept by the week: the period's counts are of whole weeks
+        lines.append(tr("rpt_quality_ondemand_long_records", n=longest))
     return tuple(lines)
 
 
@@ -278,10 +283,10 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
             if spec.ondemand_prepare is not None:
                 spec.ondemand_prepare(res.ctx, inp.now)
             doc = spec.build(dataclasses.replace(inp, ctx=res.ctx, install=ctx))
+            notes = ondemand_lines(res, inp.start, inp.end, inp.lang, inp.tz)  # reads the pulled store: while it is open
     except OnDemandFailed as exc:
         raise _Fail("rpt_err_ondemand_failed", str(exc)[:ERROR_DETAIL_MAX]) from exc
-    return doc.model_copy(update={"data_quality": (*doc.data_quality,
-                                                   *ondemand_lines(res, inp.start, inp.lang, inp.tz))})
+    return doc.model_copy(update={"data_quality": (*doc.data_quality, *notes)})
 
 
 # The parameter each refusal is about, for the API's field name.

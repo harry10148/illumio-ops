@@ -46,7 +46,9 @@ What a report holds (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.
 
 - Traffic read from the PCE was counted wrongly wherever a query window crossed a UTC midnight. The PCE keeps
   traffic by UTC day and answers such a window with one record per connection holding both days' counts (lab 26.2
-  and SaaS 26.30). Every traffic window now stops at UTC midnight. What it changes:
+  and SaaS 26.30). The windows of collection, backfill, the daily re-read, a report's own read of the PCE and rule
+  usage now stop at UTC midnight (a workbench query's gap fill and the predicted-block recompute send one window
+  and are unchanged). What it changes:
   - a report made from the PCE (lightweight mode, or a period older than the traffic kept) in a display time zone
     other than UTC counted the period's inner days twice: connection counts were about double. The numbers of such
     a report made by 6.10.0 are about half those an earlier release made, and are the PCE's;
@@ -54,6 +56,10 @@ What a report holds (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.
     and "no rule" connections were too low;
   - collected traffic (advanced and full mode) held about 1.4% more connections a day than the PCE (lab, one day
     compared): the hour ending at midnight brought part of the next day. Days already collected keep their counts.
+- The PCE keeps traffic older than about two weeks in records of a week (Monday to Sunday), holding the week's count.
+  A report read from the PCE whose period holds such records says so in its data notes (they are counted whole), and
+  the weekly overview gives no previous period when that period is kept this way, instead of a week's count compared
+  with seven days.
 
 ## [6.9.0] - 2026-11-12
 
