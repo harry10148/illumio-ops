@@ -2,7 +2,8 @@
 install keeps no traffic for it (lightweight mode, or a period past the local retention).
 
 The store has the same schema as the install's own, so a report is built from it with the same SQL. It is read
-a day at a time, each query at most PER_QUERY rows (lab: one download of 150k rows peaked at 1.4 GB) and written
+a UTC day at a time (the PCE keeps traffic by UTC day, services/collect/windows.py), each query at most PER_QUERY
+rows (lab: one download of 150k rows peaked at 1.4 GB) and written
 before the next is read; a day at the cap is halved like a collection cycle's window, and what still caps at the
 smallest window is kept and recorded as a truncated gap. The file lives under the install's data directory and goes when the pull ends,
 however it ends; the service sweeps leftovers at start."""
@@ -29,7 +30,12 @@ from illumio_ops.services.collect.traffic import (
     QUERY_DEADLINE_SECONDS,
     normalize_all,
 )
-from illumio_ops.services.collect.windows import MAX_DEPTH, MIN_WINDOW
+from illumio_ops.services.collect.windows import (
+    MAX_DEPTH,
+    MIN_WINDOW,
+    asked_end,
+    day_end,
+)
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import (
     analysis,
@@ -83,7 +89,7 @@ class _Pull:
     earliest: datetime | None = None
     unread_from: datetime | None = None
     reading: tuple[datetime, datetime] = (datetime.min.replace(tzinfo=UTC), datetime.min.replace(tzinfo=UTC))
-    fit: timedelta | None = None  # the smallest window of the day being read that came back whole
+    fit: timedelta | None = None  # the smallest halved window of the day being read that came back whole
 
 
 def ondemand_dir(paths: InstallPaths) -> Path:
@@ -117,6 +123,7 @@ def _seed(conn: sqlite3.Connection, install: Path) -> None:
 
 
 def _payload(spec: FilterSpec | None, a: datetime, b: datetime) -> dict[str, object]:
+    b = asked_end(a, b)
     if spec is None:
         return traffic_payload(a, b, max_results=PER_QUERY, query_name=QUERY_NAME)
     # Ports and decisions go to the PCE; label conditions stay with the report's own SQL (no label hrefs here).
@@ -143,7 +150,7 @@ def _walk(ctx: AppContext, fdb: FlowDb, client: object, spec: FilterSpec | None,
         _walk(ctx, fdb, client, spec, mid, b, depth + 1, state, at)
         return
     capped = result.capped
-    if not capped:
+    if not capped and depth:  # a piece found by halving (a first or last day shorter than a day found nothing)
         state.fit = (b - a) if state.fit is None else min(state.fit, b - a)
     records, _skipped = normalize_all(result.rows)
     del result
@@ -197,7 +204,7 @@ def open_period(ctx: AppContext, *, start: datetime, end: datetime, spec: Filter
             with ctx.pce_client(settings.pce) as client:
                 cur, piece = start, WINDOW
                 while cur < end and state.unread_from is None:
-                    nxt = min(cur + WINDOW, end)
+                    nxt = min(day_end(cur), end)  # a UTC day: what the PCE keeps traffic by (collect/windows.py)
                     state.fit, before = None, state.rows
                     p = cur
                     while p < nxt and state.unread_from is None:

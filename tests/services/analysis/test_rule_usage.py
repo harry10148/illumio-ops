@@ -97,10 +97,20 @@ def test_no_rule_groups(ctx, pce):
     assert [(g.src_app, g.dst_app, g.port, g.connections) for g in u.no_rule] == [("Batch", "DB", 1433, 5)]
 
 
-def test_windows_are_days(ctx, pce):
+def test_windows_are_utc_days(ctx, pce):
+    """The PCE keeps traffic by UTC day; a window touching two days comes back as one record per connection holding
+    both days' counts, dated from the first (lab and SaaS, 2026-11-14) — in days of a zone eight hours ahead every
+    day after the first was skipped as a record of the day before. A window is a UTC day, asked to its last second."""
     rule_usage.rule_usage(ctx, start=START, end=END, now=NOW)
-    assert [p["start_date"][:10] for p in pce.payloads] == ["2026-10-25", "2026-10-26", "2026-10-27"]
+    assert [(p["start_date"], p["end_date"]) for p in pce.payloads] == [
+        ("2026-10-25T00:00:00Z", "2026-10-25T23:59:59Z"), ("2026-10-26T00:00:00Z", "2026-10-26T23:59:59Z"),
+        ("2026-10-27T00:00:00Z", "2026-10-27T23:59:59Z")]
     assert all(p["max_results"] == rule_usage.PER_QUERY for p in pce.payloads)
+    pce.payloads.clear()
+    start = START + timedelta(hours=16)
+    rule_usage.rule_usage(ctx, start=start, end=start + timedelta(days=1), now=NOW)
+    assert [(p["start_date"], p["end_date"]) for p in pce.payloads] == [
+        ("2026-10-25T16:00:00Z", "2026-10-25T23:59:59Z"), ("2026-10-26T00:00:00Z", "2026-10-26T16:00:00Z")]
 
 
 def test_capped_window_halved_then_truncated(ctx, pce, monkeypatch):

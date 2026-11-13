@@ -15,6 +15,7 @@ from illumio_ops.services.collect import reread
 from illumio_ops.services.collect.backfill import run_backfill
 from illumio_ops.services.collect.reread import ensure_daily_reread
 from illumio_ops.services.collect.traffic import run_traffic_cycle
+from illumio_ops.services.collect.windows import asked_end
 from illumio_ops.store.flowdb import ingest_state
 
 from .conftest import configured_ctx, minutes, raw_flow
@@ -93,7 +94,8 @@ def test_rereads_the_last_settled_day_hour_by_hour(tmp_path, fake_traffic, fake_
     _cover(ctx, "events", DAY - timedelta(days=1), RUN)
     assert ensure_daily_reread(ctx, now=RUN) is not None
     hours = [(DAY + HOUR * i, DAY + HOUR * (i + 1)) for i in range(24)]
-    assert fake_traffic.calls == [(pce_time(a), pce_time(b)) for a, b in hours]
+    # the day's last hour is asked to 23:59:59: a window ending at 00:00:00 touches the next UTC day (windows.py)
+    assert fake_traffic.calls == [(pce_time(a), pce_time(asked_end(a, b))) for a, b in hours]
     assert fake_events.calls == hours
     st, mine = _progress(ctx)
     assert mine["day"] == "2026-10-23" and mine["finished"] is True and st.last_error is None

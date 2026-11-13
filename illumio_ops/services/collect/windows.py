@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 MIN_WINDOW = timedelta(seconds=60)
@@ -45,11 +45,36 @@ def harvest(fetch: Callable[[datetime, datetime], tuple[list[dict[str, Any]], bo
     return out
 
 
+# The PCE keeps traffic by UTC day: one record per connection and day, and a query whose window touches a day
+# answers with that whole day's count for the connections seen inside the window. A window touching two days comes
+# back as one record per connection holding both days' counts (lab 26.2 and SaaS 26.30, 2026-11-14: a one-hour
+# window and a twelve-hour window of the same day returned the same count, a window from 16:00 to 16:00 twice it;
+# and the end is inclusive: a window ending at 00:00:00 brought the next day's records stamped 00:00:00). Read in
+# windows of days that are not UTC days, a period counted its inner days twice. So no traffic window sent to the
+# PCE crosses a UTC midnight (day_end), and one that ends at a midnight is asked to the second before (asked_end).
+
+
+def day_end(at: datetime) -> datetime:
+    """The UTC midnight after `at`."""
+    return at.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+
+def asked_end(start: datetime, end: datetime) -> datetime:
+    """The end a traffic query for [start, end) is sent with: the second before `end` when it is a UTC midnight,
+    so the query does not touch the day that begins there."""
+    e = end.astimezone(UTC)
+    if (e.hour, e.minute, e.second, e.microsecond) == (0, 0, 0, 0) and end - start > timedelta(seconds=1):
+        return end - timedelta(seconds=1)
+    return end
+
+
 def slices(start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
-    """[start, end] as consecutive pieces of at most SLICE (one piece when it is no longer)."""
+    """[start, end] as consecutive pieces of at most SLICE, none crossing a UTC midnight (one piece when it is no
+    longer and within one day)."""
     out = []
     cur = start
     while cur < end:
-        out.append((cur, min(cur + SLICE, end)))
-        cur += SLICE
+        nxt = min(cur + SLICE, day_end(cur), end)
+        out.append((cur, nxt))
+        cur = nxt
     return out

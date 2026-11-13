@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -31,11 +31,11 @@ from illumio_ops.pce.policy import (
     fetch_rule_sets,
 )
 from illumio_ops.services.analysis.predicted_block import draft_records
+from illumio_ops.services.collect.windows import asked_end, day_end
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import pair_row
 from illumio_ops.store.flowdb import capabilities
 
-WINDOW = timedelta(days=1)
 PER_QUERY = 50_000
 MAX_SPLITS = 3
 QUERY_DEADLINE_SECONDS = 900
@@ -124,7 +124,7 @@ def _count(raws: list[dict[str, Any]], c: _Counts, own_from: datetime | None) ->
 
 
 def _walk(client: PceClient, a: datetime, b: datetime, depth: int, c: _Counts, own_from: datetime | None) -> None:
-    result = run_traffic_query(client, traffic_payload(a, b, max_results=PER_QUERY, query_name="illumio-ops rule usage"),
+    result = run_traffic_query(client, traffic_payload(a, asked_end(a, b), max_results=PER_QUERY, query_name="illumio-ops rule usage"),
                                deadline=time.monotonic() + QUERY_DEADLINE_SECONDS, compute_draft=True)
     c.windows += 1
     if result.capped and depth < MAX_SPLITS:
@@ -152,7 +152,7 @@ def rule_usage(ctx: AppContext, *, start: datetime, end: datetime, now: datetime
         cur = start
         try:
             while cur < end:
-                nxt = min(cur + WINDOW, end)
+                nxt = min(day_end(cur), end)  # a UTC day (collect/windows.py): its records are that day's alone
                 _walk(client, cur, nxt, 0, c, None if cur == start else cur)
                 cur = nxt
         except PceQueryError as exc:

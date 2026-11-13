@@ -42,6 +42,19 @@ What a report holds (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.
   pointing to its report, lateral movement one sentence pointing to its report, and users and processes are a
   chapter of the traffic report.
 
+### Fixed
+
+- Traffic read from the PCE was counted wrongly wherever a query window crossed a UTC midnight. The PCE keeps
+  traffic by UTC day and answers such a window with one record per connection holding both days' counts (lab 26.2
+  and SaaS 26.30). Every traffic window now stops at UTC midnight. What it changes:
+  - a report made from the PCE (lightweight mode, or a period older than the traffic kept) in a display time zone
+    other than UTC counted the period's inner days twice: connection counts were about double. The numbers of such
+    a report made by 6.10.0 are about half those an earlier release made, and are the PCE's;
+  - rule usage (the policy usage report), in such a zone, counted the first day and little of the others: its hits
+    and "no rule" connections were too low;
+  - collected traffic (advanced and full mode) held about 1.4% more connections a day than the PCE (lab, one day
+    compared): the hour ending at midnight brought part of the next day. Days already collected keep their counts.
+
 ## [6.9.0] - 2026-11-12
 
 How a report reads (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §9.1). No key number is computed

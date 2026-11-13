@@ -58,6 +58,12 @@ def _leftovers(ctx):
     return sorted(p.name for p in d.iterdir()) if d.exists() else []
 
 
+def _span(payload):
+    """The window a query was for: a window ending at a UTC midnight is asked to the second before."""
+    span = datetime.fromisoformat(payload["end_date"]) - datetime.fromisoformat(payload["start_date"])
+    return span + timedelta(seconds=1) if payload["end_date"].endswith("T23:59:59Z") else span
+
+
 def _count(c):
     with c.flows().connect() as conn:
         return conn.execute("SELECT count(*) FROM flows").fetchone()[0]
@@ -73,13 +79,53 @@ def test_pull_writes_rows_into_temp_db(ctx, pce):
     assert _count(ctx) == 0  # the install's own store is untouched
 
 
-def test_windows_are_days(ctx, pce):
-    """Lab, 2026-10-29: halving from the whole span spent more on discarded capped answers than daily windows."""
+def test_windows_are_utc_days(ctx, pce):
+    """Lab, 2026-10-29: halving from the whole span spent more on discarded capped answers than daily windows.
+    Lab and SaaS, 2026-11-14: the PCE keeps traffic by UTC day, and a window touching two days comes back as one
+    record per connection holding both days' counts — so a window is a UTC day, asked to its last second."""
     with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
         assert res.rows == 72
-    assert [(p["start_date"][:10], p["end_date"][:10]) for p in pce.payloads] == [
-        ("2026-10-25", "2026-10-26"), ("2026-10-26", "2026-10-27"), ("2026-10-27", "2026-10-28")]
+    assert [(p["start_date"], p["end_date"]) for p in pce.payloads] == [
+        ("2026-10-25T00:00:00Z", "2026-10-25T23:59:59Z"), ("2026-10-26T00:00:00Z", "2026-10-26T23:59:59Z"),
+        ("2026-10-27T00:00:00Z", "2026-10-27T23:59:59Z")]
     assert all(p["max_results"] == ondemand.PER_QUERY for p in pce.payloads)
+
+
+def test_a_period_of_local_days_is_read_in_utc_days(ctx, pce):
+    """A period of days in a zone eight hours ahead: no window crosses a UTC midnight (that one counted twice)."""
+    start = START + timedelta(hours=16)
+    with ondemand.pull_period(ctx, start=start, end=start + timedelta(days=2), now=NOW) as res:
+        assert res.rows == 48
+    assert [(p["start_date"], p["end_date"]) for p in pce.payloads] == [
+        ("2026-10-25T16:00:00Z", "2026-10-25T23:59:59Z"), ("2026-10-26T00:00:00Z", "2026-10-26T23:59:59Z"),
+        ("2026-10-27T00:00:00Z", "2026-10-27T16:00:00Z")]
+
+
+def _daily_buckets(start, end, max_results):
+    """What the PCE does (lab 26.2 and SaaS 26.30, 2026-11-14): one connection, 100 connections a UTC day, first
+    seen 00:05 and last 23:55 each day. A window answers with one record: every day it touches, end included."""
+    day = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    days = []
+    while day <= end:
+        days.append(day)
+        day += timedelta(days=1)
+    row = raw_flow(1, days[0] + timedelta(minutes=5), days[-1] + timedelta(hours=23, minutes=55))
+    row["num_connections"] = 100 * len(days)
+    return [row]
+
+
+def test_each_utc_day_is_counted_once(ctx, pce):
+    """Two days of a zone eight hours ahead touch three UTC days: 300 connections. Read in windows of local days the
+    store held 400 (each window answered with two days, kept as two records) — a lightweight install's connection
+    counts were about twice the PCE's."""
+    pce.answer = _daily_buckets
+    start = START + timedelta(hours=16)
+    with ondemand.pull_period(ctx, start=start, end=start + timedelta(days=2), now=NOW) as res, \
+            res.ctx.flows().connect() as conn:
+        assert conn.execute("SELECT count(*), sum(num_connections) FROM flows").fetchone()[:] == (3, 300)
+        # the day before the period, read too, would not reach into it: each record is one day's
+        assert conn.execute("SELECT max(julianday(last_detected) - julianday(first_detected)) FROM flows"
+                            ).fetchone()[0] < 1
 
 
 def test_capped_day_halved_until_it_fits(ctx, pce, monkeypatch):
@@ -225,7 +271,7 @@ def test_dense_days_start_at_the_size_that_fit(ctx, pce, monkeypatch):
     monkeypatch.setattr(ondemand, "PER_QUERY", 10)  # a day (24 rows) caps, its halves (12) cap, quarters (6) fit
     with ondemand.pull_period(ctx, start=START, end=END, now=NOW) as res:
         assert res.rows == 72 and not res.truncated
-    spans = [datetime.fromisoformat(p["end_date"]) - datetime.fromisoformat(p["start_date"]) for p in pce.payloads]
+    spans = [_span(p) for p in pce.payloads]
     assert len(spans) == 7 + 4 + 4  # the first day finds the size; the next two are read at it, nothing discarded
     assert spans[7:] == [timedelta(hours=6)] * 8
 
@@ -240,6 +286,6 @@ def test_sparse_days_grow_back(ctx, pce, monkeypatch):
     by_day: dict = {}
     for p in pce.payloads:
         s = datetime.fromisoformat(p["start_date"])
-        by_day.setdefault(s.date(), []).append(datetime.fromisoformat(p["end_date"]) - s)
+        by_day.setdefault(s.date(), []).append(_span(p))
     days = sorted(by_day)
     assert by_day[days[1]] == [timedelta(hours=6)] * 4 and by_day[days[2]] == [timedelta(hours=12)] * 2

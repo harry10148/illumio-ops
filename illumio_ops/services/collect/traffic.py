@@ -36,7 +36,7 @@ from illumio_ops.services.collect import CycleResult, drops_stale
 from illumio_ops.services.collect.cycle import begin, fail
 from illumio_ops.services.collect.guard import BindingMismatch, ensure_binding
 from illumio_ops.services.collect.mode import collects
-from illumio_ops.services.collect.windows import harvest, slices
+from illumio_ops.services.collect.windows import asked_end, harvest, slices
 from illumio_ops.services.context import AppContext
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.db import StaleGeneration, db_day, transaction
@@ -61,7 +61,7 @@ def fetch_traffic(client: PceClient, start: datetime, end: datetime, *, query_na
         list[dict[str, Any]], int, list[tuple[datetime, datetime, int]]]:
     """Rows for [start, end] with cap splitting: (rows, windows queried, truncated windows)."""
     def fetch(a: datetime, b: datetime) -> tuple[list[dict[str, Any]], bool]:
-        payload = traffic_payload(a, b, max_results=MAX_RESULTS, query_name=query_name)
+        payload = traffic_payload(a, asked_end(a, b), max_results=MAX_RESULTS, query_name=query_name)
         result = run_traffic_query(client, payload, deadline=time.monotonic() + QUERY_DEADLINE_SECONDS)
         return result.rows, result.capped
     h = harvest(fetch, start, end)
