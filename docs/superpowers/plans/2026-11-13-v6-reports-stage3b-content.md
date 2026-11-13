@@ -31,7 +31,10 @@
   查過的事實（2026-11-13）：`flow_totals`、`maturity()`、`run_rules`、`readiness_rows` 的呼叫者全部在 `services/reports/` 底下，畫面沒有用到，
   所以不會有「畫面與報表對同一個數字說兩個值」。安全風險的上期值是用同一個算法現算的（不是取舊報表存的數字），升級後第一份的比較兩邊是同一個基準。
   準備度的 `policy`、`staged` 已經除以有判定的連線；`ringfence`（同一個 app 內的連線比例）分子分母都是全部連線，它量的是連線往哪裡去、不是判定，**不改**，
-  在準備度「怎麼算」的說明表補一句寫明這一點。準備度的數字因此都不變。流量報表的 `flows`、`connections`、`sources`、`destinations` 是「看到多少」，照舊含沒有判定的。
+  在準備度「怎麼算」的說明表補一句寫明這一點。
+  **2026-11-13 修正（Task 1 的 implementer 讀到的）**：準備度的 `remote` 因子（遠端管理連線中有規則允許的比例）分母含沒有判定的連線。它是判定的比例，
+  照使用者同意的規則改成只算有判定的（`readiness_rows` 的 `remote` 加 `d != 'unknown'`；`remote_allowed` 本來就只數 allowed）。
+  準備度的 `overall`、`ready`、`held_back` 因此列入會變的數字；Task 7 驗收時附 .106 的改前改後。這一項併在 Task 3 的開頭做。流量報表的 `flows`、`connections`、`sources`、`destinations` 是「看到多少」，照舊含沒有判定的。
 - 19 條規則的觸發條件除了「只算有判定的」之外不變（§9.3）；不加新規則。
 - 定義只有一個：有判定＝`policy_decision IN ('allowed','potentially_blocked','blocked')`；沒有判定＝`'unknown'`。不看 `state`。
   沒有判定的再分兩種，只看隨那筆流量存下的 `src_managed／dst_managed`：兩端都是 0＝「兩端都沒有 VEN」；其餘＝「至少一端有 VEN」。
