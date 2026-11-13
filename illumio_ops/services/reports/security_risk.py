@@ -6,7 +6,8 @@ What other reports hold is named, not repeated (UI redesign spec §9.2): ransomw
 note names the ransomware report, lateral movement one sentence that names the lateral posture report, and users
 and processes are a chapter of the traffic report (flowsections.users_section).
 The maturity score and the enforced share of hosts are today's inventory; their previous-period values come from the
-daily snapshot of the previous period's last day, when that day can be compared with (see build_security_risk)."""
+daily snapshots of the previous period's last day (the hosts' modes, the ransomware services), when that day can be
+compared with (see build_security_risk)."""
 from __future__ import annotations
 
 import json
@@ -58,7 +59,7 @@ from illumio_ops.services.reports.generate import (
 )
 from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.registry import BuildInput
-from illumio_ops.store.flowdb import analysis, workloads
+from illumio_ops.store.flowdb import analysis, ransomware, workloads
 from illumio_ops.store.flowdb.db import db_day
 
 TOP = 20
@@ -170,29 +171,41 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     # hosts of a period that ended earlier are not today's inventory) — and the report has no filter (a snapshot
     # holds no labels to tell a filtered report's hosts by).
     ends_now = (inp.now.astimezone(inp.tz).date() - inp.end.astimezone(inp.tz).date()).days <= 1
+    # a snapshot's day is the collector's, a UTC day: the one that holds the previous period's last instant
+    day_before = db_day(inp.start - timedelta(microseconds=1))
+    hosts_before: workloads.ModeCounts | None = None
+    rw_before: tuple[int, int] | None = None
+    rw_snapshot_before = False
     with reads.reading(inp.ctx) as conn:
         rw_row = analysis.read_result(conn, "ransomware")
-        # a snapshot's day is the collector's, a UTC day: the one that holds the previous period's last instant
-        hosts_before = (workloads.mode_counts_on(conn, db_day(inp.start - timedelta(microseconds=1)))
-                        if cond is None and ends_now else None)
+        if cond is None and ends_now:
+            hosts_before = workloads.mode_counts_on(conn, day_before)
+            # That day's ransomware services, counted as _ransomware_counts counts this period's (one definition:
+            # ransomware.protected_by_day). Nothing when the day has no ransomware snapshot, and also when its
+            # snapshot holds no critical or high service with a known state: snapshot_taken tells which.
+            rw_before = ransomware.protected_by_day(conn, day_before, day_before).get(day_before)
+            rw_snapshot_before = ransomware.snapshot_taken(conn, day_before)
     rw = json.loads(rw_row["result_json"]) if rw_row is not None else None
     rw_counts = _ransomware_counts(rw, {h.href for h in hosts if h.href} if cond is not None else None)
     by = {d.decision: d for d in totals.by_decision}
     score = _score(hosts=len(hosts), full=modes["full"], selective=modes["selective"], flows=totals, rw=rw_counts)
-    # The previous period's score, worked out the same way from that day's hosts and that period's connections (all
-    # of them collected, and at least one flow: a score on the inventory alone is not shown for this period either).
-    # It is worked out without the ransomware part: this period's part is the ransomware analysis' stored result
-    # (_ransomware_counts), of which only the latest is kept. (The store also holds a daily snapshot of the PCE's
-    # ransomware services — ransomware_snapshot_daily, the ransomware report's trend; this report does not read
-    # it.) A part without data is left out and the others scaled up: two scores are compared only when they rest
-    # on the same parts, never across two scales.
+    # The previous period's score, worked out the same way from that day's hosts, that period's connections (all of
+    # them collected, and at least one flow: a score on the inventory alone is not shown for this period either)
+    # and that day's ransomware services. This period's ransomware part is the hourly analysis' stored result, of
+    # which only the latest is kept; the previous one is the daily snapshot of the same services
+    # (ransomware_snapshot_daily), counted by the same definition. A part without data is left out and the others
+    # scaled up: two scores are compared only when they rest on the same parts, never across two scales.
     score_before = (_score(hosts=hosts_before.hosts, full=hosts_before.modes.get("full", 0),
-                           selective=hosts_before.modes.get("selective", 0), flows=prev_totals, rw=None)
+                           selective=hosts_before.modes.get("selective", 0), flows=prev_totals, rw=rw_before)
                     if hosts_before is not None and prev_totals is not None and prev_totals.flows else None)
-    same_parts = score_before is not None and _scored(score_before) == _scored(score)
-    # the ransomware part (which the previous score never has) is all that sets the two apart: the number's note
-    # says why there is no change to read
-    ransomware_apart = score_before is not None and _scored(score) == _scored(score_before) | {"ransomware"}
+    parts, parts_before = _scored(score), _scored(score_before) if score_before is not None else None
+    same_parts = parts_before == parts
+    # This period's score has the ransomware part, the previous one lacks it because that day has no ransomware
+    # snapshot, and nothing else sets the two apart: the number's note says why there is no change to read. (A day
+    # whose snapshot holds nothing to rate leaves the previous score without the part too, and the two are not
+    # compared either — but a snapshot is not what is missing there, and the note does not say it is.)
+    no_ransomware_snapshot = (parts_before is not None and not rw_snapshot_before
+                              and parts == parts_before | {"ransomware"})
     outcomes = findings.run_rules(inp.ctx, spec, inp.ctx.settings.current().reports.rule_thresholds, lang,
                                   now=inp.now, scoped=cond is not None) if totals.flows else []
     fired = [o for o in outcomes if o.severity in (Severity.CRITICAL, Severity.HIGH)]
@@ -223,7 +236,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     if totals.undecided.flows:  # these two count decided connections: say where the others are
         notes.update(dict.fromkeys(("unmanaged_connections", "admin_open_connections"), t("rpt_kpi_decided_only")))
     maturity_said = no_flows if not totals.flows else maturity_note() if score.grade else t("rpt_sec_maturity_none")
-    if ransomware_apart and totals.flows:
+    if no_ransomware_snapshot and totals.flows:
         maturity_said = " ".join((maturity_said, t("rpt_sec_no_previous_parts")))
     notes.update(
         maturity=maturity_said,

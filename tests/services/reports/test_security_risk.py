@@ -11,7 +11,7 @@ from illumio_ops.domain.report import TableBlock, TextBlock
 from illumio_ops.domain.values import Language, ReportType, Severity
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.services.reports.render_html import render_html
-from illumio_ops.store.flowdb import analysis, labels, workloads
+from illumio_ops.store.flowdb import analysis, labels, ransomware, workloads
 from tests.services.collect.conftest import configured_ctx
 from tests.services.reports.test_findings import (
     MOVED_PORT_GAPS,
@@ -394,8 +394,12 @@ WEEK = END - START
 # sources, no ransomware data: of the 90 points that have data
 MATURITY_BEFORE = round(100 * (40 * (1 / 3) + 25 * 0.75 + 15 + 10) / 90)   # 63
 MATURITY_NOW = round(100 * (40 * (1.5 / 3) + 25 * 0.75 + 15 + 10) / 90)    # 71: the second host counts half
-NO_PREVIOUS_PARTS = ("The previous period has no record of the ransomware part, so the two scores rest on "
-                     "different parts and are not compared.")
+NO_PREVIOUS_PARTS = ("The last day of the previous period has no snapshot of ransomware protection, so the two "
+                     "scores rest on different parts and are not compared.")
+# (severity, protection state) of the ransomware services in that day's snapshot: 1 of the 4 critical and high ones
+# protected, where this period's analysis (_ransomware_result) has 1 of 2
+RANSOMWARE_BEFORE = [("critical", "unprotected"), ("high", "unprotected"), ("high", "unprotected"),
+                     ("critical", "protected_open"), ("low", "unprotected")]
 
 
 def _hosts(ctx, hosts, *, snapshot=None):
@@ -409,6 +413,18 @@ def _hosts(ctx, hosts, *, snapshot=None):
             for name, mode, managed in hosts])
         if snapshot:
             workloads.snapshot_day(conn, snapshot)
+        conn.commit()
+
+
+def _ransomware_snapshot(ctx, day, services, *, host="a1"):
+    """services: (severity, protection state) of the host's ransomware services, as the PCE listed them; the store's
+    ransomware services are then snapshotted as `day`'s (what the inventory run does once a day)."""
+    with ctx.flows().connect() as conn:
+        ransomware.upsert_services(conn, f"/orgs/1/workloads/{host}", [
+            {"name": f"svc{i}", "port": 1000 + i, "proto": 6, "severity": severity, "protection_state": state,
+             "port_status": "listening"} for i, (severity, state) in enumerate(services)],
+            source_updated_at=None, at=NOW)
+        ransomware.snapshot_day(conn, day)
         conn.commit()
 
 
@@ -481,6 +497,12 @@ def test_a_filtered_report_does_not_compare_the_two(ctx):
     assert (maturity.previous, enforced.previous) == (None, None)
     # the numbers read from the flows are compared as before: both periods are filtered alike
     assert {k.key: k.previous for k in doc.kpis}["pb_flows"] == 1
+    # ...and a ransomware snapshot of that day changes nothing: it holds no labels either
+    _ransomware_snapshot(ctx, PREVIOUS_DAY, RANSOMWARE_BEFORE)
+    _ransomware_result(ctx)
+    maturity, enforced = _compared(_build(ctx, cond=FlowCondition(dst=EndpointFilter(labels=(LabelCond(
+        key="app", values=("DB",)),)))))
+    assert (maturity.previous, enforced.previous) == (None, None) and NO_PREVIOUS_PARTS not in maturity.note
 
 
 def test_a_previous_period_not_wholly_collected_is_no_maturity_to_compare(ctx):
@@ -492,23 +514,83 @@ def test_a_previous_period_not_wholly_collected_is_no_maturity_to_compare(ctx):
     assert (enforced.value, enforced.previous) == (66.7, 33.3)
 
 
-def test_a_score_with_the_ransomware_part_is_not_compared_and_says_why(ctx):
-    """The ransomware part has no record for the previous period: its score would rest on four parts, this period's
-    on five. Two scores on different parts are not subtracted."""
+def test_the_previous_score_has_its_ransomware_part_where_that_day_has_a_snapshot(ctx):
+    """The store keeps a daily snapshot of the PCE's ransomware services. Where the previous period's last day has
+    one, the previous score counts it as this period's score counts the analysis' result: both rest on all five
+    parts and are compared. That day 1 of 4 critical and high services was protected (2.5 of the part's 10
+    points), now 1 of 2 (5 of 10)."""
     _two_periods(ctx)
+    _ransomware_snapshot(ctx, PREVIOUS_DAY, RANSOMWARE_BEFORE)
+    _ransomware_result(ctx)
+    maturity, enforced = _compared(_build(ctx))
+    before = round(40 * (1 / 3) + 25 * 0.75 + 15 + 10 + 10 * 0.25)   # of the whole 100 points
+    now = round(40 * (1.5 / 3) + 25 * 0.75 + 15 + 10 + 10 * 0.5)
+    assert (maturity.value, maturity.previous) == (now, before) == (69, 60)
+    assert NO_PREVIOUS_PARTS not in maturity.note
+    assert (enforced.value, enforced.previous) == (66.7, 33.3)
+
+
+def test_no_ransomware_snapshot_that_day_is_no_comparison_and_says_why(ctx):
+    """This period's score has the ransomware part and the previous period's last day has no ransomware snapshot
+    (the one of the day before is not that day's): the previous score would rest on four parts, this period's on
+    five. Two scores on different parts are not subtracted, and the note says what is missing."""
+    _two_periods(ctx)
+    _ransomware_snapshot(ctx, "2026-10-18", RANSOMWARE_BEFORE)
     _ransomware_result(ctx)
     doc = _build(ctx)
     maturity, enforced = _compared(doc)
-    assert maturity.value is not None and maturity.previous is None
+    assert (maturity.value, maturity.previous) == (69, None)
     assert maturity.note.endswith(NO_PREVIOUS_PARTS) and maturity.note.startswith("Grade ")
     assert (enforced.value, enforced.previous) == (66.7, 33.3)  # the share of hosts has both its values
     zh, _ = _compared(_build(ctx, lang=Language.ZH_TW))
-    assert zh.note.endswith("上期沒有勒索防護那一部分的紀錄，計分的部分不同，所以不比較。")
+    assert zh.note.endswith("上期那一天沒有勒索防護的快照，計分的部分不同，所以不比較。")
+
+
+def test_a_ransomware_snapshot_with_nothing_rated_is_no_comparison_and_not_that_sentence(ctx):
+    """That day has a ransomware snapshot, and none of its services is a critical or high one with a known state:
+    the previous score has no ransomware part, so the two are not compared — but a snapshot is not what is
+    missing, and the sentence that says so is not said."""
+    _two_periods(ctx)
+    _ransomware_snapshot(ctx, PREVIOUS_DAY, [("low", "unprotected"), ("critical", None)])
+    _ransomware_result(ctx)
+    maturity, enforced = _compared(_build(ctx))
+    assert (maturity.value, maturity.previous) == (69, None) and NO_PREVIOUS_PARTS not in maturity.note
+    assert enforced.previous == 33.3
+
+
+def test_a_previous_ransomware_part_this_period_lacks_is_no_comparison(ctx):
+    """The other way round: that day's snapshot gives the previous score a ransomware part, and this period has
+    none (the analysis has no result yet). Different parts again: not compared, and no sentence about a snapshot."""
+    _two_periods(ctx)
+    _ransomware_snapshot(ctx, PREVIOUS_DAY, RANSOMWARE_BEFORE)
+    maturity, _ = _compared(_build(ctx))
+    assert (maturity.value, maturity.previous) == (MATURITY_NOW, None) and NO_PREVIOUS_PARTS not in maturity.note
+
+
+def test_a_days_ransomware_snapshot_counts_the_services_the_analysis_counts(ctx):
+    """One set of ransomware services, read both ways at one moment: the day's snapshot (what the previous score's
+    ransomware part is worked out from) and the hourly analysis' result (this period's). Both count the critical
+    and high services with a known state and, of them, the protected ones — also for spellings the PCE does not
+    use, so the two readings cannot drift apart on a letter's case."""
+    import json
+
+    from illumio_ops.services.analysis.ransomware import ransomware_overlay
+    from illumio_ops.services.reports.security_risk import _ransomware_counts
+    day = "2026-10-27"
+    _ransomware_snapshot(ctx, day, [("critical", "unprotected"), ("high", "Unprotected"), ("HIGH", "UNPROTECTED"),
+                                    ("critical", "protected_open"), ("low", "unprotected"), ("critical", None)])
+    _ransomware_snapshot(ctx, day, [("Critical", "Protected_Closed"), ("high", "pending"),
+                                    ("medium", "protected_open")], host="a2")
+    ransomware_overlay(ctx, NOW)
+    with ctx.flows().connect() as conn:
+        snapshot = ransomware.protected_by_day(conn, day, day).get(day)
+        result = json.loads(analysis.read_result(conn, "ransomware")["result_json"])
+    assert snapshot == _ransomware_counts(result, None) == (5, 2)
 
 
 def test_the_ransomware_sentence_is_said_only_when_ransomware_is_what_sets_the_scores_apart(ctx):
-    """With no snapshot to compare with, the missing ransomware record is not why: the sentence is not said (the
-    first report after the upgrade must not blame ransomware for what the snapshot lacks)."""
+    """With no snapshot of the hosts to compare with, a missing ransomware snapshot is not why: the sentence is not
+    said (the first report after the upgrade must not blame ransomware for what the hosts' snapshot lacks)."""
     _two_periods(ctx, snapshot="2026-10-18")
     _ransomware_result(ctx)
     maturity, enforced = _compared(_build(ctx))

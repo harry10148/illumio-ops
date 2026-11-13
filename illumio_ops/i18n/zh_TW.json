@@ -1808,7 +1808,7 @@
   "rpt_rdy_finding_action": "照「先做什麼」處理：裡面列出最接近的幾個 app，以及要先替哪些連線寫規則。",
   "rpt_sec_maturity_note": "等級 {grade}：扣最多的是「{part}」（{weight} 分只拿到 {got} 分）；這項補滿約可到 {fixed} 分。算法見「分段成熟度怎麼算」。",
   "rpt_sec_maturity_full": "等級 {grade}：沒有扣分的項目。",
-  "rpt_sec_no_previous_parts": "上期沒有勒索防護那一部分的紀錄，計分的部分不同，所以不比較。",
+  "rpt_sec_no_previous_parts": "上期那一天沒有勒索防護的快照，計分的部分不同，所以不比較。",
   "rpt_sec_sec_how": "分段成熟度怎麼算",
   "rpt_sec_how_intro": "一個 0–100 的分數，看分段做到哪裡：主機強制了沒、流量有沒有規則、管理 port 與非受管來源有沒有被管住。分數是下面五項依配分加總；沒有資料的項目不計，其餘按比例放大。「本期」一欄寫出分數掉在哪裡。",
   "rpt_sec_tbl_parts": "成熟度的五個項目",

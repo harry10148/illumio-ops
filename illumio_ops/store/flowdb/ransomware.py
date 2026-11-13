@@ -94,12 +94,22 @@ def delete_snapshots_before(conn: sqlite3.Connection, day: str) -> int:
 
 def protected_by_day(conn: sqlite3.Connection, first_day: str, last_day: str) -> dict[str, tuple[int, int]]:
     """day -> (critical/high services with a known protection state, of them protected), from the daily snapshots.
-    A state the PCE did not give is neither (the ransomware report's trend)."""
+    A state the PCE did not give is neither (the ransomware report's trend; the previous period's ransomware part
+    of the security risk report's maturity score). The states are read as domain.ransomware.service_coverage reads
+    them, whatever their case — "unprotected", or one that starts with "protected" — so this count and the one the
+    hourly analysis' result gives for the same services are one definition. A day with no such service has no
+    entry: snapshot_taken tells whether it has a snapshot at all."""
     return {r[0]: (r[1], r[2] or 0) for r in conn.execute(
         "SELECT day, COUNT(*), SUM(protection_state LIKE 'protected%') FROM ransomware_snapshot_daily "
         "WHERE day >= ? AND day <= ? AND lower(severity) IN ('critical', 'high') "
-        "AND (protection_state = 'unprotected' OR protection_state LIKE 'protected%') GROUP BY day",
+        "AND (lower(protection_state) = 'unprotected' OR protection_state LIKE 'protected%') GROUP BY day",
         (first_day, last_day))}
+
+
+def snapshot_taken(conn: sqlite3.Connection, day: str) -> bool:
+    """Whether `day` (a UTC day) has a ransomware snapshot: at least one service row. (A day on which the PCE
+    listed no ransomware service for any host leaves no row, and reads as a day without one.)"""
+    return conn.execute("SELECT 1 FROM ransomware_snapshot_daily WHERE day = ? LIMIT 1", (day,)).fetchone() is not None
 
 
 def org_summaries(conn: sqlite3.Connection, last_day: str) -> list[tuple[str, dict[str, Any]]]:
