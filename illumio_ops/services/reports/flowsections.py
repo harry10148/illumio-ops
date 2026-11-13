@@ -331,7 +331,7 @@ def share_text(lang: Language, n: int, d: int) -> str:
 def undecided_caveat(lang: Language, saw: Seen, *, chapter: bool = True) -> tuple[str, ...]:
     """The sentence under the conclusion when some of the period's flows carry no decision: their share of every
     flow, and of every connection (the two differ widely: on lab 93% and 30%). chapter=False: the report has no
-    monitor-only chapter to point at (readiness), and names the two factors that leave such connections out.
+    monitor-only chapter to point at (readiness), and names the three factors that leave such connections out.
     Nothing when every flow has a decision."""
     if not saw.undecided.flows:
         return ()
@@ -340,7 +340,7 @@ def undecided_caveat(lang: Language, saw: Seen, *, chapter: bool = True) -> tupl
     if chapter:
         return (tr(lang, "rpt_caveat_undecided", **shares),)
     return (tr(lang, "rpt_caveat_undecided_plain", **shares, policy=tr(lang, "rpt_rdy_factor_policy"),
-               staged=tr(lang, "rpt_rdy_factor_staged")),)
+               staged=tr(lang, "rpt_rdy_factor_staged"), remote=tr(lang, "rpt_rdy_factor_remote")),)
 
 
 def monitor_only_section(inp: BuildInput, spec: FilterSpec | Sequence[FilterSpec], saw: Seen, *,

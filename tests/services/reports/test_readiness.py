@@ -152,14 +152,16 @@ def test_unknown_decisions_left_out(ctx):
     row = {r[0]: r for r in _joined(doc)}["DB (Dev)"]
     assert row[4] == "100.0%" and row[7] == "100.0%"  # policy and staged over the 2 decided connections
     # stage 3b: said under the conclusion, in the flow reports' sentence (1 of the period's 2 flows, 8 of its 10
-    # connections), naming the two factors that leave such connections out; this report has no chapter for them
+    # connections), naming the three factors that leave such connections out; this report has no chapter for them
     (said,) = doc.caveats
     assert said == ("Flows without a decision: 50.0% of the period's flows (80.0% by connections). The factors "
-                    "“Allowed by a rule” and “Not blocked once enforced” count only the connections with a decision.")
+                    "“Allowed by a rule”, “Not blocked once enforced” and “Remote access with a rule” count only "
+                    "the connections with a decision.")
     assert not any("no reported decision" in q for q in doc.data_quality)
     assert "monitor_only" not in {s.id for s in doc.sections}
     (zh,) = _build(ctx, lang=Language.ZH_TW).caveats
-    assert zh == "期間內有 50.0% 的流量（依連線數是 80.0%）沒有判定；「有規則允許」與「切強制後不會被擋」兩個因子只算有判定的連線。"
+    assert zh == ("期間內有 50.0% 的流量（依連線數是 80.0%）沒有判定；「有規則允許」「切強制後不會被擋」與「遠端管理有規則」"
+                  "三個因子只算有判定的連線。")
 
 
 def test_every_flow_decided_no_sentence_under_the_conclusion(ctx):
@@ -168,17 +170,49 @@ def test_every_flow_decided_no_sentence_under_the_conclusion(ctx):
     assert _build(ctx).caveats == ()
 
 
+def test_remote_factor_is_a_share_of_the_remote_connections_with_a_decision(ctx):
+    """"Remote access with a rule" is a share of decisions, like "allowed by a rule": of the remote-access connections
+    the PCE gave a decision for, the ones a rule allows. One without a decision is in neither number (6 of 8 here,
+    not 6 of 20)."""
+    from illumio_ops.services.flowsource import readiness_rows
+    from illumio_ops.services.reports import flowsections
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=22, conns=6),
+                 flow(src_app="Web", dst_app="DB", port=22, decision="potentially_blocked", conns=2),
+                 flow(src_app="Web", dst_app="DB", port=22, decision="unknown", conns=12)])
+    inp = BuildInput(ctx=ctx, params=ReportParams(report_type=ReportType.READINESS), start=START, end=END,
+                     lang=Language.EN, tz=UTC, now=NOW, pce_label="pce")
+    (row,) = readiness_rows(ctx, flowsections.window(inp), app_key="app", env_key="env", remote_ports={(22, 6)})
+    assert (row.connections, row.unknown, row.remote, row.remote_allowed) == (20, 12, 8, 6)
+    assert {r[0]: r for r in _joined(_build(ctx))}["DB (Dev)"][8] == "75.0%"
+
+
+def test_remote_connections_all_without_a_decision_leave_the_factor_out(ctx):
+    """Remote-access connections that all lack a decision say nothing about rules: the factor has no data and is
+    not scored — never 0%, which would cost the app its 10 points."""
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, conns=3),
+                 flow(src_app="Web", dst_app="DB", port=22, decision="unknown", conns=12)])
+    row = {r[0]: r for r in _joined(_build(ctx))}["DB (Dev)"]
+    assert row[8] == "—"
+    # policy 3 of 3, from the app itself 0 of 15, no hosts, staged 3 of 3: 50 of the 70 points that have data
+    # (with the remote factor at 0 it would be 50 of 80: 63)
+    assert row[1] == 71
+
+
 def test_how_to_read_says_which_factors_count_every_connection(ctx):
-    """"From the app itself" measures where connections come from, not a decision: it counts every connection, and
-    so does "remote access with a rule" (its numbers are unchanged in stage 3b). The table says so."""
+    """"From the app itself" measures where connections come from, not a decision: it alone counts every connection,
+    and the table says so. "Remote access with a rule" is a share of decisions and says that it counts the
+    connections with one."""
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
     factors = next(b for b in _section(_build(ctx), "how").blocks if isinstance(b, TableBlock))
     measures = {r[0]: r[1] for r in factors.rows}
     assert "with or without a decision" in measures["From the app itself"]
     assert "not what was decided" in measures["From the app itself"]
-    assert "with or without a decision" in measures["Remote access with a rule"]
+    assert "with or without a decision" not in measures["Remote access with a rule"]
+    assert "with a reported decision" in measures["Remote access with a rule"]
     zh = next(b for b in _section(_build(ctx, lang=Language.ZH_TW), "how").blocks if isinstance(b, TableBlock))
-    assert sum("不分有沒有判定" in r[1] for r in zh.rows) == 2
+    said = {r[0]: r[1] for r in zh.rows}
+    assert [k for k, v in said.items() if "不分有沒有判定" in v] == ["來自同一 app"]
+    assert "有回報判定的" in said["遠端管理有規則"]
 
 
 def test_all_unknown_no_policy_factor(ctx):

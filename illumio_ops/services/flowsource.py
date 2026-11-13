@@ -864,13 +864,14 @@ class ReadinessRow(BaseModel):
     allowed: int
     same_app: int
     potentially_blocked: int
-    remote: int
+    remote: int  # on the remote-access ports, with a reported decision (DECIDED)
     remote_allowed: int
 
 
 def readiness_rows(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: str,
                    remote_ports: Collection[tuple[int, int | None]]) -> list[ReadinessRow]:
-    """Per destination app and environment, the connections into its managed hosts: one pass."""
+    """Per destination app and environment, the connections into its managed hosts: one pass. `remote` counts the
+    remote-access connections the PCE gave a decision for: the share allowed among them is a share of decisions."""
     fdb, gen, settings = _store_read(ctx)
     remote_sql, remote_params = _ports_sql(remote_ports, "r")
     with fdb.connect() as conn:
@@ -884,7 +885,8 @@ def readiness_rows(ctx: AppContext, spec: FilterSpec, *, app_key: str, env_key: 
             "SELECT NULLIF(da, ''), NULLIF(de, ''), SUM(n), SUM(CASE WHEN d = 'allowed' THEN n END), "
             "SUM(CASE WHEN d IS NULL OR d = 'unknown' THEN n END), "
             "SUM(CASE WHEN da != '' AND sa = da THEN n END), SUM(CASE WHEN d = 'potentially_blocked' THEN n END), "
-            f"SUM(CASE WHEN {remote_sql} THEN n END), SUM(CASE WHEN {remote_sql} AND d = 'allowed' THEN n END) "
+            f"SUM(CASE WHEN {remote_sql} AND {decision_sql('d')} THEN n END), "
+            f"SUM(CASE WHEN {remote_sql} AND d = 'allowed' THEN n END) "
             f"FROM ({sub}) r GROUP BY da, de",
             [*remote_params, *remote_params, app_key, app_key, env_key, *params]).fetchall()
     if fdb.generation != gen:

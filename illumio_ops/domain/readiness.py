@@ -1,7 +1,8 @@
 """Whether one app is ready for enforcement (P5b-2 Task 5): 5.x readiness's five factors and weights, over the app's
 inbound connections (enforcement blocks what comes in) and its own hosts. A connection without a reported decision
-says nothing about policy, so policy and staged are shares of the decided ones. A factor without data is left out and the
-others rescaled; grades are the maturity score's (A ≥ 85, B ≥ 70, C ≥ 55, D ≥ 40), one scale for both reports."""
+says nothing about policy, so policy, staged and remote are shares of the decided ones (ringfence measures where
+connections come from and counts them all). A factor without data is left out and the others rescaled; grades are the
+maturity score's (A ≥ 85, B ≥ 70, C ≥ 55, D ≥ 40), one scale for both reports."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,7 +19,7 @@ class ReadinessInputs:
     allowed: int
     same_app: int             # from the app itself
     potentially_blocked: int
-    remote: int               # on remote-execution ports
+    remote: int               # on remote-execution ports, with a reported decision
     remote_allowed: int
     hosts: int                # the app's managed hosts in the inventory
     full: int

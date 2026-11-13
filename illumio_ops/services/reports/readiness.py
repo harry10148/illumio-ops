@@ -266,7 +266,7 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                t("rpt_rdy_quality_definition"))
     # The flows without a decision, said as the flow reports say them: their share of the period's flows under this
     # report's filter (not only the connections into managed hosts the scores read). This report has no chapter for
-    # them, so the sentence names the two factors that leave them out instead of pointing at one.
+    # them, so the sentence names the three factors that leave them out instead of pointing at one.
     saw = flowsections.seen(flow_totals(inp.ctx, spec))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_readiness"), period_start=inp.start,
