@@ -16,11 +16,11 @@ from illumio_ops.domain.findings_rules import (
     RuleOutcome,
 )
 from illumio_ops.domain.flows import normalize_flow
-from illumio_ops.domain.values import DataOrigin, Language, Severity
+from illumio_ops.domain.values import DataOrigin, IngestSource, Language, Severity
 from illumio_ops.i18n import dictionary
 from illumio_ops.services.reports import findings
 from illumio_ops.services.reports.common import tr
-from illumio_ops.store.flowdb import analysis, workloads
+from illumio_ops.store.flowdb import analysis, ingest_state, labels, workloads
 from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.services.collect.conftest import configured_ctx, raw_flow
 
@@ -62,6 +62,43 @@ def decided_and_not():
             flow(port=8080, decision="potentially_blocked", conns=30),
             flow(port=443, decision="unknown", unmanaged_src=True, unmanaged_dst=True, conns=50),
             flow(port=22, decision="unknown", conns=10)]
+
+
+# What the first page says of undecided_sample()'s flows: 5 of 9 flows, 69 of 109 connections.
+UNDECIDED_EN = ("Flows without a decision: 55.6% of the period's flows (63.3% by connections). The report's shares "
+                "count only the flows with a decision; the rest are in “Traffic that can only be watched”.")
+UNDECIDED_ZH = "期間內有 55.6% 的流量（依連線數是 63.3%）沒有判定；報表的比例只算有判定的，其餘見〈只能監看的流量〉。"
+
+
+def covered(ctx):
+    """Traffic was collected over the whole sample period: a report of it has no collection gap to say."""
+    with ctx.flows().connect() as conn:
+        ingest_state.add_coverage(conn, IngestSource.TRAFFIC, SPEC.start, SPEC.end)
+        conn.commit()
+
+
+def undecided_sample(ctx):
+    """Stage 3b's sample install for the chapter of undecided flows. 9 flows, 109 connections; 4 flows (40
+    connections) carry a decision. Without one: 1 flow (50 connections) between two addresses with no VEN, and 4
+    flows (19 connections) with a VEN on an end — from left-1 (a workload the inventory does not hold), idle-1 (in
+    Idle now), sel-1 (Selective now; its flow row says Idle, the mode of some other day) and from db to idle-1.
+    The inventory: idle-1 Idle, sel-1 Selective, db Full."""
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href=f"/orgs/1/workloads/{name}", hostname=name, name=None, managed=1, enforcement_mode=mode,
+            visibility_level=None, os_id=None, ven_version=None, ven_href=None,
+            label_set=labels.label_set_id(conn, (("app", app), ("env", "Dev"))), online=1, risk_exposure=None,
+            risk_percent=None, risk_updated_at=None, fetched_at="x")
+            for name, mode, app in (("idle-1", "idle", "Web"), ("sel-1", "selective", "Web"), ("db", "full", "DB"))])
+        conn.commit()
+    stale = flow(src="sel-1", port=8443, decision="unknown", conns=2)
+    object.__setattr__(stale, "src_mode", "idle")
+    _write(ctx, [flow(port=443, conns=4), flow(port=22, conns=2), flow(port=443, conns=4, unmanaged_src=True),
+                 flow(port=8080, decision="potentially_blocked", conns=30),
+                 flow(port=443, decision="unknown", unmanaged_src=True, unmanaged_dst=True, conns=50),
+                 flow(src="left-1", port=22, decision="unknown", conns=10),
+                 flow(src="idle-1", port=8443, decision="unknown", conns=3), stale,
+                 flow(src="db", dst="idle-1", port=9000, decision="unknown", conns=4, src_app="DB", dst_app="Web")])
 
 
 @pytest.fixture

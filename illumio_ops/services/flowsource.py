@@ -466,6 +466,17 @@ def _label_of(side: str) -> str:
             "AND m.key = ?), '')")
 
 
+def _where_any(conn: Any, spec: FilterSpec | Sequence[FilterSpec]) -> tuple[str, list[Any]]:
+    """The rows one filter matches, or any of several (one application's traffic in either direction: a flow
+    both match is one row), as one SQL condition."""
+    parts, params = [], []
+    for s in [spec] if isinstance(spec, FilterSpec) else spec:
+        w, p = to_sql(s, wide=wide_window(conn, s))
+        parts.append(f"({w})")
+        params += p
+    return f"({' OR '.join(parts)})", params
+
+
 def group_for_findings(conn: Any, spec: FilterSpec | Sequence[FilterSpec], *, env_key: str, table: str) -> None:
     """The findings engine's one read of a period (services.reports.findings): the primary rows grouped by
     source, destination, service, decision, managed sides, app and environment labels and user, into the
@@ -474,12 +485,7 @@ def group_for_findings(conn: Any, spec: FilterSpec | Sequence[FilterSpec], *, en
     decisions out. Several specs: the rows any of them matches (one application's traffic in either direction)."""
     for name, fn in sql_functions().items():
         conn.create_function(name, -1, fn, deterministic=True)
-    parts, params = [], []
-    for s in [spec] if isinstance(spec, FilterSpec) else spec:
-        w, p = to_sql(s, wide=wide_window(conn, s))
-        parts.append(f"({w})")
-        params += p
-    where = " OR ".join(parts)
+    where, params = _where_any(conn, spec)
     conn.execute(f"DROP TABLE IF EXISTS temp.{table}")
     conn.execute(
         f"CREATE TEMP TABLE {table} AS SELECT f.src_key, f.dst_key, COALESCE(f.port, -1) AS port, f.proto, "
@@ -609,6 +615,94 @@ def flow_totals(ctx: AppContext, spec: FilterSpec, *,
                       from_unmanaged_connections=r[4] or 0, admin_open_connections=r[5] or 0, by_decision=decisions,
                       decided_flows=sum(d.flows for d in decided),
                       decided_connections=sum(d.connections for d in decided), undecided=undecided)
+
+
+class UndecidedEnd(BaseModel):
+    """One source or destination of the flows without a decision."""
+    key: str
+    flows: int
+    connections: int
+
+
+class UndecidedKind(BaseModel):
+    """The busiest ends of one kind of undecided flows (most connections first, at most `top`), and how many
+    distinct ends there are."""
+    sources: list[UndecidedEnd] = []
+    sources_total: int = 0
+    destinations: list[UndecidedEnd] = []
+    destinations_total: int = 0
+
+
+class UndecidedHost(BaseModel):
+    """A host on a managed end of flows without a decision: the flows it is on (either end), and which end."""
+    key: str
+    flows: int
+    connections: int
+    as_source: bool
+    as_destination: bool
+
+
+class UndecidedBreakdown(BaseModel):
+    """Who the flows without a decision are between (the monitor-only chapter of the flow reports)."""
+    unmanaged: UndecidedKind = UndecidedKind()  # neither end had a VEN
+    managed: UndecidedKind = UndecidedKind()  # at least one end had
+    managed_hosts: list[UndecidedHost] = []  # most connections first, at most `hosts`
+    managed_hosts_total: int = 0
+
+
+_UNDECIDED = "rpt_undecided"  # the TEMP table undecided_breakdown groups the period's undecided flows into
+# The two kinds, on that table: what the PCE said of the two ends when the flow was collected.
+_NO_VEN = "src_managed = 0 AND dst_managed = 0"
+_SOME_VEN = f"NOT ({_NO_VEN})"
+
+
+def undecided_breakdown(ctx: AppContext, spec: FilterSpec | Sequence[FilterSpec], *, top: int = 10,
+                        hosts: int = 200) -> UndecidedBreakdown:
+    """Who the flows without a decision are between, over the rows flow_totals counts as `undecided` (several
+    specs: the rows any of them matches, each once). One read of the period: the undecided rows are grouped by
+    source, destination and managed flags into a TEMP table, and every list is a query on that.
+    Only the managed flags stored with a flow are read. The modes stored beside them are not: they are the mode of
+    the day the row was last written, not the flow's, so a caller shows the inventory's current mode instead."""
+    fdb, gen, settings = _store_read(ctx)
+    with fdb.connect() as conn:
+        require_same_pce(conn, settings.pce)
+        for name, fn in sql_functions().items():
+            conn.create_function(name, -1, fn, deterministic=True)
+        where, params = _where_any(conn, spec)
+        conn.execute(f"DROP TABLE IF EXISTS temp.{_UNDECIDED}")
+        conn.execute(
+            f"CREATE TEMP TABLE {_UNDECIDED} AS SELECT f.src_key, f.dst_key, f.src_managed, f.dst_managed, "
+            "COUNT(*) AS flows, COALESCE(SUM(f.num_connections), 0) AS connections FROM flows f "
+            f"WHERE {where} AND f.policy_decision = '{UNDECIDED}' GROUP BY 1, 2, 3, 4", params)
+
+        def ends(column: str, kind: str) -> tuple[list[UndecidedEnd], int]:
+            rows = conn.execute(
+                f"SELECT {column}, SUM(flows) AS f, SUM(connections) AS n FROM {_UNDECIDED} WHERE {kind} "
+                f"GROUP BY {column} ORDER BY n DESC, f DESC, {column} LIMIT ?", (top,)).fetchall()
+            total = conn.execute(f"SELECT COUNT(DISTINCT {column}) FROM {_UNDECIDED} WHERE {kind}").fetchone()[0]
+            return [UndecidedEnd(key=k, flows=f, connections=n) for k, f, n in rows], total
+
+        def kind_of(kind: str) -> UndecidedKind:
+            sources, n_sources = ends("src_key", kind)
+            destinations, n_destinations = ends("dst_key", kind)
+            return UndecidedKind(sources=sources, sources_total=n_sources, destinations=destinations,
+                                 destinations_total=n_destinations)
+        unmanaged, managed = kind_of(_NO_VEN), kind_of(_SOME_VEN)
+        # A host is listed once, with the flows it is on at either end; a flow from a host to itself is one flow.
+        on_hosts = (f"SELECT src_key AS k, 1 AS s, (dst_managed = 1 AND dst_key = src_key) AS d, flows, connections "
+                    f"FROM {_UNDECIDED} WHERE src_managed = 1 UNION ALL "
+                    f"SELECT dst_key, 0, 1, flows, connections FROM {_UNDECIDED} WHERE dst_managed = 1 "
+                    "AND NOT (src_managed = 1 AND src_key = dst_key)")
+        found = conn.execute(f"SELECT k, SUM(s), SUM(d), SUM(flows) AS f, SUM(connections) AS n FROM ({on_hosts}) "
+                             "GROUP BY k ORDER BY n DESC, f DESC, k LIMIT ?", (hosts,)).fetchall()
+        n_hosts = conn.execute(f"SELECT COUNT(*) FROM (SELECT k FROM ({on_hosts}) GROUP BY k)").fetchone()[0]
+        conn.execute(f"DROP TABLE IF EXISTS temp.{_UNDECIDED}")
+    if fdb.generation != gen:
+        raise StaleGeneration
+    return UndecidedBreakdown(
+        unmanaged=unmanaged, managed=managed, managed_hosts_total=n_hosts,
+        managed_hosts=[UndecidedHost(key=k, flows=f, connections=n, as_source=bool(s), as_destination=bool(d))
+                       for k, s, d, f, n in found])
 
 
 class LabelMix(BaseModel):

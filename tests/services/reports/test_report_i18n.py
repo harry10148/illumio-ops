@@ -35,7 +35,7 @@ from illumio_ops.store.flowdb.events import upsert_events
 from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.services.collect.conftest import configured_ctx
 from tests.services.reports.test_audit import event as audit_event
-from tests.services.reports.test_findings import flow
+from tests.services.reports.test_findings import flow, undecided_sample
 from tests.services.reports.test_lateral_posture import (
     _detection,
     _exposure,
@@ -238,19 +238,29 @@ def _outputs(ctx, report_type, lang):
             "email": mail.subject + "\n" + mail.text + "\n" + (mail.html or "")}
 
 
+def _raw_keys(text):
+    """The message keys left in an output's own text (its stylesheet and script apart)."""
+    body = text.split("<style>", 1)[0] + text.split("</style>", 1)[-1].split("<script>", 1)[0]
+    return sorted(set(RAW_KEY.findall(body)))
+
+
+def _english_copy():
+    """The English report sentences a zh_TW output must not carry."""
+    return [v for k, v in EN.items() if k.startswith(("rpt_", "detector_name_")) and len(v) > 12
+            and not re.search(r"\{\w+\}", v) and v.isascii() and v not in PCE_TERMS]
+
+
 @pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
 @pytest.mark.parametrize("report_type", list(ReportType))
 def test_no_raw_keys_in_output(ctx, report_type, lang):
     for kind, text in _outputs(ctx, report_type, lang).items():
-        body = text.split("<style>", 1)[0] + text.split("</style>", 1)[-1].split("<script>", 1)[0]
-        found = sorted(set(RAW_KEY.findall(body)))
+        found = _raw_keys(text)
         assert found == [], f"{report_type} {lang} {kind}: {found}"
 
 
 @pytest.mark.parametrize("report_type", list(ReportType))
 def test_zh_tw_has_no_english_report_copy(ctx, report_type):
-    english = [v for k, v in EN.items() if k.startswith(("rpt_", "detector_name_")) and len(v) > 12
-               and not re.search(r"\{\w+\}", v) and v.isascii() and v not in PCE_TERMS]
+    english = _english_copy()
     for kind, text in _outputs(ctx, report_type, Language.ZH_TW).items():
         leaked = [s for s in english if s in text]
         assert leaked == [], f"{report_type} {kind}: {leaked[:3]}"
@@ -344,14 +354,13 @@ def _host_tables(ctx, report_type, lang=Language.EN):
     return [(s.id, b) for s, b in doc.tables()]
 
 
-@pytest.mark.parametrize("report_type", list(ReportType))
-def test_every_host_column_knows_which_host_each_row_names(ctx, report_type):
+def _check_host_columns(ctx, tables):
     """A host column carries one key per row the HTML prints, and the key is the host the cell names: resolved the
     way the inventory names it, the nth key gives the nth cell's text."""
     from illumio_ops.domain.report import HTML_ROW_CAP
     from illumio_ops.services.hosts import display_names
     from illumio_ops.services.reports.common import unnamed_host
-    for sid, table in _host_tables(ctx, report_type):
+    for sid, table in tables:
         host_cols = {c.key for c in table.columns if c.kind == "host"}
         assert set(table.host_keys) == host_cols, (sid, table.title)
         named = display_names(ctx, {k for keys in table.host_keys.values() for k in keys if k}, lang=Language.EN)
@@ -362,6 +371,11 @@ def test_every_host_column_knows_which_host_each_row_names(ctx, report_type):
                 if key is not None:
                     assert row[i] in (named.get(key), key.removeprefix("ip:"), key.rsplit("/", 1)[-1],
                                       unnamed_host(key, Language.EN)), (sid, table.title, col, key, row[i])
+
+
+@pytest.mark.parametrize("report_type", list(ReportType))
+def test_every_host_column_knows_which_host_each_row_names(ctx, report_type):
+    _check_host_columns(ctx, _host_tables(ctx, report_type))
 
 
 HOST_TABLES = {  # report type -> (section, column, the part of the host page its links open at)
@@ -419,3 +433,67 @@ def test_no_chapter_repeats_the_heading_of_the_closing_part(ctx, report_type, la
         lang=lang, tz=UTC, now=NOW, pce_label="pce"))
     part = translate(lang, "rpt_part_how", {})
     assert part not in [s.title for s in doc.sections]
+
+
+# ── flows without a decision (stage 3b). The install above holds none — adding them would move its pinned numbers —
+# so what a report says about them is read from a second install: both kinds, a host in Idle now and hosts not. ──
+
+UNDECIDED_TYPES = (ReportType.SECURITY_RISK, ReportType.TRAFFIC, ReportType.APP_SUMMARY, ReportType.READINESS)
+WITH_CHAPTER = (ReportType.SECURITY_RISK, ReportType.TRAFFIC, ReportType.APP_SUMMARY)
+
+
+@pytest.fixture(scope="module")
+def undecided(ctx, tmp_path_factory):
+    """`ctx` is asked for its patches: the readiness report's draft recompute is a PCE call."""
+    c = configured_ctx(tmp_path_factory.mktemp("undecided"))
+    undecided_sample(c)
+    return c
+
+
+@pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
+@pytest.mark.parametrize("report_type", UNDECIDED_TYPES)
+def test_what_is_said_of_undecided_flows_has_no_raw_key_and_no_english_in_zh(undecided, report_type, lang):
+    out = _outputs(undecided, report_type, lang)
+    # the copy under test is in the output: the sentence under the conclusion, and the chapter where there is one
+    for kind in ("html", "xlsx", "email"):
+        assert translate(lang, "rpt_caveats_title", {}) in out[kind], kind
+    if report_type in WITH_CHAPTER:
+        assert translate(lang, "rpt_mon_tbl_hosts", {}) in out["html"] and translate(lang, "rpt_mon_tbl_hosts", {})[:31] in out["xlsx"]
+        assert translate(lang, "rpt_mon_idle_note", {}) in out["html"]
+    english = _english_copy() if lang is Language.ZH_TW else []
+    for kind, text in out.items():
+        assert _raw_keys(text) == [], f"{report_type} {lang} {kind}"
+        leaked = [s for s in english if s in text]
+        assert leaked == [], f"{report_type} {kind}: {leaked[:3]}"
+
+
+@pytest.mark.parametrize("report_type", WITH_CHAPTER)
+def test_the_undecided_chapters_host_columns_know_their_hosts(undecided, report_type):
+    tables = _host_tables(undecided, report_type)
+    named = {(sid, col, table.host_section) for sid, table in tables for col, keys in table.host_keys.items()
+             if any(keys)}
+    assert ("monitor_only", "host", "connections") in named and ("monitor_only", "host", None) in named
+    assert sum(1 for sid, t in tables if sid == "monitor_only" and t.host_keys) >= 3  # two rankings and the hosts
+    _check_host_columns(undecided, tables)
+
+
+@pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
+@pytest.mark.parametrize("report_type", UNDECIDED_TYPES)
+def test_the_first_page_says_how_many_flows_have_no_decision(undecided, report_type, lang):
+    """Through finish() and the renderer: the sentence stands under the conclusion (after the collection gap this
+    sample has), and in the three flow reports it names a chapter the page has."""
+    from illumio_ops.services.reports.finish import finish
+    from tests.services.reports.dom import dom
+    cond = APP_DB if specs()[report_type].requires_app else None
+    doc = finish(specs()[report_type].build(BuildInput(
+        ctx=undecided, params=ReportParams(report_type=report_type, filter=cond), start=START, end=END, lang=lang,
+        tz=UTC, now=NOW, pce_label="pce")))
+    assert len(doc.caveats) == 2  # no coverage is recorded here: the gap first, then the undecided flows
+    page = dom(render_html(doc, tz=UTC))
+    said = page.one("data-role", "caveats").text()
+    assert doc.caveats[0] in said and doc.caveats[1] in said
+    chapter = translate(lang, "rpt_mon_sec", {})
+    assert (chapter in doc.caveats[1]) == (report_type in WITH_CHAPTER)
+    assert len(page.find_attr("id", "monitor_only")) == (1 if report_type in WITH_CHAPTER else 0)
+    if report_type in WITH_CHAPTER:
+        assert chapter in [s.title for s in doc.sections]

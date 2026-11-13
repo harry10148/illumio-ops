@@ -24,10 +24,11 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.segment import GroupBy
 from illumio_ops.domain.values import PolicyDecision, SegmentDimension, SegmentMetric
 from illumio_ops.services.analysis.context import load_lateral_context
-from illumio_ops.services.flowsource import DECIDED, FlowTotals, Undecided, flow_totals
+from illumio_ops.services.flowsource import DECIDED, FlowTotals, flow_totals
 from illumio_ops.services.reports import findings, flowsections
 from illumio_ops.services.reports.common import DECISION_KEYS, host_keys, mode_word, tr
 from illumio_ops.services.reports.generate import (
+    caveats_in_order,
     coverage_text,
     previous_period,
     traffic_covered,
@@ -93,7 +94,9 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
     # The three parts are disjoint, so their decided and undecided flows add up to the app's.
     decided_flows = sum(p.decided_flows for p in parts.values())
     decided_connections = sum(p.decided_connections for p in parts.values())
-    undecided = sum((p.undecided for p in parts.values()), Undecided())
+    saw = flowsections.seen(*parts.values())
+    # The app's flows in either direction, each once: what the three parts hold together (the rules read the same).
+    touching = [sides["touching_dst"], sides["touching_src"]]
     no_flows = t("rpt_no_flows_filtered")
     no_decided = t("rpt_no_decided_flows")
 
@@ -174,9 +177,9 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
         impact_blocks += (TextBlock(paragraphs=(t(
             "rpt_app_impact_text", allowed=pct(decisions.get("allowed", (0, 0))[1], decided_connections),
             pb=f"{decisions.get('potentially_blocked', (0, 0))[0]:,}"),)),)
-    impact_blocks += flowsections.decided_note(lang, undecided)
+    impact_blocks += flowsections.decided_note(lang, saw.undecided)
 
-    outcomes = findings.run_rules(inp.ctx, [sides["touching_dst"], sides["touching_src"]],
+    outcomes = findings.run_rules(inp.ctx, touching,
                                   inp.ctx.settings.current().reports.rule_thresholds, lang,
                                   now=inp.now, scoped=True) if flows else []
     filter_line = flowsections.filter_text(inp.params.filter, lang)
@@ -187,7 +190,8 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=title, period_start=inp.start, period_end=inp.end,
         generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang), caveats=cov.caveats,
+        findings=findings.as_findings(outcomes, lang),
+        caveats=caveats_in_order(gaps=cov.caveats, undecided=flowsections.undecided_caveat(lang, saw)),
         data_quality=(*quality, *(() if hosts else (hint(lang, "rpt_hint_pending_app_hosts", labels=", ".join(f"{k}={v}" for k, v in conds.items())),)),
                       *flowsections.no_links_note(inp)),
         sections=(
@@ -209,6 +213,7 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
                              limit=UNCOVERED_TOP)),
                     workbench_link=peer_link("inbound", SegmentDimension.SRC_LABEL, uncovered=True,
                                              limit=UNCOVERED_TOP)),
+            *flowsections.monitor_only_section(inp, touching, saw, hosts=lc.hosts),
             *findings.unevaluated_section(outcomes, lang,
                                           title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_app_findings_intro"),
                                           table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(flows))))

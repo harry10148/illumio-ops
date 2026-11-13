@@ -3,7 +3,8 @@ run_segment — the same number the workbench shows — turned into a report tab
 words and the optional fields' coverage."""
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 
@@ -18,7 +19,14 @@ from illumio_ops.domain.filter import (
     label_group_hrefs,
 )
 from illumio_ops.domain.lateral import HostInfo
-from illumio_ops.domain.report import Cell, Column, TableBlock, TextBlock
+from illumio_ops.domain.report import (
+    HTML_ROW_CAP,
+    Cell,
+    Column,
+    Section,
+    TableBlock,
+    TextBlock,
+)
 from illumio_ops.domain.segment import FlowSegment, GroupBy
 from illumio_ops.domain.values import (
     Language,
@@ -29,7 +37,15 @@ from illumio_ops.domain.values import (
 )
 from illumio_ops.services.analysis.segments import run_segment
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.flowsource import AggRow, FieldCoverage, Undecided
+from illumio_ops.services.flowsource import (
+    AggRow,
+    FieldCoverage,
+    FlowTotals,
+    Undecided,
+    UndecidedEnd,
+    UndecidedHost,
+    undecided_breakdown,
+)
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports.common import (
     DECISION_IN_SENTENCE_KEYS,
@@ -37,6 +53,7 @@ from illumio_ops.services.reports.common import (
     host_key,
     host_keys,
     host_name,
+    mode_word,
     port_text,
     tr,
 )
@@ -274,3 +291,140 @@ def host_in_scope(host: HostInfo, cond: FlowCondition | None, *, label_groups: L
     if not includes:
         return not any(hits(exc) for _, exc in sides)
     return any(hits(inc) and not hits(exc) for inc, exc in includes)
+
+
+# ── the flows without a decision (UI redesign spec §9.2) ─────────────────────────────────────────────────────
+
+MONITOR_ONLY = "monitor_only"  # the chapter's id
+MONITOR_TOP = 10  # each ranking's rows: what a table prints on paper (PRINT_ROW_CAP), so none is cut there
+MONITOR_HOSTS = HTML_ROW_CAP  # hosts listed: what the HTML prints
+SHARE_LEAST = 0.1  # the smallest share one decimal can show: under it "less than 0.1%", never "0.0%"
+
+
+@dataclass(frozen=True)
+class Seen:
+    """What a report saw in its period: every flow and connection, and the ones without a decision among them."""
+    flows: int
+    connections: int
+    undecided: Undecided
+
+
+def seen(*parts: FlowTotals) -> Seen:
+    """Of one read, or of several disjoint reads added up (one app's inbound, outbound and intra-app traffic)."""
+    return Seen(flows=sum(p.flows for p in parts), connections=sum(p.connections for p in parts),
+                undecided=sum((p.undecided for p in parts), Undecided()))
+
+
+def share_text(lang: Language, n: int, d: int) -> str:
+    """n of d as a percentage to one decimal, for a sentence. A share that is there and would print as 0.0%, or
+    that is not everything and would print as 100.0%, is said as "less than 0.1%" / "more than 99.9%"."""
+    if not d:
+        return "—"
+    pct = 100 * n / d
+    if 0 < pct < SHARE_LEAST:
+        return tr(lang, "rpt_share_under", v=f"{SHARE_LEAST:.1f}")
+    if 100 - SHARE_LEAST < pct < 100:
+        return tr(lang, "rpt_share_over", v=f"{100 - SHARE_LEAST:.1f}")
+    return f"{pct:.1f}%"
+
+
+def undecided_caveat(lang: Language, saw: Seen, *, chapter: bool = True) -> tuple[str, ...]:
+    """The sentence under the conclusion when some of the period's flows carry no decision: their share of every
+    flow, and of every connection (the two differ widely: on lab 93% and 30%). chapter=False: the report has no
+    monitor-only chapter to point at (readiness), and names the two factors that leave such connections out.
+    Nothing when every flow has a decision."""
+    if not saw.undecided.flows:
+        return ()
+    shares = {"pct_flows": share_text(lang, saw.undecided.flows, saw.flows),
+              "pct_connections": share_text(lang, saw.undecided.connections, saw.connections)}
+    if chapter:
+        return (tr(lang, "rpt_caveat_undecided", **shares),)
+    return (tr(lang, "rpt_caveat_undecided_plain", **shares, policy=tr(lang, "rpt_rdy_factor_policy"),
+               staged=tr(lang, "rpt_rdy_factor_staged")),)
+
+
+def monitor_only_section(inp: BuildInput, spec: FilterSpec | Sequence[FilterSpec], saw: Seen, *,
+                         hosts: Mapping[str, HostInfo]) -> tuple[Section, ...]:
+    """The chapter "Traffic that can only be watched": the flows the PCE reported no decision for — how many of
+    each kind, each kind's busiest sources and destinations, and the hosts with a VEN that appear in them.
+    `spec`: the report's flows (several: the rows any of them matches); `saw`: their totals, read by the builder.
+    `hosts`: the current inventory. A host's mode is the inventory's, today's, and the column says so: the mode
+    stored with a flow is not the flow's. Only a host in Idle now gets a reason (an Idle VEN reports snapshots);
+    the report gives none for the others. Nothing when every flow has a decision (and no read is made)."""
+    u = saw.undecided
+    if not u.flows:
+        return ()
+    lang = inp.lang
+
+    def t(msg: str, /, **params: object) -> str:
+        return tr(lang, msg, **params)
+
+    def pct(n: int, d: int) -> str:
+        return f"{100 * n / d:.1f}%" if d else "—"
+    found = undecided_breakdown(inp.ctx, spec, top=MONITOR_TOP, hosts=MONITOR_HOSTS)
+    empty = t("rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_no_flows")
+    kinds = TableBlock(
+        title=t("rpt_mon_tbl_kinds"),
+        columns=(Column(key="kind", label=t("rpt_mon_col_kind")), Column(key="means", label=t("rpt_mon_col_means")),
+                 Column(key="flows", label=t("rpt_col_flows"), kind="number"),
+                 Column(key="connections", label=t("rpt_col_connections"), kind="number"),
+                 Column(key="share_flows", label=t("rpt_mon_col_share_flows")),
+                 Column(key="share_connections", label=t("rpt_mon_col_share_connections"))),
+        rows=((t("rpt_mon_kind_unmanaged"), t("rpt_mon_means_unmanaged"), u.unmanaged_flows, u.unmanaged_connections,
+               pct(u.unmanaged_flows, saw.flows), pct(u.unmanaged_connections, saw.connections)),
+              (t("rpt_mon_kind_managed"), t("rpt_mon_means_managed"), u.managed_flows, u.managed_connections,
+               pct(u.managed_flows, saw.flows), pct(u.managed_connections, saw.connections))),
+        total_rows=2, empty_text="")
+    shown = [e.key for kind in (found.unmanaged, found.managed) for e in (*kind.sources, *kind.destinations)]
+    names = display_names(inp.ctx, {*shown, *(h.key for h in found.managed_hosts)}, lang=lang)
+
+    def ranking(title: str, label: str, ends: Sequence[UndecidedEnd], total: int) -> TableBlock:
+        return TableBlock(
+            title=t(title),
+            columns=(Column(key="host", label=t(label), kind="host"),
+                     Column(key="flows", label=t("rpt_col_flows"), kind="number"),
+                     Column(key="connections", label=t("rpt_col_connections"), kind="number")),
+            rows=tuple((names[e.key], e.flows, e.connections) for e in ends), total_rows=total,
+            empty_text=empty, limit_note=t("rpt_limit_top_n", n=MONITOR_TOP) if total > len(ends) else None,
+            host_keys=host_keys(host=(host_key({}, e.key) for e in ends)), host_section="connections")
+    rankings = tuple(
+        ranking(title, label, ends, total)
+        for flows, title, label, ends, total in (
+            (u.unmanaged_flows, "rpt_mon_tbl_src_unmanaged", "rpt_col_source", found.unmanaged.sources,
+             found.unmanaged.sources_total),
+            (u.unmanaged_flows, "rpt_mon_tbl_dst_unmanaged", "rpt_col_destination", found.unmanaged.destinations,
+             found.unmanaged.destinations_total),
+            (u.managed_flows, "rpt_mon_tbl_src_managed", "rpt_col_source", found.managed.sources,
+             found.managed.sources_total),
+            (u.managed_flows, "rpt_mon_tbl_dst_managed", "rpt_col_destination", found.managed.destinations,
+             found.managed.destinations_total))
+        if flows)  # a kind with no flow has its 0 in the first table and no ranking
+
+    def mode_now(key: str) -> tuple[str, str]:
+        """(the host's mode in the inventory now, the note beside it)."""
+        host = hosts.get(key)
+        if host is None:
+            return t("rpt_mon_not_in_inventory"), ""
+        if host.enforcement_mode == "idle":
+            return mode_word(lang, "idle"), t("rpt_mon_idle_note")
+        return (mode_word(lang, host.enforcement_mode) if host.enforcement_mode else "—"), ""
+
+    def end(h: UndecidedHost) -> str:
+        return t("rpt_mon_end_both" if h.as_source and h.as_destination
+                 else "rpt_mon_end_source" if h.as_source else "rpt_mon_end_destination")
+    listed = found.managed_hosts
+    blocks: tuple[TableBlock | TextBlock, ...] = (kinds, *rankings)
+    if u.managed_flows:
+        blocks += (TextBlock(paragraphs=(t("rpt_mon_hosts_intro"),)), TableBlock(
+            title=t("rpt_mon_tbl_hosts"),
+            columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
+                     Column(key="mode", label=t("rpt_mon_col_mode_now")),
+                     Column(key="flows", label=t("rpt_col_flows"), kind="number"),
+                     Column(key="connections", label=t("rpt_col_connections"), kind="number"),
+                     Column(key="end", label=t("rpt_mon_col_end")), Column(key="note", label=t("rpt_mon_col_note"))),
+            rows=tuple((names[h.key], mode_now(h.key)[0], h.flows, h.connections, end(h), mode_now(h.key)[1])
+                       for h in listed),
+            total_rows=found.managed_hosts_total, empty_text=empty,
+            limit_note=(t("rpt_limit_top_n", n=MONITOR_HOSTS) if found.managed_hosts_total > len(listed) else None),
+            host_keys=host_keys(host=(host_key({}, h.key) for h in listed))))
+    return (Section(id=MONITOR_ONLY, title=t("rpt_mon_sec"), intro=t("rpt_mon_intro"), blocks=blocks),)

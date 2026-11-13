@@ -16,7 +16,7 @@ from illumio_ops.services.reports import readiness as readiness_report
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.store.flowdb import labels, workloads
 from tests.services.collect.conftest import configured_ctx
-from tests.services.reports.test_findings import flow
+from tests.services.reports.test_findings import covered, flow
 from tests.services.reports.test_traffic import _write
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
@@ -147,10 +147,38 @@ def test_unknown_decisions_left_out(ctx):
     A connection without a decision says nothing about policy: it is left out of policy and staged, and said."""
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, conns=2),
                  flow(src_app="Web", dst_app="DB", port=5432, decision="unknown", conns=8)])
+    covered(ctx)
     doc = _build(ctx)
     row = {r[0]: r for r in _joined(doc)}["DB (Dev)"]
     assert row[4] == "100.0%" and row[7] == "100.0%"  # policy and staged over the 2 decided connections
-    assert any("80.0%" in q for q in doc.data_quality)
+    # stage 3b: said under the conclusion, in the flow reports' sentence (1 of the period's 2 flows, 8 of its 10
+    # connections), naming the two factors that leave such connections out; this report has no chapter for them
+    (said,) = doc.caveats
+    assert said == ("Flows without a decision: 50.0% of the period's flows (80.0% by connections). The factors "
+                    "“Allowed by a rule” and “Not blocked once enforced” count only the connections with a decision.")
+    assert not any("no reported decision" in q for q in doc.data_quality)
+    assert "monitor_only" not in {s.id for s in doc.sections}
+    (zh,) = _build(ctx, lang=Language.ZH_TW).caveats
+    assert zh == "期間內有 50.0% 的流量（依連線數是 80.0%）沒有判定；「有規則允許」與「切強制後不會被擋」兩個因子只算有判定的連線。"
+
+
+def test_every_flow_decided_no_sentence_under_the_conclusion(ctx):
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432, conns=2)])
+    covered(ctx)
+    assert _build(ctx).caveats == ()
+
+
+def test_how_to_read_says_which_factors_count_every_connection(ctx):
+    """"From the app itself" measures where connections come from, not a decision: it counts every connection, and
+    so does "remote access with a rule" (its numbers are unchanged in stage 3b). The table says so."""
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
+    factors = next(b for b in _section(_build(ctx), "how").blocks if isinstance(b, TableBlock))
+    measures = {r[0]: r[1] for r in factors.rows}
+    assert "with or without a decision" in measures["From the app itself"]
+    assert "not what was decided" in measures["From the app itself"]
+    assert "with or without a decision" in measures["Remote access with a rule"]
+    zh = next(b for b in _section(_build(ctx, lang=Language.ZH_TW), "how").blocks if isinstance(b, TableBlock))
+    assert sum("不分有沒有判定" in r[1] for r in zh.rows) == 2
 
 
 def test_all_unknown_no_policy_factor(ctx):

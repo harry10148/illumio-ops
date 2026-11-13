@@ -260,7 +260,8 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
             built = spec.build(dataclasses.replace(inp, ctx=arc.ctx))
         return built.model_copy(update={"data_quality": (*built.data_quality,
                                                          *_archive_lines(arc, inp.lang, inp.tz)),
-                                        "caveats": archive_caveats(built.caveats, arc, inp.lang)})
+                                        "caveats": caveats_in_order(
+                                            built.caveats, archive=archive_caveat(arc, inp.lang))})
     if not pulls_on_demand(ctx, spec, inp.start, inp.now, inp.params):
         return spec.build(inp)
     try:
@@ -475,13 +476,22 @@ def gap_caveats(gaps: Sequence[tuple[datetime, datetime, str]], lang: Language) 
     return (translate(lang, "rpt_caveat_gaps", {"n": str(len(gaps)), "hours": f"{hours:.1f}"}),)
 
 
-def archive_caveats(caveats: tuple[str, ...], res: archive_read.ArchiveResult, lang: Language) -> tuple[str, ...]:
-    """The caveats of a report read from the archive: one more sentence when some days are in no archive file (a day
-    lacking for flows and for events is one day), unless the report already has all the caveats it may carry."""
+def caveats_in_order(chosen: Sequence[str] = (), *, gaps: Sequence[str] = (), undecided: Sequence[str] = (),
+                     archive: Sequence[str] = ()) -> tuple[str, ...]:
+    """The sentences under a report's conclusion, the one place that picks them: at most CAVEATS_MAX, in the order
+    a reader needs them — time that was not collected (gap_caveats), flows without a decision
+    (flowsections.undecided_caveat), days the archive lacks (archive_caveat). A sentence that does not fit is still
+    said elsewhere: the gaps and the archive's days in the data notes, the undecided flows in their chapter.
+    `chosen`: what an earlier call picked — a builder passes its gaps and undecided flows; the generator, which
+    alone knows what the archive lacked, passes the builder's caveats and the archive's sentence."""
+    return tuple([*chosen, *gaps, *undecided, *archive][:CAVEATS_MAX])
+
+
+def archive_caveat(res: archive_read.ArchiveResult, lang: Language) -> tuple[str, ...]:
+    """One sentence when some days of the period are in no archive file (a day lacking for flows and for events is
+    one day); nothing when the archive supplied them all."""
     days = {day for missing in res.missing_days.values() for day in missing}
-    if not days or len(caveats) >= CAVEATS_MAX:
-        return caveats
-    return (*caveats, translate(lang, "rpt_caveat_archive_missing", {"n": str(len(days))}))
+    return (translate(lang, "rpt_caveat_archive_missing", {"n": str(len(days))}),) if days else ()
 
 
 def coverage_text(ctx: AppContext, start: datetime, end: datetime, lang: Language, *, now: datetime,

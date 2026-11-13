@@ -236,17 +236,27 @@ def _archive(missing):
                                       unread_from=None)
 
 
-def test_days_the_archive_lacks_are_a_second_sentence(ctx):
+def test_days_the_archive_lacks_are_one_sentence(ctx):
     res = _archive({"flows": ["2026-10-01", "2026-10-02"], "events": ["2026-10-02", "2026-10-03"]})
-    got = generate.archive_caveats(("the gap sentence",), res, Language.ZH_TW)
-    assert got == ("the gap sentence", "期間內有 3 天的封存讀不到；明細在最後的「資料註記」。")  # a day both lack is one day
-    assert "3" in generate.archive_caveats((), res, Language.EN)[0]
+    zh = generate.archive_caveat(res, Language.ZH_TW)
+    assert zh == ("期間內有 3 天的封存讀不到；明細在最後的「資料註記」。",)  # a day both lack is one day
+    assert "3" in generate.archive_caveat(res, Language.EN)[0]
+    assert generate.archive_caveat(_archive({"flows": []}), Language.EN) == ()  # no missing day, no sentence
+    # after a builder's one sentence it is the second
+    assert generate.caveats_in_order(("the gap sentence",), archive=zh) == ("the gap sentence", zh[0])
 
 
-def test_no_missing_day_no_sentence_and_never_a_third(ctx):
-    assert generate.archive_caveats(("a",), _archive({"flows": []}), Language.EN) == ("a",)
-    full = generate.archive_caveats(("a", "b"), _archive({"flows": ["2026-10-01"]}), Language.EN)
-    assert full == ("a", "b")
+def test_the_sentences_under_the_conclusion_are_two_at_most_in_one_order():
+    """Stage 3b: time not collected, then flows without a decision, then days the archive lacks. The order is the
+    function's (no builder decides it); a sentence that does not fit is still in the data notes or its chapter."""
+    pick = generate.caveats_in_order
+    assert pick(gaps=("g",), undecided=("u",), archive=("a",)) == ("g", "u")
+    assert pick(archive=("a",), undecided=("u",), gaps=("g",)) == ("g", "u")  # however the caller names them
+    assert pick(undecided=("u",), archive=("a",)) == ("u", "a") and pick(gaps=("g",), archive=("a",)) == ("g", "a")
+    assert pick(gaps=("g",)) == ("g",) and pick(undecided=("u",)) == ("u",) and pick() == ()
+    # the generator adds the archive's sentence to what a builder chose: never a third, never before the builder's
+    assert pick(("g", "u"), archive=("a",)) == ("g", "u") and pick(("u",), archive=("a",)) == ("u", "a")
+    assert pick((), archive=("a",)) == ("a",)
 
 
 def test_period_starts_at_display_midnight_across_dst():

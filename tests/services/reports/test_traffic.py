@@ -11,7 +11,13 @@ from illumio_ops.services.reports.registry import BuildInput, ReportParams, spec
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.services.collect.conftest import configured_ctx
-from tests.services.reports.test_findings import decided_and_not, flow
+from tests.services.reports.test_findings import (
+    UNDECIDED_EN,
+    covered,
+    decided_and_not,
+    flow,
+    undecided_sample,
+)
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
 START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
@@ -254,3 +260,25 @@ def test_zh_decided_note(ctx):
     doc = _build(ctx, lang=Language.ZH_TW)
     words = " ".join(p for b in _section(doc, "decisions").blocks if isinstance(b, TextBlock) for p in b.paragraphs)
     assert words == "比例只算有判定的流量；沒有判定的 2 筆（60 次連線）見〈只能監看的流量〉。"
+
+
+# ── stage 3b: the flows without a decision have their chapter, and the first page says how many there are ────
+
+def test_undecided_flows_have_their_chapter_after_the_unmanaged_addresses(ctx):
+    undecided_sample(ctx)
+    covered(ctx)
+    doc = _build(ctx)
+    ids = [s.id for s in doc.sections]
+    assert ids[ids.index("monitor_only") - 1] == "unmanaged" and ids[ids.index("monitor_only") + 1] == "findings"
+    assert doc.caveats == (UNDECIDED_EN,)
+    kinds = _table(doc, "monitor_only")
+    assert [(r[2], r[3]) for r in kinds.rows] == [(1, 50), (4, 19)]
+    kpis = {k.key: k.value for k in doc.kpis}
+    assert (kpis["flows"], kpis["connections"]) == (9, 109)  # the sentence's two denominators
+
+
+def test_no_undecided_flow_no_chapter_and_no_sentence(ctx):
+    _write(ctx, [flow(port=443), flow(port=8080, decision="potentially_blocked")])
+    covered(ctx)
+    doc = _build(ctx)
+    assert "monitor_only" not in [s.id for s in doc.sections] and doc.caveats == ()

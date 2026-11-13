@@ -23,7 +23,8 @@ from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.services.collect.conftest import NOW, configured_ctx, raw_flow
 
 
-def _ctx(tmp_path, *, archive=True):
+def _ctx(tmp_path, *, archive=True, undecided=False):
+    """undecided: the flow of 3 days ago carries no decision."""
     ctx = configured_ctx(tmp_path)
     ctx.settings.update(ctx.settings.current().revision, lambda d: (
         d["collection"]["retention"].update({"flow_days": 7, "event_days": 7, "rollup_days": 7, "baseline_days": 7}),
@@ -31,6 +32,8 @@ def _ctx(tmp_path, *, archive=True):
         d["display"].update({"timezone": "UTC", "language": "en"})))
     recs = [normalize_flow(raw_flow(i, NOW - timedelta(days=a, minutes=5), NOW - timedelta(days=a)))
             for i, a in enumerate([100, 12, 10, 3, 2])]
+    if undecided:
+        object.__setattr__(recs[3], "policy_decision", "unknown")
     with ctx.flows().connect() as conn:
         upsert_flows(conn, recs, origin=DataOrigin.INGEST, now=NOW)
     run_archive(ctx, now=NOW)
@@ -182,3 +185,21 @@ def test_a_report_read_from_the_archive_says_under_the_conclusion_which_days_it_
     n = int(lacking.split(" ", 1)[0])
     assert n > 0 and len(doc.caveats) == 2  # the collection gap, then the archive
     assert doc.caveats[1] == f"Days of the period the archive could not supply: {n}; the details are in “Data notes” at the end."
+
+
+def test_with_a_gap_and_undecided_flows_the_archives_days_stay_in_the_data_notes(tmp_path, monkeypatch):
+    """Stage 3b: three things to know and room for two under the conclusion — the collection gap, then the flows
+    without a decision; the days the archive lacks are still said in the data notes."""
+    ctx = _ctx(tmp_path, undecided=True)
+    docs = []
+    write = generate._write
+    monkeypatch.setattr(generate, "_write", lambda out, doc, *a, **k: (docs.append(doc), write(out, doc, *a, **k))[1])
+    rid = generate.enqueue(ctx, _params(), trigger="manual", schedule_id=None, now=NOW)
+    assert generate.run_queued(ctx, now=NOW) == rid
+    doc = docs[0]
+    assert len(doc.caveats) == 2
+    assert doc.caveats[0].startswith("Stretches of the period with no data collected")
+    assert doc.caveats[1].startswith("Flows without a decision: 25.0% of the period's flows")  # 1 of the 4 read
+    assert not any("the archive could not supply" in c for c in doc.caveats)
+    assert any("neither the store nor the archive" in q for q in doc.data_quality)
+    assert "monitor_only" in [s.id for s in doc.sections]

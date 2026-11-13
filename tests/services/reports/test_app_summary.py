@@ -12,7 +12,7 @@ from illumio_ops.services.reports import generate
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
 from illumio_ops.store.flowdb import labels, workloads
 from tests.services.collect.conftest import configured_ctx
-from tests.services.reports.test_findings import flow
+from tests.services.reports.test_findings import covered, flow
 from tests.services.reports.test_traffic import _write
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
@@ -197,3 +197,38 @@ def test_an_app_with_no_decided_flow_has_no_share_and_still_an_opening_sentence(
     table = _table(doc, "impact")
     assert table.rows == () and table.empty_text == NO_DECIDED
     assert "are allowed by a rule" not in _words(doc, "impact")  # no share of nothing in a sentence either
+
+
+# ── stage 3b: the app's flows without a decision have their chapter ──────────────────────────────────────────
+
+def test_the_apps_undecided_flows_have_their_chapter_and_a_sentence_on_the_first_page(ctx):
+    _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443, conns=10),
+                 flow(src_app="Web", dst_app="Finance", port=8443, decision="unknown", conns=5),       # inbound
+                 flow(src_app="Finance", dst_app="DB", port=5432, decision="unknown", conns=3),        # outbound
+                 flow(src_app="Finance", dst_app="Finance", port=8080, decision="unknown", conns=2),   # within the app
+                 flow(dst_app="Finance", port=9, decision="unknown", unmanaged_src=True, conns=7),     # inbound
+                 flow(src_app="Web", dst_app="Other", port=443, decision="unknown", conns=100)])       # not the app's
+    covered(ctx)
+    doc = _build(ctx, _app("Finance"))
+    ids = [s.id for s in doc.sections]
+    assert ids[ids.index("monitor_only") - 1] == "uncovered"
+    kinds = _table(doc, "monitor_only")
+    # the app's 5 flows and 27 connections: 4 flows (17 connections) carry no decision, every one with a VEN on an end
+    assert [(r[0], *r[2:]) for r in kinds.rows] == [("Neither end has a VEN", 0, 0, "0.0%", "0.0%"),
+                                                    ("At least one end has a VEN", 4, 17, "80.0%", "63.0%")]
+    tables = {b.title: b for b in _section(doc, "monitor_only").blocks if isinstance(b, TableBlock)}
+    # the rankings read the app's flows in either direction, once each: they add up to what the three parts counted
+    src = tables["Top sources, at least one end has a VEN"]
+    assert (sum(r[1] for r in src.rows), sum(r[2] for r in src.rows)) == (4, 17)
+    assert "Top sources, neither end has a VEN" not in tables
+    (said,) = doc.caveats
+    assert said == ("Flows without a decision: 80.0% of the period's flows (63.0% by connections). The report's shares "
+                    "count only the flows with a decision; the rest are in “Traffic that can only be watched”.")
+
+
+def test_an_app_whose_flows_all_carry_a_decision_has_no_chapter_and_no_sentence(ctx):
+    _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443),
+                 flow(src_app="Web", dst_app="Other", port=443, decision="unknown")])  # not the app's
+    covered(ctx)
+    doc = _build(ctx, _app("Finance"))
+    assert "monitor_only" not in [s.id for s in doc.sections] and doc.caveats == ()

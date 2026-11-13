@@ -34,10 +34,15 @@ from illumio_ops.services.analysis.predicted_block import (
     predicted_summary,
 )
 from illumio_ops.services.collect.traffic import PCE_FAILURES
-from illumio_ops.services.flowsource import UnruledLink, readiness_rows, unruled_inbound
+from illumio_ops.services.flowsource import (
+    UnruledLink,
+    flow_totals,
+    readiness_rows,
+    unruled_inbound,
+)
 from illumio_ops.services.reports import flowsections
 from illumio_ops.services.reports.common import mode_word, port_text, rule_label, tr
-from illumio_ops.services.reports.generate import coverage_text
+from illumio_ops.services.reports.generate import caveats_in_order, coverage_text
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.visibility import visibility_sections
@@ -254,18 +259,21 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
                             why=t("rpt_rdy_finding_why"), action=t("rpt_rdy_finding_action"),
                             action_code="write_rules", action_short=t("rpt_act_write_rules")),)
 
-    total = sum(r.connections for r in flows.values())
-    unknown = sum(r.unknown for r in flows.values())
     filter_line = flowsections.filter_text(inp.params.filter, lang)
     cov = coverage_text(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True)
     quality = (*cov.lines,
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
-               t("rpt_rdy_quality_definition"),
-               *((t("rpt_rdy_quality_unknown", pct=f"{100 * unknown / total:.1f}"),) if unknown else ()))
+               t("rpt_rdy_quality_definition"))
+    # The flows without a decision, said as the flow reports say them: their share of the period's flows under this
+    # report's filter (not only the connections into managed hosts the scores read). This report has no chapter for
+    # them, so the sentence names the two factors that leave them out instead of pointing at one.
+    saw = flowsections.seen(flow_totals(inp.ctx, spec))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_readiness"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=findings,
-        data_quality=quality, caveats=cov.caveats,
+        data_quality=quality,
+        caveats=caveats_in_order(gaps=cov.caveats,
+                                 undecided=flowsections.undecided_caveat(lang, saw, chapter=False)),
         sections=(Section(id="how", title=t("rpt_rdy_sec_how"), intro=t("rpt_rdy_how_intro"), blocks=(factors, grades)),
                   Section(id="next", title=t("rpt_rdy_sec_next"), intro=t("rpt_rdy_next_intro"), blocks=(next_steps,)),
                   Section(id="scores", title=t("rpt_rdy_sec_scores"), intro=t("rpt_rdy_scores_intro"), blocks=(scores, basis)),

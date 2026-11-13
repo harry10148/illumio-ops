@@ -12,7 +12,14 @@ from illumio_ops.services.reports.registry import BuildInput, ReportParams, spec
 from illumio_ops.services.reports.render_html import render_html
 from illumio_ops.store.flowdb import analysis, labels, workloads
 from tests.services.collect.conftest import configured_ctx
-from tests.services.reports.test_findings import decided_and_not, flow
+from tests.services.reports.test_findings import (
+    UNDECIDED_EN,
+    UNDECIDED_ZH,
+    covered,
+    decided_and_not,
+    flow,
+    undecided_sample,
+)
 from tests.services.reports.test_traffic import _write
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
@@ -268,3 +275,35 @@ def test_how_the_score_is_worked_out_says_which_connections_it_counts(ctx):
     assert next(r for r in parts.rows if r[0] == "From managed sources")[4].startswith("8 of 10")
     zh = _build(ctx, lang=Language.ZH_TW)
     assert "只算有判定的連線" in _texts(zh, "how") and "6.10.0" in _texts(zh, "how")
+
+
+# ── stage 3b: the flows without a decision have their chapter, and the first page says how many there are ────
+
+def test_undecided_flows_have_their_chapter_before_the_rules_and_a_sentence_on_the_first_page(ctx):
+    undecided_sample(ctx)
+    covered(ctx)
+    doc = _build(ctx)
+    ids = [s.id for s in doc.sections]
+    assert ids[ids.index("monitor_only") - 1] == "lateral" and ids[ids.index("monitor_only") + 1] == "findings"
+    assert doc.caveats == (UNDECIDED_EN,)
+    kinds = _tables(doc, "monitor_only")[0]
+    assert [(r[2], r[3]) for r in kinds.rows] == [(1, 50), (4, 19)]
+    assert _build(ctx, lang=Language.ZH_TW).caveats == (UNDECIDED_ZH,)
+
+
+def test_no_undecided_flow_no_chapter_and_no_sentence(ctx):
+    _write(ctx, [flow(port=443), flow(port=8080, decision="potentially_blocked")])
+    covered(ctx)
+    doc = _build(ctx)
+    assert "monitor_only" not in [s.id for s in doc.sections] and doc.caveats == ()
+
+
+def test_a_collection_gap_comes_before_the_undecided_sentence(ctx, monkeypatch):
+    from illumio_ops.services.reports import security_risk
+    from illumio_ops.services.reports.generate import CoverageText
+    undecided_sample(ctx)
+    monkeypatch.setattr(security_risk, "coverage_text",
+                        lambda *a, **k: CoverageText(lines=("the gap, line by line",), caveats=("the gap sentence",)))
+    doc = _build(ctx)
+    assert len(doc.caveats) == 2 and doc.caveats[0] == "the gap sentence"
+    assert doc.caveats[1].startswith("Flows without a decision: 55.6%")

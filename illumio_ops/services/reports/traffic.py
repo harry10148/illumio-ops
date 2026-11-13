@@ -30,6 +30,7 @@ from illumio_ops.services.flowsource import (
 from illumio_ops.services.reports import findings, flowsections
 from illumio_ops.services.reports.common import DECISION_KEYS, PROTOCOLS, port_text, tr
 from illumio_ops.services.reports.generate import (
+    caveats_in_order,
     coverage_text,
     previous_period,
     traffic_covered,
@@ -56,6 +57,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
     env_key = lc.settings.environment_label_key
     spec = flowsections.window(inp)
     totals = flow_totals(inp.ctx, spec)
+    saw = flowsections.seen(totals)
     prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
     prev_known = traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now, flows=True)
     before = (_kpi_values(flow_totals(inp.ctx, flowsections.window(inp).model_copy(
@@ -173,7 +175,8 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_traffic"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang), caveats=cov.caveats,
+        findings=findings.as_findings(outcomes, lang),
+        caveats=caveats_in_order(gaps=cov.caveats, undecided=flowsections.undecided_caveat(lang, saw)),
         data_quality=(*quality, *flowsections.no_links_note(inp)),
         sections=(Section(id="decisions", title=t("rpt_trf_sec_decisions"), intro=t("rpt_trf_decisions_intro"),
                           blocks=decision_blocks),
@@ -185,6 +188,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
                           workbench_link=link(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST,
                                               metric=SegmentMetric.BYTES) if fc.bytes else None),
                   Section(id="unmanaged", title=t("rpt_trf_sec_unmanaged"), blocks=(unmanaged,)),
+                  *flowsections.monitor_only_section(inp, spec, saw, hosts=lc.hosts),
                   *findings.unevaluated_section(outcomes, lang,
                                                 title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_trf_findings_intro"),
                                                 table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(totals.flows))))

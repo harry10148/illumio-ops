@@ -53,6 +53,7 @@ from illumio_ops.services.reports.common import (
     tr,
 )
 from illumio_ops.services.reports.generate import (
+    caveats_in_order,
     coverage_text,
     previous_period,
     traffic_covered,
@@ -132,6 +133,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     cond = inp.params.filter
     spec = flowsections.window(inp)
     totals = flow_totals(inp.ctx, spec, admin_ports=admin)
+    saw = flowsections.seen(totals)
     prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
     before = (_flow_kpis(flow_totals(inp.ctx, spec.model_copy(update={"start": prev_start, "end": inp.start}),
                                      admin_ports=admin))
@@ -390,7 +392,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_security_risk"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
-        findings=findings.as_findings(outcomes, lang), caveats=cov.caveats,
+        findings=findings.as_findings(outcomes, lang),
+        caveats=caveats_in_order(gaps=cov.caveats, undecided=flowsections.undecided_caveat(lang, saw)),
         data_quality=(*quality, *missing, *flowsections.no_links_note(inp)),
         sections=tuple(s for s in (
             Section(id="how", title=t("rpt_sec_sec_how"), intro=t("rpt_sec_how_intro"),
@@ -414,6 +417,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                         link((), GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS)) if fc.initiator_process
                         else None)),
             Section(id="lateral", title=t("rpt_sec_sec_lateral"), blocks=(TextBlock(paragraphs=tuple(lateral_lines)),)),
+            *flowsections.monitor_only_section(inp, spec, saw, hosts=lc.hosts),
             *findings.unevaluated_section(_by_category(outcomes), lang,
                                           title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_trf_findings_intro"),
                                           table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(totals.flows)))
