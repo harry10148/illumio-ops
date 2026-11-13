@@ -1,13 +1,17 @@
 """The segmentation maturity score of the security risk report (v6 definition, P5b-1 Task 4): five parts, each
 0..1, weighted 40/25/15/10/10. A part without data is left out and the others rescaled to 100, so a missing input
-never reads as 0. 5.x counted selective enforcement as full (its fallback path); here it is half."""
+never reads as 0. 5.x counted selective enforcement as full (its fallback path); here it is half.
+The three parts scored on connections (policy, lateral, managed) are shares of the connections the PCE reported a
+decision for (UI redesign spec §9.2, from 6.10.0): a connection without one is in none of them, and with no decided
+connection the three are left out. Before 6.10.0 lateral and managed were shares of every connection, so a score
+from an earlier version is not comparable."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 WEIGHTS = {"enforcement": 40, "policy": 25, "lateral": 15, "managed": 10, "ransomware": 10}
-LATERAL_CAP = 0.30  # management-port connections not blocked: at 30% of all connections the part is 0
-MANAGED_CAP = 0.50  # connections from unmanaged sources: at 50% the part is 0
+LATERAL_CAP = 0.30  # management-port connections not blocked: at 30% of the decided connections the part is 0
+MANAGED_CAP = 0.50  # decided connections from unmanaged sources: at 50% the part is 0
 GRADES = ((85, "A"), (70, "B"), (55, "C"), (40, "D"))
 
 
@@ -16,13 +20,13 @@ class MaturityInputs:
     hosts_managed: int
     hosts_full: int
     hosts_selective: int
-    connections: int
+    connections: int  # every connection seen; the three connection parts are shares of connections - undecided
     allowed_connections: int
-    admin_open_connections: int  # on management ports, decision not blocked
-    unmanaged_source_connections: int
+    admin_open_connections: int  # on management ports: decided, and the decision is not blocked
+    unmanaged_source_connections: int  # of the decided connections
     ransomware_services: int | None  # critical/high services the PCE rated; None: no ransomware data
     ransomware_protected: int | None
-    undecided_connections: int = 0  # no reported decision: left out of the policy part
+    undecided_connections: int = 0  # no reported decision: in none of the three connection parts
 
 
 @dataclass(frozen=True)
@@ -55,11 +59,11 @@ def score_with(parts: dict[str, float | None], part: str) -> float | None:
 
 
 def maturity(m: MaturityInputs) -> Maturity:
-    share = (lambda n: n / m.connections) if m.connections else None
+    decided = m.connections - m.undecided_connections
+    share = (lambda n: n / decided) if decided > 0 else None
     parts: dict[str, float | None] = {
         "enforcement": (m.hosts_full + 0.5 * m.hosts_selective) / m.hosts_managed if m.hosts_managed else None,
-        "policy": (m.allowed_connections / (m.connections - m.undecided_connections)
-                   if m.connections - m.undecided_connections > 0 else None),
+        "policy": share(m.allowed_connections) if share else None,
         "lateral": 1 - min(share(m.admin_open_connections), LATERAL_CAP) / LATERAL_CAP if share else None,
         "managed": 1 - min(share(m.unmanaged_source_connections), MANAGED_CAP) / MANAGED_CAP if share else None,
         "ransomware": (m.ransomware_protected or 0) / m.ransomware_services if m.ransomware_services else None,

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import pytest
 
 from illumio_ops.domain.filter import EndpointFilter, FlowCondition, LabelCond
-from illumio_ops.domain.report import TableBlock
+from illumio_ops.domain.report import TableBlock, TextBlock
 from illumio_ops.domain.values import Language, ReportType
 from illumio_ops.services.reports import generate
 from illumio_ops.services.reports.registry import BuildInput, ReportParams, specs
@@ -67,7 +67,8 @@ def test_intra_app_counted_once(ctx):
                  flow(src_app="Finance", dst_app="DB", port=5432, decision="potentially_blocked")])
     doc = _build(ctx, _app("Finance"))
     rows = {r[0]: r[1] for r in _table(doc, "impact").rows}
-    assert rows == {"Allowed (a rule allows it)": 2, "Potentially Blocked (blocked once enforcement starts)": 1}
+    assert rows == {"Allowed (a rule allows it)": 2, "Potentially Blocked (blocked once enforcement starts)": 1,
+                    "Blocked": 0}  # the three decisions, always (stage 3b)
     kpi = {k.key: k.value for k in doc.kpis}
     assert kpi["inbound_connections"] == 1 and kpi["outbound_connections"] == 1 and kpi["intra_connections"] == 1
     assert kpi["pb_flows"] == 1
@@ -152,3 +153,47 @@ def test_exposure_finding_limited_to_the_app(ctx):
     doc = _build(ctx, _app("Finance"))
     # L006 was evaluated on the app's own hosts and did not fire: no finding, and no closing section to list it in
     assert doc.findings == () and "findings" not in {s.id for s in doc.sections}
+
+
+# ── stage 3b: a share counts only the flows the PCE gave a decision for ──────────────────────────────────────
+
+NO_DECIDED = "No flow in this period carries a decision, so no share can be worked out."
+
+
+def _words(doc, sid):
+    return " ".join(p for b in _section(doc, sid).blocks if isinstance(b, TextBlock) for p in b.paragraphs)
+
+
+def test_allowed_share_is_of_the_apps_decided_connections(ctx):
+    _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443, conns=10),
+                 flow(src_app="Finance", dst_app="DB", port=5432, decision="potentially_blocked", conns=30),
+                 flow(src_app="Finance", dst_app="Finance", port=8080, decision="unknown", conns=60)])
+    doc = _build(ctx, _app("Finance"))
+    kpi = {k.key: k for k in doc.kpis}
+    assert kpi["allowed_pct"].value == 25.0  # 10 of the 40 connections with a decision, not 10 of 100
+    assert kpi["intra_connections"].value == 60  # what was seen keeps the connections without a decision
+    assert _table(doc, "impact").rows == (
+        ("Allowed (a rule allows it)", 1, 10, "50.0%"),
+        ("Potentially Blocked (blocked once enforcement starts)", 1, 30, "50.0%"), ("Blocked", 0, 0, "0.0%"))
+    words = _words(doc, "impact")
+    assert "25.0% of the app's connections with a decision are allowed by a rule" in words
+    assert "Flows without one: 1 (connections: 60); see “Traffic that can only be watched”." in words
+
+
+def test_an_app_with_no_decided_flow_has_no_share_and_still_an_opening_sentence(ctx):
+    from illumio_ops.domain.conclusion import conclusion, incomplete
+    from illumio_ops.i18n import translate
+    from illumio_ops.services.reports.finish import finish
+    _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443, decision="unknown", conns=7)])
+    doc = finish(_build(ctx, _app("Finance")))
+    kpi = {k.key: k for k in doc.kpis}
+    assert kpi["allowed_pct"].value is None and kpi["allowed_pct"].note == NO_DECIDED
+    assert kpi["inbound_connections"].value == 7 and kpi["pb_flows"].value == 0
+    assert not incomplete(doc)
+    assert conclusion(doc, lambda key, p: translate(doc.lang, key, p), tz=UTC) == (
+        "Connections inbound: 7, outbound: 0, within the app: 0.")
+    zh = finish(_build(ctx, _app("Finance"), Language.ZH_TW))
+    assert conclusion(zh, lambda key, p: translate(zh.lang, key, p), tz=UTC) == "連線次數：連入 7、連出 0、App 內 0。"
+    table = _table(doc, "impact")
+    assert table.rows == () and table.empty_text == NO_DECIDED
+    assert "are allowed by a rule" not in _words(doc, "impact")  # no share of nothing in a sentence either

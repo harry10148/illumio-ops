@@ -10,6 +10,10 @@ rows), as 5.x counted rows. What differs from 5.x:
 - B008 compares each source → destination × port total over the period (rows are per-day buckets).
 - INFO (B009) becomes LOW: v6 severities start at low.
 - A rule that raises is reported as not evaluated; the others still run (5.x showed one ENG01 card).
+- A rule that counts flows "not blocked", or takes a share, counts the flows the PCE reported a decision for
+  (UI redesign spec §9.2, from 6.10.0): B001, B004, B005, B006, L002, L005, L007. A flow without a decision is neither
+  allowed nor a risk left open — it is listed in the reports' own chapter. The rules that ask whether something
+  happened at all (B007, B008, B009, L001) read every flow, as before; the others name the decision they count.
 """
 from __future__ import annotations
 
@@ -66,6 +70,10 @@ def _ports(pairs: Collection[tuple[int, int | None]]) -> tuple[str, list[Any]]:
 
 
 CROSS_ENV = "src_env != '' AND dst_env != '' AND src_env != dst_env"
+# On the grouped rows (flowsource.group_for_findings): the PCE gave the flow a decision, and that decision is not
+# "blocked" (allowed or potentially blocked). The decisions themselves are spelled once, in flowsource.
+DECIDED = "decided = 1"
+NOT_BLOCKED = f"{DECIDED} AND decision != 'blocked'"
 
 
 class _Run:
@@ -91,7 +99,7 @@ class _Run:
 
 def _b001(r: _Run) -> RuleOutcome | None:
     pc, pp = _ports(CRITICAL_PORTS)
-    base = f"{pc} AND decision != 'blocked'"
+    base = f"{pc} AND {NOT_BLOCKED}"
     total = r.sum(base, pp)
     if not total:
         return None
@@ -129,18 +137,19 @@ def _simple(rule_id: str, ports: Collection[tuple[int, int | None]], decision: s
 
 
 def _b004(r: _Run) -> RuleOutcome | None:
-    n = r.sum("src_managed = 0", [])
+    cond = f"src_managed = 0 AND {DECIDED}"
+    n = r.sum(cond, [])
     if n <= r.t.unmanaged_connection:
         return None
-    top, first = r.top(f"SELECT src_key, SUM(flows) n FROM {_AGG} WHERE src_managed = 0 GROUP BY src_key "
+    top, first = r.top(f"SELECT src_key, SUM(flows) n FROM {_AGG} WHERE {cond} GROUP BY src_key "
                        "ORDER BY n DESC", [])
     return RuleOutcome("B004", Severity.MEDIUM, "rpt_rule_b004_desc", "rpt_rule_b004_rec", {
         "n_flows": n, "threshold": r.t.unmanaged_connection, "top_sources": top}, focus=first)
 
 
 def _b005(r: _Run) -> RuleOutcome | None:
-    total = r.sum("1", [])
-    if not total:
+    total = r.sum(DECIDED, [])
+    if not total:  # no flow carries a decision: there is nothing to take a share of
         return None
     pct = 100 * r.sum("decision = 'allowed'", []) / total
     if pct >= r.t.min_policy_coverage_pct:
@@ -157,7 +166,7 @@ def _fanout(r: _Run, cond: str, params: list[Any], key: str, limit: int) -> list
 
 def _b006(r: _Run) -> RuleOutcome | None:
     pc, pp = _ports(r.admin)
-    base = f"{pc} AND decision != 'blocked'"
+    base = f"{pc} AND {NOT_BLOCKED}"
     over = _fanout(r, base, pp, "src_key", r.t.lateral_outbound_dst)
     if not over:
         return None
@@ -227,7 +236,7 @@ def _l001(r: _Run) -> RuleOutcome | None:
 
 def _l002(r: _Run) -> RuleOutcome | None:
     pc, pp = _ports(DISCOVERY_PORTS)
-    cond = f"{pc} AND decision != 'blocked'"
+    cond = f"{pc} AND {NOT_BLOCKED}"
     n = r.sum(cond, pp)
     if n < r.t.discovery_protocol:
         return None
@@ -266,7 +275,7 @@ def _l005(r: _Run) -> RuleOutcome | None:
     def apps(extra: str) -> int:
         return int(r.conn.execute(f"SELECT COUNT(DISTINCT src_app) FROM {_AGG} WHERE {pc} AND src_app != '' "
                                   f"AND {extra}", pp).fetchone()[0])
-    n = apps("decision != 'blocked'")
+    n = apps(NOT_BLOCKED)
     if n <= r.t.identity_unique_src_app:
         return None
     allowed = apps("decision = 'allowed'")
@@ -291,7 +300,7 @@ def _l006(r: _Run) -> RuleOutcome | None:
 
 def _l007(r: _Run) -> RuleOutcome | None:
     pc, pp = _ports(DB_PORTS | IDENTITY_PORTS | WINDOWS_MGMT_PORTS)
-    cond = f"src_managed = 0 AND {pc} AND decision != 'blocked'"
+    cond = f"src_managed = 0 AND {pc} AND {NOT_BLOCKED}"
     n = r.sum(cond, pp)
     if n < r.t.unmanaged_critical:
         return None

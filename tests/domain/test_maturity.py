@@ -53,3 +53,21 @@ def test_policy_part_over_decided_connections():
     assert m.parts["policy"] == pytest.approx(1.0)
     m = maturity(_inputs(connections=100, allowed_connections=0, undecided_connections=100))
     assert m.parts["policy"] is None
+
+
+def test_the_three_connection_parts_share_one_denominator():
+    """Stage 3b: management-port and unmanaged-source connections are shares of the connections with a decision,
+    as the policy part is — 60 of 100 connections carry none, so 4 unmanaged-source connections are 4 of 40."""
+    m = maturity(_inputs(connections=100, undecided_connections=60, allowed_connections=10,
+                         admin_open_connections=2, unmanaged_source_connections=4))
+    assert m.parts["policy"] == pytest.approx(10 / 40)
+    assert m.parts["managed"] == pytest.approx(1 - (4 / 40) / 0.50)  # 0.8; over all 100 it read 0.92
+    assert m.parts["lateral"] == pytest.approx(1 - (2 / 40) / 0.30)
+
+
+def test_no_decided_connection_leaves_the_three_parts_out():
+    """Nothing to take a share of: the three parts are not 0 and not full marks, they are left out, and the score
+    rests on the parts that have data."""
+    m = maturity(_inputs(connections=100, undecided_connections=100, allowed_connections=0, hosts_full=5))
+    assert m.parts["policy"] is None and m.parts["lateral"] is None and m.parts["managed"] is None
+    assert m.score == pytest.approx(100 * (40 * 0.5 + 10 * 1.0) / 50)  # enforcement and ransomware only

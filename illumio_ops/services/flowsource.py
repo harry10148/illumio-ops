@@ -93,6 +93,19 @@ __all__ = [
 ]
 
 Order = Literal["last_detected_desc", "connections_desc"]
+# The one definition of a flow "with a decision" (UI redesign spec §9.2): the PCE reported it allowed, potentially
+# blocked or blocked. 'unknown' is a flow it reported no decision for (on lab nearly all are VEN snapshots and flows
+# between two addresses without a VEN). Every share a report prints is a share of the decided flows; a count that
+# says "not blocked" counts NOT_BLOCKED. Only policy_decision is read: the daily rollups and the archive carry no
+# state, and the stored modes are today's, not the flow's.
+DECIDED = ("allowed", "potentially_blocked", "blocked")
+NOT_BLOCKED = ("allowed", "potentially_blocked")
+UNDECIDED = "unknown"
+
+
+def decision_sql(column: str, decisions: Sequence[str] = DECIDED) -> str:
+    """`column` holds one of `decisions` (every decided one by default), as a SQL condition."""
+    return f"{column} IN ({', '.join(repr(d) for d in decisions)})"
 FILL_MAX_RESULTS = 200_000
 # Records one query reads from the PCE over all its gaps, held in memory (~6 KB each once parsed).
 FILL_BUDGET = 50_000
@@ -457,7 +470,8 @@ def group_for_findings(conn: Any, spec: FilterSpec | Sequence[FilterSpec], *, en
     """The findings engine's one read of a period (services.reports.findings): the primary rows grouped by
     source, destination, service, decision, managed sides, app and environment labels and user, into the
     TEMP table `table` on `conn` (a connection from reports.reads.reading, which holds the PCE guard).
-    Several specs: the rows any of them matches (one application's traffic in either direction)."""
+    `decided` is 1 on the rows whose decision is one of DECIDED: the rules read that column, none spells the
+    decisions out. Several specs: the rows any of them matches (one application's traffic in either direction)."""
     for name, fn in sql_functions().items():
         conn.create_function(name, -1, fn, deterministic=True)
     parts, params = [], []
@@ -469,14 +483,15 @@ def group_for_findings(conn: Any, spec: FilterSpec | Sequence[FilterSpec], *, en
     conn.execute(f"DROP TABLE IF EXISTS temp.{table}")
     conn.execute(
         f"CREATE TEMP TABLE {table} AS SELECT f.src_key, f.dst_key, COALESCE(f.port, -1) AS port, f.proto, "
-        "f.policy_decision AS decision, f.src_managed, f.dst_managed, "
+        f"f.policy_decision AS decision, {decision_sql('f.policy_decision')} AS decided, "
+        "f.src_managed, f.dst_managed, "
         f"{_label_of('src')} AS src_app, {_label_of('src')} AS src_env, "
         f"{_label_of('dst')} AS dst_app, {_label_of('dst')} AS dst_env, "
         f"COALESCE({user_key_sql('f.initiator_user')}, '') AS user, "
         "COUNT(*) AS flows, SUM(f.num_connections) AS connections, "
         "SUM(COALESCE(f.bytes_in, 0) + COALESCE(f.bytes_out, 0)) AS bytes, "
         "SUM(f.bytes_in IS NOT NULL OR f.bytes_out IS NOT NULL) AS bytes_rows "
-        f"FROM flows f WHERE {where} GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12",
+        f"FROM flows f WHERE {where} GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13",
         ["app", env_key, "app", env_key, *params])
 
 
@@ -504,17 +519,46 @@ def connections_by_day(ctx: AppContext, spec: FilterSpec) -> dict[str, int]:
     return {str(day): int(n or 0) for day, n in rows}
 
 
+class Undecided(BaseModel):
+    """The flows of a period the PCE reported no decision for, in two kinds told apart by the managed flags stored
+    with each flow (what the PCE said of the two ends when the flow was collected): neither end had a VEN
+    (unmanaged_*), or at least one had (managed_*). The two add up to flows / connections."""
+    model_config = ConfigDict(frozen=True)
+    flows: int = 0
+    connections: int = 0
+    unmanaged_flows: int = 0
+    unmanaged_connections: int = 0
+    managed_flows: int = 0
+    managed_connections: int = 0
+
+    def __add__(self, other: Undecided) -> Undecided:
+        """Over two disjoint sets of flows (one app's inbound and outbound traffic)."""
+        return Undecided(**{name: getattr(self, name) + getattr(other, name) for name in Undecided.model_fields})
+
+
 class FlowTotals(BaseModel):
-    """A period's totals over the primary rows a filter matches (flows = connection records)."""
+    """A period's totals over the primary rows a filter matches (flows = connection records). flows, connections,
+    sources, destinations, from_unmanaged and to_unmanaged are what was seen, with or without a decision; the
+    numbers a risk or a share is read from count the decided flows only (DECIDED), and `undecided` holds the rest."""
     flows: int
     connections: int
     sources: int
     destinations: int
     from_unmanaged: int
     to_unmanaged: int
-    from_unmanaged_connections: int
-    admin_open_connections: int  # on the given management ports, decision not blocked
-    by_decision: list[DecisionTotals]
+    from_unmanaged_connections: int  # of the decided flows
+    admin_open_connections: int  # on the given management ports: decided and not blocked (NOT_BLOCKED)
+    by_decision: list[DecisionTotals]  # every decision the rows carry, 'unknown' among them, most flows first
+    decided_flows: int
+    decided_connections: int
+    undecided: Undecided
+
+    def decided(self) -> list[DecisionTotals]:
+        """The decided flows as one row per decision, in DECIDED's order; a decision no flow carries is a row of
+        zeros (a table of the three decisions always has its three rows)."""
+        by = {d.decision: d for d in self.by_decision}
+        return [by.get(name) or DecisionTotals(decision=name, flows=0, connections=0, into_managed=0, from_managed=0)
+                for name in DECIDED]
 
 
 
@@ -533,7 +577,8 @@ def flow_totals(ctx: AppContext, spec: FilterSpec, *,
     fdb, gen, settings = _store_read(ctx)
     admin_sql, admin_params = _ports_sql(admin_ports)
     if admin_ports:
-        admin_sql = f"{admin_sql} AND f.policy_decision != 'blocked'"
+        admin_sql = f"{admin_sql} AND {decision_sql('f.policy_decision', NOT_BLOCKED)}"
+    no_ven = f"f.policy_decision = '{UNDECIDED}' AND f.src_managed = 0 AND f.dst_managed = 0"
     with fdb.connect() as conn:
         require_same_pce(conn, settings.pce)
         for name, fn in sql_functions().items():
@@ -545,14 +590,25 @@ def flow_totals(ctx: AppContext, spec: FilterSpec, *,
                          "SELECT f.policy_decision, COUNT(*), SUM(f.num_connections), SUM(f.dst_managed = 1), "
                          f"SUM(f.src_managed = 1) FROM flows f WHERE {where} GROUP BY 1 ORDER BY 2 DESC", params)]
         r = conn.execute("SELECT COUNT(DISTINCT f.src_key), COUNT(DISTINCT f.dst_key), SUM(f.src_managed = 0), "
-                         "SUM(f.dst_managed = 0), SUM(CASE WHEN f.src_managed = 0 THEN f.num_connections END), "
-                         f"SUM(CASE WHEN {admin_sql} THEN f.num_connections END) FROM flows f WHERE {where}",
-                         [*admin_params, *params]).fetchone()
+                         "SUM(f.dst_managed = 0), "
+                         f"SUM(CASE WHEN f.src_managed = 0 AND {decision_sql('f.policy_decision')} "
+                         "THEN f.num_connections END), "
+                         f"SUM(CASE WHEN {admin_sql} THEN f.num_connections END), "
+                         f"SUM({no_ven}), SUM(CASE WHEN {no_ven} THEN f.num_connections END) "
+                         f"FROM flows f WHERE {where}", [*admin_params, *params]).fetchone()
     if fdb.generation != gen:
         raise StaleGeneration
+    decided = [d for d in decisions if d.decision in DECIDED]
+    none = next((d for d in decisions if d.decision == UNDECIDED), None)
+    flows, connections = (none.flows, none.connections) if none is not None else (0, 0)
+    undecided = Undecided(flows=flows, connections=connections, unmanaged_flows=r[6] or 0,
+                          unmanaged_connections=r[7] or 0, managed_flows=flows - (r[6] or 0),
+                          managed_connections=connections - (r[7] or 0))
     return FlowTotals(flows=sum(d.flows for d in decisions), connections=sum(d.connections for d in decisions),
                       sources=r[0], destinations=r[1], from_unmanaged=r[2] or 0, to_unmanaged=r[3] or 0,
-                      from_unmanaged_connections=r[4] or 0, admin_open_connections=r[5] or 0, by_decision=decisions)
+                      from_unmanaged_connections=r[4] or 0, admin_open_connections=r[5] or 0, by_decision=decisions,
+                      decided_flows=sum(d.flows for d in decided),
+                      decided_connections=sum(d.connections for d in decided), undecided=undecided)
 
 
 class LabelMix(BaseModel):

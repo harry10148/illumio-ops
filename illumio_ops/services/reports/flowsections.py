@@ -18,7 +18,7 @@ from illumio_ops.domain.filter import (
     label_group_hrefs,
 )
 from illumio_ops.domain.lateral import HostInfo
-from illumio_ops.domain.report import Cell, Column, TableBlock
+from illumio_ops.domain.report import Cell, Column, TableBlock, TextBlock
 from illumio_ops.domain.segment import FlowSegment, GroupBy
 from illumio_ops.domain.values import (
     Language,
@@ -29,7 +29,7 @@ from illumio_ops.domain.values import (
 )
 from illumio_ops.services.analysis.segments import run_segment
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.flowsource import AggRow, FieldCoverage
+from illumio_ops.services.flowsource import AggRow, FieldCoverage, Undecided
 from illumio_ops.services.hosts import display_names
 from illumio_ops.services.reports.common import (
     DECISION_IN_SENTENCE_KEYS,
@@ -53,6 +53,15 @@ def window(inp: BuildInput) -> FilterSpec:
     """The report's period and filter."""
     base = dict(inp.params.filter) if inp.params.filter is not None else {}
     return FilterSpec(start=inp.start, end=inp.end, **base)
+
+
+def decided_note(lang: Language, undecided: Undecided) -> tuple[TextBlock, ...]:
+    """Under a table of the three decisions: the shares count the decided flows, and how many flows have no
+    decision and where they are listed. Nothing when every flow has a decision."""
+    if not undecided.flows:
+        return ()
+    return (TextBlock(paragraphs=(tr(lang, "rpt_decided_note", flows=f"{undecided.flows:,}",
+                                     connections=f"{undecided.connections:,}"),)),)
 
 
 def narrowed(spec: FilterSpec, decisions: Sequence[PolicyDecision]) -> FilterSpec | None:

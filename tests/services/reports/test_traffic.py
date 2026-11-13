@@ -11,7 +11,7 @@ from illumio_ops.services.reports.registry import BuildInput, ReportParams, spec
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.services.collect.conftest import configured_ctx
-from tests.services.reports.test_findings import flow
+from tests.services.reports.test_findings import decided_and_not, flow
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
 START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
@@ -48,7 +48,7 @@ def test_decision_table_flows_and_connections(ctx):
     _write(ctx, [flow(port=443, conns=3), flow(port=443, conns=4), flow(port=22, decision="potentially_blocked", conns=5),
                  flow(port=23, decision="blocked", conns=1)])
     doc = _build(ctx)
-    rows = {r[0]: r[1:3] for r in _table(doc, "decisions").rows}
+    rows = {r[0]: (r[1], r[3]) for r in _table(doc, "decisions").rows}
     assert rows["Allowed (a rule allows it)"] == (2, 7) and rows["Potentially Blocked (blocked once enforcement starts)"] == (1, 5) and rows["Blocked"] == (1, 1)
     kpis = {k.key: k.value for k in doc.kpis}
     assert kpis["flows"] == 4 and kpis["connections"] == 13
@@ -58,7 +58,7 @@ def test_inbound_single_definition(ctx):
     # Into a managed host = the destination is managed, whoever started it (5.x had three definitions).
     _write(ctx, [flow(port=443, unmanaged_src=True), flow(port=443), flow(port=443, unmanaged_dst=True)])
     row = next(r for r in _table(_build(ctx), "decisions").rows if r[0] == "Allowed (a rule allows it)")
-    assert row[3] == 2 and row[4] == "66.7%"
+    assert row[4] == 2 and row[5] == "66.7%"
 
 
 def test_bytes_section_states_coverage(tmp_path):
@@ -190,9 +190,10 @@ def test_bandwidth_and_bytes_per_connection(ctx):
     assert "2 of 2" in text and "lower bound" in text and "highest here: 1.398 Mbps" in text
 
 
-def test_unknown_decisions_are_explained_and_days_are_drawn(ctx):
-    """6.6.0 Task 6: the Unknown row says what it is and how many; a period seen on more than one day draws its
-    connections per day, which add up to the total."""
+def test_undecided_flows_are_counted_under_the_table_and_days_are_drawn(ctx):
+    """Stage 3b: the flows without a decision are no row of the table; a sentence under it says how many there are
+    and where they are listed. A period seen on more than one day draws its connections per day (every connection,
+    with or without a decision), which add up to the total."""
     from datetime import timedelta
 
     from illumio_ops.domain.report import BarBlock
@@ -202,7 +203,9 @@ def test_unknown_decisions_are_explained_and_days_are_drawn(ctx):
     doc = _build(ctx)
     sec = _section(doc, "decisions")
     words = " ".join(p for blk in sec.blocks if isinstance(blk, TextBlock) for p in blk.paragraphs)
-    assert "reported the decision of 1 flow records as Unknown" in words
+    assert "Flows without one: 1 (connections: 2); see “Traffic that can only be watched”." in words
+    named = [r[0] for r in _table(doc, "decisions").rows]
+    assert named[0] == "Allowed (a rule allows it)" and "Unknown" not in named and len(named) == 3
     bars = next(blk for blk in sec.blocks if isinstance(blk, BarBlock))
     assert [v for _, v in bars.points] == [3, 2] and sum(v for _, v in bars.points) == 5
 
@@ -212,3 +215,42 @@ def test_one_day_of_traffic_draws_no_trend_and_no_unknown_note(ctx):
     _write(ctx, [flow(port=443)])
     sec = _section(_build(ctx), "decisions")
     assert not [b for b in sec.blocks if isinstance(b, (BarBlock, TextBlock))]
+
+
+# ── stage 3b: a share counts only the flows the PCE gave a decision for ──────────────────────────────────────
+
+NO_DECIDED = "No flow in this period carries a decision, so no share can be worked out."
+
+
+def test_decision_table_is_the_three_decisions_with_their_share_of_the_decided_flows(ctx):
+    _write(ctx, decided_and_not())
+    doc = _build(ctx)
+    table = _table(doc, "decisions")
+    assert [c.key for c in table.columns] == ["decision", "flows", "share", "connections", "into_managed",
+                                              "into_managed_pct"]
+    assert [r[:4] for r in table.rows] == [
+        ("Allowed (a rule allows it)", 3, "75.0%", 10),
+        ("Potentially Blocked (blocked once enforcement starts)", 1, "25.0%", 30), ("Blocked", 0, "0.0%", 0)]
+    assert sum(float(r[2].rstrip("%")) for r in table.rows) == 100.0
+    words = " ".join(p for b in _section(doc, "decisions").blocks if isinstance(b, TextBlock) for p in b.paragraphs)
+    assert words == ("Shares count only the flows with a decision. Flows without one: 2 (connections: 60); see "
+                     "“Traffic that can only be watched”.")
+    kpis = {k.key: k.value for k in doc.kpis}
+    assert kpis["flows"] == 6 and kpis["connections"] == 100  # what was seen keeps the flows without a decision
+
+
+def test_a_period_with_no_decided_flow_has_an_empty_decision_table_that_says_why(ctx):
+    _write(ctx, [flow(port=443, decision="unknown", conns=5), flow(port=22, decision="unknown", conns=5)])
+    doc = _build(ctx)
+    table = _table(doc, "decisions")
+    assert table.rows == () and table.empty_text == NO_DECIDED
+    words = " ".join(p for b in _section(doc, "decisions").blocks if isinstance(b, TextBlock) for p in b.paragraphs)
+    assert "Flows without one: 2 (connections: 10)" in words
+    assert {k.key: k.value for k in doc.kpis}["flows"] == 2
+
+
+def test_zh_decided_note(ctx):
+    _write(ctx, decided_and_not())
+    doc = _build(ctx, lang=Language.ZH_TW)
+    words = " ".join(p for b in _section(doc, "decisions").blocks if isinstance(b, TextBlock) for p in b.paragraphs)
+    assert words == "比例只算有判定的流量；沒有判定的 2 筆（60 次連線）見〈只能監看的流量〉。"

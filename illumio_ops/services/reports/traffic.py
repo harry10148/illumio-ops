@@ -68,22 +68,23 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
 
     def pct(n: int, d: int) -> str:
         return f"{100 * n / d:.1f}%" if d else "—"
+    # The three decisions and their shares of the decided flows. The flows the PCE gave no decision for are no row:
+    # the sentence under the table says how many there are and which chapter lists them. (The numbers above the
+    # table, and the day chart, are what was seen: every flow.)
+    decided = totals.decided() if totals.decided_flows else []
     decisions = TableBlock(
         title=t("rpt_trf_tbl_decisions"),
         columns=(Column(key="decision", label=t("rpt_col_decision")),
                  Column(key="flows", label=t("rpt_col_flows"), kind="number"),
+                 Column(key="share", label=t("rpt_col_share_flows")),
                  Column(key="connections", label=t("rpt_col_connections"), kind="number"),
                  Column(key="into_managed", label=t("rpt_col_into_managed"), kind="number"),
                  Column(key="into_managed_pct", label=t("rpt_col_into_managed_pct"))),
-        rows=tuple((t(DECISION_KEYS.get(d.decision, "decision_unknown")), d.flows, d.connections, d.into_managed,
-                    pct(d.into_managed, d.flows)) for d in totals.by_decision),
-        total_rows=len(totals.by_decision), empty_text=no_flows)
-
-    # PCE's own "unknown": said under the table, with how many, so the row is not read as a fault of this product
-    unknown = next((d.flows for d in totals.by_decision if d.decision == "unknown"), 0)
-    decision_blocks: tuple[TableBlock | TextBlock | BarBlock, ...] = (decisions,)
-    if unknown:
-        decision_blocks += (TextBlock(paragraphs=(t("rpt_trf_unknown_note", n=f"{unknown:,}"),)),)
+        rows=tuple((t(DECISION_KEYS[d.decision]), d.flows, pct(d.flows, totals.decided_flows), d.connections,
+                    d.into_managed, pct(d.into_managed, d.flows)) for d in decided),
+        total_rows=len(decided), empty_text=t("rpt_no_decided_flows") if totals.flows else no_flows)
+    decision_blocks: tuple[TableBlock | TextBlock | BarBlock, ...] = (
+        decisions, *flowsections.decided_note(lang, totals.undecided))
     by_day = connections_by_day(inp.ctx, spec) if totals.flows else {}
     if len(by_day) > 1:  # a period seen on one day only has no trend to draw
         decision_blocks += (BarBlock(title=t("rpt_trf_bar_daily"), points=tuple((d[5:], n) for d, n in by_day.items()),

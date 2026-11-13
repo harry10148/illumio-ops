@@ -54,6 +54,16 @@ def flow(*, src=None, dst="db", port=445, proto=6, decision="allowed", src_env="
     return normalize_flow(raw)
 
 
+def decided_and_not():
+    """Stage 3b's sample of a period: allowed 10 connections (4 of them from an unmanaged source, 2 on SSH) and
+    potentially blocked 30, none blocked; without a decision 50 between two addresses with no VEN and 10 from a
+    managed host on SSH. 6 flows, 100 connections; 4 flows and 40 connections carry a decision."""
+    return [flow(port=443, conns=4), flow(port=22, conns=2), flow(port=443, conns=4, unmanaged_src=True),
+            flow(port=8080, decision="potentially_blocked", conns=30),
+            flow(port=443, decision="unknown", unmanaged_src=True, unmanaged_dst=True, conns=50),
+            flow(port=22, decision="unknown", conns=10)]
+
+
 @pytest.fixture
 def ctx(tmp_path):
     return configured_ctx(tmp_path)
@@ -477,3 +487,74 @@ def test_unevaluated_section_says_the_rules_did_not_run():
 def test_a_rule_not_evaluated_is_never_a_finding():
     broken = RuleOutcome("B001", None, "", "", {}, error="RuntimeError: bad rule")
     assert findings.as_findings([broken], Language.EN) == ()
+
+
+# ── stage 3b: a rule counts the flows the PCE gave a decision for; "did it happen" rules read every flow ─────────
+
+def _not_blocked_rule_flows(decision):
+    """One flow set that fires B001, B006, L002, L005 and L007 when its flows are not blocked."""
+    return [flow(port=445, decision=decision),
+            *(flow(src="jump", dst=f"t{i}", port=22, decision=decision) for i in range(4)),
+            flow(port=137, proto=17, decision=decision),
+            *(flow(dst="dc", port=389, src_app=f"A{i}", decision=decision) for i in range(4)),
+            *(flow(port=1433, unmanaged_src=True, decision=decision) for _ in range(2))]
+
+
+_NOT_BLOCKED = {"lateral_outbound_dst": 3, "discovery_protocol": 1, "identity_unique_src_app": 3,
+                "unmanaged_critical": 2}
+
+
+def test_flows_without_a_decision_do_not_count_as_not_blocked(tmp_path):
+    """B001, B006, L002, L005 and L007 counted every flow whose decision was not "blocked" — the ones the PCE gave
+    no decision for among them. They count the allowed and the potentially blocked."""
+    fired = {"B001", "B006", "L002", "L005", "L007"}
+    seen = configured_ctx(tmp_path / "pb")
+    _write(seen, _not_blocked_rule_flows("potentially_blocked"))
+    assert fired <= set(run(seen, **_NOT_BLOCKED))  # the same flows with a decision fire all five
+    undecided = configured_ctx(tmp_path / "unknown")
+    _write(undecided, _not_blocked_rule_flows("unknown"))
+    assert not fired & set(run(undecided, **_NOT_BLOCKED))
+
+
+def test_b001_total_is_the_allowed_and_the_potentially_blocked(ctx):
+    _write(ctx, [flow(port=445), flow(port=445, decision="potentially_blocked"), flow(port=445, decision="unknown")])
+    p = run(ctx)["B001"].params
+    assert (p["n_total"], p["n_allowed"], p["n_pb"]) == (2, 1, 1)  # the total was 3, more than its two parts
+
+
+def test_b004_counts_decided_flows_from_unmanaged_sources(ctx):
+    _write(ctx, [flow(port=443, unmanaged_src=True) for _ in range(3)] +
+           [flow(port=443, unmanaged_src=True, unmanaged_dst=True, decision="unknown") for _ in range(5)])
+    o = run(ctx, unmanaged_connection=2)["B004"]
+    assert o.params["n_flows"] == 3
+    assert "B004" not in run(ctx, unmanaged_connection=3)  # the 5 without a decision do not take it over
+    (f,) = [x for x in findings.as_findings([o], Language.EN)]
+    assert f.what.startswith("3 flows with a decision came from unmanaged sources")
+    assert findings.as_findings([o], Language.ZH_TW)[0].what.startswith("有判定的流量中有 3 筆來自非受管來源")
+
+
+def test_b005_coverage_is_a_share_of_the_decided_flows(ctx):
+    _write(ctx, [flow(port=443)] + [flow(port=443, decision="potentially_blocked") for _ in range(3)] +
+           [flow(port=443, decision="unknown") for _ in range(6)])
+    o = run(ctx)["B005"]
+    assert o.params["coverage_pct"] == "25.0" and o.params["n_flows"] == 4  # 1 of 4, not 1 of 10
+    assert findings.as_findings([o], Language.EN)[0].what.startswith("Only 25.0% of 4 flows with a decision")
+    assert findings.as_findings([o], Language.ZH_TW)[0].what.startswith("4 筆有判定的流量中只有 25.0%")
+
+
+def test_b005_does_not_fire_without_a_decided_flow(ctx):
+    _write(ctx, [flow(port=443, decision="unknown") for _ in range(6)])
+    assert "B005" not in run(ctx)  # a share of nothing is not 0% coverage
+
+
+def test_rules_about_what_happened_read_flows_without_a_decision_too(ctx):
+    """B007 (one account, many destinations), B008 (byte outliers), B009 (across environments) and L001 (cleartext
+    protocols) ask whether something happened, not what the policy decided: unchanged."""
+    _write(ctx, [flow(dst=f"t{i}", port=8443, user="CORP\\alice", decision="unknown") for i in range(3)] +
+           [flow(port=23, decision="unknown")] +
+           [flow(port=9000, src_env="Dev", dst_env="Prod", decision="unknown") for _ in range(3)] +
+           [flow(dst=f"q{i}", port=8443, bytes_=1000, decision="unknown") for i in range(20)] +
+           [flow(dst="big", port=8443, bytes_=50 * 1024 * 1024, decision="unknown")])
+    got = run(ctx, user_destination=2, cross_env_connection=2)
+    assert got["B007"].severity is Severity.HIGH and got["B008"].params["n_outliers"] == 1
+    assert got["B009"].params["n_flows"] == 3 and got["L001"].params["n_flows"] == 1

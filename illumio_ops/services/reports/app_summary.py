@@ -24,7 +24,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.segment import GroupBy
 from illumio_ops.domain.values import PolicyDecision, SegmentDimension, SegmentMetric
 from illumio_ops.services.analysis.context import load_lateral_context
-from illumio_ops.services.flowsource import FlowTotals, flow_totals
+from illumio_ops.services.flowsource import DECIDED, FlowTotals, Undecided, flow_totals
 from illumio_ops.services.reports import findings, flowsections
 from illumio_ops.services.reports.common import DECISION_KEYS, host_keys, mode_word, tr
 from illumio_ops.services.reports.generate import (
@@ -90,11 +90,15 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
     parts = {k: flow_totals(inp.ctx, sides[k]) for k in ("inbound", "outbound", "intra")}
     decisions = _sum(list(parts.values()))
     flows = sum(f for f, _ in decisions.values())
-    connections = sum(c for _, c in decisions.values())
+    # The three parts are disjoint, so their decided and undecided flows add up to the app's.
+    decided_flows = sum(p.decided_flows for p in parts.values())
+    decided_connections = sum(p.decided_connections for p in parts.values())
+    undecided = sum((p.undecided for p in parts.values()), Undecided())
     no_flows = t("rpt_no_flows_filtered")
+    no_decided = t("rpt_no_decided_flows")
 
     prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
-    before: dict[str, float | int] | None = None
+    before: dict[str, float | int | None] | None = None
     if traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now, flows=True):
         prev = _sides(inp, ep, prev_start, inp.start)
         prev_parts = {k: flow_totals(inp.ctx, prev[k]) for k in ("inbound", "outbound", "intra")}
@@ -115,8 +119,10 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
         total_rows=len(hosts), empty_text=t("rpt_app_no_hosts"), host_keys=host_keys(host=(h.key for h in hosts)))
 
     kpis = (
+        # None with traffic: the share, when none of the app's flows carries a decision
         *(Kpi(key=k, label=t(label), value=now_v[k] if flows else None,
-              previous=before[k] if before is not None else None, note=None if flows else no_flows,
+              previous=before[k] if before is not None else None,
+              note=no_flows if not flows else no_decided if now_v[k] is None else None,
               unit="percent" if k == "allowed_pct" else "count",
               better="higher" if k == "allowed_pct" else "lower" if k == "pb_flows" else "neutral")
           for k, label in (("inbound_connections", "rpt_app_kpi_inbound"), ("outbound_connections", "rpt_app_kpi_outbound"),
@@ -151,19 +157,24 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
 
     def pct(n: int, d: int) -> str:
         return f"{100 * n / d:.1f}%" if d else "—"
-    order = sorted(decisions, key=lambda d: -decisions[d][0])
+    # The three decisions and their shares of the app's decided flows; the flows without a decision are no row:
+    # the sentence under the table says how many there are and which chapter lists them.
+    order = DECIDED if decided_flows else ()
     impact = TableBlock(
         title=t("rpt_app_tbl_impact"),
         columns=(Column(key="decision", label=t("rpt_col_decision")),
                  Column(key="flows", label=t("rpt_col_flows"), kind="number"),
                  Column(key="connections", label=t("rpt_col_connections"), kind="number"),
                  Column(key="share", label=t("rpt_col_share_flows"))),
-        rows=tuple((t(DECISION_KEYS.get(d, "decision_unknown")), decisions[d][0], decisions[d][1],
-                    pct(decisions[d][0], flows)) for d in order),
-        total_rows=len(order), empty_text=no_flows)
-    impact_text = TextBlock(paragraphs=(t(
-        "rpt_app_impact_text", allowed=pct(decisions.get("allowed", (0, 0))[1], connections),
-        pb=f"{decisions.get('potentially_blocked', (0, 0))[0]:,}"),))
+        rows=tuple((t(DECISION_KEYS[d]), decisions.get(d, (0, 0))[0], decisions.get(d, (0, 0))[1],
+                    pct(decisions.get(d, (0, 0))[0], decided_flows)) for d in order),
+        total_rows=len(order), empty_text=no_decided if flows else no_flows)
+    impact_blocks: tuple[TableBlock | TextBlock, ...] = (impact,)
+    if decided_connections:  # a share of the decided connections; without one there is no share to say
+        impact_blocks += (TextBlock(paragraphs=(t(
+            "rpt_app_impact_text", allowed=pct(decisions.get("allowed", (0, 0))[1], decided_connections),
+            pb=f"{decisions.get('potentially_blocked', (0, 0))[0]:,}"),)),)
+    impact_blocks += flowsections.decided_note(lang, undecided)
 
     outcomes = findings.run_rules(inp.ctx, [sides["touching_dst"], sides["touching_src"]],
                                   inp.ctx.settings.current().reports.rule_thresholds, lang,
@@ -189,7 +200,7 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
             Section(id="intra", title=t("rpt_app_sec_intra"), blocks=(intra,),
                     workbench_link=flowsections.link(inp, spec=sides["intra"], metric=SegmentMetric.CONNECTIONS,
                                                      limit=TOP, group_by=(GroupBy(dimension=SegmentDimension.SERVICE),))),
-            Section(id="impact", title=t("rpt_app_sec_impact"), blocks=(impact, impact_text)),
+            Section(id="impact", title=t("rpt_app_sec_impact"), blocks=impact_blocks),
             Section(id="hosts", title=t("rpt_app_sec_hosts"), intro=t("rpt_app_hosts_intro"), blocks=(host_table,)),
             Section(id="uncovered", title=t("rpt_sec_sec_uncovered"), blocks=(
                 peer_ranking("rpt_app_tbl_uncovered_in", "inbound", SegmentDimension.SRC_LABEL, uncovered=True,
@@ -203,9 +214,12 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
                                           table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(flows))))
 
 
-def _kpi_values(parts: dict[str, FlowTotals], decisions: dict[str, tuple[int, int]]) -> dict[str, float | int]:
-    connections = sum(c for _, c in decisions.values())
+def _kpi_values(parts: dict[str, FlowTotals],
+                decisions: dict[str, tuple[int, int]]) -> dict[str, float | int | None]:
+    """The connection counts are what was seen; the share is of the connections with a decision, None when the app
+    has none (a share of nothing is not 0%)."""
+    decided = sum(p.decided_connections for p in parts.values())
     return {"inbound_connections": parts["inbound"].connections, "outbound_connections": parts["outbound"].connections,
             "intra_connections": parts["intra"].connections,
-            "allowed_pct": round(100 * decisions.get("allowed", (0, 0))[1] / connections, 1) if connections else 0.0,
+            "allowed_pct": round(100 * decisions.get("allowed", (0, 0))[1] / decided, 1) if decided else None,
             "pb_flows": decisions.get("potentially_blocked", (0, 0))[0]}

@@ -12,7 +12,7 @@ from illumio_ops.services.reports.registry import BuildInput, ReportParams, spec
 from illumio_ops.services.reports.render_html import render_html
 from illumio_ops.store.flowdb import analysis, labels, workloads
 from tests.services.collect.conftest import configured_ctx
-from tests.services.reports.test_findings import flow
+from tests.services.reports.test_findings import decided_and_not, flow
 from tests.services.reports.test_traffic import _write
 
 NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
@@ -197,3 +197,74 @@ def test_maturity_note_names_the_part_losing_most_and_the_score_without_it(ctx):
     k = {x.key: x for x in _build(ctx).kpis}["maturity"]
     assert k.unit == "count" and isinstance(k.value, int)
     assert "Allowed by a rule" in k.note and "about" in k.note
+
+
+# ── stage 3b: a share counts only the flows the PCE gave a decision for ──────────────────────────────────────
+
+NO_DECIDED = "No flow in this period carries a decision, so no share can be worked out."
+DECISIONS = ["Allowed (a rule allows it)", "Potentially Blocked (blocked once enforcement starts)", "Blocked"]
+
+
+def test_shares_and_counts_rest_on_the_decided_flows(ctx):
+    _write(ctx, decided_and_not())
+    doc = _build(ctx)
+    kpi = {k.key: k for k in doc.kpis}
+    assert kpi["allowed_pct"].value == 25.0  # 10 of the 40 connections with a decision, not 10 of 100
+    assert kpi["unmanaged_connections"].value == 4 and kpi["admin_open_connections"].value == 2
+    assert kpi["unmanaged_connections"].label == "Connections with a decision from unmanaged sources"
+    assert kpi["unmanaged_connections"].note == kpi["admin_open_connections"].note == (
+        "Counts only connections with a decision; the ones without are in “Traffic that can only be watched”.")
+    assert (kpi["pb_flows"].value, kpi["blocked_flows"].value) == (1, 0)
+
+
+def test_coverage_table_is_the_three_decisions_and_says_how_many_flows_have_none(ctx):
+    _write(ctx, decided_and_not())
+    doc = _build(ctx)
+    table = _tables(doc, "coverage")[0]
+    assert [r[0] for r in table.rows] == DECISIONS
+    assert [r[1] for r in table.rows] == [3, 1, 0] and [r[2] for r in table.rows] == ["75.0%", "25.0%", "0.0%"]
+    assert sum(float(r[2].rstrip("%")) for r in table.rows) == 100.0
+    words = _texts(doc, "coverage")
+    assert ("Shares count only the flows with a decision. Flows without one: 2 (connections: 60); see “Traffic that "
+            "can only be watched”.") in words
+    # both directions over decided flows: 3 of 4 into managed hosts, 2 of 3 out of them (with the undecided: 60%, 50%)
+    assert "Of flows with a decision into managed hosts, 75.0% are allowed by a rule" in words and "66.7%" in words
+
+
+def test_no_note_about_undecided_flows_when_there_are_none(ctx):
+    _write(ctx, [flow(port=443, unmanaged_src=True), flow(port=8080, decision="potentially_blocked")])
+    doc = _build(ctx)
+    assert "can only be watched" not in _texts(doc, "coverage")
+    assert {k.key: k for k in doc.kpis}["unmanaged_connections"].note is None
+
+
+def test_no_decided_flow_is_no_share_and_never_zero_percent(ctx):
+    _inventory(ctx, [("a1", "full", "Web", "Prod")])
+    _write(ctx, [flow(port=443, decision="unknown", conns=5), flow(port=22, decision="unknown", conns=5)])
+    doc = _build(ctx)
+    kpi = {k.key: k for k in doc.kpis}
+    assert kpi["allowed_pct"].value is None and kpi["allowed_pct"].note == NO_DECIDED
+    # counts of decided flows are counts: there are none
+    assert (kpi["pb_flows"].value, kpi["unmanaged_connections"].value, kpi["admin_open_connections"].value) == (0, 0, 0)
+    table = _tables(doc, "coverage")[0]
+    assert table.rows == () and table.empty_text == NO_DECIDED
+    assert "into managed hosts" not in _texts(doc, "coverage")  # no share of nothing in a sentence either
+    # the three connection parts have no data; the score rests on the hosts (one, in full enforcement)
+    parts = _tables(doc, "how")[0]
+    assert [r[4] for r in parts.rows][1:4] == ["No data: not counted"] * 3 and kpi["maturity"].value == 100
+
+
+def test_how_the_score_is_worked_out_says_which_connections_it_counts(ctx):
+    _write(ctx, decided_and_not())
+    doc = _build(ctx)
+    parts = _tables(doc, "how")[0]
+    measures = {r[0]: r[1] for r in parts.rows}
+    assert "against all connections" not in " ".join(measures.values())
+    for part in ("Management ports closed", "From managed sources", "Allowed by a rule"):
+        assert "with a decision" in measures[part], part
+    said = _texts(doc, "how")
+    assert "count only the connections with a decision" in said and "6.10.0" in said
+    # this period's points follow the decided denominator: 4 of 40 from unmanaged sources is 0.8 of the part's 10
+    assert next(r for r in parts.rows if r[0] == "From managed sources")[4].startswith("8 of 10")
+    zh = _build(ctx, lang=Language.ZH_TW)
+    assert "只算有判定的連線" in _texts(zh, "how") and "6.10.0" in _texts(zh, "how")

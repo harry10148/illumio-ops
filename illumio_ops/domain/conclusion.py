@@ -79,6 +79,11 @@ CONCLUSIONS: Mapping[ReportType, tuple[tuple[tuple[str, ...], str], ...]] = {
         (("rated_hosts", "unprotected"), "rpt_conclusion_ransomware_unsorted"),  # no kept traffic to sort by
         ((), "rpt_conclusion_ransomware_none"),  # the analysis not run, or the PCE gives no rating
     ),
+    ReportType.APP_SUMMARY: (
+        (CONCLUSION_KPIS[ReportType.APP_SUMMARY], CONCLUSION_KEYS[ReportType.APP_SUMMARY]),
+        # none of the app's flows carries a decision: no share to say (the number's own note says why)
+        (("inbound_connections", "outbound_connections", "intra_connections"), "rpt_conclusion_app_summary_no_share"),
+    ),
     ReportType.LATERAL_POSTURE: (
         (CONCLUSION_KPIS[ReportType.LATERAL_POSTURE], CONCLUSION_KEYS[ReportType.LATERAL_POSTURE]),
         (("pivots", "cross_env", "new_detections"), "rpt_conclusion_lateral_posture_no_assets"),  # none chosen

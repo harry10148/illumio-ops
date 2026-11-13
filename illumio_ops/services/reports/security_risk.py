@@ -91,10 +91,12 @@ _KPI_KEYS = {
 _FLOW_KPIS = ("allowed_pct", "pb_flows", "blocked_flows", "unmanaged_connections", "admin_open_connections")
 
 
-def _flow_kpis(t: FlowTotals) -> dict[str, float | int]:
+def _flow_kpis(t: FlowTotals) -> dict[str, float | int | None]:
+    """The numbers read from the period's flows. Every one counts the flows the PCE gave a decision for; the share
+    is None when there is none (a share of nothing is not 0%)."""
     by = {d.decision: d for d in t.by_decision}
     allowed = by["allowed"].connections if "allowed" in by else 0
-    return {"allowed_pct": round(100 * allowed / t.connections, 1) if t.connections else 0.0,
+    return {"allowed_pct": round(100 * allowed / t.decided_connections, 1) if t.decided_connections else None,
             "pb_flows": by["potentially_blocked"].flows if "potentially_blocked" in by else 0,
             "blocked_flows": by["blocked"].flows if "blocked" in by else 0,
             "unmanaged_connections": t.from_unmanaged_connections, "admin_open_connections": t.admin_open_connections}
@@ -149,7 +151,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     score = maturity(MaturityInputs(
         hosts_managed=len(hosts), hosts_full=modes["full"], hosts_selective=modes["selective"],
         connections=totals.connections, allowed_connections=allowed_connections,
-        undecided_connections=by["unknown"].connections if "unknown" in by else 0,
+        undecided_connections=totals.connections - totals.decided_connections,
         admin_open_connections=totals.admin_open_connections,
         unmanaged_source_connections=totals.from_unmanaged_connections,
         ransomware_services=rw_counts[0] if rw_counts else None,
@@ -178,7 +180,12 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         return t("rpt_sec_maturity_note", grade=score.grade, part=t(_PART_KEYS[worst]),
                  got=f"{MATURITY_WEIGHTS[worst] * (score.parts[worst] or 0):.0f}", weight=MATURITY_WEIGHTS[worst],
                  fixed=f"{fixed:.0f}" if fixed is not None else "—")
-    notes: dict[str, str | None] = {k: (no_flows if values[k] is None else None) for k in _FLOW_KPIS}
+    # Why a number is not there: no traffic at all, or traffic of which none carries a decision.
+    no_decided = t("rpt_no_decided_flows")
+    notes: dict[str, str | None] = {k: (None if values[k] is not None else no_decided if totals.flows else no_flows)
+                                    for k in _FLOW_KPIS}
+    if totals.undecided.flows:  # these two count decided connections: say where the others are
+        notes.update(dict.fromkeys(("unmanaged_connections", "admin_open_connections"), t("rpt_kpi_decided_only")))
     notes.update(
         maturity=(no_flows if not totals.flows else maturity_note() if score.grade else t("rpt_sec_maturity_none")),
         enforced_hosts_pct=None if hosts else t("rpt_sec_no_hosts"),
@@ -212,6 +219,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         rows=tuple((t(_PART_KEYS[k]), t(_PART_MEASURES[k]), t(_PART_FULL[k]), str(w), got(k), reached(k))
                    for k, w in MATURITY_WEIGHTS.items()),
         total_rows=len(MATURITY_WEIGHTS), empty_text="")
+    parts_rule = TextBlock(paragraphs=(t("rpt_sec_how_decided"),))
     grades_table = TableBlock(
         title=t("rpt_rdy_tbl_grades"),
         columns=(Column(key="grade", label=t("rpt_rdy_col_grade")), Column(key="range", label=t("rpt_rdy_col_range")),
@@ -222,20 +230,26 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     # ── coverage ────────────────────────────────────────────────────────────
     def pct(n: int, d: int) -> str:
         return f"{100 * n / d:.1f}%" if d else "—"
+    # The three decisions and their shares of the decided flows; the flows without a decision are no row here: a
+    # sentence under the table says how many there are and which chapter lists them.
+    decided = totals.decided() if totals.decided_flows else []
     coverage = TableBlock(
         title=t("rpt_sec_tbl_coverage"),
         columns=(Column(key="decision", label=t("rpt_col_decision")),
                  Column(key="flows", label=t("rpt_col_flows"), kind="number"),
                  Column(key="share", label=t("rpt_col_share_flows")),
                  Column(key="connections", label=t("rpt_col_connections"), kind="number")),
-        rows=tuple((t(DECISION_KEYS.get(d.decision, "decision_unknown")), d.flows, pct(d.flows, totals.flows),
-                    d.connections) for d in totals.by_decision),
-        total_rows=len(totals.by_decision), empty_text=no_flows)
-    into = sum(d.into_managed for d in totals.by_decision)
-    out = sum(d.from_managed for d in totals.by_decision)
-    direction = TextBlock(paragraphs=(t("rpt_sec_direction_coverage",
-                                        inbound=pct(by["allowed"].into_managed if "allowed" in by else 0, into),
-                                        outbound=pct(by["allowed"].from_managed if "allowed" in by else 0, out)),))
+        rows=tuple((t(DECISION_KEYS[d.decision]), d.flows, pct(d.flows, totals.decided_flows), d.connections)
+                   for d in decided),
+        total_rows=len(decided), empty_text=no_decided if totals.flows else no_flows)
+    coverage_blocks: tuple[TableBlock | TextBlock, ...] = (coverage,)
+    if decided:  # both shares are of decided flows; without one there is no share to say
+        into = sum(d.into_managed for d in decided)
+        out = sum(d.from_managed for d in decided)
+        coverage_blocks += (TextBlock(paragraphs=(t(
+            "rpt_sec_direction_coverage", inbound=pct(by["allowed"].into_managed if "allowed" in by else 0, into),
+            outbound=pct(by["allowed"].from_managed if "allowed" in by else 0, out)),)),)
+    coverage_blocks += flowsections.decided_note(lang, totals.undecided)
 
     # ── traffic no rule covers ──────────────────────────────────────────────
     def two_labels(title: str, decisions: tuple[PolicyDecision, ...], second: GroupBy,
@@ -380,9 +394,9 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         data_quality=(*quality, *missing, *flowsections.no_links_note(inp)),
         sections=tuple(s for s in (
             Section(id="how", title=t("rpt_sec_sec_how"), intro=t("rpt_sec_how_intro"),
-                    blocks=(parts_table, grades_table)),
+                    blocks=(parts_table, parts_rule, grades_table)),
             Section(id="coverage", title=t("rpt_sec_sec_coverage"), intro=t("rpt_sec_coverage_intro"),
-                    blocks=(coverage, direction)),
+                    blocks=coverage_blocks),
             Section(id="uncovered", title=t("rpt_sec_sec_uncovered"), intro=t("rpt_sec_uncovered_intro"),
                     blocks=(uncovered,), workbench_link=link(UNCOVERED, by_app_src, by_app_dst)),
             Section(id="ports", title=t("rpt_sec_sec_ports"), blocks=(port_gaps,),
