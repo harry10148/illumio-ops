@@ -1,6 +1,7 @@
 """The pieces every flow report is built from (spec §6.3 point 4): a ranking is an analysis segment computed by
 run_segment — the same number the workbench shows — turned into a report table; plus the report's filter in
-words and the optional fields' coverage."""
+words, the optional fields' coverage, and the chapters more than one report may carry (the flows without a
+decision, users and processes)."""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -57,6 +58,7 @@ from illumio_ops.services.reports.common import (
     port_text,
     tr,
 )
+from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.workbench import FlowRequest
 from illumio_ops.store.flowdb import policy_objects
@@ -291,6 +293,60 @@ def host_in_scope(host: HostInfo, cond: FlowCondition | None, *, label_groups: L
     if not includes:
         return not any(hits(exc) for _, exc in sides)
     return any(hits(inc) and not hits(exc) for inc, exc in includes)
+
+
+# ── users and processes (UI redesign spec §9.2: moved from the security risk report to the traffic report) ────
+
+USERS = "users"  # the chapter's id
+USERS_TOP = 20  # each ranking's rows
+
+
+def users_section(inp: BuildInput, spec: FilterSpec, fc: FieldCoverage) -> tuple[Section, ...]:
+    """The chapter "Users and processes": the users who started connections, ranked by how many destinations each
+    reached, and the processes, ranked by connections. `spec`: the report's flows; `fc`: how many of them name a
+    user and a process (field_coverage of `spec`, which the builder has read). A ranking is there only when a flow
+    names its field, and the chapter only when one of the two is: users_notes gives the data note for what is left
+    out. The chapter opens its first ranking in the workbench."""
+    if not (fc.initiator_user or fc.initiator_process):
+        return ()
+    lang = inp.lang
+
+    def t(msg: str, /, **params: object) -> str:
+        return tr(lang, msg, **params)
+
+    def share(n: int) -> str:
+        return f"{100 * n / fc.total:.1f}" if fc.total else "0.0"
+    by_user = (GroupBy(dimension=SegmentDimension.INITIATOR_USER),)
+    by_process = (GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS),)
+    blocks: list[TableBlock | TextBlock] = [TextBlock(paragraphs=(t(
+        "rpt_users_intro", user=share(fc.initiator_user), process=share(fc.initiator_process)),))]
+    if fc.initiator_user:
+        blocks.append(ranking(
+            inp, title=t("rpt_users_tbl_users"), spec=spec, metric=SegmentMetric.DISTINCT_DST, limit=USERS_TOP,
+            group_by=by_user, skip_empty=True,
+            columns=(Column(key="user", label=t("rpt_col_user")),
+                     Column(key="n", label=t("rpt_col_distinct_destinations"), kind="number"))))
+    if fc.initiator_process:
+        blocks.append(ranking(
+            inp, title=t("rpt_users_tbl_processes"), spec=spec, metric=SegmentMetric.CONNECTIONS, limit=USERS_TOP,
+            group_by=by_process, skip_empty=True,
+            columns=(Column(key="process", label=t("rpt_col_process")),
+                     Column(key="n", label=t("rpt_col_connections"), kind="number"))))
+    first = (link(inp, spec=spec, group_by=by_user, metric=SegmentMetric.DISTINCT_DST, limit=USERS_TOP)
+             if fc.initiator_user else
+             link(inp, spec=spec, group_by=by_process, metric=SegmentMetric.CONNECTIONS, limit=USERS_TOP))
+    return (Section(id=USERS, title=t("rpt_users_sec"), blocks=tuple(blocks), workbench_link=first),)
+
+
+def users_notes(lang: Language, fc: FieldCoverage) -> tuple[str, ...]:
+    """The data note for what users_section leaves out (a part that is not there says why, hints.py): no flow of
+    the period names a user, a process, or either — the last is why the report has no such chapter."""
+    if not fc.initiator_user:
+        return (hint(lang, "rpt_hint_pending_no_users" if fc.initiator_process
+                     else "rpt_hint_pending_no_users_processes"),)
+    if not fc.initiator_process:
+        return (hint(lang, "rpt_hint_pending_no_processes"),)
+    return ()
 
 
 # ── the flows without a decision (UI redesign spec §9.2) ─────────────────────────────────────────────────────

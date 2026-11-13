@@ -1,7 +1,10 @@
 """The security risk report (spec §6.5 報表, 5.x security_risk): how far segmentation has come and where the risk
-is — the maturity score, policy coverage, traffic no rule covers and what to do about it, enforcement progress by
-app, potentially blocked traffic with the rule it needs, ransomware and lateral-movement summaries, users and
-processes, and every rule finding. Flow numbers are the flow store's primary rows under the report's filter."""
+is — the maturity score, policy coverage, traffic no rule covers (by app pair and by port) and what to do about it,
+enforcement progress by app, potentially blocked traffic with the rule it needs, and every rule finding. Flow
+numbers are the flow store's primary rows under the report's filter.
+What other reports hold is named, not repeated (UI redesign spec §9.2): ransomware protection is one number whose
+note names the ransomware report, lateral movement one sentence that names the lateral posture report, and users
+and processes are a chapter of the traffic report (flowsections.users_section)."""
 from __future__ import annotations
 
 import json
@@ -42,16 +45,7 @@ from illumio_ops.domain.values import (
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.flowsource import FlowTotals, field_coverage, flow_totals
 from illumio_ops.services.reports import findings, flowsections, reads
-from illumio_ops.services.reports.common import (
-    DECISION_KEYS,
-    MODE_KEYS,
-    host_key,
-    host_keys,
-    host_name,
-    port_text,
-    severity_name,
-    tr,
-)
+from illumio_ops.services.reports.common import DECISION_KEYS, MODE_KEYS, tr
 from illumio_ops.services.reports.generate import (
     caveats_in_order,
     coverage_text,
@@ -63,7 +57,6 @@ from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.store.flowdb import analysis
 
 TOP = 20
-RANSOMWARE_TOP = 5  # a summary: the ransomware report holds the list
 APP = "app"  # the app label key
 UNCOVERED = (PolicyDecision.POTENTIALLY_BLOCKED, PolicyDecision.BLOCKED)
 PB_ONLY = (PolicyDecision.POTENTIALLY_BLOCKED,)
@@ -87,7 +80,7 @@ _KPI_KEYS = {
     "allowed_pct": "rpt_sec_kpi_allowed_pct", "pb_flows": "rpt_sec_kpi_pb_flows",
     "blocked_flows": "rpt_sec_kpi_blocked_flows", "unmanaged_connections": "rpt_sec_kpi_unmanaged_connections",
     "admin_open_connections": "rpt_sec_kpi_admin_open", "critical_high_findings": "rpt_sec_kpi_critical_high",
-    "ransomware_protected_pct": "rpt_sec_kpi_ransomware_protected", "lateral_detections": "rpt_sec_kpi_detections",
+    "ransomware_protected_pct": "rpt_sec_kpi_ransomware_protected",
 }
 _FLOW_KPIS = ("allowed_pct", "pb_flows", "blocked_flows", "unmanaged_connections", "admin_open_connections")
 
@@ -144,8 +137,6 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     modes = Counter(h.enforcement_mode for h in hosts)
     with reads.reading(inp.ctx) as conn:
         rw_row = analysis.read_result(conn, "ransomware")
-        exposure_row = analysis.read_result(conn, "exposure")
-        detections = analysis.detection_counts(conn, inp.start, inp.end)
     rw = json.loads(rw_row["result_json"]) if rw_row is not None else None
     rw_counts = _ransomware_counts(rw, {h.href for h in hosts if h.href} if cond is not None else None)
     by = {d.decision: d for d in totals.by_decision}
@@ -172,7 +163,6 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         **{k: (now_flow[k] if totals.flows else None) for k in _FLOW_KPIS},
         "critical_high_findings": len(fired) if totals.flows else None,
         "ransomware_protected_pct": round(100 * rw_counts[1] / rw_counts[0], 1) if rw_counts else None,
-        "lateral_detections": sum(n for n, _ in detections.values()),
     }
     def maturity_note() -> str:
         worst = losing_most(score.parts)
@@ -192,7 +182,8 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         maturity=(no_flows if not totals.flows else maturity_note() if score.grade else t("rpt_sec_maturity_none")),
         enforced_hosts_pct=None if hosts else t("rpt_sec_no_hosts"),
         critical_high_findings=None if totals.flows else no_flows,
-        lateral_detections=t("rpt_sec_detections_all_hosts"))
+        # the one number this report keeps of ransomware protection: where each host and service is listed
+        ransomware_protected_pct=t("rpt_sec_see_ransomware", report=t("rpt_title_ransomware")))
     percent = {"enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
     higher = {"maturity", "enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k],
@@ -244,7 +235,10 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         rows=tuple((t(DECISION_KEYS[d.decision]), d.flows, pct(d.flows, totals.decided_flows), d.connections)
                    for d in decided),
         total_rows=len(decided), empty_text=no_decided if totals.flows else no_flows)
-    coverage_blocks: tuple[TableBlock | TextBlock, ...] = (coverage,)
+    # Lateral movement has its own report: one sentence here names it. It stands with a chapter that has something
+    # to show; in a period without traffic the chapter stays what it was, a table with no rows (finish folds it).
+    see_lateral = TextBlock(paragraphs=(t("rpt_sec_see_lateral", report=t("rpt_title_lateral_posture")),))
+    coverage_blocks: tuple[TableBlock | TextBlock, ...] = (*((see_lateral,) if totals.flows else ()), coverage)
     if decided:  # both shares are of decided flows; without one there is no share to say
         into = sum(d.into_managed for d in decided)
         out = sum(d.from_managed for d in decided)
@@ -318,72 +312,16 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         "rows": tuple((*r, t("rpt_sec_pb_rule", app=r[0], service=r[1]) if r[0] != no_label
                        else t("rpt_sec_pb_rule_unlabeled", service=r[1])) for r in pb_base.rows)})
 
-    # ── ransomware ──────────────────────────────────────────────────────────
-    # A part that rests on another analysis is left out until that analysis has a result; each gets one data note.
-    missing: list[str] = []
-    rw_blocks: tuple[TableBlock | TextBlock, ...] = ()
+    # ── what is not there ───────────────────────────────────────────────────
+    # The ransomware number rests on another analysis: it is left out until that analysis has a result, and one
+    # data note says why (hints.py). The ransomware report holds the hosts and services.
+    missing: tuple[str, ...] = ()
     if rw is None:
-        missing.append(hint(lang, "rpt_hint_pending_sec_rw"))
+        missing = (hint(lang, "rpt_hint_pending_sec_rw"),)
     elif rw.get("unsupported"):
-        missing.append(hint(lang, "rpt_hint_unsupported_sec_rw"))
-    else:
-        scope = {h.href for h in hosts if h.href} if cond is not None else None
-        priority = [r for r in rw.get("priority") or () if scope is None or r.get("host") in scope]
-        rw_blocks = (TableBlock(
-            title=t("rpt_sec_tbl_ransomware"),
-            columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
-                     Column(key="service", label=t("rpt_col_name")), Column(key="port", label=t("rpt_col_service")),
-                     Column(key="severity", label=t("rpt_col_severity")),
-                     Column(key="sources", label=t("rpt_col_recent_sources"), kind="number")),
-            host_keys=host_keys(host=(host_key(lc.hosts, r.get("host")) for r in priority[:RANSOMWARE_TOP])),
-            rows=tuple((r.get("hostname") or host_name(lc.hosts, str(r.get("host")), lang), r.get("name"),
-                        port_text(r.get("port"), int(r.get("proto") or 0)),
-                        severity_name(lang, str(r.get("severity") or "").lower()), r.get("recent_sources"))
-                       for r in priority[:RANSOMWARE_TOP]),
-            total_rows=len(priority), empty_text=t("rpt_sec_rw_none"),
-            limit_note=t("rpt_limit_top_n", n=RANSOMWARE_TOP) if len(priority) > RANSOMWARE_TOP else None),)
-    if rw_blocks:
-        rw_blocks = (*rw_blocks, TextBlock(paragraphs=(t("rpt_sec_rw_see"),)))
+        missing = (hint(lang, "rpt_hint_unsupported_sec_rw"),)
 
-    # ── users and processes ─────────────────────────────────────────────────
     fc = field_coverage(inp.ctx, spec)
-
-    def share(n: int) -> str:
-        return f"{100 * n / fc.total:.1f}" if fc.total else "0.0"
-    user_blocks: list[TableBlock | TextBlock] = [TextBlock(paragraphs=(t(
-        "rpt_sec_users_intro", user=share(fc.initiator_user), process=share(fc.initiator_process)),))]
-    if fc.initiator_user:
-        user_blocks.append(flowsections.ranking(
-            inp, title=t("rpt_sec_tbl_users"), metric=SegmentMetric.DISTINCT_DST, limit=TOP,
-            group_by=(GroupBy(dimension=SegmentDimension.INITIATOR_USER),), skip_empty=True,
-            columns=(Column(key="user", label=t("rpt_col_user")),
-                     Column(key="n", label=t("rpt_col_distinct_destinations"), kind="number"))))
-    else:
-        missing.append(hint(lang, "rpt_hint_pending_sec_no_users" if fc.initiator_process
-                            else "rpt_hint_pending_sec_no_users_processes"))
-    if fc.initiator_process:
-        user_blocks.append(flowsections.ranking(
-            inp, title=t("rpt_sec_tbl_processes"), metric=SegmentMetric.CONNECTIONS, limit=TOP,
-            group_by=(GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS),), skip_empty=True,
-            columns=(Column(key="process", label=t("rpt_col_process")),
-                     Column(key="n", label=t("rpt_col_connections"), kind="number"))))
-    elif fc.initiator_user:
-        missing.append(hint(lang, "rpt_hint_pending_sec_no_processes"))
-
-    # ── lateral movement ────────────────────────────────────────────────────
-    exposure = json.loads(exposure_row["result_json"]) if exposure_row is not None else None
-    lateral_lines = [t("rpt_sec_lateral_detections", n=values["lateral_detections"],
-                       high=sum(h for _, h in detections.values()))]
-    if exposure is None:
-        missing.append(hint(lang, "rpt_hint_pending_sec_exposure"))
-    else:
-        lateral_lines.append(t(
-            "rpt_sec_lateral_exposure",
-            assets=sum(1 for a in exposure.get("assets") or () if a.get("sources_now")),
-            pivots=sum(1 for h in exposure.get("hosts") or () if h.get("pivot_now")),
-            cross_env=exposure.get("cross_env_total") or 0))
-    lateral_lines.append(t("rpt_sec_lateral_see", report=t("rpt_title_lateral_posture")))
-
     filter_line = flowsections.filter_text(cond, lang)
     cov = coverage_text(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True)
     quality = (*cov.lines,
@@ -395,30 +333,20 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         findings=findings.as_findings(outcomes, lang),
         caveats=caveats_in_order(gaps=cov.caveats, undecided=flowsections.undecided_caveat(lang, saw)),
         data_quality=(*quality, *missing, *flowsections.no_links_note(inp)),
-        sections=tuple(s for s in (
+        sections=(
             Section(id="how", title=t("rpt_sec_sec_how"), intro=t("rpt_sec_how_intro"),
                     blocks=(parts_table, parts_rule, grades_table)),
             Section(id="coverage", title=t("rpt_sec_sec_coverage"), intro=t("rpt_sec_coverage_intro"),
                     blocks=coverage_blocks),
+            # by app pair, then the same connections by port (its own chapter, "Ports with gaps", until 6.10.0);
+            # the chapter opens its first ranking in the workbench
             Section(id="uncovered", title=t("rpt_sec_sec_uncovered"), intro=t("rpt_sec_uncovered_intro"),
-                    blocks=(uncovered,), workbench_link=link(UNCOVERED, by_app_src, by_app_dst)),
-            Section(id="ports", title=t("rpt_sec_sec_ports"), blocks=(port_gaps,),
-                    workbench_link=link(UNCOVERED, by_service)),
+                    blocks=(uncovered, port_gaps), workbench_link=link(UNCOVERED, by_app_src, by_app_dst)),
             Section(id="enforcement", title=t("rpt_sec_sec_enforcement"), intro=t("rpt_sec_enforcement_intro"),
                     blocks=(enforcement,)),
             Section(id="pb", title=t("rpt_sec_sec_pb"), intro=t("rpt_sec_pb_intro"), blocks=(pb,),
                     workbench_link=link(PB_ONLY, by_app_dst, by_service)),
-            Section(id="ransomware", title=t("rpt_sec_sec_ransomware"), blocks=rw_blocks) if rw_blocks else None,
-            None if not (fc.initiator_user or fc.initiator_process) else
-            Section(id="users", title=t("rpt_sec_sec_users"), blocks=tuple(user_blocks),
-                    workbench_link=(
-                        link((), GroupBy(dimension=SegmentDimension.INITIATOR_USER), metric=SegmentMetric.DISTINCT_DST)
-                        if fc.initiator_user else
-                        link((), GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS)) if fc.initiator_process
-                        else None)),
-            Section(id="lateral", title=t("rpt_sec_sec_lateral"), blocks=(TextBlock(paragraphs=tuple(lateral_lines)),)),
             *flowsections.monitor_only_section(inp, spec, saw, hosts=lc.hosts),
             *findings.unevaluated_section(_by_category(outcomes), lang,
                                           title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_trf_findings_intro"),
-                                          table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(totals.flows)))
-            if s is not None))
+                                          table_title=t("rpt_rules_tbl_unevaluated"), evaluated=bool(totals.flows))))

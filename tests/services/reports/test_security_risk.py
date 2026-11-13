@@ -1,6 +1,7 @@
 """The security risk report (P5b-1 Task 4): maturity from the inventory and the period's connections, the
-uncovered traffic with what to do about it, enforcement progress by app, user and process coverage stated, the
-ransomware and lateral summaries, and the rule engine's critical/high findings — every KPI shown (5.x showed 8)."""
+uncovered traffic by app pair and by port with what to do about it, enforcement progress by app, and the rule
+engine's findings. Stage 3b: ransomware and lateral movement are a number and a sentence that name their own
+reports; users and processes are a chapter of the traffic report (test_traffic)."""
 from datetime import UTC, datetime
 
 import pytest
@@ -13,11 +14,14 @@ from illumio_ops.services.reports.render_html import render_html
 from illumio_ops.store.flowdb import analysis, labels, workloads
 from tests.services.collect.conftest import configured_ctx
 from tests.services.reports.test_findings import (
+    MOVED_PORT_GAPS,
     UNDECIDED_EN,
     UNDECIDED_ZH,
+    as_moved,
     covered,
     decided_and_not,
     flow,
+    moved_sample,
     undecided_sample,
 )
 from tests.services.reports.test_traffic import _write
@@ -97,21 +101,6 @@ def test_maturity_from_inventory_and_connections(ctx):
     assert "B" in kpi["maturity"].note
 
 
-def test_zero_user_coverage_says_so(ctx):
-    _write(ctx, [flow(port=443)])
-    doc = _build(ctx)
-    # 6.6.0: no flow names a user or a process — the section is left out and one data note says so
-    assert "users" not in {s.id for s in doc.sections}
-    assert sum("names the initiating user or process" in q for q in doc.data_quality) == 1
-
-
-def test_users_ranked_when_present(ctx):
-    _write(ctx, [flow(dst=f"t{i}", port=443, user="CORP\\alice") for i in range(3)] +
-           [flow(dst=f"n{i}", port=443) for i in range(5)])  # flows without a user are not a "(none)" user
-    users = next(t for t in _tables(_build(ctx), "users") if "user" in t.title.lower())
-    assert users.rows == (("corp\\alice", 3),)
-
-
 def test_filter_with_no_flows_says_so(ctx):
     _write(ctx, [flow(port=443)])
     cond = FlowCondition(dst=EndpointFilter(labels=(LabelCond(key="app", values=("Nope",)),)))
@@ -127,7 +116,8 @@ def test_all_kpis_rendered(ctx):
     _write(ctx, [flow(port=5900)])
     doc = _build(ctx)
     html = render_html(doc, tz=UTC)
-    assert len(doc.kpis) >= 9 and all(k.label in html for k in doc.kpis)
+    # the eight this install has: no ransomware analysis, so no "ransomware services protected"
+    assert len(doc.kpis) == 8 and all(k.label in html for k in doc.kpis)
 
 
 def test_every_fired_rule_is_a_finding_and_the_number_still_counts_critical_and_high(ctx):
@@ -149,16 +139,8 @@ def test_every_fired_rule_is_a_finding_and_the_number_still_counts_critical_and_
     assert [r[0] for r in _tables(doc, "findings")[0].rows] == ["L006"]
 
 
-def test_ransomware_summary(tmp_path):
-    a = configured_ctx(tmp_path / "a")
-    _write(a, [flow(port=443)])
-    doc = _build(a)  # 6.6.0: not computed yet — no section, no number, one data note
-    assert "ransomware" not in {s.id for s in doc.sections}
-    assert "ransomware_protected_pct" not in {k.key for k in doc.kpis}
-    assert sum("ransomware analysis has not been computed" in q for q in doc.data_quality) == 1
-    b = configured_ctx(tmp_path / "b")
-    _write(b, [flow(port=443)])
-    with b.flows().connect() as conn:
+def _ransomware_result(c):
+    with c.flows().connect() as conn:
         analysis.write_result(conn, "ransomware", params={}, at=NOW, result={
             "unsupported": False, "contradictions": 0, "safe_to_block": [], "suspicious": [],
             "priority": [{"host": "/orgs/1/workloads/db", "hostname": "db", "name": "SMB", "port": 445, "proto": 6,
@@ -168,14 +150,104 @@ def test_ransomware_summary(tmp_path):
                 {"severity": "high", "protection_state": "protected_open"},
                 {"severity": "low", "protection_state": "unprotected"}]}]})
         conn.commit()
+
+
+def test_ransomware_is_one_number_that_names_its_report(tmp_path):
+    """Stage 3b: the chapter is gone. What stays is the number (and the maturity score's part), with one fixed
+    sentence that says where each host and service is listed."""
+    a = configured_ctx(tmp_path / "a")
+    _write(a, [flow(port=443)])
+    doc = _build(a)  # 6.6.0: not computed yet — no number, one data note; the note names no chapter
+    assert "ransomware" not in {s.id for s in doc.sections}
+    assert "ransomware_protected_pct" not in {k.key for k in doc.kpis}
+    (note,) = [q for q in doc.data_quality if "ransomware analysis has not been computed" in q]
+    assert "section" not in note and "ransomware services protected" in note
+    b = configured_ctx(tmp_path / "b")
+    _write(b, [flow(port=443)])
+    _ransomware_result(b)
     doc = _build(b)
-    assert _tables(doc, "ransomware")[0].rows[0][:2] == ("db", "SMB")
-    assert {k.key: k.value for k in doc.kpis}["ransomware_protected_pct"] == 50.0
+    assert "ransomware" not in {s.id for s in doc.sections}
+    kpi = {k.key: k for k in doc.kpis}["ransomware_protected_pct"]
+    assert kpi.value == 50.0 and kpi.note == "Every host and service is in the “Ransomware protection” report."
+    # the score still counts the part: 1 of the 2 critical and high services is protected, 5 of its 10 points
+    part = next(r for r in _tables(doc, "how")[0].rows if r[0] == "Ransomware services protected")
+    assert part[4].startswith("5 of 10")
+    zh = {k.key: k for k in _build(b, lang=Language.ZH_TW).kpis}["ransomware_protected_pct"]
+    assert zh.note == "各主機與服務的明細見〈勒索防護〉報表。"
 
 
-def test_lateral_summary_points_to_report(ctx):
+def test_lateral_movement_is_one_sentence_that_names_its_report(ctx):
+    """Stage 3b: no chapter and no "lateral detections" number; the policy coverage chapter says where they are."""
     _write(ctx, [flow(port=443)])
-    assert "Lateral movement posture" in _texts(_build(ctx), "lateral")
+    doc = _build(ctx)
+    assert "lateral" not in {s.id for s in doc.sections}
+    assert "lateral_detections" not in {k.key for k in doc.kpis}
+    assert ("Lateral-movement detections and what can be reached are in the “Lateral movement posture” report."
+            in _texts(doc, "coverage"))
+    assert "橫向移動的偵測與可觸及範圍見〈橫向移動態勢〉報表。" in _texts(_build(ctx, lang=Language.ZH_TW), "coverage")
+    # the exposure analysis is not this report's to wait for any more: no data note about it
+    assert not [q for q in doc.data_quality if "exposure" in q.lower()]
+
+
+def test_a_period_without_traffic_still_folds_the_coverage_chapter(ctx):
+    """The sentence about lateral movement is part of a chapter that has something to show; a period with no flow
+    keeps the chapter one line under "Nothing to show this period", as before."""
+    from illumio_ops.services.reports.finish import finish
+    doc = finish(_build(ctx))
+    assert "coverage" not in {s.id for s in doc.sections}
+    assert any(p.startswith("Policy coverage: ") for b in _section(doc, "nothing").blocks for p in b.paragraphs)
+
+
+# ── stage 3b: the report keeps what is its own ───────────────────────────────────────────────────────────────
+
+def _everything(c):
+    """An install where every chapter the report ever had would have content: hosts, uncovered traffic, flows
+    without a decision, flows that name users and processes, a ransomware result."""
+    undecided_sample(c)
+    _write(c, moved_sample())
+    _ransomware_result(c)
+
+
+def test_the_chapters_in_reading_order(ctx):
+    from illumio_ops.services.reports.finish import finish
+    from tests.services.reports.dom import dom
+    _everything(ctx)
+    doc = finish(_build(ctx))
+    # the builder puts "how" first; the page moves it to the closing part, before the data notes
+    assert [s.id for s in doc.sections] == ["how", "coverage", "uncovered", "enforcement", "pb", "monitor_only",
+                                            "findings"]
+    page = dom(render_html(doc, tz=UTC))
+    assert [n.attrs["id"] for n in page.find_attr("class", "chapter")] == [
+        "coverage", "uncovered", "enforcement", "pb", "monitor_only", "findings", "how", "notes"]
+    assert not {"ransomware", "lateral", "users", "ports"} & {s.id for s in doc.sections}
+
+
+def test_ports_with_gaps_is_the_second_table_of_the_uncovered_chapter(ctx):
+    """The table left its own chapter for this one with its title, columns and rows as they were."""
+    _write(ctx, moved_sample())
+    doc = _build(ctx)
+    tables = _tables(doc, "uncovered")
+    assert len(tables) == 2
+    by_pair, by_port = tables
+    assert by_pair.title == "Uncovered connections by app pair" and by_pair.rows[0][:3] == ("Web", "DB", 15)
+    assert as_moved(by_port) == MOVED_PORT_GAPS
+    assert "second table" in _section(doc, "uncovered").intro
+    zh = _build(ctx, lang=Language.ZH_TW)
+    assert _tables(zh, "uncovered")[1].title == "依 port／協定的未涵蓋連線" and "第二張表" in _section(zh, "uncovered").intro
+
+
+def test_users_and_processes_are_not_this_reports_any_more(tmp_path):
+    """Flows that name users and processes: no chapter here and no data note about them (the traffic report has
+    both); the share of flows that carry each stays in the data notes, as in every flow report."""
+    named = configured_ctx(tmp_path / "named")
+    _write(named, moved_sample())
+    doc = _build(named)
+    assert "users" not in {s.id for s in doc.sections}
+    assert not [t for _, t in doc.tables() if t.title in ("Users by distinct destinations", "Processes by connections")]
+    assert sum("carry a process" in q for q in doc.data_quality) == 1
+    none = configured_ctx(tmp_path / "none")  # no flow names either: the traffic report says so, this one does not
+    _write(none, [flow(port=443)])
+    assert not [q for q in _build(none).data_quality if "initiating user" in q or "initiating process" in q]
 
 
 def test_zh_tw_builds(ctx):
@@ -284,7 +356,7 @@ def test_undecided_flows_have_their_chapter_before_the_rules_and_a_sentence_on_t
     covered(ctx)
     doc = _build(ctx)
     ids = [s.id for s in doc.sections]
-    assert ids[ids.index("monitor_only") - 1] == "lateral" and ids[ids.index("monitor_only") + 1] == "findings"
+    assert ids[ids.index("monitor_only") - 1] == "pb" and ids[ids.index("monitor_only") + 1] == "findings"
     assert doc.caveats == (UNDECIDED_EN,)
     kinds = _tables(doc, "monitor_only")[0]
     assert [(r[2], r[3]) for r in kinds.rows] == [(1, 50), (4, 19)]

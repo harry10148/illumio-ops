@@ -22,7 +22,7 @@ BASE = "https://ops.example.com:5001"
 APP = FlowCondition(dst=EndpointFilter(labels=(LabelCond(key="app", values=("erp",)),)))
 # report type -> (its filter, the sections that must link)
 FLOW_REPORTS = {
-    ReportType.TRAFFIC: (None, {"labels", "services"}),
+    ReportType.TRAFFIC: (None, {"labels", "services", "users"}),  # users: from the security risk report (3b)
     ReportType.SECURITY_RISK: (None, set()),
     ReportType.NETWORK_INVENTORY: (None, set()),
     ReportType.APP_SUMMARY: (APP, set()),
@@ -35,7 +35,8 @@ def ctx(tmp_path):
     c.settings.update(c.settings.current().revision, lambda d: d["reports"].update(gui_external_url=BASE))
     with c.flows().connect() as conn:
         upsert_flows(conn, [flow(port=443, conns=3), flow(port=22, decision="potentially_blocked"),
-                            flow(port=3389, decision="blocked")], origin=DataOrigin.INGEST, now=NOW)
+                            flow(port=3389, decision="blocked"), flow(port=443, user="CORP\\alice")],
+                     origin=DataOrigin.INGEST, now=NOW)
     return c
 
 

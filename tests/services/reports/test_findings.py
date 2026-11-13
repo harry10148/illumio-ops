@@ -64,6 +64,36 @@ def decided_and_not():
             flow(port=22, decision="unknown", conns=10)]
 
 
+def moved_sample():
+    """Stage 3b's sample for the tables that changed places: connections no rule covers on three services, flows
+    that name the user who started them, and flows that name the process. 13 flows; 5 name a user, 3 a process."""
+    flows = [flow(port=8080, decision="potentially_blocked", conns=7), flow(port=8080, decision="blocked", conns=2),
+             flow(port=3306, decision="potentially_blocked", conns=5),
+             flow(port=53, proto=17, decision="blocked", conns=1), flow(port=443, conns=9),
+             *(flow(dst=f"t{i}", port=443, user="CORP\\alice") for i in range(3)),
+             *(flow(dst=f"u{i}", port=443, user="CORP\\bob") for i in range(2)),
+             flow(port=22, conns=4), flow(port=22, conns=6), flow(port=445, conns=3)]
+    for f, process in zip(flows[-3:], ("sshd", "sshd", "System"), strict=True):
+        object.__setattr__(f, "own_process", process)
+    return flows
+
+
+# The rows of the tables stage 3b moved, for moved_sample(), as the security risk report printed them before the
+# move (read from its "Ports with gaps" and "Users and processes" chapters at 72cf320a): a table that changes
+# chapter or report keeps its title, its columns and every row.
+MOVED_PORT_GAPS = ("Uncovered connections by port / protocol", ["service", "n"],
+                   (("8080/TCP", 9), ("3306/TCP", 5), ("53/UDP", 1)))
+MOVED_USERS_SAID = ("38.5% of the period's flows carry the initiating user and 23.1% the initiating process; these "
+                    "rankings cover only those.")
+MOVED_USERS = ("Users by distinct destinations", ["user", "n"], (("corp\\alice", 3), ("corp\\bob", 2)))
+MOVED_PROCESSES = ("Processes by connections", ["process", "n"], (("sshd", 10), ("System", 3)))
+
+
+def as_moved(table):
+    """A table as the MOVED_* constants hold one: (title, column keys, rows)."""
+    return table.title, [c.key for c in table.columns], table.rows
+
+
 # What the first page says of undecided_sample()'s flows: 5 of 9 flows, 69 of 109 connections.
 UNDECIDED_EN = ("Flows without a decision: 55.6% of the period's flows (63.3% by connections). The report's shares "
                 "count only the flows with a decision; the rest are in “Traffic that can only be watched”.")

@@ -1,7 +1,7 @@
 """The traffic report (spec §6.5 報表, 5.x traffic): what moved in the period — flows and connections by decision,
-the busiest apps, environments, services and host pairs, traffic touching unmanaged addresses, and the findings
-of the rule engine. Every number is the flow store's primary rows under the report's filter; rankings are
-analysis segments (the workbench's numbers)."""
+the busiest apps, environments, services and host pairs, traffic touching unmanaged addresses, the users and
+processes that started connections, and the findings of the rule engine. Every number is the flow store's primary
+rows under the report's filter; rankings are analysis segments (the workbench's numbers)."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -177,7 +177,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
         findings=findings.as_findings(outcomes, lang),
         caveats=caveats_in_order(gaps=cov.caveats, undecided=flowsections.undecided_caveat(lang, saw)),
-        data_quality=(*quality, *flowsections.no_links_note(inp)),
+        data_quality=(*quality, *flowsections.users_notes(lang, fc), *flowsections.no_links_note(inp)),
         sections=(Section(id="decisions", title=t("rpt_trf_sec_decisions"), intro=t("rpt_trf_decisions_intro"),
                           blocks=decision_blocks),
                   Section(id="labels", title=t("rpt_trf_sec_labels"), blocks=labels,
@@ -188,6 +188,7 @@ def build_traffic(inp: BuildInput) -> ReportDocument:
                           workbench_link=link(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST,
                                               metric=SegmentMetric.BYTES) if fc.bytes else None),
                   Section(id="unmanaged", title=t("rpt_trf_sec_unmanaged"), blocks=(unmanaged,)),
+                  *flowsections.users_section(inp, spec, fc),
                   *flowsections.monitor_only_section(inp, spec, saw, hosts=lc.hosts),
                   *findings.unevaluated_section(outcomes, lang,
                                                 title=t("rpt_rules_sec_unevaluated"), intro=t("rpt_trf_findings_intro"),

@@ -1,5 +1,6 @@
 """The traffic report (P5b-1 Task 3): flows and connections by decision, rankings by label, service and bytes,
-the unmanaged summary and the rule engine's findings — every number from the flow store's primary rows."""
+the unmanaged summary, the users and processes that started connections (stage 3b: moved here from the security
+risk report) and the rule engine's findings — every number from the flow store's primary rows."""
 from datetime import UTC, datetime
 
 import pytest
@@ -12,10 +13,15 @@ from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.services.collect.conftest import configured_ctx
 from tests.services.reports.test_findings import (
+    MOVED_PROCESSES,
+    MOVED_USERS,
+    MOVED_USERS_SAID,
     UNDECIDED_EN,
+    as_moved,
     covered,
     decided_and_not,
     flow,
+    moved_sample,
     undecided_sample,
 )
 
@@ -282,3 +288,72 @@ def test_no_undecided_flow_no_chapter_and_no_sentence(ctx):
     covered(ctx)
     doc = _build(ctx)
     assert "monitor_only" not in [s.id for s in doc.sections] and doc.caveats == ()
+
+
+# ── stage 3b: users and processes, moved here from the security risk report ──────────────────────────────────
+
+def test_users_and_processes_follow_the_unmanaged_addresses_with_the_rows_they_had(ctx):
+    """The chapter as the security risk report held it: the sentence on how much of the traffic names a user or a
+    process, then the two rankings — titles, columns and rows unchanged."""
+    _write(ctx, moved_sample())
+    doc = _build(ctx)
+    ids = [s.id for s in doc.sections]
+    assert "users" in ids and ids[ids.index("users") - 1] == "unmanaged"
+    sec = _section(doc, "users")
+    assert sec.title == "Users and processes"
+    said, users, processes = sec.blocks
+    assert said.paragraphs == (MOVED_USERS_SAID,)
+    assert as_moved(users) == MOVED_USERS and as_moved(processes) == MOVED_PROCESSES
+    zh = _section(_build(ctx, lang=Language.ZH_TW), "users")
+    assert zh.title == "使用者與程式"
+    assert [b.title for b in zh.blocks[1:]] == ["依不重複目的端數的使用者", "依連線數的程式"]
+
+
+def test_users_ranked_when_present_and_the_missing_process_ranking_is_said(ctx):
+    _write(ctx, [flow(dst=f"t{i}", port=443, user="CORP\\alice") for i in range(3)] +
+           [flow(dst=f"n{i}", port=443) for i in range(5)])  # flows without a user are not a "(none)" user
+    doc = _build(ctx)
+    assert "users" in [s.id for s in doc.sections]
+    tables = [b for b in _section(doc, "users").blocks if isinstance(b, TableBlock)]
+    assert [t.title for t in tables] == ["Users by distinct destinations"] and tables[0].rows == (("corp\\alice", 3),)
+    assert sum("names the initiating process, so there is no process ranking" in q for q in doc.data_quality) == 1
+
+
+def test_processes_ranked_alone_and_the_missing_user_ranking_is_said(ctx):
+    named = flow(port=22, conns=4)
+    object.__setattr__(named, "own_process", "sshd")
+    _write(ctx, [named, flow(port=443)])
+    doc = _build(ctx)
+    assert "users" in [s.id for s in doc.sections]
+    tables = [b for b in _section(doc, "users").blocks if isinstance(b, TableBlock)]
+    assert [t.title for t in tables] == ["Processes by connections"] and tables[0].rows == (("sshd", 4),)
+    assert sum("names the initiating user, so there is no user ranking" in q for q in doc.data_quality) == 1
+
+
+def test_zero_user_coverage_says_so(ctx):
+    _write(ctx, [flow(port=443)])
+    doc = _build(ctx)
+    # 6.6.0: no flow names a user or a process — the section is left out and one data note says so
+    assert "users" not in {s.id for s in doc.sections}
+    assert sum("names the initiating user or process" in q for q in doc.data_quality) == 1
+    assert sum("本報表沒有「使用者與程式」一節" in q for q in _build(ctx, lang=Language.ZH_TW).data_quality) == 1
+
+
+def test_users_chapter_opens_its_first_ranking_in_the_workbench(ctx):
+    import json
+    from urllib.parse import parse_qs, urlparse
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["reports"].update(gui_external_url="https://ops.example"))
+    _write(ctx, moved_sample())
+    doc = _build(ctx)
+    assert "users" in [s.id for s in doc.sections]
+    req = json.loads(parse_qs(urlparse(_section(doc, "users").workbench_link).query)["q"][0])
+    # as the security risk report linked it: users by distinct destinations, every decision
+    assert (req["group_by"], req["metric"], req["limit"]) == ([{"dimension": "initiator_user"}], "distinct_dst", 20)
+    assert req["condition"]["decisions"] == [] and req["start"].startswith("2026-10-20")
+
+
+def test_users_come_before_the_flows_without_a_decision(ctx):
+    undecided_sample(ctx)
+    _write(ctx, moved_sample())
+    assert [s.id for s in _build(ctx).sections][-4:] == ["unmanaged", "users", "monitor_only", "findings"]

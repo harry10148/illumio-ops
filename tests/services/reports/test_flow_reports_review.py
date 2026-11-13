@@ -113,19 +113,23 @@ def test_network_inventory_hosts_follow_the_filter(ctx):
     assert _kpi(doc)["managed_hosts"].value == 1
 
 
-# 8: the ransomware priority list follows the filter
-def test_ransomware_priority_follows_the_filter(ctx):
+# 8: what the security risk report says of ransomware follows the filter. It was the priority list; since stage 3b
+# the report keeps one number (the list is the ransomware report's), and that number counts the filtered hosts only.
+def test_ransomware_number_follows_the_filter(ctx):
     _inventory(ctx, [("f1", {"app": "Finance"}, "full"), ("o1", {"app": "Other"}, "full")])
     _write(ctx, [flow(port=443, dst_app="Finance")])
-    row = {"name": "SMB", "port": 445, "proto": 6, "severity": "critical", "weight": 40, "recent_sources": 3}
     with ctx.flows().connect() as conn:
         analysis.write_result(conn, "ransomware", params={}, at=NOW, result={
-            "unsupported": False, "contradictions": 0, "safe_to_block": [], "suspicious": [],
-            "priority": [{**row, "host": "/orgs/1/workloads/o1", "hostname": "o1"},
-                         {**row, "host": "/orgs/1/workloads/f1", "hostname": "f1"}], "hosts": []})
+            "unsupported": False, "contradictions": 0, "safe_to_block": [], "suspicious": [], "priority": [],
+            "hosts": [{"href": "/orgs/1/workloads/o1",
+                       "services": [{"severity": "critical", "protection_state": "unprotected"}]},
+                      {"href": "/orgs/1/workloads/f1",
+                       "services": [{"severity": "critical", "protection_state": "protected_open"}]}]})
         conn.commit()
+    assert _kpi(_build(ctx, ReportType.SECURITY_RISK))["ransomware_protected_pct"].value == 50.0
     doc = _build(ctx, ReportType.SECURITY_RISK, FlowCondition(dst=EndpointFilter(labels=(FIN,))))
-    assert [r[0] for r in _table(doc, "ransomware").rows] == ["f1"]
+    assert _kpi(doc)["ransomware_protected_pct"].value == 100.0
+    assert "ransomware" not in {s.id for s in doc.sections}
 
 
 # 9: maturity's lateral part counts remote-execution ports only

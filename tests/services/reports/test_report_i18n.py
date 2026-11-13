@@ -435,6 +435,32 @@ def test_no_chapter_repeats_the_heading_of_the_closing_part(ctx, report_type, la
     assert part not in [s.title for s in doc.sections]
 
 
+@pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
+def test_what_left_the_security_risk_report_has_its_place(ctx, lang):
+    """Stage 3b: ransomware is a number whose note names the ransomware report, lateral movement a sentence that
+    names its report, users and processes a chapter of the traffic report. Nothing moved without landing."""
+    from illumio_ops.domain.report import TableBlock, TextBlock
+
+    def build(report_type):
+        return specs()[report_type].build(BuildInput(
+            ctx=ctx, params=ReportParams(report_type=report_type), start=START, end=END, lang=lang, tz=UTC, now=NOW,
+            pce_label="pce"))
+    risk, traffic = build(ReportType.SECURITY_RISK), build(ReportType.TRAFFIC)
+    assert not {"ransomware", "lateral", "users", "ports"} & {s.id for s in risk.sections}
+    kpis = {k.key: k for k in risk.kpis}
+    assert "lateral_detections" not in kpis
+    assert translate(lang, "rpt_title_ransomware", {}) in (kpis["ransomware_protected_pct"].note or "")
+    coverage = next(s for s in risk.sections if s.id == "coverage")
+    assert any(translate(lang, "rpt_title_lateral_posture", {}) in p for b in coverage.blocks
+               if isinstance(b, TextBlock) for p in b.paragraphs)
+    uncovered = [b for s in risk.sections if s.id == "uncovered" for b in s.blocks if isinstance(b, TableBlock)]
+    assert [t.title for t in uncovered] == [translate(lang, "rpt_sec_tbl_uncovered", {}),
+                                            translate(lang, "rpt_sec_tbl_port_gaps", {})]
+    assert "users" in [s.id for s in traffic.sections]
+    users = next(s for s in traffic.sections if s.id == "users")
+    assert [b.rows for b in users.blocks if isinstance(b, TableBlock)] == [(("corp\\alice", 2),)]
+
+
 # ── flows without a decision (stage 3b). The install above holds none — adding them would move its pinned numbers —
 # so what a report says about them is read from a second install: both kinds, a host in Idle now and hosts not. ──
 

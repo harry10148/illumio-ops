@@ -34,7 +34,7 @@ PINNED: dict[str, dict[str, Numbers]] = {
             "maturity": (66, None), "enforced_hosts_pct": (100.0, None), "allowed_pct": (94.6, None),
             "pb_flows": (1, None), "blocked_flows": (1, None), "unmanaged_connections": (2, None),
             "admin_open_connections": (5, None), "critical_high_findings": (12, None),
-            "ransomware_protected_pct": (50.0, None), "lateral_detections": (2, None),
+            "ransomware_protected_pct": (50.0, None),
         },
         "network_inventory": {
             "managed_hosts": (3, None), "hosts_missing_labels": (3, None), "apps": (1, None),
@@ -96,7 +96,6 @@ PINNED: dict[str, dict[str, Numbers]] = {
             "maturity": (68, None), "enforced_hosts_pct": (100.0, None), "allowed_pct": (94.6, None),
             "pb_flows": (1, None), "blocked_flows": (1, None), "unmanaged_connections": (2, None),
             "admin_open_connections": (5, None), "critical_high_findings": (11, None),
-            "lateral_detections": (0, None),
         },
         "network_inventory": {
             "managed_hosts": (3, None), "hosts_missing_labels": (3, None), "apps": (1, None),
