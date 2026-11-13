@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.10.0] - 2026-11-13
+
+What a report holds (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §9.2).
+
+### Changed — numbers that are computed differently
+
+- A share counts only the flows the PCE gave a decision for (Allowed, Potentially Blocked, Blocked). Flows with no
+  decision — connections neither end has a VEN for, or that a VEN recorded without one — are left out of every
+  share and have a chapter of their own, "Traffic that can only be watched"; the first page says how many there are,
+  by flows and by connections. This changes, in the security risk report: the maturity score (its policy, lateral
+  and managed parts), connections allowed by a rule, connections from unmanaged sources and management-port
+  connections not blocked; in the app summary: connections allowed by a rule; in the readiness report: the remote
+  management factor. A score made by 6.10.0 is not comparable with one an earlier release made.
+- Findings rules that count what was not blocked (B001, B006, L002, L005, L007), unmanaged source activity (B004)
+  and policy coverage (B005) count decided flows only. Rules about whether something happened are unchanged.
+
+### Added
+
+- Weekly overview: alerts, VENs, traffic, new connections and policy provisioning of the period on one page, each
+  pointing to its own report, and what to do first. Where the installation keeps no traffic it asks the PCE; when
+  that fails only the traffic chapters say so and the rest is made.
+- The security risk report compares its maturity score and its share of enforced hosts with the previous period,
+  once a daily snapshot knows which hosts were managed (from the first day after this upgrade).
+
+### Changed
+
+- Rule Hit Count is a chapter of the policy usage report. The report is made whether or not Rule Hit Count is on;
+  the chapter then says why it has no counts. A schedule for the old report becomes one for policy usage (at most
+  30 days back; one that is then the same as another is kept once), said once in the service log. Reports the old
+  type made stay listed.
+- The security risk report keeps coverage, uncovered traffic (with the ports that have a gap), enforcement modes,
+  what enforcement would block and the traffic that can only be watched. Ransomware protection is one number
+  pointing to its report, lateral movement one sentence pointing to its report, and users and processes are a
+  chapter of the traffic report.
+
 ## [6.9.0] - 2026-11-12
 
 How a report reads (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §9.1). No key number is computed

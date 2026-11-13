@@ -1,3 +1,3 @@
 """illumio-ops v6."""
 
-__version__ = "6.9.0"
+__version__ = "6.10.0"
