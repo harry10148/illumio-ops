@@ -28,6 +28,7 @@ CONCLUSION_KEYS: Mapping[ReportType, str] = {
     ReportType.POLICY_DIFF: "rpt_conclusion_policy_diff",
     ReportType.POLICY_RESOLVER: "rpt_conclusion_policy_resolver",
     ReportType.CUSTOM: "rpt_conclusion_custom",
+    ReportType.WEEKLY_OVERVIEW: "rpt_conclusion_weekly_overview",
 }
 CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.LATERAL_POSTURE: ("assets_reachable", "pivots", "cross_env", "new_detections"),
@@ -45,12 +46,14 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.POLICY_DIFF: ("total", "rule_sets", "rules", "objects", "high"),
     ReportType.POLICY_RESOLVER: ("rules", "rulesets", "rows", "not_expanded", "no_address"),
     ReportType.CUSTOM: ("sections", "period"),
+    ReportType.WEEKLY_OVERVIEW: ("new_alerts", "vens_not_online", "pb_connections", "provisions"),
 }
 
 # The three numbers a report's first page leads with (stage 3a), in the order shown. The closing step (finish) moves
 # the ones the report has to the front; a missing one is filled from the numbers after. policy_resolver and custom
 # have no row of numbers on a first page.
 LEAD_KPIS: Mapping[ReportType, tuple[str, ...]] = {
+    ReportType.WEEKLY_OVERVIEW: ("new_alerts", "vens_not_online", "pb_connections"),
     ReportType.SECURITY_RISK: ("maturity", "enforced_hosts_pct", "pb_flows"),
     ReportType.LATERAL_POSTURE: ("assets_reachable", "pivots", "new_detections"),
     ReportType.NEW_CONNECTIONS: ("new", "admin", "unmanaged_source"),
@@ -92,6 +95,14 @@ CONCLUSIONS: Mapping[ReportType, tuple[tuple[tuple[str, ...], str], ...]] = {
         (CONCLUSION_KPIS[ReportType.LATERAL_POSTURE], CONCLUSION_KEYS[ReportType.LATERAL_POSTURE]),
         (("pivots", "cross_env", "new_detections"), "rpt_conclusion_lateral_posture_no_assets"),  # none chosen
         (("new_detections",), "rpt_conclusion_lateral_posture_detections"),  # the exposure not computed yet
+    ),
+    ReportType.WEEKLY_OVERVIEW: (
+        (CONCLUSION_KPIS[ReportType.WEEKLY_OVERVIEW], CONCLUSION_KEYS[ReportType.WEEKLY_OVERVIEW]),
+        # the period's traffic could not be had from the PCE (or the period holds no flow): no traffic number
+        (("new_alerts", "vens_not_online", "provisions"), "rpt_conclusion_weekly_overview_no_flows"),
+        # no event at all in the period: no count of provisions (as the audit report gives none)
+        (("new_alerts", "vens_not_online", "pb_connections"), "rpt_conclusion_weekly_overview_no_events"),
+        (("new_alerts", "vens_not_online"), "rpt_conclusion_weekly_overview_alerts_vens"),
     ),
 }
 

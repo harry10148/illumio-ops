@@ -20,6 +20,7 @@ export const TYPE_KEYS: Record<string, string> = {
   policy_diff: "rpt_title_policy_diff",
   policy_resolver: "rpt_title_policy_resolver",
   custom: "rpt_title_custom",
+  weekly_overview: "rpt_title_weekly_overview",
 };
 export const TYPE_DESC_KEYS: Record<string, string> = {
   lateral_posture: "gui_reports_desc_lateral_posture",
@@ -37,6 +38,7 @@ export const TYPE_DESC_KEYS: Record<string, string> = {
   policy_diff: "gui_reports_desc_policy_diff",
   policy_resolver: "gui_reports_desc_policy_resolver",
   custom: "gui_reports_desc_custom",
+  weekly_overview: "gui_reports_desc_weekly_overview",
 };
 export const STATUS_KEYS: Record<string, string> = {
   queued: "gui_reports_status_queued", running: "gui_reports_status_running",

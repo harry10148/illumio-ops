@@ -8,7 +8,10 @@ No task of stage 3a may edit an expected value in this file.
 
 Stage 3b, Task 5: Rule Hit Count became a chapter of the policy usage report. Its own entry is gone (the type is no
 longer built) and policy usage has three numbers more — rhc_hit, rhc_zero, rhc_no_record, the values that entry had
-for hit, zero and no_record. The other numbers of policy usage are as they were."""
+for hit, zero and no_record. The other numbers of policy usage are as they were.
+
+Stage 3b, Task 6: the weekly overview is a new type, with an entry of its own in each install. The sample with every
+setting got alerts for it (test_report_i18n._alerts_sample); no other type reads alerts, and no other entry changed."""
 import pytest
 
 from illumio_ops.domain.values import Language, ReportType
@@ -80,6 +83,10 @@ PINNED: dict[str, dict[str, Numbers]] = {
             "omitted": (3, None), "not_expanded": (2, None), "no_address": (1, None),
         },
         "custom": {},
+        "weekly_overview": {
+            "new_alerts": (4, 1), "vens_not_online": (1, None), "pb_connections": (1, None),
+            "critical_high_alerts": (3, 0), "new_connections": (39, None), "provisions": (1, None),
+        },
     },
     "bare": {
         "lateral_posture": {
@@ -137,6 +144,10 @@ PINNED: dict[str, dict[str, Numbers]] = {
             "omitted": (0, None), "not_expanded": (0, None), "no_address": (0, None),
         },
         "custom": {},
+        "weekly_overview": {
+            "new_alerts": (0, None), "vens_not_online": (1, None), "pb_connections": (1, None),
+            "critical_high_alerts": (0, None), "new_connections": (39, None), "provisions": (1, None),
+        },
     },
 }
 

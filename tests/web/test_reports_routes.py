@@ -50,7 +50,7 @@ def test_catalog_lists_built_types(client, ctx):
     data = get(client, "/api/reports/catalog").get_json()["data"]
     types = {e["report_type"]: e for e in data["entries"]}
     # rule_hit_count is a chapter of policy_usage since stage 3b: no card of its own
-    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness", "policy_usage", "policy_diff", "policy_resolver", "custom"}
+    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness", "policy_usage", "policy_diff", "policy_resolver", "custom", "weekly_overview"}
     assert all(e["available"] for e in types.values()) and data["smtp_enabled"] is False
 
 
@@ -251,13 +251,15 @@ def test_bulk_delete(client, ctx):
     assert r.status_code in (400, 403)  # CSRF
 
 
-def test_the_common_templates_are_these_four(client, ctx):
-    """UI redesign spec §9.1 (stage 3a): the templates page leads with the common ones; the rest are by topic."""
+def test_the_common_templates_are_these_five(client, ctx):
+    """UI redesign spec §9.1, §9.2: the templates page leads with the common ones, the weekly overview first (it
+    joined them in stage 3b); the rest are by topic."""
     login(client)
     entries = get(client, "/api/reports/catalog").get_json()["data"]["entries"]
     assert all(e.get("tier") in ("common", "topic") for e in entries)
     assert sorted(e["report_type"] for e in entries if e.get("tier") == "common") == [
-        "audit", "new_connections", "security_risk", "ven_status"]
+        "audit", "new_connections", "security_risk", "ven_status", "weekly_overview"]
+    assert entries[0]["report_type"] == "weekly_overview" and entries[0]["mode"] == "on_demand"
 
 
 # ── Rule Hit Count joined the policy usage report (stage 3b): nothing new of the type, the old ones still read ──

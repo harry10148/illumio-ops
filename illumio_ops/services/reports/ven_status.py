@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -19,9 +20,10 @@ from illumio_ops.domain.report import (
     TableBlock,
     TextBlock,
 )
-from illumio_ops.domain.values import SEVERITY_ORDER, Severity
+from illumio_ops.domain.values import SEVERITY_ORDER, Language, Severity
 from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.analysis.tamper import list_annotations
+from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import (
     MODE_KEYS,
@@ -114,6 +116,90 @@ def compat_state(report: VenCompat | None, mode: str | None) -> str:
     return _QUALIFY.get(status, "unknown")
 
 
+@dataclass(frozen=True)
+class Fleet:
+    """The managed hosts as the inventory has them now, and what the VEN status report says of them: read once, by
+    this report and by the weekly overview, so the two cannot count a host differently."""
+    hosts: list[WorkloadRow]
+    sets: dict[int, dict[str, str]]  # label set -> its labels
+    name: dict[str, str]  # href -> the host's name
+    buckets: dict[str, str]  # href -> bucket()
+    counts: Counter[str]  # hosts per bucket
+    trouble: dict[str, list[str]]  # online hosts with policy sync problems -> problems()
+    tamper: Any  # the tamper analysis' stored result; None before its first run
+    tamper_hosts: list[Any]
+    unexplained: int  # hosts with tampering no known cause explains in the last 7 days
+    report_of: dict[str, VenCompat | None]  # href -> the PCE's compatibility report of its VEN
+    compat: dict[str, str]  # href -> compat_state()
+    compat_counts: Counter[str]
+    computed_at: str | None  # the tamper analysis' last run
+    run_error: str | None
+
+    def offline(self) -> list[WorkloadRow]:
+        """The hosts out of contact, the latest heartbeat first."""
+        return sorted((w for w in self.hosts if self.buckets[w.href] in _BUCKET_KEYS),
+                      key=lambda w: w.last_heartbeat_at or "", reverse=True)
+
+
+def read_fleet(ctx: AppContext, now: datetime) -> Fleet:
+    with reads.reading(ctx) as conn:
+        fleet = [w for w in workloads.all_workloads(conn) if w.managed]
+        sets = labels.label_sets(conn, {w.label_set for w in fleet if w.label_set is not None})
+        reports = ven_compat.by_ven(conn)
+        tamper_row = analysis.read_result(conn, "tamper")
+        computed_at, run_error = reads.analysis_state(conn, "tamper")
+    name = {w.href: w.hostname or w.href.rsplit("/", 1)[-1] for w in fleet}
+    buckets = {w.href: bucket(w, now) for w in fleet}
+    trouble = {w.href: problems(w) for w in fleet if buckets[w.href] == "online"}
+    tamper = json.loads(tamper_row["result_json"]) if tamper_row is not None else None
+    tamper_hosts = list((tamper or {}).get("hosts") or ())
+    report_of = {w.href: reports.get(w.ven_href) if w.ven_href else None for w in fleet}
+    compat = {w.href: compat_state(report_of[w.href], w.enforcement_mode) for w in fleet}
+    return Fleet(hosts=fleet, sets=sets, name=name, buckets=buckets, counts=Counter(buckets.values()),
+                 trouble={h: p for h, p in trouble.items() if p}, tamper=tamper, tamper_hosts=tamper_hosts,
+                 unexplained=sum(1 for h in tamper_hosts if int(h.get("unexplained_7d") or 0) > 0),
+                 report_of=report_of, compat=compat, compat_counts=Counter(compat.values()),
+                 computed_at=computed_at, run_error=run_error)
+
+
+def ven_findings(fleet: Fleet, lang: Language) -> list[Finding]:
+    """What the fleet's state asks an operator to do, most severe first. Each finding counts the rows of a table of
+    the VEN status report; none of them means that report says nothing needs action."""
+    def t(msg: str, /, **params: object) -> str:
+        return tr(lang, msg, **params)
+    counts, compat_counts, offline = fleet.counts, fleet.compat_counts, fleet.offline()
+    found: list[Finding] = []
+    if offline:
+        # the one out of contact the longest, among those whose last heartbeat is known
+        oldest_out = min((w for w in offline if w.last_heartbeat_at), key=lambda w: w.last_heartbeat_at or "",
+                         default=None)
+        found.append(Finding(
+            severity=Severity.HIGH if counts["long_offline"] else Severity.MEDIUM,
+            title=t("rpt_ven_find_offline_title", n=f"{len(offline):,}"),
+            what=t("rpt_ven_find_offline_what", d1=counts["lost_24h"], d2=counts["lost_48h"], old=counts["long_offline"]),
+            why=t("rpt_ven_find_offline_why"), action=t("rpt_ven_find_offline_action"), action_code="ven_offline",
+            action_short=t("rpt_act_ven_offline"),
+            action_focus=t("rpt_ven_find_offline_focus", host=fleet.name[oldest_out.href]) if oldest_out else ""))
+    if fleet.unexplained:
+        found.append(Finding(severity=Severity.HIGH, title=t("rpt_ven_find_tamper_title", n=f"{fleet.unexplained:,}"),
+                             what=t("rpt_ven_find_tamper_what"), why=t("rpt_ven_find_tamper_why"),
+                             action=t("rpt_ven_find_tamper_action"), action_code="ven_tamper",
+                             action_short=t("rpt_act_ven_tamper")))
+    if fleet.trouble:
+        found.append(Finding(severity=Severity.MEDIUM, title=t("rpt_ven_find_sync_title", n=f"{len(fleet.trouble):,}"),
+                             why=t("rpt_ven_find_sync_why"), action=t("rpt_ven_find_sync_action"),
+                             action_code="ven_sync", action_short=t("rpt_act_ven_sync")))
+    not_passed = compat_counts["warn"] + compat_counts["fail"]
+    if not_passed:
+        found.append(Finding(
+            severity=Severity.MEDIUM, title=t("rpt_ven_find_compat_title", n=f"{not_passed:,}"),
+            what=t("rpt_ven_find_compat_what", warn=compat_counts["warn"], fail=compat_counts["fail"]),
+            why=t("rpt_ven_find_compat_why"), action=t("rpt_ven_find_compat_action"), action_code="ven_compat",
+            action_short=t("rpt_act_ven_compat")))
+    found.sort(key=lambda f: -SEVERITY_ORDER.index(f.severity))
+    return found
+
+
 def build_ven_status(inp: BuildInput) -> ReportDocument:
     lang, now = inp.lang, inp.now
 
@@ -122,20 +208,12 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
 
     lc = load_lateral_context(inp.ctx, now=now)
     env_key = lc.settings.environment_label_key
-    with reads.reading(inp.ctx) as conn:
-        fleet = [w for w in workloads.all_workloads(conn) if w.managed]
-        sets = labels.label_sets(conn, {w.label_set for w in fleet if w.label_set is not None})
-        reports = ven_compat.by_ven(conn)
-        tamper_row = analysis.read_result(conn, "tamper")
-        computed_at, run_error = reads.analysis_state(conn, "tamper")
-    name = {w.href: w.hostname or w.href.rsplit("/", 1)[-1] for w in fleet}
-    buckets = {w.href: bucket(w, now) for w in fleet}
-    counts = Counter(buckets.values())
-    trouble = {w.href: problems(w) for w in fleet if buckets[w.href] == "online"}
-    trouble = {h: p for h, p in trouble.items() if p}
-    tamper = json.loads(tamper_row["result_json"]) if tamper_row is not None else None
-    tamper_hosts = list((tamper or {}).get("hosts") or ())
-    unexplained = sum(1 for h in tamper_hosts if int(h.get("unexplained_7d") or 0) > 0)
+    state = read_fleet(inp.ctx, now)
+    fleet, sets, name, buckets, counts, trouble = (state.hosts, state.sets, state.name, state.buckets, state.counts,
+                                                   state.trouble)
+    tamper, tamper_hosts, unexplained = state.tamper, state.tamper_hosts, state.unexplained
+    report_of, compat, compat_counts = state.report_of, state.compat, state.compat_counts
+    computed_at, run_error = state.computed_at, state.run_error
     values: dict[str, int | None] = {
         "managed": len(fleet), "online": counts["online"], "lost_24h": counts["lost_24h"],
         "lost_48h": counts["lost_48h"], "long_offline": counts["long_offline"], "status_unknown": counts["unknown"],
@@ -148,8 +226,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
 
     def stamp(value: str | None) -> str | None:
         return value or None  # time columns: the renderers show it in the display zone; missing stays blank
-    offline = sorted((w for w in fleet if buckets[w.href] in _BUCKET_KEYS),
-                     key=lambda w: w.last_heartbeat_at or "", reverse=True)
+    offline = state.offline()
     offline_table = TableBlock(
         title=t("rpt_ven_tbl_offline"),
         columns=(Column(key="host", label=t("rpt_col_host"), kind="host"),
@@ -165,8 +242,6 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
     def app_env(w: WorkloadRow) -> str:
         lab = sets.get(w.label_set, {}) if w.label_set is not None else {}
         return f"{lab.get('app') or no_label} ({lab.get(env_key) or no_label})"
-    report_of = {w.href: reports.get(w.ven_href) if w.ven_href else None for w in fleet}
-    compat = {w.href: compat_state(report_of[w.href], w.enforcement_mode) for w in fleet}
 
     def compat_cell(w: WorkloadRow) -> str:
         state, report = t(_COMPAT_KEYS[compat[w.href]]), report_of[w.href]
@@ -193,7 +268,6 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                    for w in online),
         total_rows=len(online), empty_text=t("rpt_ven_none_online"),
         host_keys=host_keys(host=(w.href for w in online)), host_section="status")
-    compat_counts = Counter(compat.values())
     compat_table = TableBlock(
         title=t("rpt_ven_tbl_compat"),
         columns=(Column(key="state", label=t("rpt_ven_col_compat")),
@@ -274,36 +348,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
         quality.append(t("rpt_quality_analysis_failed", error=run_error[:200]))
     if counts["unknown"]:
         quality.append(t("rpt_ven_quality_unknown", n=counts["unknown"]))
-    # Each finding counts the rows of a table below; none of them means the report says nothing needs action.
-    found: list[Finding] = []
-    if offline:
-        # the one out of contact the longest, among those whose last heartbeat is known
-        oldest_out = min((w for w in offline if w.last_heartbeat_at), key=lambda w: w.last_heartbeat_at or "",
-                         default=None)
-        found.append(Finding(
-            severity=Severity.HIGH if counts["long_offline"] else Severity.MEDIUM,
-            title=t("rpt_ven_find_offline_title", n=f"{len(offline):,}"),
-            what=t("rpt_ven_find_offline_what", d1=counts["lost_24h"], d2=counts["lost_48h"], old=counts["long_offline"]),
-            why=t("rpt_ven_find_offline_why"), action=t("rpt_ven_find_offline_action"), action_code="ven_offline",
-            action_short=t("rpt_act_ven_offline"),
-            action_focus=t("rpt_ven_find_offline_focus", host=name[oldest_out.href]) if oldest_out else ""))
-    if unexplained:
-        found.append(Finding(severity=Severity.HIGH, title=t("rpt_ven_find_tamper_title", n=f"{unexplained:,}"),
-                             what=t("rpt_ven_find_tamper_what"), why=t("rpt_ven_find_tamper_why"),
-                             action=t("rpt_ven_find_tamper_action"), action_code="ven_tamper",
-                             action_short=t("rpt_act_ven_tamper")))
-    if trouble:
-        found.append(Finding(severity=Severity.MEDIUM, title=t("rpt_ven_find_sync_title", n=f"{len(trouble):,}"),
-                             why=t("rpt_ven_find_sync_why"), action=t("rpt_ven_find_sync_action"),
-                             action_code="ven_sync", action_short=t("rpt_act_ven_sync")))
-    not_passed = compat_counts["warn"] + compat_counts["fail"]
-    if not_passed:
-        found.append(Finding(
-            severity=Severity.MEDIUM, title=t("rpt_ven_find_compat_title", n=f"{not_passed:,}"),
-            what=t("rpt_ven_find_compat_what", warn=compat_counts["warn"], fail=compat_counts["fail"]),
-            why=t("rpt_ven_find_compat_why"), action=t("rpt_ven_find_compat_action"), action_code="ven_compat",
-            action_short=t("rpt_act_ven_compat")))
-    found.sort(key=lambda f: -SEVERITY_ORDER.index(f.severity))
+    found = ven_findings(state, lang)
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_ven_status"), period_start=inp.start,
         period_end=inp.end, generated_at=now, pce_label=inp.pce_label, kpis=kpis, findings=tuple(found),

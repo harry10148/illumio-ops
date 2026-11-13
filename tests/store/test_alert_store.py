@@ -139,3 +139,42 @@ def test_alerts_from_before_are_given_their_hosts_once(tmp_path):
         assert [(d.key, d.role) for d in got[event]] == [(W + "c", "subject")]
         assert system not in got and counted not in got
         assert store.backfill_devices(conn) == 0
+
+
+# ── a period with an end (the weekly overview, UI redesign spec §9.2) ──
+
+def test_until_bounds_the_period_and_its_end_is_not_included(tmp_path):
+    from illumio_ops.domain.alert_devices import Device
+    ctx = make_ctx(tmp_path)
+    start, end = NOW - timedelta(days=7), NOW
+    with ctx.db() as conn:
+        for at in (start - timedelta(microseconds=1), start, end - timedelta(microseconds=1), end):
+            insert(conn, at=at)
+        _with_devices(conn, [Device(f"{W}a", "source")], at=end - timedelta(hours=1))
+        _with_devices(conn, [Device(f"{W}a", "source")], at=end)
+        same = {"pce_url": A[0], "org_id": A[1], "since": start}
+        assert store.count_alerts(conn, **same) == 5 and store.count_alerts(conn, **same, until=end) == 3
+        counts = store.period_counts(conn, **same, until=end)
+        assert counts == {"high": 3, "grouped": 0} and store.period_counts(conn, **same)["high"] == 5
+        assert [(r["key"], r["n"]) for r in store.alerted_devices(conn, **same)] == [(f"{W}a", 2)]
+        assert [(r["key"], r["n"]) for r in store.alerted_devices(conn, **same, until=end)] == [(f"{W}a", 1)]
+        assert store.first_fired_at(conn, pce_url=A[0], org_id=A[1]) == start - timedelta(microseconds=1)
+        assert store.first_fired_at(conn, pce_url=B[0], org_id=B[1]) is None
+
+
+def test_the_categories_of_a_period_add_up_to_its_alerts(tmp_path):
+    """Every rule type falls in exactly one category of the alerts page, a lateral rule's by its detector."""
+    from dataclasses import replace
+    ctx = make_ctx(tmp_path)
+    start, end = NOW - timedelta(days=7), NOW
+    with ctx.db() as conn:
+        for i, (rule_type, detector) in enumerate([(t, None) for t in AlertRuleType] + [
+                (AlertRuleType.LATERAL, "fanout"), (AlertRuleType.LATERAL, "volume_surge")]):
+            t = replace(trig(f"s{i}"), rule_type=rule_type, params={"detector": detector} if detector else {})
+            store.insert_alert(conn, pce_url=A[0], org_id=A[1], rule_name="r", pack_key=None, trigger=t,
+                               at=start + timedelta(hours=i), channels=["line"], hold=None)
+        insert(conn, at=end)  # after the period: in no category of it
+        got = store.counts_by_category(conn, pce_url=A[0], org_id=A[1], since=start, until=end)
+        total = store.count_alerts(conn, pce_url=A[0], org_id=A[1], since=start, until=end)
+    assert got == {"lateral": 2, "anomaly": 1, "traffic": 3, "event": 1, "system": 1}
+    assert sum(got.values()) == total == len(AlertRuleType) + 2

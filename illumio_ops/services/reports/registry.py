@@ -85,7 +85,9 @@ class BuildInput:
     tz: tzinfo | None
     now: datetime
     pce_label: str
-    # The install's context when ctx is a store pulled from the PCE (traffic only): what reads events uses it.
+    # The install's context when ctx is a throwaway store: one pulled from the PCE (traffic only: what reads events
+    # uses the install), or, for a type that gets its own traffic (ReportSpec.own_traffic), the archive's store of
+    # events (it holds no traffic: what reads traffic, the inventory or alerts uses the install).
     install: AppContext | None = None
 
 
@@ -107,6 +109,11 @@ class ReportSpec:
     formats: tuple[ReportFormat, ...] = (ReportFormat.HTML, ReportFormat.XLSX)  # the formats this type makes
     # Whether these parameters read traffic, when the type alone does not say (a custom report of event sections)
     needs_traffic_for: Callable[[AppContext, ReportParams], bool] | None = None
+    # The builder reads traffic and gets it itself: from the install's store when that keeps the period, else by its
+    # own pull from the PCE — and when the pull fails only its traffic chapters say so (the weekly overview; a
+    # needs_traffic type fails whole). The generator hands such a builder the install's context beside an archive
+    # store (BuildInput.install), and the catalog lists the type as one that pulls on demand.
+    own_traffic: bool = False
 
 
 REGISTRY: dict[ReportType, ReportSpec] = {}
@@ -170,7 +177,14 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.traffic import build_traffic
     from illumio_ops.services.reports.unmanaged import build_unmanaged
     from illumio_ops.services.reports.ven_status import build_ven_status
+    from illumio_ops.services.reports.weekly_overview import build_weekly_overview
     return {
+        # First: the reports page leads with it. It reads alerts, the inventory and events in every mode and gets
+        # its traffic itself (own_traffic), so a failed pull costs it two chapters, not the report. Its lookback is
+        # a flow report's; no `retention`: it does not read traffic from the archive, so the archive reaching
+        # further back does not let its period start earlier.
+        ReportType.WEEKLY_OVERVIEW: ReportSpec(ReportType.WEEKLY_OVERVIEW, "operations", False, build_weekly_overview,
+                                               max_lookback=flow_days, reads_events=True, own_traffic=True),
         ReportType.LATERAL_POSTURE: ReportSpec(ReportType.LATERAL_POSTURE, "lateral", True, build_lateral_posture,
                                                ondemand_lead=baseline_lead, ondemand_prepare=_prepare_exposure),
         ReportType.NEW_CONNECTIONS: ReportSpec(ReportType.NEW_CONNECTIONS, "analysis", True, build_new_connections,

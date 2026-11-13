@@ -80,8 +80,9 @@ class ReportPage(BaseModel):
     page_size: int
 
 
-# The templates the reports page leads with (UI redesign spec §9.1, stage 3a; the weekly overview joins in 3b).
-COMMON = frozenset({ReportType.SECURITY_RISK, ReportType.VEN_STATUS, ReportType.NEW_CONNECTIONS, ReportType.AUDIT})
+# The templates the reports page leads with, the weekly overview first (UI redesign spec §9.1, §9.2).
+COMMON = (ReportType.WEEKLY_OVERVIEW, ReportType.SECURITY_RISK, ReportType.VEN_STATUS, ReportType.NEW_CONNECTIONS,
+          ReportType.AUDIT)
 UI_GROUPS = {"lateral": "assessment", "assessment": "assessment", "analysis": "traffic", "inventory": "traffic",
              "custom": "traffic", "policy": "policy", "operations": "operations"}
 
@@ -100,10 +101,13 @@ def catalog(ctx: AppContext) -> Catalog:
     latest = now.astimezone(tz).date() - timedelta(days=1)
 
     def first(s: ReportSpec) -> date | None:
+        own = first_day(earliest_start(settings, s, now, reached), tz)
         if s.reads_events:  # not refused: a period before the events kept shows its gaps; the picker starts there
             floor = now - timedelta(days=settings.collection.retention.event_days)
-            return first_day(min(floor, reached["events"]) if "events" in reached else floor, tz)
-        return first_day(earliest_start(settings, s, now, reached), tz)
+            events = first_day(min(floor, reached["events"]) if "events" in reached else floor, tz)
+            # a type with a limit of its own as well (the weekly overview) is refused before it: the later of the two
+            return max(own, events) if own is not None and events is not None else events
+        return own
 
     return Catalog(entries=[CatalogEntry(report_type=t, group=s.group, available=avail.get(t) is None,
                                          reason_key=avail.get(t), accepts_filter=s.accepts_filter,
@@ -112,7 +116,7 @@ def catalog(ctx: AppContext) -> Catalog:
                                          earliest_day=first(s), latest_day=latest,
                                          formats=list(s.formats), ui_group=UI_GROUPS.get(s.group, "traffic"),  # type: ignore[arg-type]
                                          tier="common" if t in COMMON else "topic",
-                                         mode="on_demand" if s.needs_traffic else "basic",
+                                         mode="on_demand" if s.needs_traffic or s.own_traffic else "basic",
                                          schedules=scheduled.get(t.value, 0), copies=copies.get(t.value, 0))
                             for t, s in specs().items()],
                    smtp_enabled=settings.alerts.channels.smtp.enabled,

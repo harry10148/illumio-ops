@@ -37,7 +37,7 @@ from illumio_ops.domain.report import (
 from illumio_ops.domain.values import Language, ReportType, Severity
 from illumio_ops.i18n import translate
 from illumio_ops.services.reports.common import host_url
-from illumio_ops.services.reports.finish import NOTHING, UNEVALUATED
+from illumio_ops.services.reports.finish import NOT_RUN_REASONS, NOTHING, UNEVALUATED
 from illumio_ops.services.reports.sheets import sheet_names
 from illumio_ops.services.reports.svg import bar_svg
 
@@ -470,7 +470,12 @@ def to_do(doc: ReportDocument) -> ToDo | None:
     words = ""
     if held is not None:
         section, n = held
+        # The rules did not run: for want of traffic in the period (the sentence every report had), or for a
+        # registered reason the section's empty table gives (finish.NOT_RUN_REASONS) — said here as the table says it.
+        said = next((b.empty_text for b in section.blocks if isinstance(b, TableBlock)), "")
         words = (tr(lang, "rpt_actions_unevaluated", n=n, section=section.title) if n
+                 else tr(lang, "rpt_actions_not_run_why", why=said, section=section.title)
+                 if said in {tr(lang, key) for key in NOT_RUN_REASONS}
                  else tr(lang, "rpt_actions_not_run", section=section.title))
     return ToDo(top=top, more=more, nothing=not top and held is None, held=words)
 

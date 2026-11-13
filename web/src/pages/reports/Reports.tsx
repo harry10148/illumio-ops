@@ -146,7 +146,7 @@ const UI_GROUP_KEYS: Record<string, string> = {
 const TIERS = ["common", "topic"] as const;
 const TIER_KEYS: Record<string, string> = { common: "rpt_tier_common", topic: "rpt_tier_topic" };
 // The common templates in the order they are read (UI redesign spec §9.1); which types are common is the catalog's.
-const COMMON_ORDER = ["security_risk", "ven_status", "new_connections", "audit"];
+const COMMON_ORDER = ["weekly_overview", "security_risk", "ven_status", "new_connections", "audit"];
 
 function tierEntries(catalog: Catalog, tier: string): CatalogEntry[] {
   const found = catalog.entries.filter((e) => e.tier === tier);

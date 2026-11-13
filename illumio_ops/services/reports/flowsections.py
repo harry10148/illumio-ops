@@ -384,15 +384,18 @@ def share_text(lang: Language, n: int, d: int) -> str:
     return f"{pct:.1f}%"
 
 
-def undecided_caveat(lang: Language, saw: Seen, *, chapter: bool = True) -> tuple[str, ...]:
+def undecided_caveat(lang: Language, saw: Seen, *, chapter: bool = True, elsewhere: str | None = None) -> tuple[str, ...]:
     """The sentence under the conclusion when some of the period's flows carry no decision: their share of every
     flow, and of every connection (the two differ widely: on lab 93% and 30%). chapter=False: the report has no
     monitor-only chapter to point at (readiness), and names the three factors that leave such connections out.
-    Nothing when every flow has a decision."""
+    elsewhere: the report has no such chapter and counts connections by decision (the weekly overview); the
+    sentence names the report that lists these flows. Nothing when every flow has a decision."""
     if not saw.undecided.flows:
         return ()
     shares = {"pct_flows": share_text(lang, saw.undecided.flows, saw.flows),
               "pct_connections": share_text(lang, saw.undecided.connections, saw.connections)}
+    if elsewhere is not None:
+        return (tr(lang, "rpt_caveat_undecided_elsewhere", **shares, report=elsewhere),)
     if chapter:
         return (tr(lang, "rpt_caveat_undecided", **shares),)
     return (tr(lang, "rpt_caveat_undecided_plain", **shares, policy=tr(lang, "rpt_rdy_factor_policy"),

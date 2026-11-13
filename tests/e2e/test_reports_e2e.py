@@ -232,7 +232,7 @@ def test_audit_in_lightweight_mode(context, live_app):
 
 # ── the reports page (UI redesign samples 07, 08) ───────────────────────────
 
-COMMON = ["security_risk", "ven_status", "new_connections", "audit"]
+COMMON = ["weekly_overview", "security_risk", "ven_status", "new_connections", "audit"]
 
 
 @pytest.mark.parametrize("width,columns", [(1440, (3, 4)), (820, (1, 2))])
@@ -252,16 +252,17 @@ def test_templates_are_the_common_ones_then_the_rest(browser, live_app, width, c
     assert [common.nth(i).get_attribute("data-report-type") for i in range(common.count())] == COMMON
     topic = page.locator("[data-tier=topic] .rpt-card")
     kinds = [topic.nth(i).get_attribute("data-report-type") for i in range(topic.count())]
-    # 15 cards: Rule Hit Count has none since it became a chapter of the policy usage report (stage 3b)
+    # 16 cards: Rule Hit Count has none since it became a chapter of the policy usage report, and the weekly
+    # overview joined the common ones (stage 3b)
     assert "rule_hit_count" not in kinds and "policy_usage" in kinds
-    assert not set(kinds) & set(COMMON) and len(kinds) + len(COMMON) == 15
+    assert not set(kinds) & set(COMMON) and len(kinds) + len(COMMON) == 16
     cards = page.locator("[data-role=report-catalog] .rpt-card")
     tags = page.locator("[data-role=report-catalog] .rpt-card [data-role=rpt-group]")
-    assert tags.count() == cards.count() == 15
+    assert tags.count() == cards.count() == 16
     assert set(tags.all_text_contents()) == {"Security assessment", "Traffic analysis", "Policy", "Operations and audit"}
     assert page.locator("[data-report-type=audit] [data-role=rpt-group]").inner_text() == "Operations and audit"
     # cards of one row share a top: the widest row of each part is as many columns as the width allows
-    for tier, n in (("common", 4), ("topic", 11)):
+    for tier, n in (("common", 5), ("topic", 11)):
         tops = page.evaluate(
             "(t) => [...document.querySelectorAll(`[data-tier=${t}] .rpt-card`)].map((c) => Math.round(c.getBoundingClientRect().top))",
             tier)

@@ -30841,7 +30841,8 @@
               "rule_hit_count",
               "policy_diff",
               "policy_resolver",
-              "custom"
+              "custom",
+              "weekly_overview"
             ],
             "title": "ReportType",
             "type": "string"
@@ -31484,7 +31485,8 @@
               "rule_hit_count",
               "policy_diff",
               "policy_resolver",
-              "custom"
+              "custom",
+              "weekly_overview"
             ],
             "title": "ReportType",
             "type": "string"
@@ -32219,7 +32221,8 @@
               "rule_hit_count",
               "policy_diff",
               "policy_resolver",
-              "custom"
+              "custom",
+              "weekly_overview"
             ],
             "title": "ReportType",
             "type": "string"
@@ -32942,7 +32945,8 @@
               "rule_hit_count",
               "policy_diff",
               "policy_resolver",
-              "custom"
+              "custom",
+              "weekly_overview"
             ],
             "title": "ReportType",
             "type": "string"
@@ -33861,7 +33865,8 @@
               "rule_hit_count",
               "policy_diff",
               "policy_resolver",
-              "custom"
+              "custom",
+              "weekly_overview"
             ],
             "title": "ReportType",
             "type": "string"
@@ -34504,7 +34509,8 @@
               "rule_hit_count",
               "policy_diff",
               "policy_resolver",
-              "custom"
+              "custom",
+              "weekly_overview"
             ],
             "title": "ReportType",
             "type": "string"
@@ -34812,7 +34818,8 @@
               "rule_hit_count",
               "policy_diff",
               "policy_resolver",
-              "custom"
+              "custom",
+              "weekly_overview"
             ],
             "title": "ReportType",
             "type": "string"
@@ -35314,7 +35321,8 @@
               "rule_hit_count",
               "policy_diff",
               "policy_resolver",
-              "custom"
+              "custom",
+              "weekly_overview"
             ],
             "title": "ReportType",
             "type": "string"
@@ -51754,7 +51762,8 @@
       "security_risk",
       "traffic",
       "unmanaged_endpoints",
-      "ven_status"
+      "ven_status",
+      "weekly_overview"
     ],
     "RuleAction": [
       "allow",

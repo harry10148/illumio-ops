@@ -33,6 +33,11 @@ NOTHING = "nothing"  # the closing section's id
 # empty, and it is not folded with the sections that hold nothing: the first page reads it to say that the rules
 # were not evaluated, instead of "nothing needs action", and links to it.
 UNEVALUATED = "findings"
+# Why the rules of a report did not run, when it is not that the period holds no traffic: the sentences (message
+# keys) a builder may give its empty rules table (findings.unevaluated_section not_run_key). The first page says the
+# same sentence in place of "no traffic to evaluate the rules on" (render_html.to_do); any other empty table there
+# is read as "no traffic", as before.
+NOT_RUN_REASONS = ("rpt_wk_rules_no_flows",)
 
 
 def _empty(block: Block) -> bool:

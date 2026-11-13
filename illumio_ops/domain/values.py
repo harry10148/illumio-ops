@@ -403,6 +403,7 @@ class ReportType(StrEnum):
     POLICY_DIFF = "policy_diff"
     POLICY_RESOLVER = "policy_resolver"
     CUSTOM = "custom"  # sections saved from the workbench (P6e)
+    WEEKLY_OVERVIEW = "weekly_overview"  # alerts, VENs, traffic, new connections and policy on one page (stage 3b)
 
 
 class ReportFormat(StrEnum):

@@ -76,6 +76,7 @@ def ctx(tmp_path_factory):
                 ("2026-10-23", "/orgs/1/workloads/a", "ip:8.8.8.8", 53, "allowed", 3)])
     _rule_flows(c)
     _p5b2_sample(c)
+    _alerts_sample(c)
     mp = pytest.MonkeyPatch()
     # The readiness report's draft recompute is a PCE call: a fixed answer here, so every section has content.
     mp.setattr(readiness_report, "predicted_summary", lambda ctx, spec, **kw: PredictedSummary(
@@ -94,6 +95,37 @@ def ctx(tmp_path_factory):
         breakdown=None, allow_rules={"445/6": []}, allow_status={"445/6": "error"}))
     yield c
     mp.undo()
+
+
+def _alerts_sample(c):
+    """Alerts for the weekly overview: this period's (each severity but low, four of the five categories, three
+    hosts), the previous period's, and one from before both — the records reach back over the previous period."""
+    from dataclasses import replace
+
+    from illumio_ops.domain.alert_devices import Device
+    from illumio_ops.domain.values import AlertRuleType, Severity
+    from illumio_ops.store import alerts as alert_store
+    from tests.services.collect.conftest import PCE
+    from tests.store.test_alert_store import trig
+    a, db = "/orgs/1/workloads/a", "/orgs/1/workloads/db"
+    sample = [
+        (datetime(2026, 10, 10, tzinfo=UTC), Severity.LOW, AlertRuleType.SYSTEM, None, ()),
+        (datetime(2026, 10, 15, tzinfo=UTC), Severity.MEDIUM, AlertRuleType.TRAFFIC, None, ()),
+        (datetime(2026, 10, 21, 9, tzinfo=UTC), Severity.HIGH, AlertRuleType.LATERAL, "fanout",
+         (Device(a, "source"), Device(db, "destination"))),
+        (datetime(2026, 10, 22, 9, tzinfo=UTC), Severity.MEDIUM, AlertRuleType.LATERAL, "volume_surge",
+         (Device(a, "source"),)),
+        (datetime(2026, 10, 23, 9, tzinfo=UTC), Severity.CRITICAL, AlertRuleType.EVENT, None,
+         (Device("ip:10.9.9.9", "source"),)),
+        (datetime(2026, 10, 24, 9, tzinfo=UTC), Severity.HIGH, AlertRuleType.SYSTEM, None, ()),
+    ]
+    with c.db() as conn:
+        for at, severity, rule_type, detector, devices in sample:
+            t = replace(trig(at.isoformat()), severity=severity, rule_type=rule_type, devices=devices,
+                        params={"detector": detector} if detector else {"free_bytes": 1})
+            alert_store.insert_alert(conn, pce_url=PCE["url"], org_id=PCE["org_id"], rule_name="r", pack_key=None,
+                                     trigger=t, at=at, channels=["line"], hold=None)
+        conn.commit()
 
 
 def _rhc_sample(mp):
@@ -330,7 +362,8 @@ def test_injected_missing_key_is_caught(ctx, monkeypatch):
 
 COVERAGE_BUILDERS = (ReportType.APP_SUMMARY, ReportType.SECURITY_RISK, ReportType.READINESS,
                      ReportType.NETWORK_INVENTORY, ReportType.LATERAL_POSTURE, ReportType.NEW_CONNECTIONS,
-                     ReportType.UNMANAGED_ENDPOINTS, ReportType.TRAFFIC, ReportType.CUSTOM)
+                     ReportType.UNMANAGED_ENDPOINTS, ReportType.TRAFFIC, ReportType.CUSTOM,
+                     ReportType.WEEKLY_OVERVIEW)
 
 
 @pytest.mark.parametrize("report_type", COVERAGE_BUILDERS)
@@ -397,6 +430,7 @@ HOST_TABLES = {  # report type -> (section, column, the part of the host page it
                             ("tamper", "host", "tamper")},
     ReportType.RANSOMWARE: {("hosts", "host", "ransomware")},
     ReportType.NETWORK_INVENTORY: {("hygiene", "host", None)},
+    ReportType.WEEKLY_OVERVIEW: {("alerts", "host", "alerts"), ("vens", "host", "status")},
 }
 
 

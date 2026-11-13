@@ -16,6 +16,7 @@ from illumio_ops.domain.alert_devices import (
     devices_of_detection,
     devices_of_events,
 )
+from illumio_ops.domain.alertcategory import CATEGORIES, category_filter
 from illumio_ops.domain.alerting import RuleState, Trigger
 from illumio_ops.domain.segment import EventSegment
 from illumio_ops.domain.values import DeliveryStatus
@@ -106,8 +107,12 @@ def backfill_devices(conn: sqlite3.Connection) -> int:
 def _where(*, pce_url: str, org_id: str, since: datetime, rule_types: Sequence[str] | None = None,
            severity: str | None = None, rule_id: str | None = None, detectors_in: Sequence[str] | None = None,
            detectors_not_in: Sequence[str] | None = None, ungrouped_only: bool = False,
-           device: str | None = None, fired_after: datetime | None = None) -> tuple[str, list[Any]]:
+           device: str | None = None, fired_after: datetime | None = None,
+           until: datetime | None = None) -> tuple[str, list[Any]]:
     clauses, params = ["pce_url = ?", "org_id = ?", "fired_at >= ?"], [pce_url, org_id, _t(since)]
+    if until is not None:  # a period's end, not included
+        clauses.append("fired_at < ?")
+        params.append(_t(until))
     for column, value in (("severity", severity), ("rule_id", rule_id)):
         if value:
             clauses.append(f"{column} = ?")
@@ -157,9 +162,11 @@ def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: d
     return rows, int(total)
 
 
-def period_counts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime) -> dict[str, int]:
-    """Alerts fired since `since` per severity, and how many were marked as known (`grouped`)."""
-    where, params = _where(pce_url=pce_url, org_id=org_id, since=since)
+def period_counts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime,
+                  until: datetime | None = None) -> dict[str, int]:
+    """Alerts fired since `since` (and before `until`, when given) per severity, and how many were marked as known
+    (`grouped`: a count across the severities, not one more of them)."""
+    where, params = _where(pce_url=pce_url, org_id=org_id, since=since, until=until)
     out = {r[0]: int(r[1]) for r in conn.execute(
         f"SELECT severity, COUNT(*) FROM alerts WHERE {where} GROUP BY severity", params)}
     out["grouped"] = int(conn.execute(f"SELECT COUNT(*) FROM alerts WHERE {where} AND grouped_annotation IS NOT NULL",
@@ -167,15 +174,36 @@ def period_counts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since:
     return out
 
 
-def alerted_devices(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime) -> list[sqlite3.Row]:
+def counts_by_category(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime,
+                       until: datetime) -> dict[str, int]:
+    """Alerts fired in [since, until) per category of the alerts page (domain/alertcategory.py CATEGORIES, each
+    counted with the filter the page lists it by)."""
+    out: dict[str, int] = {}
+    for cat in CATEGORIES:
+        types, must, must_not = category_filter(cat)
+        out[cat] = count_alerts(conn, pce_url=pce_url, org_id=org_id, since=since, until=until, rule_types=types,
+                                detectors_in=must, detectors_not_in=must_not)
+    return out
+
+
+def first_fired_at(conn: sqlite3.Connection, *, pce_url: str, org_id: str) -> datetime | None:
+    """When the oldest alert of this PCE still kept was raised; None when it has none."""
+    row = conn.execute("SELECT MIN(fired_at) FROM alerts WHERE pce_url = ? AND org_id = ?", (pce_url, org_id)).fetchone()
+    return datetime.fromisoformat(row[0]) if row[0] else None
+
+
+def alerted_devices(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime,
+                    until: datetime | None = None) -> list[sqlite3.Row]:
     """The hosts the period's alerts are about: key, how many alerts (n), the highest severity among them (rank: 3
-    critical … 0 low) and the latest (last) — most alerted first, then most recent."""
+    critical … 0 low) and the latest (last) — most alerted first, then most recent. until: the period's end, not
+    included (None: up to now)."""
+    before, more = ("AND a.fired_at < ? ", (_t(until),)) if until is not None else ("", ())
     return conn.execute(
         "SELECT d.key AS key, COUNT(DISTINCT a.id) AS n, MAX(a.fired_at) AS last, "
         "MAX(CASE a.severity WHEN 'critical' THEN 3 WHEN 'high' THEN 2 WHEN 'medium' THEN 1 ELSE 0 END) AS rank "
         "FROM alert_devices d JOIN alerts a ON a.id = d.alert_id "
-        "WHERE a.pce_url = ? AND a.org_id = ? AND a.fired_at >= ? GROUP BY d.key ORDER BY n DESC, last DESC, d.key",
-        (pce_url, org_id, _t(since))).fetchall()
+        f"WHERE a.pce_url = ? AND a.org_id = ? AND a.fired_at >= ? {before}"
+        "GROUP BY d.key ORDER BY n DESC, last DESC, d.key", (pce_url, org_id, _t(since), *more)).fetchall()
 
 
 def devices_recorded_since(conn: sqlite3.Connection, *, pce_url: str, org_id: str) -> datetime | None:
@@ -210,11 +238,12 @@ def count_new(conn: sqlite3.Connection, *, pce_url: str, org_id: str, after: dat
 def count_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime,
                  rule_types: Sequence[str] | None = None, severity: str | None = None, rule_id: str | None = None,
                  detectors_in: Sequence[str] | None = None, detectors_not_in: Sequence[str] | None = None,
-                 ungrouped_only: bool = False, device: str | None = None, fired_after: datetime | None = None) -> int:
-    """How many alerts the same filters as list_alerts match."""
+                 ungrouped_only: bool = False, device: str | None = None, fired_after: datetime | None = None,
+                 until: datetime | None = None) -> int:
+    """How many alerts the same filters as list_alerts match; until: only those fired before it."""
     where, params = _where(pce_url=pce_url, org_id=org_id, since=since, rule_types=rule_types, severity=severity,
                            rule_id=rule_id, detectors_in=detectors_in, detectors_not_in=detectors_not_in,
-                           ungrouped_only=ungrouped_only, device=device, fired_after=fired_after)
+                           ungrouped_only=ungrouped_only, device=device, fired_after=fired_after, until=until)
     return int(conn.execute(f"SELECT COUNT(*) FROM alerts WHERE {where}", params).fetchone()[0])
 
 

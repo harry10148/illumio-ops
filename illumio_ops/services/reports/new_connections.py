@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Sequence
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, tzinfo
 from typing import Any
 
 from illumio_ops.domain.report import (
@@ -16,8 +17,9 @@ from illumio_ops.domain.report import (
     TableBlock,
     TextBlock,
 )
-from illumio_ops.domain.values import DYNAMIC_PORTS_FROM, Severity
+from illumio_ops.domain.values import DYNAMIC_PORTS_FROM, Language, Severity
 from illumio_ops.services.analysis.context import LateralContext, load_lateral_context
+from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import (
     DECISION_KEYS,
@@ -61,6 +63,51 @@ def _count(conn: sqlite3.Connection, lc: LateralContext, kind: str, start: datet
     clause, params = _where(lc, kind)
     return int(conn.execute(f"SELECT COUNT(*) FROM connection_baseline WHERE {_WINDOW} AND {clause}",
                             [db_time(start), db_time(end), *params]).fetchone()[0])
+
+
+KINDS = ("new", "admin", "critical", "unmanaged_source")
+
+
+@dataclass(frozen=True)
+class NewCounts:
+    """How many connections first appeared in a period, per kind, and in the period before it; with what the
+    baseline they are read from cannot say. Counted here for this report and for the weekly overview."""
+    now: dict[str, int]
+    before: dict[str, int | None]  # None: the previous period cannot be compared with
+    prev_start: datetime
+    prev_known: bool
+    partial: str | None  # the period starts before what the baseline keeps: the sentence saying so
+    accumulating: str | None  # the baseline is not full yet: the sentence saying so
+
+    @property
+    def note(self) -> str | None:
+        return " ".join(x for x in (self.partial, self.accumulating) if x) or None
+
+
+def previous_known(ctx: AppContext, prev_start: datetime, start: datetime, *, now: datetime) -> bool:
+    """The previous period's new connections can be counted: the baseline still keeps it and its traffic was all
+    collected."""
+    # The baseline keeps a connection only while it was seen within baseline_days: older periods are partial.
+    baseline_days = ctx.settings.current().collection.retention.baseline_days
+    kept_from = ctx.traffic_floor(baseline_days, now)  # an on-demand pull holds its whole baseline
+    return prev_start >= kept_from and traffic_covered(ctx, prev_start, start, now=now)
+
+
+def count_new(ctx: AppContext, conn: sqlite3.Connection, lc: LateralContext, *, start: datetime, end: datetime,
+              tz: tzinfo | None, now: datetime, lang: Language, kinds: Sequence[str] = KINDS) -> NewCounts:
+    """The period's new connections of each kind, and the previous period's where it is known. `conn`: a read of
+    ctx's flow store (reads.reading)."""
+    prev_start, _ = previous_period(start, end, tz)
+    prev_known = previous_known(ctx, prev_start, start, now=now)
+    baseline_days = ctx.settings.current().collection.retention.baseline_days
+    kept_from = ctx.traffic_floor(baseline_days, now)
+    return NewCounts(
+        now={k: _count(conn, lc, k, start, end) for k in kinds},
+        before={k: _count(conn, lc, k, prev_start, start) if prev_known else None for k in kinds},
+        prev_start=prev_start, prev_known=prev_known,
+        partial=tr(lang, "rpt_new_older_than_baseline", days=baseline_days) if start < kept_from else None,
+        accumulating=None if lc.baseline_full() else tr(
+            lang, "detector_baseline_accumulating", days=f"{lc.baseline_days:.0f}", required=lc.baseline_required))
 
 
 class _Builder:
@@ -135,16 +182,11 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
     b = _Builder(inp)
     lc = b.lc
     window = [db_time(inp.start), db_time(inp.end)]
-    kinds = ("new", "admin", "critical", "unmanaged_source")
-    prev_start, _ = previous_period(inp.start, inp.end, inp.tz)
-    # The baseline keeps a connection only while it was seen within baseline_days: older periods are partial.
-    baseline_days = inp.ctx.settings.current().collection.retention.baseline_days
-    kept_from = inp.ctx.traffic_floor(baseline_days, inp.now)  # an on-demand pull holds its whole baseline
-    prev_known = prev_start >= kept_from and traffic_covered(inp.ctx, prev_start, inp.start, now=inp.now)
+    kinds = KINDS
     with reads.reading(inp.ctx) as conn:
-        now_counts = {k: _count(conn, lc, k, inp.start, inp.end) for k in kinds}
-        before: dict[str, int | None] = {k: _count(conn, lc, k, prev_start, inp.start) if prev_known else None
-                                         for k in kinds}
+        counted = count_new(inp.ctx, conn, lc, start=inp.start, end=inp.end, tz=inp.tz, now=inp.now, lang=inp.lang)
+        now_counts, before = counted.now, counted.before
+        prev_start, prev_known = counted.prev_start, counted.prev_known
         left_out = int(conn.execute(
             f"SELECT COUNT(*) FROM connection_baseline WHERE first_seen >= ? AND first_seen < ? AND NOT ({_ELIGIBLE})",
             window).fetchone()[0])
@@ -169,12 +211,10 @@ def build_new_connections(inp: BuildInput) -> ReportDocument:
                                       gone_window).fetchone()[0]) if prev_known else 0
         gone_rows = conn.execute(f"SELECT * FROM connection_baseline WHERE {gone_where} ORDER BY last_seen, src_key "
                                  "LIMIT ?", [*gone_window, ROW_LIMIT]).fetchall() if prev_known else []
-    accumulating = None if lc.baseline_full() else b.t(
-        "detector_baseline_accumulating", days=f"{lc.baseline_days:.0f}", required=lc.baseline_required)
+    accumulating = counted.accumulating
     labels = {"new": "rpt_new_kpi_new", "admin": "rpt_new_kpi_admin", "critical": "rpt_new_kpi_critical",
               "unmanaged_source": "rpt_new_kpi_unmanaged_source"}
-    partial = b.t("rpt_new_older_than_baseline", days=baseline_days) if inp.start < kept_from else None
-    note = " ".join(x for x in (partial, accumulating) if x) or None
+    partial, note = counted.partial, counted.note
     kpis = tuple(Kpi(key=k, label=b.t(labels[k]), value=now_counts[k], previous=before[k], better="lower",
                      note=note) for k in kinds)
     empty = b.t("rpt_new_none")

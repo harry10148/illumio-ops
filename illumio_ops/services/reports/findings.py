@@ -56,6 +56,7 @@ from illumio_ops.services.analysis.context import load_lateral_context
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import host_name, port_text, severity_name, tr
+from illumio_ops.services.reports.finish import NOT_RUN_REASONS
 from illumio_ops.settings.schema import ReportRuleThresholds
 from illumio_ops.store.flowdb import analysis
 
@@ -418,19 +419,26 @@ def as_findings(outcomes: list[RuleOutcome], lang: Language) -> tuple[Finding, .
 
 
 def unevaluated_section(outcomes: list[RuleOutcome], lang: Language, *, title: str, intro: str, table_title: str,
-                        evaluated: bool = True) -> tuple[Section, ...]:
+                        evaluated: bool = True, not_run_key: str | None = None) -> tuple[Section, ...]:
     """The closing "rules" section: only the rules that could not be evaluated (every rule that fired is a finding
-    in the summary). Nothing when all of them were evaluated; evaluated=False: the rules did not run (no traffic
-    matched), and the section stays to say so."""
+    in the summary). Nothing when all of them were evaluated; evaluated=False: the rules did not run, and the
+    section stays to say so — because no traffic matched, or for the reason `not_run_key` names (one of
+    finish.NOT_RUN_REASONS: the weekly overview could not get the traffic from the PCE). The first page says the
+    same sentence (render_html.to_do)."""
     rest = [o for o in outcomes if o.severity is None]
     if evaluated and not rest:
         return ()
-    return (Section(id="findings", title=title, intro=intro, blocks=(outcomes_table(rest, lang, title=table_title),)),)
+    return (Section(id="findings", title=title, intro=intro,
+                    blocks=(outcomes_table(rest, lang, title=table_title, not_run_key=not_run_key),)),)
 
 
-def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str) -> TableBlock:
+def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str,
+                   not_run_key: str | None = None) -> TableBlock:
     """The rules given, one row each: a rule that fired with what it found and what to do, a rule that could not be
-    evaluated with the reason. An empty table says the rules did not run: the only case it is built empty for."""
+    evaluated with the reason. An empty table says the rules did not run: the only case it is built empty for.
+    not_run_key: why they did not, when it is not that no traffic matched (finish.NOT_RUN_REASONS)."""
+    if not_run_key is not None and not_run_key not in NOT_RUN_REASONS:
+        raise ValueError(f"{not_run_key} is not a registered reason (finish.NOT_RUN_REASONS)")
     def row(o: RuleOutcome) -> tuple[str, ...]:
         info = BY_ID[o.rule_id]
         head = (o.rule_id, tr(lang, info.name_key), tr(lang, CATEGORY_KEYS[info.category]))
@@ -447,4 +455,4 @@ def outcomes_table(outcomes: list[RuleOutcome], lang: Language, *, title: str) -
                Column(key="mitre", label=tr(lang, "rpt_col_mitre")))
     rows = tuple(row(o) for o in outcomes)
     return TableBlock(title=title, columns=columns, rows=rows, total_rows=len(rows),
-                      empty_text=tr(lang, "rpt_rules_not_evaluated"))
+                      empty_text=tr(lang, not_run_key or "rpt_rules_not_evaluated"))

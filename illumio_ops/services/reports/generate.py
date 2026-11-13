@@ -179,13 +179,19 @@ def pulls_on_demand(ctx: AppContext, spec: ReportSpec, start: datetime, now: dat
         return False
     if spec.needs_traffic_for is not None and params is not None and not spec.needs_traffic_for(ctx, params):
         return False
+    return not keeps_traffic(ctx, start, now)
+
+
+def keeps_traffic(ctx: AppContext, start: datetime, now: datetime) -> bool:
+    """The install's own store holds the traffic of a period starting at `start`: not in lightweight mode (it keeps
+    none), and only flow_days back in the others."""
     settings = ctx.settings.current()
     if settings.collection.mode is CollectionMode.LIGHTWEIGHT:
-        return True
-    return start < now - timedelta(days=settings.collection.retention.flow_days)
+        return False
+    return start >= now - timedelta(days=settings.collection.retention.flow_days)
 
 
-def _ondemand_lines(res: OnDemandResult, start: datetime, lang: Language, tz: tzinfo | None) -> tuple[str, ...]:
+def ondemand_lines(res: OnDemandResult, start: datetime, lang: Language, tz: tzinfo | None) -> tuple[str, ...]:
     def tr(key: str, **params: object) -> str:
         return translate(lang, key, {k: str(v) for k, v in params.items()})
 
@@ -256,7 +262,9 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
         with archive_read.archive_period(ctx, start=inp.start - lead, end=inp.end, now=inp.now, kinds=kinds) as arc:
             if spec.ondemand_prepare is not None and "flows" in kinds:
                 spec.ondemand_prepare(arc.ctx, inp.now)
-            built = spec.build(dataclasses.replace(inp, ctx=arc.ctx))
+            # a type that gets its own traffic reads it, the inventory and alerts from the install, not from the
+            # archive's store of events
+            built = spec.build(dataclasses.replace(inp, ctx=arc.ctx, install=ctx if spec.own_traffic else None))
         return built.model_copy(update={"data_quality": (*built.data_quality,
                                                          *_archive_lines(arc, inp.lang, inp.tz)),
                                         "caveats": caveats_in_order(
@@ -273,7 +281,7 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
     except OnDemandFailed as exc:
         raise _Fail("rpt_err_ondemand_failed", str(exc)[:ERROR_DETAIL_MAX]) from exc
     return doc.model_copy(update={"data_quality": (*doc.data_quality,
-                                                   *_ondemand_lines(res, inp.start, inp.lang, inp.tz))})
+                                                   *ondemand_lines(res, inp.start, inp.lang, inp.tz))})
 
 
 # The parameter each refusal is about, for the API's field name.
