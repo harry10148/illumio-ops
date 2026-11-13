@@ -237,14 +237,15 @@ def test_ports_with_gaps_is_the_second_table_of_the_uncovered_chapter(ctx):
 
 
 def test_users_and_processes_are_not_this_reports_any_more(tmp_path):
-    """Flows that name users and processes: no chapter here and no data note about them (the traffic report has
-    both); the share of flows that carry each stays in the data notes, as in every flow report."""
+    """Flows that name users and processes: no chapter here and no data note about them — the traffic report has
+    both. The note on how much of the traffic carries a process, a user and byte counts went with them: it speaks
+    of "rankings by these", and this report has none left."""
     named = configured_ctx(tmp_path / "named")
     _write(named, moved_sample())
     doc = _build(named)
     assert "users" not in {s.id for s in doc.sections}
     assert not [t for _, t in doc.tables() if t.title in ("Users by distinct destinations", "Processes by connections")]
-    assert sum("carry a process" in q for q in doc.data_quality) == 1
+    assert not [q for q in doc.data_quality if "carry a process" in q or "rankings by these" in q]
     none = configured_ctx(tmp_path / "none")  # no flow names either: the traffic report says so, this one does not
     _write(none, [flow(port=443)])
     assert not [q for q in _build(none).data_quality if "initiating user" in q or "initiating process" in q]

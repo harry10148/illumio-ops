@@ -304,6 +304,8 @@ def test_users_and_processes_follow_the_unmanaged_addresses_with_the_rows_they_h
     said, users, processes = sec.blocks
     assert said.paragraphs == (MOVED_USERS_SAID,)
     assert as_moved(users) == MOVED_USERS and as_moved(processes) == MOVED_PROCESSES
+    # the data note the rankings rest on is this report's (it has rankings by user, process and bytes)
+    assert sum("rankings by these cover only that share" in q for q in doc.data_quality) == 1
     zh = _section(_build(ctx, lang=Language.ZH_TW), "users")
     assert zh.title == "使用者與程式"
     assert [b.title for b in zh.blocks[1:]] == ["依不重複目的端數的使用者", "依連線數的程式"]

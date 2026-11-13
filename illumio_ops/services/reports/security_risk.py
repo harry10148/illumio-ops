@@ -47,7 +47,7 @@ from illumio_ops.domain.values import (
     Severity,
 )
 from illumio_ops.services.analysis.context import load_lateral_context
-from illumio_ops.services.flowsource import FlowTotals, field_coverage, flow_totals
+from illumio_ops.services.flowsource import FlowTotals, flow_totals
 from illumio_ops.services.reports import findings, flowsections, reads
 from illumio_ops.services.reports.common import DECISION_KEYS, MODE_KEYS, tr
 from illumio_ops.services.reports.generate import (
@@ -181,8 +181,11 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     score = _score(hosts=len(hosts), full=modes["full"], selective=modes["selective"], flows=totals, rw=rw_counts)
     # The previous period's score, worked out the same way from that day's hosts and that period's connections (all
     # of them collected, and at least one flow: a score on the inventory alone is not shown for this period either).
-    # Nothing records what the PCE rated then, so it has no ransomware part. A part without data is left out and
-    # the others scaled up: two scores are compared only when they rest on the same parts, never across two scales.
+    # It is worked out without the ransomware part: this period's part is the ransomware analysis' stored result
+    # (_ransomware_counts), of which only the latest is kept. (The store also holds a daily snapshot of the PCE's
+    # ransomware services — ransomware_snapshot_daily, the ransomware report's trend; this report does not read
+    # it.) A part without data is left out and the others scaled up: two scores are compared only when they rest
+    # on the same parts, never across two scales.
     score_before = (_score(hosts=hosts_before.hosts, full=hosts_before.modes.get("full", 0),
                            selective=hosts_before.modes.get("selective", 0), flows=prev_totals, rw=None)
                     if hosts_before is not None and prev_totals is not None and prev_totals.flows else None)
@@ -370,12 +373,13 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     elif rw.get("unsupported"):
         missing = (hint(lang, "rpt_hint_unsupported_sec_rw"),)
 
-    fc = field_coverage(inp.ctx, spec)
     filter_line = flowsections.filter_text(cond, lang)
     cov = coverage_text(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz, flows=True)
+    # No note on how much of the traffic carries a process, a user or byte counts (flowsections.coverage_lines): it
+    # is about rankings by those fields, and the ones this report had are the traffic report's now.
     quality = (*cov.lines,
                *((t("rpt_quality_filter", filter=filter_line),) if filter_line else ()),
-               t("rpt_trf_quality_counts"), *flowsections.coverage_lines(inp, fc))
+               t("rpt_trf_quality_counts"))
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_security_risk"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis,
