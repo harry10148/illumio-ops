@@ -5,8 +5,10 @@ email renderers read only this, so the three outputs of one report cannot disagr
 Length rules (project rule: no silent truncation): a table holds every row it has (the XLSX writes them
 all, up to XLSX_ROW_CAP); the HTML shows the first HTML_ROW_CAP and says how many there are and where the
 rest is; a cell longer than CELL_SOFT_MAX characters is cut in the HTML only, with its full length stated.
-A report has at most 2 caveats ("know this before reading the numbers"): a third is refused when the document is
-built, never dropped. One thing to do (domain/actions.py) lists the titles of its first 4 findings and says how many
+A report has at most 2 caveats ("know this before reading the numbers"). Which two is picked in one place
+(services/reports/generate.py caveats_in_order: a collection gap, then flows without a decision, then days the archive
+lacks); the one left out is still said — in the data notes, or in its chapter. A document handed a third is refused
+when it is built, never cut. One thing to do (domain/actions.py) lists the titles of its first 4 findings and says how many
 more there are; the first page lists the first 3 things to do and says how many more there are.
 The email is the first page: 3 numbers (the others are in the report), the first 3 things to do and how many more;
 it lists no finding and no data note, and only its subject is ever cut (render_email.SUBJECT_MAX, with an ellipsis).
