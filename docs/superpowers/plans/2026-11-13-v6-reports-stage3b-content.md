@@ -190,9 +190,10 @@
 - `workloads.mode_counts_on(conn, day) -> ModeCounts | None`：那一天的快照裡 `managed = 1` 的主機各模式幾台；那天沒有快照或有任何一列 `managed IS NULL` 回 `None`。
 - 安全風險：上期結束那一天（顯示時區的日曆日，與每日快照的 `day` 同一種算法——確認 `snapshot_day` 的 `day` 是哪個時區的日期並照它）取 `mode_counts_on`。
   有的話：`enforced_hosts_pct.previous` 用它算。
-  `maturity.previous`：用「上期那天的主機模式＋上期的流量數字（現有的 `before`）」重算。勒索部分沒有歷史，所以**只有本期也沒有勒索部分時**
-  （PCE 不給勒索評等、或分析沒跑）兩期計分的部分才相同，才給 `previous`；本期有勒索部分時 `previous=None`，`maturity` 的 note 補固定一句
-  `rpt_sec_no_previous_parts`（zh「上期沒有勒索防護那一部分的紀錄，計分的部分不同，所以不比較。」）。不得拿兩個不同基準的分數相減。
+  `maturity.previous`：用「上期那天的主機模式＋上期的流量數字（現有的 `before`）＋上期那天的勒索快照」重算。
+  **2026-11-13 更正**：原本寫「勒索部分沒有歷史」是錯的——`ransomware_snapshot_daily` 每天有快照，`ransomware.protected_by_day` 與報表本期的算法同一個定義
+  （大小寫的一處差異已改成一致，`85fdc83f`）。規則：兩期有分數的部分集合相同才給 `previous`，否則 `None`；本期有勒索部分而上期那天完全沒有勒索快照、
+  且這是唯一差異時，note 補一句「上期那一天沒有勒索防護的快照，計分的部分不同，所以不比較。」不得拿兩個不同基準的分數相減。
   另外兩個前提，缺一就是 `None`：上期流量有完整收集（現有的 `traffic_covered`）；本期值取的是**現在**的清冊，所以期間必須結束在今天或昨天
   （顯示時區）——指定較早期間的手動報表這兩個數字不比。
 - 不變量測試：以同一時刻的清冊寫一份快照，`mode_counts_on` 算出的已強制比例等於報表本期的 `enforced_hosts_pct`（「受管」的認定兩邊一致）。
