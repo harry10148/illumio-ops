@@ -147,6 +147,32 @@ def test_a_short_report_prints_on_one_page(context, tmp_path):
         assert word in pages[0], word
 
 
+@pytest.mark.skipif(shutil.which("pdftotext") is None, reason="reads the printed PDF's pages with poppler's pdftotext")
+def test_a_tables_title_and_limit_note_print_on_the_page_of_its_first_row(context, tmp_path):
+    """Stage 3b: a table that lists a top ten says so in a note between its title and its rows. A table that did not
+    fit the foot of a page moved to the next one whole and left its title and that note behind (the chapter of
+    undecided flows is four such rankings in a row)."""
+    def ranking(i):
+        return TableBlock(
+            title=f"QZT{i:02d}Z busiest sources", total_rows=14, empty_text="none",
+            columns=(Column(key="host", label="Host"), Column(key="n", label="Connections", kind="number")),
+            rows=tuple((f"QZR{i:02d}Z" if r == 0 else f"host-{r}", 100 - r) for r in range(10)),
+            limit_note="Only the top 10 are listed.")
+    doc = make_doc(kpis=(), sections=(Section(id="ranked", title="Ranked", blocks=tuple(map(ranking, range(8)))),))
+    page = _page(context, render_html(doc, tz=UTC), width=PAPER_W, media="print")
+    pages = _pdf_pages(page, tmp_path)
+    assert len(pages) >= 3  # the tables do cross page ends
+    apart = []
+    for i in range(8):
+        title = [n for n, t in enumerate(pages) if f"QZT{i:02d}Z" in t]
+        first = [n for n, t in enumerate(pages) if f"QZR{i:02d}Z" in t]
+        assert len(title) == 1 and len(first) == 1, (i, title, first)
+        if title != first:
+            apart.append((i, title, first))
+    assert apart == [], apart
+    assert all(len(t) > 200 for t in pages[:-1]), [len(t) for t in pages]  # and no page is left nearly empty for it
+
+
 LONGEST = ("rpt_sec_kpi_pb_flows", "rpt_sec_kpi_allowed_pct", "rpt_sec_kpi_blocked_flows")
 
 

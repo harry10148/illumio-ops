@@ -148,6 +148,10 @@ html[lang="zh-TW"] .print-btn { letter-spacing: 0; }
   .toc { break-after: auto; margin-bottom: var(--space-6); }
   .chapter { break-before: auto; }
   .finding { break-inside: avoid; }
+  /* What stands between a table's title and its rows (the builder's "only the top N", a sentence said once for a
+     column) stays with the rows, as the title stays with it: a table that moved whole to the next page left its
+     title and that note at the foot of the page before. */
+  .note-warn, .note[data-role="said-once"] { break-after: avoid; }
   .lead-value { font-size: 20pt; }
   /* A4's printable width is 695px: four share columns at their screen width (135px each, the number and a 72px
      bar that do not wrap) pushed the readiness scores table 100px past the paper's edge. */
