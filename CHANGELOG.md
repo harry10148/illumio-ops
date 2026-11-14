@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [Unreleased]
+## [6.11.3] - 2026-11-14
 
 ### Fixed
+
+- The application database's connections are closed when their block ends. They were left to Python's cycle
+  collector, so the service held files open it no longer used (31 after 80 requests, measured), under a limit of 1,024
+  open files. The numbers a page or report shows are unchanged.
 
 - SIEM syslog over TCP and TLS: a live connection on a file descriptor numbered 1024 or above was read as closed by
   its peer, so every record after the first dropped the connection and reconnected (`select()` refuses such a

@@ -22,7 +22,7 @@ from illumio_ops.settings.secrets import (
 )
 from illumio_ops.settings.store import SettingsInvalid, SettingsStore
 from illumio_ops.store import alerts as alert_store
-from illumio_ops.store.db import connect, migrate, pending_migrations
+from illumio_ops.store.db import ClosingConnection, connect, migrate, pending_migrations
 from illumio_ops.store.flowdb.db import MIGRATIONS_PACKAGE as FLOW_MIGRATIONS
 from illumio_ops.tls import build_ssl_context, cert_info, ensure_self_signed
 
@@ -143,7 +143,7 @@ def prepare(root: Path | None) -> Runtime:
             s = store.create_initial(password_hash=hash_password(DEFAULT_ADMIN_PASSWORD),
                                      secret_key=new_secret_key())
             logger.warning("no settings file found: created {} with the default sign-in", store.path)
-        with connect(paths.app_db) as conn:
+        with connect(paths.app_db, factory=ClosingConnection) as conn:
             try:
                 migrate(conn)
             except RuntimeError as exc:

@@ -43,7 +43,7 @@ from illumio_ops.settings.schema import Settings
 from illumio_ops.settings.store import SettingsStore
 from illumio_ops.store import alerts as alert_store
 from illumio_ops.store import siem as siem_store
-from illumio_ops.store.db import connect, migrate
+from illumio_ops.store.db import ClosingConnection, connect, migrate
 from illumio_ops.store.flowdb import ingest_state
 
 COLD_START_CAP = timedelta(days=7)
@@ -233,7 +233,7 @@ def upgrade(v5_root: Path, root: Path, *, now: datetime, lang: Language = Langua
                                                           local_zone=v5_rule_schedules.host_zone())
     result.report.items.extend(schedule_items)
     result.report.items.extend(not_carried_files(v5_root))
-    with connect(paths.app_db) as conn:  # as the service's start does (runtime.prepare)
+    with connect(paths.app_db, factory=ClosingConnection) as conn:  # as the service's start does (runtime.prepare)
         migrate(conn)
         v5_rule_schedules.write(conn, schedules, pce_url=s.pce.url, org_id=s.pce.org_id, now=now)
         conn.commit()

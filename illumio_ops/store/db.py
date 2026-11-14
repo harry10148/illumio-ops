@@ -7,11 +7,36 @@ import sqlite3
 import time
 from importlib import resources
 from pathlib import Path
+from typing import Literal, Self
 
 _MIGRATION_NAME = re.compile(r"^(\d{4})_[a-z0-9_]+\.sql$")
 
 
 BUSY_TIMEOUT_SECONDS = 5.0
+
+
+class ClosingConnection(sqlite3.Connection):
+    """A connection whose outermost `with` block ends it: committed or rolled back as sqlite3 does, then closed.
+    sqlite3's own `with` only ends the transaction, and a Connection is part of a reference cycle, so one left open
+    kept its file descriptors until the cycle collector ran — 31 open after 80 requests, measured 2026-11-14. The
+    service may hold 1,024 files. A `with conn:` inside (the store's functions use it for a transaction) ends that
+    transaction and leaves the connection open. What is used after the outermost block must be read inside it."""
+
+    _depth = 0
+
+    def __enter__(self) -> Self:
+        self._depth += 1
+        super().__enter__()
+        return self
+
+    def __exit__(self, *exc: object) -> Literal[False]:
+        self._depth -= 1
+        try:
+            super().__exit__(*exc)  # type: ignore[arg-type]
+        finally:
+            if self._depth <= 0:
+                self.close()
+        return False
 
 
 def connect(path: Path, *, factory: type[sqlite3.Connection] = sqlite3.Connection) -> sqlite3.Connection:

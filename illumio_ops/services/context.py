@@ -12,7 +12,7 @@ from illumio_ops.pce.client import PceClient, PceNotConfigured, client_from_sett
 from illumio_ops.pce.rate_limit import RateLimiter
 from illumio_ops.settings.schema import PceSettings, TlsSettings
 from illumio_ops.settings.store import SettingsStore
-from illumio_ops.store.db import connect
+from illumio_ops.store.db import ClosingConnection, connect
 from illumio_ops.store.flowdb.db import FlowDb
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ class AppContext:
             self.rate_limiter = RateLimiter(self.settings.current().collection.rate_limit_per_minute)
 
     def db(self) -> sqlite3.Connection:
-        return connect(self.paths.app_db)
+        return connect(self.paths.app_db, factory=ClosingConnection)  # `with ctx.db() as conn:` closes it
 
     def pce_write_client(self, pce: PceSettings | None = None) -> PceClient:
         """A client on the optional write key (Rule Hit Count, quarantine); PceNotConfigured when it is not set."""
