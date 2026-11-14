@@ -61,7 +61,7 @@ def test_decision_table_flows_and_connections(ctx):
                  flow(port=23, decision="blocked", conns=1)])
     doc = _build(ctx)
     rows = {r[0]: (r[1], r[3]) for r in _table(doc, "decisions").rows}
-    assert rows["Allowed (a rule allows it)"] == (2, 7) and rows["Potentially Blocked (blocked once enforcement starts)"] == (1, 5) and rows["Blocked"] == (1, 1)
+    assert rows["Allowed (a rule allows it)"] == (2, 7) and rows["Potentially Blocked"] == (1, 5) and rows["Blocked"] == (1, 1)
     kpis = {k.key: k.value for k in doc.kpis}
     assert kpis["flows"] == 4 and kpis["connections"] == 13
 
@@ -242,7 +242,7 @@ def test_decision_table_is_the_three_decisions_with_their_share_of_the_decided_f
                                               "into_managed_pct"]
     assert [r[:4] for r in table.rows] == [
         ("Allowed (a rule allows it)", 3, "75.0%", 10),
-        ("Potentially Blocked (blocked once enforcement starts)", 1, "25.0%", 30), ("Blocked", 0, "0.0%", 0)]
+        ("Potentially Blocked", 1, "25.0%", 30), ("Blocked", 0, "0.0%", 0)]
     assert sum(float(r[2].rstrip("%")) for r in table.rows) == 100.0
     words = " ".join(p for b in _section(doc, "decisions").blocks if isinstance(b, TextBlock) for p in b.paragraphs)
     assert words == ("Shares count only the flows with a decision. Flows without one: 2 (connections: 60); see "

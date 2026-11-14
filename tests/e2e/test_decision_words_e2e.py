@@ -13,7 +13,7 @@ from tests.e2e import ui_rules
 from tests.e2e.conftest import NARROW, sign_in
 
 ALLOWED = "Allowed (a rule allows it)"
-PB = "Potentially Blocked (blocked once enforcement starts)"
+PB = "Potentially Blocked"
 WIDTHS = (1280, NARROW)
 
 # The lines the element's own words are laid out on (1: they did not wrap); its checkbox is not text.

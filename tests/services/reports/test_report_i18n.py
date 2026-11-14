@@ -49,7 +49,7 @@ NOW = datetime(2026, 10, 27, 1, 0, tzinfo=UTC)
 START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
 RAW_KEY = re.compile(r"\b(?:rpt|gui_reports|detector_name|decision|term|severity)_[a-z0-9_]+\b")
 # PCE console words zh_TW keeps in English (spec §6.2.1): not report copy left untranslated.
-PCE_TERMS = frozenset({"Rule Hit Count", "Override Deny"})
+PCE_TERMS = frozenset({"Rule Hit Count", "Override Deny", "Potentially Blocked"})
 APP_DB = FlowCondition(dst=EndpointFilter(labels=(LabelCond(key="app", values=("DB",)),)))
 EN = json.loads((Path(__file__).resolve().parents[3] / "illumio_ops/i18n/en.json")
                 .read_text(encoding="utf-8"))

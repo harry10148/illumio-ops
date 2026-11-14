@@ -67,7 +67,7 @@ def test_intra_app_counted_once(ctx):
                  flow(src_app="Finance", dst_app="DB", port=5432, decision="potentially_blocked")])
     doc = _build(ctx, _app("Finance"))
     rows = {r[0]: r[1] for r in _table(doc, "impact").rows}
-    assert rows == {"Allowed (a rule allows it)": 2, "Potentially Blocked (blocked once enforcement starts)": 1,
+    assert rows == {"Allowed (a rule allows it)": 2, "Potentially Blocked": 1,
                     "Blocked": 0}  # the three decisions, always (stage 3b)
     kpi = {k.key: k.value for k in doc.kpis}
     assert kpi["inbound_connections"] == 1 and kpi["outbound_connections"] == 1 and kpi["intra_connections"] == 1
@@ -195,7 +195,7 @@ def test_allowed_share_is_of_the_apps_decided_connections(ctx):
     assert kpi["intra_connections"].value == 60  # what was seen keeps the connections without a decision
     assert _table(doc, "impact").rows == (
         ("Allowed (a rule allows it)", 1, 10, "50.0%"),
-        ("Potentially Blocked (blocked once enforcement starts)", 1, 30, "50.0%"), ("Blocked", 0, 0, "0.0%"))
+        ("Potentially Blocked", 1, 30, "50.0%"), ("Blocked", 0, 0, "0.0%"))
     words = _words(doc, "impact")
     assert "25.0% of the app's connections with a decision are allowed by a rule" in words
     assert "Flows without one: 1 (connections: 60); see “Traffic that can only be watched”." in words

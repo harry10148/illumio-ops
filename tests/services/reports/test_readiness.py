@@ -155,12 +155,12 @@ def test_unknown_decisions_left_out(ctx):
     # connections), naming the three factors that leave such connections out; this report has no chapter for them
     (said,) = doc.caveats
     assert said == ("Flows without a decision: 50.0% of the period's flows (80.0% by connections). The factors "
-                    "“Allowed by a rule”, “Not blocked once enforced” and “Remote access with a rule” count only "
+                    "“Allowed by a rule”, “Not Potentially Blocked” and “Remote access with a rule” count only "
                     "the connections with a decision.")
     assert not any("no reported decision" in q for q in doc.data_quality)
     assert "monitor_only" not in {s.id for s in doc.sections}
     (zh,) = _build(ctx, lang=Language.ZH_TW).caveats
-    assert zh == ("期間內有 50.0% 的流量（依連線數是 80.0%）沒有判定；「有規則允許」「切強制後不會被擋」與「遠端管理有規則」"
+    assert zh == ("期間內有 50.0% 的流量（依連線數是 80.0%）沒有判定；「有規則允許」「不是 Potentially Blocked」與「遠端管理有規則」"
                   "三個因子只算有判定的連線。")
 
 

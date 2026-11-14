@@ -282,7 +282,7 @@ def test_maturity_note_names_the_part_losing_most_and_the_score_without_it(ctx):
 # ── stage 3b: a share counts only the flows the PCE gave a decision for ──────────────────────────────────────
 
 NO_DECIDED = "No flow in this period carries a decision, so no share can be worked out."
-DECISIONS = ["Allowed (a rule allows it)", "Potentially Blocked (blocked once enforcement starts)", "Blocked"]
+DECISIONS = ["Allowed (a rule allows it)", "Potentially Blocked", "Blocked"]
 
 
 def test_shares_and_counts_rest_on_the_decided_flows(ctx):

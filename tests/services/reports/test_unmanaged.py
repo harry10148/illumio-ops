@@ -54,7 +54,7 @@ def test_unmanaged_rollup_grouping(ctx):
     assert set(rows) == {"10.5.5.5", "8.8.8.8", "10.6.6.6"}
     r = rows["10.5.5.5"]
     assert r[1] == "Private" and r[2] == "Both directions" and r[3] == 3 and r[4] == 23
-    assert r[5].startswith("445/TCP") and r[6] == "Allowed (a rule allows it), Potentially Blocked (blocked once enforcement starts)"
+    assert r[5].startswith("445/TCP") and r[6] == "Allowed (a rule allows it), Potentially Blocked"
 
 
 def test_private_vs_public(ctx):

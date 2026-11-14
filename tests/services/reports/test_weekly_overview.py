@@ -171,7 +171,7 @@ def test_the_opening_sentence_is_the_full_form(full):
     said = conclusion(doc, lambda key, p: translate(Language.EN, key, p), tz=UTC)
     assert said == translate(Language.EN, "rpt_conclusion_weekly_overview",
                              {k: f"{_kpi(doc, k).value:,}" for k in CONCLUSIONS[WK][0][0]})
-    assert "enforcement would block" in said
+    assert "Potentially Blocked connections: " in said
 
 
 # ── the previous period of the alerts ────────────────────────────────────────────────────────────────────────
@@ -308,7 +308,7 @@ def test_lightweight_pulls_once_and_all_five_chapters_have_content(tmp_path, pce
     values = {k["key"]: k["value"] for k in row.kpis}
     assert values["pb_connections"] == pb and values["new_connections"] == len(od.ROWS)
     assert values["new_alerts"] == 1 and values["vens_not_online"] == 1 and values["provisions"] == 1
-    assert "enforcement would block" in row.conclusion
+    assert "Potentially Blocked connections: " in row.conclusion
     page = dom(_html(ctx, row))
     for sid in ("alerts", "vens", "flows", "new_connections", "policy"):
         assert page.one("id", sid).find("table"), sid

@@ -41,12 +41,12 @@ def test_the_lateral_actions_use_the_report_s_own_words():
 
 DECISION_TERMS = {
     "term_decision_allowed": ("有規則允許（Allowed）", "Allowed (a rule allows it)"),
-    "term_decision_potentially_blocked": ("開始擋之後會被擋（Potentially Blocked）",
-                                          "Potentially Blocked (blocked once enforcement starts)"),
+    "term_decision_potentially_blocked": ("Potentially Blocked", "Potentially Blocked"),
     "term_decision_blocked": ("已被擋下（Blocked）", "Blocked"),
 }
 # Where a decision is a name (a number's name, a chapter, a table, a state): plain words with the PCE's own in
-# brackets, in both languages. A sentence keeps the PCE's word as it is.
+# brackets, in both languages. A sentence keeps the PCE's word as it is. Potentially Blocked is the exception (user
+# 2026-11-14): its name is the PCE's word alone, everywhere, with no plain words beside it.
 DECISION_NAMES = {
     "rpt_sec_kpi_allowed_pct": "Allowed", "rpt_sec_kpi_pb_flows": "Potentially Blocked",
     "rpt_sec_kpi_blocked_flows": "Blocked", "rpt_sec_sec_pb": "Potentially Blocked",
@@ -60,9 +60,13 @@ DECISION_NAMES = {
 def test_a_decision_is_named_in_plain_words_with_the_pce_word_beside():
     zh, en = dictionary(Language.ZH_TW), dictionary(Language.EN)
     assert {k: (zh[k], en[k]) for k in DECISION_TERMS} == DECISION_TERMS
-    assert zh["rpt_sec_kpi_pb_flows"] == "開始擋之後會被擋的流量（Potentially Blocked）"
+    assert zh["rpt_sec_kpi_pb_flows"] == "Potentially Blocked 的流量"
     for key, pce in DECISION_NAMES.items():
-        assert f"（{pce}" in zh[key] and zh[key] != pce, key  # the PCE's word in brackets, after the plain words
+        if pce == "Potentially Blocked":  # the PCE's word itself is the name; what follows it in brackets is the rule kind
+            assert pce in zh[key] and "（Potentially Blocked" not in zh[key] and "blocked once" not in en[key], key
+            assert zh[key].replace(pce, "").strip() in ("", "的流量", "依目的端 app 與服務： 的連線", "（Deny Rule）", "（Override Deny）"), key
+        else:
+            assert f"（{pce}" in zh[key] and zh[key] != pce, key  # the PCE's word in brackets, after the plain words
         assert pce in en[key], key
     assert zh["decision_unknown"] == en["decision_unknown"] == "Unknown"  # stage 3b's
 

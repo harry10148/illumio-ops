@@ -2,8 +2,10 @@
 prose is Chinese, and what the PCE console shows is written as the console shows it — it has no Chinese UI, so a
 customer reading "可能被擋" cannot find it there. Where a policy decision or an enforcement mode is a name (a table
 cell, a filter option, a state, a column, a number's name, a chapter or table title) it is said in plain words with the
-console's word in brackets after it: 「開始擋之後會被擋（Potentially Blocked）」, the term_decision_* and term_mode_*
-keys. Inside a sentence the console's word stands alone.
+console's word in brackets after it, the term_decision_* and term_mode_* keys — except Potentially Blocked, which has
+one name everywhere, the console's own, with no paraphrase beside it (user 2026-11-14): the paraphrases it used to
+carry are banned as names. A sentence that explains what it means says so in other words. Inside a sentence the
+console's word stands alone.
 Each pattern is a spelling that must not appear in zh_TW, in a name or in a sentence; the comment names the one to use."""
 import json
 import re
@@ -15,7 +17,8 @@ ZH = json.loads((Path(__file__).resolve().parents[2] / "illumio_ops" / "i18n" / 
 
 BANNED = {
     # policy decisions: the console's own words
-    r"可能被擋|potentially[_ ]blocked|Potentially blocked": "「開始擋之後會被擋（Potentially Blocked）」（名稱）或 Potentially Blocked（句子裡）",
+    r"可能被擋|potentially[_ ]blocked|Potentially blocked": "Potentially Blocked（名稱與句子裡都一樣）",
+    r"開始擋之後會被擋|切到 Full 後會被擋": "Potentially Blocked（名稱不加白話；解釋它的句子改寫成「目的端開始強制後，這些連線就會被擋下」這類說法）",
     r"\bblocked\b|\bBlock\b": "Blocked（判定）或「擋下」（動作）",
     r"\ballowed\b|\bAllow\b|\ballow\b": "Allowed（判定）或「規則允許」",
     r"^允許$|^被擋$|^被擋（|允許$(?<=Deny Rule 允許)":
@@ -60,8 +63,24 @@ def test_gate_catches_an_old_spelling():
 
 def test_a_decision_name_is_plain_words_then_the_pce_word():
     """Where a decision is a name, the reader who does not know Illumio gets it in plain words and the one checking
-    against the PCE console gets the console's word in brackets."""
+    against the PCE console gets the console's word in brackets; Potentially Blocked is the console's word alone."""
     assert {k: ZH[k] for k in ZH if k.startswith("term_decision_")} == {
         "term_decision_allowed": "有規則允許（Allowed）",
-        "term_decision_potentially_blocked": "開始擋之後會被擋（Potentially Blocked）",
+        "term_decision_potentially_blocked": "Potentially Blocked",
         "term_decision_blocked": "已被擋下（Blocked）"}
+
+
+EN = json.loads((Path(__file__).resolve().parents[2] / "illumio_ops" / "i18n" / "en.json").read_text())
+
+
+def test_potentially_blocked_is_written_one_way_in_both_languages():
+    """One name (user 2026-11-14): never in another case, never with a gloss in brackets after it, and the keys that
+    are its name say nothing else."""
+    other_case = re.compile(r"potentially[_ ]blocked", re.IGNORECASE)
+    for lang in (ZH, EN):
+        assert sorted(k for k, v in lang.items() if any(m != "Potentially Blocked" for m in other_case.findall(_words(v)))) == []
+        assert sorted(k for k, v in lang.items() if re.search(r"Potentially Blocked ?[（(](?!Deny Rule|Override Deny)", v)) == []
+        assert sorted(k for k, v in lang.items() if re.search(r"[（(]Potentially Blocked[）)]", v)) == []
+        assert {lang[k] for k in ("term_decision_potentially_blocked", "decision_potentially_blocked", "rpt_sec_sec_pb",
+                                  "fleet_col_would_block")} == {"Potentially Blocked"}
+    assert not [k for k, v in EN.items() if re.search(r"blocked once enforcement starts\)|enforcement would block:", v)]
