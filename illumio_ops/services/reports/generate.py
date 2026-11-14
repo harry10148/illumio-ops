@@ -40,6 +40,7 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import store_coverage
 from illumio_ops.services.flowsource import LONG_RECORD_DAYS, longest_record_days
 from illumio_ops.services.ondemand import OnDemandFailed, OnDemandResult, pull_period
+from illumio_ops.services.reports.common import utc_days_note
 from illumio_ops.services.reports.deliver import deliver, gui_link
 from illumio_ops.services.reports.finish import finish
 from illumio_ops.services.reports.registry import (
@@ -289,6 +290,14 @@ def _build(ctx: AppContext, spec: ReportSpec, inp: BuildInput) -> ReportDocument
     return doc.model_copy(update={"data_quality": (*doc.data_quality, *notes)})
 
 
+def _counts_traffic(ctx: AppContext, spec: ReportSpec, params: ReportParams) -> bool:
+    """The report counts the period's traffic: a type built on it, or rule usage (the PCE's recompute of the same
+    records). The weekly overview says it itself, when it had traffic to count (weekly_overview.py)."""
+    if params.report_type is ReportType.POLICY_USAGE:
+        return True
+    return spec.needs_traffic and (spec.needs_traffic_for is None or spec.needs_traffic_for(ctx, params))
+
+
 # The parameter each refusal is about, for the API's field name.
 REFUSAL_FIELDS = {"rpt_err_rhc_merged": "report_type", "rpt_unavailable_not_built": "report_type",
                   "rpt_err_custom_required": "custom_id", "rpt_err_custom_not_supported": "custom_id",
@@ -436,6 +445,9 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
                                            pce_label=row.pce_label))
         if fdb.generation != generation:
             raise _Fail("rpt_err_pce_switched")
+        if _counts_traffic(ctx, spec, params):  # a period of days that are not UTC days counts its edge days whole
+            doc = doc.model_copy(update={"data_quality": (
+                *doc.data_quality, *utc_days_note(row.period_start, row.period_end, doc.lang))})
         # gui_base before finish: finish says in the data notes when the hosts a table names cannot be links
         doc = finish(doc.model_copy(update={"gui_base": settings.reports.gui_external_url.rstrip("/") or None}))
         doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id),

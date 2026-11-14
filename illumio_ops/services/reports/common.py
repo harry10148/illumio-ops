@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
 from itertools import islice
 from typing import Any
 from urllib.parse import quote_plus
@@ -63,6 +64,16 @@ MODE_KEYS = {"idle": "term_mode_idle", "visibility_only": "term_mode_visibility_
 
 def tr(lang: Language, msg: str, /, **params: object) -> str:
     return translate(lang, msg, {k: "" if v is None else str(v) for k, v in params.items()})
+
+
+def utc_days_note(start: datetime, end: datetime, lang: Language) -> tuple[str, ...]:
+    """The data note of a report that counts traffic over a period whose days are not UTC days: the PCE keeps
+    traffic by UTC day (services/collect/windows.py), so the first and the last day are counted whole. Nothing when
+    the period starts and ends at a UTC midnight."""
+    def midnight(at: datetime) -> bool:
+        u = at.astimezone(UTC)
+        return (u.hour, u.minute, u.second, u.microsecond) == (0, 0, 0, 0)
+    return () if midnight(start) and midnight(end) else (tr(lang, "rpt_quality_utc_days"),)
 
 
 # What the console's host page opens (web/src/components/HostLink.tsx OPENS): a workload or an address, not a

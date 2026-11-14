@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.10.1] - 2026-11-14
+
+### Changed
+
+- Every report that counts traffic over a period of days that are not UTC days says, in its data notes, that traffic
+  counts use whole UTC days, so the first and last day may include a few hours outside the period (the lateral
+  movement and unmanaged endpoints reports said it; now also traffic, security risk, network inventory, app summary,
+  new connections, readiness, policy usage, the weekly overview and a custom report with a flow section). A period of
+  whole UTC days no longer carries the note.
+
 ## [6.10.0] - 2026-11-13
 
 What a report holds (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §9.2).

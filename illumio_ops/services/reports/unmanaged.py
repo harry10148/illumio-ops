@@ -182,7 +182,7 @@ def build_unmanaged(inp: BuildInput) -> ReportDocument:
                              action_focus=t("rpt_unm_focus", address=e.address, peers=e.admin_peers))
                      for e in flagged)
     cov = coverage_text(inp.ctx, inp.start, inp.end, lang, now=inp.now, tz=inp.tz)
-    quality = (*cov.lines, t("rpt_quality_utc_days"))
+    quality = cov.lines
     return ReportDocument(
         report_type=inp.params.report_type, lang=lang, title=t("rpt_title_unmanaged"), period_start=inp.start,
         period_end=inp.end, generated_at=inp.now, pce_label=inp.pce_label, kpis=kpis, findings=findings,

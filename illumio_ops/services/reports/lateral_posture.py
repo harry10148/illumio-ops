@@ -396,7 +396,6 @@ class _Builder:
     def quality(self, exposure_row: Any, coverage: tuple[str, ...]) -> tuple[str, ...]:
         inp, lc = self.inp, self.lc
         lines = list(coverage)
-        lines.append(self.t("rpt_quality_utc_days"))
         if not self.critical_set:
             lines.append(hint(self.lang, "rpt_hint_unset_critical_assets"))
         stale_admin = [f"{k}={v}" for which, k, v in lc.stale if which == "admin_groups"]

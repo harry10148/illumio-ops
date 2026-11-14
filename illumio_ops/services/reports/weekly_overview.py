@@ -67,6 +67,7 @@ from illumio_ops.services.reports.common import (
     mode_word,
     severity_name,
     tr,
+    utc_days_note,
 )
 from illumio_ops.services.reports.generate import (
     CoverageText,
@@ -198,7 +199,8 @@ def _read_traffic(inp: BuildInput, ctx: AppContext, prev_start: datetime, pulled
                 if totals.flows else [])
     return Traffic(totals=totals, before=before, new=new, outcomes=outcomes,
                    coverage=coverage_text(ctx, inp.start, inp.end, inp.lang, now=inp.now, tz=inp.tz, flows=True),
-                   notes=ondemand_lines(pulled, inp.start, inp.end, inp.lang, inp.tz) if pulled is not None else (),
+                   notes=(*(ondemand_lines(pulled, inp.start, inp.end, inp.lang, inp.tz) if pulled is not None else ()),
+                          *utc_days_note(inp.start, inp.end, inp.lang)),
                    reaches=reaches, long_before=long_before)
 
 
