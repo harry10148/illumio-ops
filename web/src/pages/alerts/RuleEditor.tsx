@@ -365,10 +365,13 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
         {scenario && start ? (
           <>
             <div className="stack" data-role="short-form">
-              <p data-role="scenario">
-                <strong>{category ? t(category.label_key) : t(scenario.labelKey)}</strong>{" — "}
-                {scenario.descKey ? t(scenario.descKey) : t("scn_event_count", { n: String(category?.events.length ?? 0) })}
-              </p>
+              <div className="scn-text">
+                <p data-role="scenario">
+                  <strong>{category ? t(category.label_key) : t(scenario.labelKey)}</strong>{" — "}
+                  {scenario.descKey ? t(scenario.descKey) : t("scn_event_count", { n: String(category?.events.length ?? 0) })}
+                </p>
+                {scenario.notesKey && <p className="hint" data-role="scenario-notes">{t(scenario.notesKey)}</p>}
+              </div>
               {nameField}
               {rule.type === "event" && (
                 <>

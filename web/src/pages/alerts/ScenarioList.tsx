@@ -50,6 +50,7 @@ export function ScenarioList() {
                   <span data-role="scenario-desc">
                     {s.descKey ? t(s.descKey) : t("scn_event_count", { n: String(eventCount.get(s.id) ?? 0) })}
                   </span>
+                  {s.notesKey && <span className="hint" data-role="scenario-notes">{t(s.notesKey)}</span>}
                   {(filed.get(scenarioKey(s)) ?? []).map((item) => (
                     <Link key={item.rule.id} to={`/alerts/rules/${item.rule.id}`} data-role="covered-by">
                       {t("scn_covered_by", { name: item.display_name })}

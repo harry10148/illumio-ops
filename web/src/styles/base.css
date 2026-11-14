@@ -533,4 +533,5 @@ input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
 .scn-list > li:last-child { padding-bottom: 0; }
 .scn-checks { display: grid; gap: var(--space-4); }
 .scn-text { display: grid; gap: var(--space-2); justify-items: start; min-width: 0; overflow-wrap: anywhere; }
+.scn-text > p { margin: 0; }
 [data-role=rule-list] th, [data-role=rule-list] td:nth-child(2) { white-space: nowrap; }  /* short headers and the type stay on one line */

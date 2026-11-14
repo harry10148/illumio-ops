@@ -194,3 +194,67 @@ def test_the_list_fits_the_narrow_width(narrow_context, live_app):
     _open(page, live_app)
     assert page.viewport_size["width"] == NARROW
     assert ui_rules.violations(page) == {}
+
+
+# ── a scenario says what fires it first, its conditions after ──
+
+WITHOUT_NOTES = {"detector:fanout", "detector:pivot_chain", "detector:cross_env", "detector:auth_to_non_dc",
+                 "flow:traffic", *(f"system:{c.value}" for c in SystemCheck)}
+
+
+@pytest.mark.parametrize(("language", "width"), [("en", 1280), ("zh_TW", 1280), ("en", NARROW)])
+def test_a_row_says_what_fires_it_then_its_conditions(browser, live_app, language, width):
+    _language(live_app, language)
+    lang = Language.ZH_TW if language == "zh_TW" else Language.EN
+    ctx = browser.new_context(locale="zh-TW" if language == "zh_TW" else "en-US", viewport={"width": width, "height": 900})
+    page = ctx.new_page()
+    sign_in(page, live_app.url)
+    listing = _open(page, live_app)
+    rows = listing.locator("[data-scenario-group=detector] [data-scenario], [data-scenario-group=flow] [data-scenario], "
+                           "[data-scenario-group=system] [data-scenario]").evaluate_all(
+        "(els) => els.map((e) => { const n = e.querySelector('[data-role=scenario-notes]');"
+        " return [e.dataset.scenario, e.querySelector('[data-role=scenario-desc]').innerText.trim(),"
+        " n ? n.innerText.trim() : null, n ? getComputedStyle(n).fontSize : null,"
+        " getComputedStyle(e.querySelector('[data-role=scenario-desc]')).fontSize,"
+        " n ? n.previousElementSibling.dataset.role : null]; })")
+    assert len(rows) == 21 + 3 + 6
+    for scenario, desc, notes, notes_size, desc_size, before in rows:
+        group, name = scenario.split(":")
+        key = {"detector": "scn_det_", "flow": "scn_flow_", "system": "scn_sys_"}[group] + name
+        assert desc == translate(lang, key), scenario   # the trigger: one sentence
+        assert desc.count("。" if language == "zh_TW" else ". ") == (1 if language == "zh_TW" else 0), scenario
+        if scenario in WITHOUT_NOTES:
+            assert notes is None, scenario
+        else:
+            assert notes == translate(lang, key + "_notes"), scenario
+            assert before == "scenario-desc" and float(notes_size[:-2]) < float(desc_size[:-2]), scenario   # under it, as a hint
+    assert sum(1 for r in rows if r[0].startswith("detector:") and r[2]) == 17
+    assert ui_rules.violations(page) == {}
+    ctx.close()
+
+
+def test_the_short_form_shows_the_trigger_and_its_conditions(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules/new?scenario=detector:new_pair_port")
+    top = page.locator("[data-role=short-form] [data-role=scenario]")
+    expect(top).to_contain_text(translate(Language.EN, "scn_det_new_pair_port"))
+    notes = page.locator("[data-role=short-form] [data-role=scenario-notes]")
+    expect(notes).to_have_text(translate(Language.EN, "scn_det_new_pair_port_notes"))
+    assert "hint" in notes.get_attribute("class").split()
+    page.wait_for_load_state("networkidle")
+    assert ui_rules.violations(page) == {}
+    page.goto(f"{live_app.url}/alerts/rules/new?scenario=detector:fanout")
+    page.wait_for_selector("[data-role=short-form] [data-role=scenario]")
+    expect(page.locator("[data-role=scenario-notes]")).to_have_count(0)
+
+
+def test_every_notes_key_belongs_to_a_scenario_sentence():
+    """Nothing was dropped into a key no row shows: each *_notes key sits beside the sentence it continues."""
+    from illumio_ops.i18n import dictionary
+    for lang in (Language.EN, Language.ZH_TW):
+        d = dictionary(lang)
+        notes = {k for k in d if k.startswith("scn_") and k.endswith("_notes")}
+        assert len(notes) == 19 and all(k[:-len("_notes")] in d for k in notes)
+        group = {"scn_det_": "detector", "scn_flow_": "flow", "scn_sys_": "system"}
+        assert {f"{group[k[:k.index('_', 4) + 1]]}:{k[k.index('_', 4) + 1:-len('_notes')]}" for k in notes}.isdisjoint(WITHOUT_NOTES)
