@@ -173,6 +173,47 @@ def test_a_tables_title_and_limit_note_print_on_the_page_of_its_first_row(contex
     assert all(len(t) > 200 for t in pages[:-1]), [len(t) for t in pages]  # and no page is left nearly empty for it
 
 
+def _wide(i, rows=4, **over):
+    """A table of nine columns (render_html.WIDE_COLUMNS: it prints on a landscape page), its title and its first
+    row each carrying a word the PDF's text can be searched for."""
+    columns = (Column(key="host", label="Host"),
+               *(Column(key=f"n{c}", label=f"Count {c}", kind="number") for c in range(8)))
+    return TableBlock(title=f"QZT{i:02d}Z connections by host", columns=columns, total_rows=rows, empty_text="none",
+                      rows=tuple((f"QZR{i:02d}Z" if r == 0 else f"host-{r}", *range(r, r + 8)) for r in range(rows)),
+                      **over)
+
+
+@pytest.mark.skipif(shutil.which("pdftotext") is None, reason="reads the printed PDF's pages with poppler's pdftotext")
+def test_a_wide_tables_title_prints_on_the_page_of_its_first_row(context, tmp_path):
+    """A table of nine columns or more is printed on a landscape page. Its title — and what stands between the title
+    and the rows — was left at the foot of the portrait page before: a change of page kind is a page break that
+    "keep with what follows" does not cancel. Asked of every table of the report: after other content, right after
+    another wide table, with a note under its title, as the first thing of its section (then the section's title
+    and intro are what would be left behind), and long enough to be cut on paper (its sentence stays with it)."""
+    filler = table([(f"host-{i}", i) for i in range(8)], title="QZT00Z narrow")
+    filler = filler.model_copy(update={"rows": (("QZR00Z", 0), *filler.rows[1:])})
+    doc = make_doc(kpis=(), sections=(
+        Section(id="first", title="First", intro="What the section holds.",
+                blocks=(filler, _wide(1), _wide(2), _wide(3, limit_note="QZN03Z only the top 4 are listed."))),
+        Section(id="second", title="QZC04Z second", intro="QZI04Z what the second section holds.",
+                blocks=(_wide(4), _wide(5, rows=30))),
+        Section(id="third", title="Third", blocks=(table([("QZR06Z", 1)], title="QZT06Z narrow again"),))))
+    page = _page(context, render_html(doc, tz=UTC), width=PAPER_W, media="print")
+    pages = _pdf_pages(page, tmp_path)
+
+    def on(word):
+        found = [n for n, t in enumerate(pages) if word in t]
+        assert len(found) == 1, (word, found)  # a table cut on paper names its title again under it: the same page
+        return found[0]
+    where = [(i, on(f"QZT{i:02d}Z"), on(f"QZR{i:02d}Z")) for i in range(7)]
+    assert [w for w in where if w[1] != w[2]] == [], where
+    assert on("QZN03Z") == on("QZR03Z")  # the note between a title and its rows
+    # a section's title and intro, when a wide table is its first (the title is in the contents too, on page 1)
+    assert [n for n, t in enumerate(pages) if "QZC04Z" in t] == [0, on("QZR04Z")] and on("QZI04Z") == on("QZR04Z")
+    assert on("Printliststhefirst10rowsof30") == on("QZR05Z")  # what is said under a table cut on paper
+    assert all(len(t) > 60 for t in pages), [len(t) for t in pages]  # no page holds a title alone, none is blank
+
+
 LONGEST = ("rpt_sec_kpi_pb_flows", "rpt_sec_kpi_allowed_pct", "rpt_sec_kpi_blocked_flows")
 
 

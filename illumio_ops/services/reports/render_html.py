@@ -152,6 +152,16 @@ html[lang="zh-TW"] .print-btn { letter-spacing: 0; }
      column) stays with the rows, as the title stays with it: a table that moved whole to the next page left its
      title and that note at the foot of the page before. */
   .note-warn, .note[data-role="said-once"] { break-after: avoid; }
+  /* A table of nine columns or more is printed on a landscape page (report_shell.css: page: wide, on its panel). A
+     change of page kind is a page break that nothing cancels — "break-after: avoid" on the title does not — so the
+     title, and the notes between it and the rows, were left at the foot of the portrait page before, every time.
+     The table's whole block is of the landscape page instead: title, notes, rows, and what is said under them.
+     When that block is the first thing of its section, so are the section's title, intro and link. */
+  .table-landscape { page: wide; }
+  .chapter:has(> .chapter-head + .table-landscape, > .chapter-head + .section-intro + .table-landscape,
+               > .chapter-head + .section-link + .table-landscape,
+               > .chapter-head + .section-intro + .section-link + .table-landscape)
+    > :is(.chapter-head, .section-intro, .section-link) { page: wide; }
   .lead-value { font-size: 20pt; }
   /* A4's printable width is 695px: four share columns at their screen width (135px each, the number and a 72px
      bar that do not wrap) pushed the readiness scores table 100px past the paper's edge. */
@@ -366,7 +376,9 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language, *, base
              f'{" report-table--interactive" if len(t.columns) >= 2 else ""}" data-column-count="{len(t.columns)}"'
              f'{f" data-print-cap=\"{PRINT_ROW_CAP}\"" if on_paper else ""}>'
              f"<colgroup>{cols}</colgroup><thead><tr>{ths}</tr></thead><tbody>{body}</tbody></table></div></div>")
-    return head + limit + table + on_paper + cap
+    block = head + limit + table + on_paper + cap
+    # one block for a table printed on a landscape page: its title and notes are printed on that page with it
+    return f'<div class="table-landscape">{block}</div>' if wide else block
 
 
 def _bars(b: BarBlock, lang: Language) -> str:
