@@ -97,7 +97,7 @@ def test_a_scenario_names_the_rules_that_cover_it(context, live_app):
     link.click()
     page.wait_for_selector("[data-role=rule-editor]")
     assert page.url.endswith(f"/alerts/rules/{pack_rule_id('rule_agent_tampering')}")
-    expect(page.locator("[data-role=rule-editor] input[name=event_types]")).to_have_value("agent.tampering")
+    expect(page.locator("[data-role=rule-editor] textarea[name=event_types]")).to_have_value("agent.tampering")
 
 
 def test_covered_scenarios_come_first_in_their_group(context, live_app):

@@ -96,7 +96,7 @@ def test_event_short_form_saves_what_the_full_form_saves(page, live_app):
     _save(page, form)
     form = _full(page, live_app, "event")
     form.locator("input[name=name]").fill("Full event")
-    form.locator("input[name=event_types]").fill("agent.activate_clone")
+    form.locator("textarea[name=event_types]").fill("agent.activate_clone")
     _save(page, form)
     assert _saved(live_app, "Short event") == _saved(live_app, "Full event")
     assert _saved(live_app, "Short event")["event_types"] == ["agent.activate_clone"]
@@ -114,7 +114,7 @@ def test_event_short_form_counts_within_a_window(page, live_app):
     _save(page, form)
     form = _full(page, live_app, "event")
     form.locator("input[name=name]").fill("Full count")
-    form.locator("input[name=event_types]").fill("user.sign_in")
+    form.locator("textarea[name=event_types]").fill("user.sign_in")
     form.locator("select[name=threshold]").select_option("count")
     form.locator("input[name=window_minutes]").fill("20")
     form.locator("input[name=threshold_count]").fill("4")

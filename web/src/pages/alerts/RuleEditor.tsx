@@ -571,6 +571,31 @@ function EventPicker({ types, onAdd }: { types: string[]; onAdd: (type: string) 
   );
 }
 
+const typedLines = (text: string) => text.split("\n").map((x) => x.trim()).filter((x) => x !== "");
+
+/** The rule's event types as the list they are: one type or pattern per line. A pattern is a regular expression and
+ * may hold a comma (`{1,3}`), so no character inside a line separates anything. The box keeps the text as it is
+ * typed (an empty line, the caret); the rule gets the lines that hold something — [""] when none does, which the
+ * server refuses at this field. The text is written again from the rule only when the list was changed somewhere
+ * else: the catalog's picker, the short form's checklist, a built-in rule's settings coming in. */
+function EventTypesBox({ types, onChange }: { types: readonly string[]; onChange: (types: string[]) => void }) {
+  const [text, setText] = useState(() => types.join("\n"));
+  const held = types.map((x) => x.trim()).filter((x) => x !== "");
+  const heldKey = JSON.stringify(held);
+  useEffect(() => {
+    setText((now) => JSON.stringify(typedLines(now)) === heldKey ? now : held.join("\n"));
+  }, [heldKey]);  // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <textarea name="event_types" rows={Math.max(3, text.split("\n").length)} value={text} spellCheck={false}
+              placeholder={"rule_set.create\nsec_policy.create"}
+              onChange={(e) => {
+                setText(e.target.value);
+                const lines = typedLines(e.target.value);
+                onChange(lines.length > 0 ? lines : [""]);
+              }} />
+  );
+}
+
 function EventFields({ rule, set, fieldError, threshold, fieldsSeq }: {
   rule: EventRule; set: (patch: Partial<EventRule>) => void; fieldError: (name: string) => ReactElement | null;
   /** With the threshold sentence: the short form has its own. */ threshold: boolean;
@@ -584,8 +609,7 @@ function EventFields({ rule, set, fieldError, threshold, fieldsSeq }: {
     <>
       <label>
         {t("rule_event_types")}
-        <input name="event_types" value={rule.event_types.join(", ")} placeholder="rule_set.create, sec_policy.create"
-               onChange={(e) => set({ event_types: e.target.value.split(",").map((s) => s.trim()) as [string, ...string[]] })} />
+        <EventTypesBox types={rule.event_types} onChange={(types) => set({ event_types: types as [string, ...string[]] })} />
         <span className="hint">{t("rule_event_types_hint")}</span>
         {fieldError("event_types")}
       </label>

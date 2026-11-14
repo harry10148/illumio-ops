@@ -52,7 +52,7 @@ def test_three_rules_made_from_the_rule_list(context, live_app):
     _save(page)
     form = _full_form(page, live_app, "event")
     form.locator("input[name=name]").fill("Label deleted, full form")
-    form.locator("input[name=event_types]").fill("label.delete")
+    form.locator("textarea[name=event_types]").fill("label.delete")
     _save(page)
     assert _named(live_app, "Label deleted") == _named(live_app, "Label deleted, full form")
 
@@ -78,7 +78,7 @@ def test_three_rules_made_from_the_rule_list(context, live_app):
     page.get_by_role("link", name="New rule").click()
     page.locator(f"[data-scenario='event:agent_security'] [data-role=covered-by][href='/alerts/rules/{rid}']").click()
     form = page.locator("[data-role=rule-editor]")
-    expect(form.locator("input[name=event_types]")).to_have_value("agent.tampering")
+    expect(form.locator("textarea[name=event_types]")).to_have_value("agent.tampering")
     form.locator("input[name=cooldown_minutes]").fill("90")
     _save(page)
     after = _rules(live_app)
@@ -116,6 +116,7 @@ _EVENT = {"name": "", "pack_key": None, "enabled": True, "notify": True, "severi
 OTHER_SHAPES = [
     _EVENT | {"name": "either of two", "event_types": ["agent.tampering|agent.suspend"]},
     _EVENT | {"name": "a regular expression", "event_types": ["^user\\.(sign_in|login)$", "rule_set\\..*"]},
+    _EVENT | {"name": "a pattern with a comma", "event_types": ["^agent\\.(a|b){1,3}$", "user.login"]},
     _EVENT | {"name": "everything", "event_types": ["*"], "status": "failure", "event_severity": "err|warning"},
     _EVENT | {"name": "not in the catalog", "event_types": ["vendor.brand_new", "agent.tampering"], "enabled": False},
     _EVENT | {"name": "field matches", "event_types": ["system_task.prune_old_log_events"], "threshold": "count",
@@ -164,3 +165,71 @@ def test_rules_of_other_shapes_open_and_save_unchanged(context, live_app):
     after = _rules(live_app)
     for rid, rule in before.items():
         assert after[rid] == rule, rule["name"]
+
+
+# ── an event pattern may hold a comma: the form edits the list as a list, one pattern per line ─────────────
+
+COMMA = "^agent\\.(a|b){1,3}$"
+
+
+def _event_rule(live_app, name: str, event_types: list[str]) -> str:
+    rid = uuid.uuid4().hex
+    s = live_app.ctx.settings
+    s.update(s.current().revision, lambda d: d["alerts"]["rules"].append(_EVENT | {"id": rid, "name": name,
+                                                                                    "event_types": event_types}))
+    return rid
+
+
+def test_a_pattern_with_a_comma_is_one_entry_opened_saved_and_edited(context, live_app):
+    rid = _event_rule(live_app, "Comma", [COMMA, "user.login"])
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alerts/rules/{rid}")
+    form = page.locator("[data-role=rule-editor]")
+    box = form.locator("textarea[name=event_types]")
+    expect(box).to_have_value(f"{COMMA}\nuser.login")   # two entries, one per line
+    page.wait_for_load_state("networkidle")
+    _save(page)
+    assert _rules(live_app)[rid]["event_types"] == [COMMA, "user.login"]   # saved unchanged: the same list
+
+    page.goto(f"{live_app.url}/alerts/rules/{rid}")
+    box = page.locator("[data-role=rule-editor] textarea[name=event_types]")
+    expect(box).to_have_value(f"{COMMA}\nuser.login")
+    box.press("Control+End")          # the second entry is edited where it stands: the keys a reader presses
+    for _ in range(len("login")):
+        box.press("Backspace")
+    box.press_sequentially("sign_in")
+    expect(box).to_have_value(f"{COMMA}\nuser.sign_in")
+    _save(page)
+    assert _rules(live_app)[rid]["event_types"] == [COMMA, "user.sign_in"]   # the first is whole
+
+
+def test_a_pattern_with_a_comma_typed_into_a_new_rule_is_one_entry(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    form = _full_form(page, live_app, "event")
+    form.locator("input[name=name]").fill("Typed comma")
+    box = form.locator("textarea[name=event_types]")
+    box.press_sequentially(COMMA)
+    box.press("Enter")
+    box.press_sequentially("user.sign_in")
+    box.press("Enter")                 # a line left empty at the end is not an entry
+    expect(box).to_have_value(f"{COMMA}\nuser.sign_in\n")
+    # the catalog's picker adds a line of its own
+    picker = form.locator("[data-role=event-picker]")
+    picker.locator("select[name=event_pick]").select_option("agent.tampering")
+    picker.get_by_role("button", name="Add event type").click()
+    expect(box).to_have_value(f"{COMMA}\nuser.sign_in\nagent.tampering")
+    _save(page)
+    assert _named(live_app, "Typed comma")["event_types"] == [COMMA, "user.sign_in", "agent.tampering"]
+
+
+def test_a_rule_with_no_event_type_typed_is_refused_at_the_field(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    form = _full_form(page, live_app, "event")
+    form.locator("input[name=name]").fill("Nothing typed")
+    form.locator("textarea[name=event_types]").fill("  \n\n")
+    form.get_by_role("button", name="Save").click()
+    expect(form.locator(".form-error[data-field*=event_types]").first).to_be_visible()
+    assert "Nothing typed" not in [r["name"] for r in _rules(live_app).values()]

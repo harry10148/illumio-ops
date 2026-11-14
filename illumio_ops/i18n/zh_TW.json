@@ -753,7 +753,7 @@
   "rule_event_severity": "事件嚴重度（all、err、warning、info；a|b；!x）",
   "rule_event_status": "事件狀態（all、success、failure；a|b；!x）",
   "rule_event_types": "事件類型",
-  "rule_event_types_hint": "以逗號分隔；每項可為精確類型、a|b 或正規表示式。",
+  "rule_event_types_hint": "一行一項；每項可為精確類型、a|b 或正規表示式。",
   "rule_min_severity": "最低嚴重度",
   "rule_minutes": "分鐘",
   "rule_minutes_at_least": "分鐘內，至少",

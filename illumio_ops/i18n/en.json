@@ -753,7 +753,7 @@
   "rule_event_severity": "Event severity (all, err, warning, info; a|b; !x)",
   "rule_event_status": "Event status (all, success, failure; a|b; !x)",
   "rule_event_types": "Event types",
-  "rule_event_types_hint": "Comma separated; each an exact type, a|b, or a regular expression.",
+  "rule_event_types_hint": "One per line; each an exact type, a|b, or a regular expression.",
   "rule_min_severity": "At least",
   "rule_minutes": "minutes",
   "rule_minutes_at_least": "minutes, at least",
