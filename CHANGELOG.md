@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [Unreleased]
+
+### Fixed
+
+- SIEM syslog over TCP and TLS: a live connection on a file descriptor numbered 1024 or above was read as closed by
+  its peer, so every record after the first dropped the connection and reconnected (`select()` refuses such a
+  descriptor; `poll()` is used instead). An install under the service's default limit of 1024 open files never has such
+  a descriptor; the test suite did, which is where it showed.
+- Three tests that failed now and then asserted before the answer they were about had arrived (the alert note, the
+  rule set search) or met the defect above (TLS syslog). They wait for the right thing now; none was given a retry or
+  a longer timeout.
+
 ## [6.11.2] - 2026-11-14
 
 ### Fixed
