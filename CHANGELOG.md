@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.11.0] - 2026-11-14
+
+The alert rule form (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §10). No rule, no evaluation and no
+built-in rule is changed; a rule the short form saves is the one the full form saves for the same values.
+
+### Added
+
+- "New rule" starts from a list of scenarios in four groups — the 11 categories of PCE events, the three traffic
+  thresholds, the 21 detectors, the 6 checks of this system — each with a sentence saying what makes it fire and the
+  rules that already cover it (a link opens the rule). Event rules that name events by `*`, `a|b`, a regular
+  expression or a type the catalog does not list are in a list of their own, under no category.
+- A scenario opens a short form: a name, the events to tick (by description, not by type string) or the threshold,
+  and whether to notify, with the notification channels that are on. Every other field is under "Advanced", which is
+  open whenever one of its fields holds a value other than the default.
+- Ticking exactly the events of a built-in rule brings that rule's settings whole (status, threshold, cooldown, rate
+  limit, severity) and says so; anything else starts at "on each occurrence".
+- The full form is still there ("Open the full form without choosing a scenario"); editing a rule opens it, as before.
+
 ## [6.10.1] - 2026-11-14
 
 ### Changed
