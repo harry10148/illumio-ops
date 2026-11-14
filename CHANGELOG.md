@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.12.0] - 2026-11-14
+
+### Added
+
+- A report table sorts by its column headers on screen: ascending, descending, then the report's own order. Numbers
+  sort as numbers and times as times; a cell without a value is last either way. Paper keeps the report's own order
+  and its first ten rows whatever was clicked. A table that lists part of its rows says that sorting orders those rows
+  only.
+
+### Fixed
+
+- On paper a wide table's title (nine columns or more) is on the page of its table; it was left at the foot of the
+  page before, twelve times in the sample reports.
+- Investigate, filling a gap from the PCE: a gap that crosses a UTC midnight is asked a day at a time. Asked whole, the
+  PCE answered with one record per connection holding both days' counts, which replaced the stored row of the first
+  day and left the second day's beside it — the second day counted twice. (The predicted-block recompute is one query
+  and counted nothing twice; its window now ends before a UTC midnight instead of on it.)
+- The rule form's event types are one pattern per line. They were one comma-separated line, so editing a rule with a
+  regular expression that holds a comma (`{1,3}`) cut the pattern in two without a word.
+
 ## [6.11.3] - 2026-11-14
 
 ### Fixed

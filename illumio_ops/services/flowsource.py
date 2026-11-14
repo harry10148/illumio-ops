@@ -55,6 +55,7 @@ from illumio_ops.pce.client import PceNotConfigured
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.collect.traffic import PCE_FAILURES
+from illumio_ops.services.collect.windows import asked_end, day_end
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.coverage import (
     Coverage,
@@ -357,12 +358,24 @@ def query_flows(ctx: AppContext, spec: FilterSpec, *, limit: int, order: Order,
             if g[2] == "truncated" or budget <= 0:  # a capped window would cap again; a spent budget
                 kept_gaps.append((g[0], g[1], "truncated"))  # leaves the rest unread, said so
                 continue
+            # One query per UTC day of the gap: a window touching two days comes back as one record per connection
+            # holding both days' counts under the first day's key (collect/windows.py) — it would replace the
+            # store's row of the first day and leave the second day's beside it, counted twice.
+            records: list[FlowRecord] = []
+            capped, cur = False, g[0]
             try:
-                records, capped = _fetch(ctx, settings.pce, spec, (g[0], g[1]), min(budget, FILL_MAX_RESULTS))
+                while cur < g[1] and budget - len(records) > 0:
+                    nxt = min(day_end(cur), g[1])
+                    part, part_capped = _fetch(ctx, settings.pce, spec, (cur, asked_end(cur, nxt)),
+                                               min(budget - len(records), FILL_MAX_RESULTS))
+                    records.extend(part)
+                    capped = capped or part_capped
+                    cur = nxt
             except (*PCE_FAILURES, PceNotConfigured) as exc:
                 logger.warning("could not fill a gap from the PCE: {}", exc)
                 kept_gaps.append((g[0], g[1], "ingest_failed"))
                 continue
+            capped = capped or cur < g[1]  # the budget ran out before the gap's last day
             fetched.extend(records)
             budget -= len(records)
             filled.append((g[0], g[1]))

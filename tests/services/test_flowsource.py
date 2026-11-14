@@ -4,6 +4,7 @@ from datetime import timedelta
 import pytest
 
 from illumio_ops.domain.filter import EndpointFilter, FilterSpec, LabelCond
+from illumio_ops.domain.timefmt import pce_time
 from illumio_ops.domain.values import IngestSource
 from illumio_ops.pce.async_query import PceQueryError
 from illumio_ops.services.collect.traffic import run_traffic_cycle
@@ -85,6 +86,18 @@ def test_fill_gaps_queries_pce_and_marks_mixed(collected, fake_traffic):
     assert q.coverage.filled_from_pce == [(NOW, NOW + minutes(15))] and q.coverage.gaps == []
     with collected.flows().connect() as conn:
         assert conn.execute("SELECT count(*) FROM flows").fetchone()[0] == 3  # never written to the store
+
+
+def test_a_gap_across_a_utc_midnight_is_asked_a_day_at_a_time(collected, fake_traffic):
+    """The PCE answers a window that touches two UTC days with one record per connection holding both days' counts,
+    dated from the first (lab and SaaS, 2026-11-14): it replaced the store's row of the first day and left the second
+    day's beside it, counted twice. Each query stays inside one UTC day and ends before the next begins."""
+    midnight = (NOW + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    q = query_flows(collected, _spec(NOW - minutes(60), midnight + minutes(90)), limit=100,
+                    order="last_detected_desc", fill_gaps=True)
+    assert fake_traffic.calls == [(pce_time(NOW), pce_time(midnight - timedelta(seconds=1))),
+                                  (pce_time(midnight), pce_time(midnight + minutes(90)))]
+    assert q.coverage.filled_from_pce == [(NOW, midnight + minutes(90))] and q.coverage.gaps == []
 
 
 def test_fill_gaps_with_zero_rows_is_still_mixed(collected, fake_traffic):

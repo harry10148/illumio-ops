@@ -30,6 +30,7 @@ from illumio_ops.domain.policy import DraftView, RuleRef, index_rules, parse_dra
 from illumio_ops.domain.values import KNOWN_DRAFT_POLICY_DECISIONS, CapabilityState
 from illumio_ops.pce.async_query import PceQueryError, run_traffic_query
 from illumio_ops.pce.policy import fetch_policy_names, fetch_rule_sets
+from illumio_ops.services.collect.windows import asked_end
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import FlowRow, pair_row
 from illumio_ops.store.flowdb import capabilities, ip_lists, policy_objects
@@ -90,7 +91,10 @@ def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_
     fdb = ctx.flows()
     gen = fdb.generation  # noted before the settings it goes with: an answer from a switched-away PCE is dropped
     settings = ctx.settings.current()
-    payload, residual = to_pce_payload(spec, max_results=max_results, query_name="illumio-ops predicted blocks",
+    # a window ending at a UTC midnight is asked to the second before: the end is inclusive, and 00:00:00 belongs
+    # to the day after (collect/windows.py)
+    asked = spec.model_copy(update={"end": asked_end(spec.start, spec.end)})
+    payload, residual = to_pce_payload(asked, max_results=max_results, query_name="illumio-ops predicted blocks",
                                        label_hrefs={})
     # The PCE answered the time window (a daily flow bucket may reach past it); only the conditions it could
     # not take are checked here.
