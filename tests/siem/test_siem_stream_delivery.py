@@ -5,10 +5,15 @@
 """
 from __future__ import annotations
 
+import contextlib
+import os
+import resource
 import socket
 import ssl
 import threading
 import time
+
+import pytest
 
 from tests.siem.test_transport_tls import _generate_self_signed
 
@@ -100,6 +105,74 @@ def test_tls_finish_batch_delivers_whole_batch(tmp_path):
     assert counts == [100]
 
 
+
+
+@contextlib.contextmanager
+def _descriptors_from_1024():
+    """Every descriptor opened inside is numbered 1024 or above — where a long-lived process that holds many files
+    (the web server's database handles, in the worker that ran the browser tests) puts its sockets."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    need = 1024 + 64
+    if hard != resource.RLIM_INFINITY and hard < need:
+        pytest.skip(f"the hard limit on open files is {hard}; descriptors above 1024 cannot be opened here")
+    if soft != resource.RLIM_INFINITY and soft < need:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (need, hard))
+    held: list[int] = []
+    try:
+        while not held or held[-1] < 1023:
+            held.append(os.open(os.devnull, os.O_RDONLY))
+        yield
+    finally:
+        for fd in held:
+            os.close(fd)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
+
+
+def test_peer_closed_reads_a_live_peer_as_open_on_a_descriptor_above_1023():
+    """select() refuses such a descriptor; that refusal was read as "peer closed" (CI, 2026-11-14)."""
+    from illumio_ops.siem.transports._stream import peer_closed
+
+    with _descriptors_from_1024():
+        a, b = socket.socketpair()
+        try:
+            assert a.fileno() >= 1024
+            assert peer_closed(a) is False
+            b.close()
+            assert peer_closed(a) is True
+        finally:
+            a.close()
+            b.close()
+
+
+def test_tcp_keeps_one_connection_on_a_descriptor_above_1023():
+    """Each send after the first dropped the live connection and opened another; a server that was still reading the
+    first one never saw the rest of the batch."""
+    from illumio_ops.siem.transports.syslog_tcp import SyslogTCPTransport
+
+    ls, port = _listen()
+    counts: list[int] = []
+
+    def serve():
+        c, _ = ls.accept()
+        buf = b""
+        while True:
+            d = c.recv(65536)
+            if not d:
+                break
+            buf += d
+        counts.append(buf.count(b"\n"))
+        c.close()
+
+    th = threading.Thread(target=serve, daemon=True)
+    th.start()
+    with _descriptors_from_1024():
+        tr = SyslogTCPTransport("127.0.0.1", port)
+        for i in range(20):
+            tr.send(f"line {i}")
+        tr.finish_batch()
+    th.join(timeout=5)
+    ls.close()
+    assert counts == [20]
 
 
 def test_frame_payload_lf_and_octet_counting():

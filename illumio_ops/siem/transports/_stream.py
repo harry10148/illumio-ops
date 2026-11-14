@@ -25,8 +25,12 @@ def peer_closed(sock: socket.socket) -> bool:
     session ticket 由 ssl 模組在 recv 內部消化）。讀到 EOF 代表對端已關閉。
     """
     try:
-        readable, _, _ = select.select([sock], [], [], 0)
-    except (OSError, ValueError):
+        # poll, not select: select() refuses a descriptor numbered 1024 or above (FD_SETSIZE), and that refusal
+        # read as "peer closed" — in a process holding that many files every send dropped a live connection.
+        poller = select.poll()
+        poller.register(sock, select.POLLIN)
+        readable = poller.poll(0)
+    except (OSError, ValueError):  # the socket is already closed on our side (fileno() is -1)
         return True
     pending = sock.pending() if isinstance(sock, ssl.SSLSocket) else 0
     if not readable and not pending:
