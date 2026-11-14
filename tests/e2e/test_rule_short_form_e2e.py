@@ -362,7 +362,7 @@ def test_ticking_a_built_in_rules_events_brings_its_settings_whole(page, live_ap
     expect(form.locator("[data-role=pack-prefill]")).to_have_count(0)
     assert not _is_open(form)
     _tick(form, "user.login")
-    expect(form.locator("[data-role=pack-prefill]")).to_have_text("Uses the settings of the built-in rule “Login Failures”.")
+    expect(form.locator("[data-role=pack-prefill]")).to_have_text('Uses the settings of the built-in rule "Login Failures".')
     assert _is_open(form)
     expect(form.locator("input[name=status]")).to_be_visible()
     expect(form.locator("input[name=status]")).to_have_value("failure")

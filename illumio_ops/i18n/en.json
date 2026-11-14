@@ -3859,7 +3859,7 @@
   "scn_sys_collection_failing": "Collecting one kind of data from the PCE fails 3 times in a row.",
   "scn_sys_data_loss": "A span of time is newly recorded as not fully collected: collecting it failed, or the PCE returned as many rows as one query can return.",
   "scn_sys_job_failing": "One of this system's background jobs fails 3 times in a row.",
-  "scn_sys_disk_low": "Free disk space on this system falls below the warning level set on the “Modes and data sources” page.",
+  "scn_sys_disk_low": "Free disk space on this system falls below the warning level set on the \"Modes and data sources\" page.",
   "scn_sys_siem_backlog": "For an enabled SIEM destination, the records waiting to be sent exceed the set warning number, or its DLQ is full.",
   "scn_back": "← Scenarios",
   "scn_advanced": "Advanced",
@@ -3868,7 +3868,7 @@
   "scn_when": "Alert",
   "scn_threshold_each": "on each occurrence",
   "scn_threshold_count": "on a number of events:",
-  "scn_pack_prefill": "Uses the settings of the built-in rule “{name}”.",
+  "scn_pack_prefill": "Uses the settings of the built-in rule \"{name}\".",
   "scn_channels_on": "Notifications go to: {channels}.",
   "scn_channels_none": "No notification channel is turned on."
 }
