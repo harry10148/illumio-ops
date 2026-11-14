@@ -60,9 +60,12 @@ def test_alert_note_persists(context, live_app):
     notes = page.locator("[data-role=notes]")
     notes.locator("textarea[name=note]").fill("Checked: the backup job filled the disk.")
     notes.get_by_role("button", name="Add note").click()
-    expect(notes).to_contain_text("Checked: the backup job filled the disk.")
+    # The saved note is the list entry. The form as a whole also holds what was typed (a textarea's value is part of
+    # its text), so reading the form passed before the save had answered and the reload then raced the save.
+    expect(notes.locator("li")).to_contain_text("Checked: the backup job filled the disk.")
+    expect(notes.locator("textarea[name=note]")).to_have_value("")
     page.reload()
-    expect(page.locator("[data-role=notes]")).to_contain_text("Checked: the backup job filled the disk.")
+    expect(page.locator("[data-role=notes] li")).to_contain_text("Checked: the backup job filled the disk.")
 
 
 def test_rule_create_traffic_with_condition(context, live_app):
@@ -202,7 +205,7 @@ def test_direct_link_detail_note(context, live_app):
     with page.expect_response(lambda r: r.request.method == "POST" and r.url.endswith("/notes")) as resp:
         notes.get_by_role("button", name="Add note").click()
     assert resp.value.status == 200
-    expect(notes).to_contain_text("Opened from a link.")
+    expect(notes.locator("li")).to_contain_text("Opened from a link.")  # the list entry, not the text typed
 
 
 def test_lateral_alert_marked_known_then_removed(context, live_app):
