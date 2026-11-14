@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.11.1] - 2026-11-14
+
+### Fixed — Selective was counted and described as Full
+
+- A Potentially Blocked connection is blocked only once its destination is in Full enforcement; a host in Selective
+  blocks only what a Deny Rule names. The product said "blocked once enforcement starts" and counted Selective hosts
+  as enforced. Now:
+  - the security risk and app summary key number is "Managed hosts in Full enforcement": Full hosts over managed
+    hosts (it was Full and Selective together), with a line saying how many are in Selective. The last column of the
+    "enforcement mode by app" tables (security risk, VEN status) is the share in Full. **These numbers are lower than
+    an earlier release's wherever hosts are in Selective.** The maturity and readiness scores are computed as before
+    (a host in Selective counts as half); their explanations now say so;
+  - every sentence explaining Potentially Blocked says Full; five findings no longer advise "Selective or Full" for
+    traffic only Full blocks; the first thing to do reads "move the hosts that are not yet in Full to Full";
+  - "once enforced" in the lateral movement and readiness reports and pages reads "once all in Full" / "to Full"
+    (what they compute did not change).
+
+### Changed
+
+- One name: "Potentially Blocked", in both languages, wherever it names the decision or the traffic that has it
+  (labels, columns, chapter and table titles, key numbers, conclusions). The plain-language paraphrases beside it are
+  gone; the sentences that explain it stay.
+- A detector scenario (and the bandwidth and volume scenarios) says what fires it in its first sentence; exceptions
+  and prerequisites are on a second, smaller line. No condition was dropped.
+
 ## [6.11.0] - 2026-11-14
 
 The alert rule form (docs/superpowers/specs/2026-11-11-v6-purpose-led-ui-design.md §10). No rule, no evaluation and no
