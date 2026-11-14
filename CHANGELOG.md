@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
-## [Unreleased]
+## [6.11.2] - 2026-11-14
+
+### Fixed
+
+- Moving hosts to another enforcement mode (the VEN overview): the sentence to confirm names what the preview showed.
+  To Selective it is the Deny Rules checked in the PCE, to Visibility Only the hosts; it asked to confirm "the
+  Potentially Blocked connections" for every target, though only the Full preview shows them and only Full blocks them.
 
 ### Changed
 

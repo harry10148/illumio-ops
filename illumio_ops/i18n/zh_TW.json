@@ -3108,6 +3108,8 @@
   "fleet_blocks_none": "Visibility Only 不擋任何連線：VEN 只回報流量、不套用規則。",
   "fleet_truncated": "有計數達到筆數上限：實際數字至少是畫面所示。",
   "fleet_enf_confirm": "我已檢查主機與 Potentially Blocked 的連線，要把 {n} 台主機推進到 {mode}。",
+  "fleet_enf_confirm_deny_rules": "我已在 PCE 檢查會套用到這些主機的 Deny Rule，要把 {n} 台主機推進到 {mode}。",
+  "fleet_enf_confirm_none": "我已檢查主機，要把 {n} 台主機推進到 {mode}。",
   "fleet_enf_apply": "推進 {n} 台到 {mode}",
   "fleet_applying": "寫入中…",
   "fleet_enf_heartbeat": "PCE 已接受變更；各 VEN 在下次心跳時套用，期間 PCE 顯示政策同步中。",

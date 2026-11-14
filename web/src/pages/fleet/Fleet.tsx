@@ -264,7 +264,10 @@ function EnforcementDialog({ chosen, envKey, onClose, onDone }: {
           {!outcome && usable.length > 0 && (
             <label className="row" data-role="fleet-ack">
               <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-              {t("fleet_enf_confirm", { n: String(usable.length), mode: modeWord(prev.target) })}
+              {/* what the preview showed is what is confirmed: the connections Full blocks, Selective's Deny Rules, or nothing */}
+              {prev.basis === "connections" ? t("fleet_enf_confirm", { n: String(usable.length), mode: modeWord(prev.target) })
+                : prev.basis === "deny_rules" ? t("fleet_enf_confirm_deny_rules", { n: String(usable.length), mode: modeWord(prev.target) })
+                : t("fleet_enf_confirm_none", { n: String(usable.length), mode: modeWord(prev.target) })}
             </label>
           )}
           {!outcome && (

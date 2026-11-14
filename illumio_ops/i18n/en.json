@@ -3108,6 +3108,8 @@
   "fleet_blocks_none": "Visibility Only blocks nothing: the VEN reports traffic and applies no rule.",
   "fleet_truncated": "A count stopped at its row limit: the numbers are at least what is shown.",
   "fleet_enf_confirm": "I have checked the hosts and the Potentially Blocked connections, and move {n} hosts to {mode}.",
+  "fleet_enf_confirm_deny_rules": "I have checked in the PCE the Deny Rules that apply to these hosts, and move {n} hosts to {mode}.",
+  "fleet_enf_confirm_none": "I have checked the hosts, and move {n} hosts to {mode}.",
   "fleet_enf_apply": "Move {n} hosts to {mode}",
   "fleet_applying": "Writing…",
   "fleet_enf_heartbeat": "The PCE accepted the change; each VEN applies it at its next heartbeat, and the PCE shows the policy syncing until then.",

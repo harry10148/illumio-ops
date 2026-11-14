@@ -60,6 +60,16 @@ def test_overview_filter_progress_and_rate(context, live_app, fake_pce):
     fleet.locator("[data-role=fleet-open-enforce]").click()
     dialog = page.locator("[data-role=fleet-enforce]")
     expect(dialog.locator("[data-role=fleet-would-block]")).to_have_text("4")
+    # the sentence to confirm names what the preview showed: Full's connections, Selective's Deny Rules
+    ack = dialog.locator("[data-role=fleet-ack]")
+    expect(ack).to_contain_text("the Potentially Blocked connections")
+    dialog.locator("select[name=target]").select_option("selective")
+    expect(dialog.locator("[data-role=fleet-blocks-selective]")).to_be_visible()
+    expect(ack).to_contain_text("checked in the PCE the Deny Rules that apply to these hosts")
+    expect(ack).not_to_contain_text("Potentially Blocked")
+    dialog.locator("select[name=target]").select_option("full")
+    expect(dialog.locator("[data-role=fleet-would-block]")).to_have_text("4")
+    expect(ack).to_contain_text("the Potentially Blocked connections")
     apply = dialog.locator("[data-role=fleet-apply]")
     expect(apply).to_be_disabled()  # not before the confirmation
     assert f"/api/v2{DB}" not in fake_pce.calls  # nothing read or written before confirming
