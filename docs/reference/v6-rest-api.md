@@ -10,7 +10,7 @@ verified_against:
 
 > 本頁由 `scripts/gen_api_reference.py` 從 API 契約產生，請勿手改。新增或修改操作後重新執行該腳本。
 
-這些是網頁介面自己使用的 API，共 124 個操作。每個操作的請求與回應欄位（JSON Schema）在
+這些是網頁介面自己使用的 API，共 125 個操作。每個操作的請求與回應欄位（JSON Schema）在
 `web/src/api/contracts.json`，以下只列操作、方法、路徑與模型名稱。
 
 ## 共通規則
@@ -41,6 +41,7 @@ verified_against:
 | `alert_rules.event_catalog` | GET | `/api/alert-rules/event-catalog` | — | `EventCatalog` |
 | `alert_rules.list` | GET | `/api/alert-rules` | — | `RulesView` |
 | `alert_rules.pack` | POST | `/api/alert-rules/pack` | `PackApply` | `RulesView` |
+| `alert_rules.pack_rules` | GET | `/api/alert-rules/pack-rules` | — | `PackRules` |
 | `alert_rules.preview` | POST | `/api/alert-rules/preview` | `RulePreviewRequest` | `RulePreview` |
 | `alert_rules.reset_state` | POST | `/api/alert-rules/<rule_id>/reset-state` | — | `RulesView` |
 | `alert_rules.retention` | PUT | `/api/alert-rules/retention` | `RetentionUpdate` | `RulesView` |

@@ -9,7 +9,7 @@ from typing import Any, Literal
 from flask import Blueprint
 from pydantic import BaseModel, Field
 
-from illumio_ops.domain.alertpack import PACK_KEYS
+from illumio_ops.domain.alertpack import PACK_KEYS, best_practice_rules
 from illumio_ops.domain.alertrules import AlertRule
 from illumio_ops.domain.event_catalog import CATEGORY_KEYS, EVENT_DESC_KEYS, catalog
 from illumio_ops.services.alerts import rule_test
@@ -87,6 +87,15 @@ class PackApply(BaseModel):
     mode: Literal["append_missing", "replace"]
 
 
+class PackRule(BaseModel):
+    rule: AlertRule  # as best_practice_rules(notify_new_defaults=True) builds it
+    name_key: str    # the pack key: the i18n key of its name
+
+
+class PackRules(BaseModel):
+    rules: list[PackRule]
+
+
 OP_LIST = operation("alert_rules.list", "GET", "/api/alert-rules", None, RulesView)
 OP_CREATE = operation("alert_rules.create", "POST", "/api/alert-rules", RuleWrite, RulesView)
 OP_UPDATE = operation("alert_rules.update", "PUT", "/api/alert-rules/<rule_id>", RuleWrite, RulesView)
@@ -100,6 +109,7 @@ OP_RESET = operation("alert_rules.reset_state", "POST", "/api/alert-rules/<rule_
 OP_RETENTION = operation("alert_rules.retention", "PUT", "/api/alert-rules/retention", RetentionUpdate, RulesView)
 OP_EVALUATE = operation("alert_rules.evaluate_now", "POST", "/api/alert-rules/evaluate-now", None, EvaluateRequested)
 OP_EVENT_CATALOG = operation("alert_rules.event_catalog", "GET", "/api/alert-rules/event-catalog", None, EventCatalog)
+OP_PACK_RULES = operation("alert_rules.pack_rules", "GET", "/api/alert-rules/pack-rules", None, PackRules)
 OP_TEST_CANDIDATES = operation("alert_rules.test_candidates", "GET", "/api/alert-rules/test-candidates", None,
                                Candidates)
 
@@ -207,6 +217,14 @@ def event_catalog() -> EventCatalog:
             vendor_documented=e.vendor_documented, status_filter=e.status_filter, severity_filter=e.severity_filter))
     return EventCatalog(categories=[CatalogCategory(id=c, label_key=CATEGORY_KEYS[c], events=events)
                                     for c, events in by_category.items() if events])
+
+
+@api_route(bp, OP_PACK_RULES)
+def pack_rules() -> PackRules:
+    """The built-in pack's rules as the pack builds them, for the rule form to start from: not the settings file's
+    copy (which the operator may have changed or deleted), and nothing is read from or written to it."""
+    return PackRules(rules=[PackRule(rule=r, name_key=r.pack_key)
+                            for r in best_practice_rules(notify_new_defaults=True) if r.pack_key is not None])
 
 
 @api_route(bp, OP_RESET)

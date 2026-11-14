@@ -241,3 +241,34 @@ def test_evaluate_now_asks_the_existing_jobs_to_run(client, ctx):
         assert {j.id for j in ctx.scheduler.get_jobs()} == scheduled  # the same jobs, none added
     finally:
         ctx.scheduler = None
+
+
+# ── stage 4: the built-in pack's rule values for the rule form (read-only) ──
+
+def test_pack_rules_are_the_pack_as_built(client, ctx):
+    from illumio_ops.domain.alertpack import best_practice_rules
+    assert client.get("/api/alert-rules/pack-rules", environ_overrides=LOCAL).status_code == 401
+    login(client)
+    before = ctx.settings.current().revision
+    r = client.get("/api/alert-rules/pack-rules", environ_overrides=LOCAL)
+    items = r.get_json()["data"]["rules"]
+    pack = best_practice_rules(notify_new_defaults=True)
+    assert r.status_code == 200 and len(items) == len(pack)
+    assert [i["rule"] for i in items] == [p.model_dump(mode="json") for p in pack]
+    assert all(i["name_key"] == i["rule"]["pack_key"] for i in items)
+    failed = next(i["rule"] for i in items if i["name_key"] == "rule_login_failed")
+    assert failed["status"] == "failure" and failed["throttle"] == {"count": 1, "period_minutes": 15}
+    assert failed["threshold_count"] == 5
+    assert ctx.settings.current().revision == before
+
+
+def test_pack_rules_do_not_follow_the_settings_file(client, ctx):
+    """The pack as built, not what the operator has made of it: a pack rule changed or deleted in the settings is
+    still served with the pack's own values."""
+    login(client)
+    data = rules(client)
+    rid = pack_rule_id("rule_login_failed")
+    rule = next(i["rule"] for i in data["items"] if i["rule"]["id"] == rid)
+    put(client, f"/api/alert-rules/{rid}", {"revision": data["revision"], "rule": rule | {"threshold_count": 99}})
+    items = client.get("/api/alert-rules/pack-rules", environ_overrides=LOCAL).get_json()["data"]["rules"]
+    assert next(i["rule"] for i in items if i["name_key"] == "rule_login_failed")["threshold_count"] == 5
