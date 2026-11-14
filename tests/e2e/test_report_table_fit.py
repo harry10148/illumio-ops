@@ -88,15 +88,18 @@ def test_paper_lists_the_first_ten_rows_and_says_so(context):
     assert len(rows) == 30 and said == []
 
 
-def test_paper_lists_the_first_ten_rows_by_place_not_by_the_rows_own_number(context):
+def test_paper_lists_the_first_ten_rows_of_the_report_whatever_the_page_was_sorted_by(context):
+    """Until 6.11.3 paper listed the first ten rows as the reader had sorted them, and no header sorted anything.
+    Now a header does (test_report_table_sort.py), and paper is the report: its own order, its own first ten."""
     doc = make_doc(sections=(Section(id="hosts", title="Hosts", blocks=(table([(f"host-{i:02d}", i) for i in range(30)]),)),))
     page = _page(context, render_html(doc, tz=UTC), width=1280, media="screen")
-    # The shell's own sort (report_table.js sortTable re-appends the rows in their new order), called directly:
-    # v6's tables do not carry data-interactive="true", so no header click is wired to it today.
-    page.evaluate("() => { const t = document.querySelector('table.report-table'); sortTable(t, 1); sortTable(t, 1); }")
+    # the page's own sort (report_table.js sortTable), descending by the second column
+    page.evaluate("() => sortTable(document.querySelector('table.report-table'), 1, 'descending')")
+    rows = page.evaluate(f"[...document.querySelectorAll('tbody tr')].filter({VISIBLE}).map(r => r.cells[0].innerText)")
+    assert rows == [f"host-{i:02d}" for i in range(29, -1, -1)]
     page.emulate_media(media="print")
     rows = page.evaluate(f"[...document.querySelectorAll('tbody tr')].filter({VISIBLE}).map(r => r.cells[0].innerText)")
-    assert rows == [f"host-{i:02d}" for i in range(29, 19, -1)]
+    assert rows == [f"host-{i:02d}" for i in range(10)]
 
 
 def _pdf_pages(page, tmp_path):

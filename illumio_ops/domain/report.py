@@ -13,8 +13,9 @@ more there are; the first page lists the first 3 things to do and says how many 
 The email is the first page: 3 numbers (the others are in the report), the first 3 things to do and how many more;
 it lists no finding and no data note, and only its subject is ever cut (render_email.SUBJECT_MAX, with an ellipsis).
 The XLSX summary writes every caveat, number and finding whole.
-On paper a table lists its first PRINT_ROW_CAP rows (the first as the reader sorted them) and a sentence under it
-says how many there are and where: the XLSX sheet, or the report on screen. The tables of "how to read this report"
+On paper a table lists its first PRINT_ROW_CAP rows (the first in the report's own order, whatever column the page
+was sorted by on screen) and a sentence under it says how many there are and where: the XLSX sheet, or the report on
+screen. Sorting on screen orders the rows the HTML holds; a table that holds fewer than it has says so beside it. The tables of "how to read this report"
 are printed whole. Every finding is a card (no cap: the rules are 19 at most, a builder adds a handful).
 """
 from __future__ import annotations

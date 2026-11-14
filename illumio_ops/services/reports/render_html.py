@@ -167,9 +167,16 @@ html[lang="zh-TW"] .print-btn { letter-spacing: 0; }
      bar that do not wrap) pushed the readiness scores table 100px past the paper's edge. */
   .share-bar { width: 36px; }
   .report-table td.share .share-num { min-width: 3em; margin-right: 4px; }
-  /* Paper lists a table's first rows, as the reader sorted them (by place, not by the row's own number). */
+  /* Paper lists a table's first rows in the report's own order: a table sorted on screen keeps its rows as the
+     report listed them (report_table.js sortTable shows a sorted copy beside them), and those are what is printed. */
   table[data-print-cap] tbody tr:nth-child(n+__AFTER_CAP__) { display: none; }
+  tbody[data-role="sorted"] { display: none; }
+  /* A header's button is not printed: its words are (the column's name), its mark is not. */
+  .th-sort { display: contents; }
+  .th-sort::before { content: none; }
 }
+/* A table sorted on screen shows the sorted copy of its rows, not the rows as listed. */
+@media screen { table[data-sorted] > tbody:not([data-role="sorted"]) { display: none; } }
 """
 EXTRA_CSS = _CSS.replace("__AFTER_CAP__", str(PRINT_ROW_CAP + 1))
 LONG_TABLE_ROWS = 15
@@ -269,13 +276,13 @@ def _lead_kpi(k: Kpi, lang: Language) -> str:
             f'<div class="lead-value" data-role="kpi-value">{_esc(_kpi_value(k, lang))}</div>{lines}</div>')
 
 
-def _share_cell(col: Column, value: Cell, tz: tzinfo | None) -> str:
+def _share_cell(col: Column, value: Cell, tz: tzinfo | None, attrs: str = "") -> str:
     """A share as its number and a bar of that length (a <progress>, so no inline style)."""
     text = cell_text(col, value, tz)
     m = _SHARE.match(text)
     if not m:
-        return f"<td>{_esc(text)}</td>"
-    return (f'<td class="share"><span class="share-num">{_esc(text)}</span>'
+        return f"<td{attrs}>{_esc(text)}</td>"
+    return (f'<td class="share"{attrs}><span class="share-num">{_esc(text)}</span>'
             f'<progress class="share-bar" max="100" value="{float(m.group(1)):g}" aria-hidden="true"></progress></td>')
 
 
@@ -290,6 +297,45 @@ def _cell(col: Column, value: Cell, tz: tzinfo | None, lang: Language) -> str:
 _XLSX_BESIDE: ContextVar[bool] = ContextVar("xlsx_beside", default=True)  # for the length of one render_html call
 _SHARE = re.compile(r"^(\d{1,3}(?:\.\d+)?)%$")
 SAME_ON_EVERY_ROW = frozenset({"action"})  # columns said once above the table when every row says the same
+
+
+NO_VALUE = frozenset({"", "—"})  # a cell that holds nothing: sorted last, whichever way the column is sorted
+# A number as a builder writes it into a text cell: thousands separators, a percent sign or a short unit after it.
+_NUMBER_TEXT = re.compile(r"^(-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?) ?(%|[A-Za-z]{1,5})?$")
+_BYTE_UNITS = {"B": 1, "KB": 10**3, "MB": 10**6, "GB": 10**9, "TB": 10**12,
+               "KiB": 2**10, "MiB": 2**20, "GiB": 2**30, "TiB": 2**40}
+
+
+def _sort_values(col: Column, cells: list[Cell]) -> list[str] | None:
+    """What a column sorts by on screen (report_table.js reads it from data-sort, never from the printed text).
+    A column of numbers or of times: one number per row — the cell's own value, a time as seconds, a number written
+    as text ("12.5%", "1,204", "20 MB") as that number, sizes in different units in bytes — and "" for a cell
+    without a value. None: the column sorts by its text (a cell that is neither, or numbers in units that do not
+    compare)."""
+    found: list[tuple[float, str] | None] = []
+    for value in cells:
+        if value is None or (isinstance(value, str) and value.strip() in NO_VALUE):
+            found.append(None)
+        elif isinstance(value, bool):
+            return None
+        elif isinstance(value, (int, float)):
+            found.append((value, ""))
+        elif col.kind == "time":
+            try:
+                found.append((datetime.fromisoformat(value).timestamp(), ""))
+            except ValueError:
+                return None
+        elif m := _NUMBER_TEXT.match(value.strip()):
+            found.append((float(m.group(1).replace(",", "")), m.group(2) or ""))
+        else:
+            return None
+    units = {x[1] for x in found if x is not None}
+    if not units:
+        return None  # no cell holds a value: nothing to sort by
+    if len(units) > 1 and not units <= _BYTE_UNITS.keys():
+        return None
+    scale = _BYTE_UNITS if len(units) > 1 else {}
+    return ["" if x is None else repr(x[0] * scale.get(x[1], 1)) for x in found]  # repr: every digit (a time is 10)
 
 
 def _share_columns(t: TableBlock, tz: tzinfo | None) -> set[int]:
@@ -346,19 +392,45 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language, *, base
              + (" report-table-panel--long" if len(shown) > LONG_TABLE_ROWS else ""))
     numeric = {i for i, c in enumerate(t.columns) if c.kind == "number"}
     cols = "".join("<col>" for _ in t.columns)
-    ths = "".join(f'<th scope="col"{" class=\"num\"" if i in numeric else ""}>'
-                  f'<span class="th-label">{_esc(c.label)}</span></th>' for i, c in enumerate(t.columns))
+    # A table of two rows and two columns or more sorts by its headers on screen (report_table.js): each header is a
+    # button. Every row is one record — no builder writes a total row or a row that spans others — so any row may
+    # take any place. A one-column table has no room kept for the mark of the sort (report_shell.css) and is left.
+    sortable = len(t.columns) >= 2 and len(shown) >= 2
+    by = [_sort_values(c, [r[i] for r in shown]) if sortable else None for i, c in enumerate(t.columns)]
+    hint = _esc(tr(lang, "rpt_sort_hint"))
+
+    def th(i: int, c: Column) -> str:
+        label = f'<span class="th-label">{_esc(c.label)}</span>'
+        if not sortable:
+            return f'<th scope="col"{" class=\"num\"" if i in numeric else ""}>{label}</th>'
+        return (f'<th scope="col"{" class=\"num\"" if i in numeric else ""} aria-sort="none"'
+                f' data-sort-type="{"text" if by[i] is None else "number"}">'
+                f'<button type="button" class="th-sort" title="{hint}">{label}'
+                '<span class="sort-indicator" aria-hidden="true"></span></button></th>')
+
+    def sort_attr(i: int, n: int, value: Cell) -> str:
+        """data-sort: the number a cell sorts by, or "" for a cell without a value (in a column of text too)."""
+        values = by[i]
+        if not sortable:
+            return ""
+        if values is not None:
+            return f' data-sort="{_esc(values[n])}"'
+        return ' data-sort=""' if value is None or (isinstance(value, str) and value.strip() in NO_VALUE) else ""
+
+    ths = "".join(th(i, c) for i, c in enumerate(t.columns))
 
     def linked(c: Column, n: int, inner: str) -> str:
-        # by the column's key and the row's place in `rows`: columns were dropped above, rows never reordered
+        # by the column's key and the row's place in `rows`: columns were dropped above, rows never reordered here
+        # (sorting on screen moves copies of whole rows, each with its links)
         keys = t.host_keys.get(c.key, ())
         url = host_url(base, keys[n] if n < len(keys) else None, t.host_section)
         return inner if url is None else f'<a data-role="host-link" href="{_esc(url)}">{inner}</a>'
 
     body = "".join(
         f'<tr data-row="{n}">' + "".join(
-            (_share_cell(c, row[i], tz) if i in shares else
-             f'<td{" class=\"num\"" if i in numeric else ""}>{linked(c, n, _cell(c, row[i], tz, lang))}</td>')
+            (_share_cell(c, row[i], tz, sort_attr(i, n, row[i])) if i in shares else
+             f'<td{" class=\"num\"" if i in numeric else ""}{sort_attr(i, n, row[i])}>'
+             f'{linked(c, n, _cell(c, row[i], tz, lang))}</td>')
             for i, c in enumerate(t.columns)) + "</tr>"
         for n, row in enumerate(shown))
     cap = ""
@@ -366,7 +438,10 @@ def _table(t: TableBlock, sheet: str, tz: tzinfo | None, lang: Language, *, base
         said = f"{t.html_note} " if t.html_note and own is not None else ""
         words = (tr(lang, "rpt_rows_capped", shown=len(shown), total=len(t.rows), sheet=sheet) if beside
                  else tr(lang, "rpt_rows_capped_no_xlsx", shown=len(shown), total=len(t.rows)))
-        cap = f'<p class="note">{_esc(said)}{_esc(words)}</p>'
+        # sorting orders the rows the page holds, not the ones left out: said on screen (paper cannot be sorted)
+        sorts = (f'<span class="screen-only" data-role="sort-capped"> {_esc(tr(lang, "rpt_sort_capped", shown=len(shown)))}'
+                 "</span>" if sortable else "")
+        cap = f'<p class="note">{_esc(said)}{_esc(words)}{sorts}</p>'
     on_paper = ""
     if print_cap and len(shown) > PRINT_ROW_CAP:  # paper only: the first rows, how many there are and where
         words = (tr(lang, "rpt_print_capped", cap=PRINT_ROW_CAP, total=len(t.rows), sheet=sheet) if beside

@@ -2,35 +2,52 @@ function normalizeCellValue(text) {
   return (text || '').replace(/[\s\u00A0]+/g, ' ').trim();
 }
 
-function parseSortableValue(text) {
-  const normalized = normalizeCellValue(text);
-  const numeric = normalized.replace(/,/g, '').match(/^-?\d+(\.\d+)?$/);
-  if (numeric) return { type: 'number', value: parseFloat(numeric[0]) };
-  return { type: 'text', value: normalized.toLowerCase() };
+/* Sorting by a column header (render_html.py writes the header as a button, and on each cell what it sorts by).
+   A header's state is its th's aria-sort: none -> ascending -> descending -> none (the report's own order).
+   The rows as the report lists them stay where they are — paper prints them, in that order — and the screen shows
+   a sorted copy beside them (the style sheet shows one tbody or the other by medium), so nothing has to be put
+   back before printing and the third click only takes the copy away.
+   A column of numbers (th data-sort-type="number") sorts by each cell's data-sort, never by the printed text; any
+   other column by its text as a reader of the page's language orders it, digits by their value. A cell without a
+   value (data-sort="", or no text) is last, whichever way the column is sorted. Rows that compare equal keep the
+   report's order. */
+const SORT_NEXT = { none: 'ascending', ascending: 'descending', descending: 'none' };
+
+function sortValue(cell, numeric) {
+  if (!cell || cell.dataset.sort === '') return null;
+  if (numeric) {
+    const n = parseFloat(cell.dataset.sort);
+    return Number.isNaN(n) ? null : n;
+  }
+  return normalizeCellValue(cell.textContent) || null;
 }
 
-function sortTable(table, col) {
-  const body = table.tBodies[0];
-  if (!body) return;
-  const rows = Array.from(body.rows);
-  const asc = !(table.dataset.sortCol === String(col) && table.dataset.sortDir === 'asc');
+function sortTable(table, col, dir) {
+  const listed = table.tBodies[0];
+  if (!listed || !table.tHead) return;
+  const headers = Array.from(table.tHead.rows[0].cells);
+  headers.forEach((th, i) => {
+    if (th.hasAttribute('aria-sort')) th.setAttribute('aria-sort', i === col ? dir : 'none');
+  });
+  const was = table.querySelector('tbody[data-role="sorted"]');
+  if (dir === 'none') {
+    if (was) was.remove();
+    delete table.dataset.sorted;
+    return;
+  }
+  const numeric = headers[col].dataset.sortType === 'number';
+  const collator = new Intl.Collator(document.documentElement.lang || undefined, { numeric: true, sensitivity: 'base' });
+  const sign = dir === 'descending' ? -1 : 1;
+  const rows = Array.from(listed.rows).map(row => ({ row, key: sortValue(row.cells[col], numeric) }));
   rows.sort((a, b) => {
-    const av = parseSortableValue(a.cells[col] ? a.cells[col].innerText : '');
-    const bv = parseSortableValue(b.cells[col] ? b.cells[col].innerText : '');
-    if (av.type === 'number' && bv.type === 'number') {
-      return asc ? av.value - bv.value : bv.value - av.value;
-    }
-    return asc ? av.value.localeCompare(bv.value) : bv.value.localeCompare(av.value);
+    if (a.key === null || b.key === null) return (a.key === null) - (b.key === null);
+    return sign * (numeric ? a.key - b.key : collator.compare(a.key, b.key));
   });
-  rows.forEach(row => body.appendChild(row));
-  table.dataset.sortCol = String(col);
-  table.dataset.sortDir = asc ? 'asc' : 'desc';
-  table.querySelectorAll('th').forEach((th, index) => {
-    th.classList.toggle('is-sorted-asc', index === col && asc);
-    th.classList.toggle('is-sorted-desc', index === col && !asc);
-    const indicator = th.querySelector('.sort-indicator');
-    if (indicator) indicator.textContent = index === col ? (asc ? '\u25B2' : '\u25BC') : '\u2195';
-  });
+  const sorted = document.createElement('tbody');
+  sorted.dataset.role = 'sorted';
+  rows.forEach(r => sorted.appendChild(r.row.cloneNode(true)));
+  if (was) was.replaceWith(sorted); else table.appendChild(sorted);
+  table.dataset.sorted = 'true';
 }
 
 /* Auto-fit: measure natural content widths and distribute slack space.
@@ -50,14 +67,14 @@ function wrappedHeaderWidth(probe, text) {
 
 function measureColumnWidths(table) {
   const headers = Array.from(table.querySelectorAll('thead th'));
-  const body = table.tBodies[0];
+  /* the rows that are drawn: a sorted table hides the rows as listed and shows their sorted copy (a share's bar
+     is measured, and a row that is not drawn has none) */
+  const body = Array.from(table.tBodies).find(b => b.rows[0] && b.rows[0].getClientRects().length) || table.tBodies[0];
   const rows = body ? Array.from(body.rows) : [];
   const nCols = headers.length;
   const MIN_COL = 56;
-  /* The th's asymmetric padding (12px left / 28px right) already includes the
-     space the absolutely-positioned .sort-indicator occupies, so there's no
-     additional reserve to add here — adding one causes the label to
-     double-count and ellipsis-truncate short CJK headers like 連接埠. */
+  /* The th's right padding (report_shell.css, tables with more than one column) already includes the space the
+     absolutely-positioned .sort-indicator occupies, so there's no additional reserve to add here. */
   const NARROW_MAX_CHARS = 10;       /* content wider than this = "text" not "narrow" */
   const NARROW_DISTINCT_CAP = 6;     /* column with ≤ this many distinct values = enum-like */
 
@@ -271,25 +288,6 @@ function autoFitColumns(table) {
   if (isWide) updateWideScrollState(panel);
 }
 
-function autoFitSingleColumn(table, colIndex) {
-  const headers = Array.from(table.querySelectorAll('thead th'));
-  const cols = Array.from(table.querySelectorAll('colgroup col'));
-  const th = headers[colIndex];
-  const col = cols[colIndex];
-  if (!th) return;
-
-  const { widths } = measureColumnWidths(table);
-  const w = widths[colIndex];
-  if (col) { col.style.width = w + 'px'; col.style.minWidth = ''; }
-  th.style.width = w + 'px'; th.style.minWidth = '';
-
-  const total = headers.reduce((sum, h) => sum + h.getBoundingClientRect().width, 0);
-  table.style.minWidth = total + 'px';
-
-  const panel = table.closest('.report-table-panel--wide');
-  if (panel) updateWideScrollState(panel);
-}
-
 function updateWideScrollState(panel) {
   const wrap = panel.querySelector('.report-table-wrap');
   if (!wrap) return;
@@ -304,93 +302,15 @@ function updateWideScrollState(panel) {
   panel.setAttribute('data-scroll-state', state);
 }
 
-/* Wrap header content in <span class="th-label"> using DOM cloning (no innerHTML). */
-function wrapHeaderLabel(th) {
-  if (th.querySelector('.th-label')) return;
-  const label = document.createElement('span');
-  label.className = 'th-label';
-  while (th.firstChild) label.appendChild(th.firstChild);
-  th.appendChild(label);
-}
-
 function initReportTable(table) {
-  if (!table) return;
-  const headers = Array.from(table.querySelectorAll('thead th'));
-  const cols = Array.from(table.querySelectorAll('colgroup col'));
-  if (headers.length < 1) return;
-
-  if (table.dataset.interactive !== 'true') {
-    requestAnimationFrame(() => autoFitColumns(table));
-    return;
-  }
-
-  headers.forEach(th => {
-    wrapHeaderLabel(th);
-
-    const indicator = document.createElement('span');
-    indicator.className = 'sort-indicator';
-    indicator.textContent = '\u2195';
-    th.appendChild(indicator);
-
-    const resizer = document.createElement('div');
-    resizer.className = 'col-resizer';
-    th.appendChild(resizer);
-
-    th.addEventListener('click', event => {
-      if (event.target === resizer) return;
-      sortTable(table, Array.from(th.parentNode.children).indexOf(th));
-    });
-
-    let startX = 0;
-    let startWidth = 0;
-    const colIndex = Array.from(th.parentNode.children).indexOf(th);
-    const targetCol = cols[colIndex] || null;
-
-    const onMouseMove = event => {
-      const width = Math.max(48, startWidth + event.clientX - startX);
-      if (targetCol) { targetCol.style.width = width + 'px'; targetCol.style.minWidth = width + 'px'; }
-      th.style.width = width + 'px'; th.style.minWidth = width + 'px';
-      const total = headers.reduce((s, h) => s + h.getBoundingClientRect().width, 0);
-      const wrapWidth = table.closest('.report-table-wrap')?.clientWidth || 0;
-      table.style.minWidth = Math.max(total, wrapWidth) + 'px';
-      const panel = table.closest('.report-table-panel--wide');
-      if (panel) updateWideScrollState(panel);
-    };
-    const onMouseUp = () => {
-      resizer.classList.remove('is-active');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-    resizer.addEventListener('mousedown', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      startX = event.clientX;
-      startWidth = (targetCol || th).getBoundingClientRect().width;
-      resizer.classList.add('is-active');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    });
-
-    resizer.addEventListener('dblclick', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      autoFitSingleColumn(table, colIndex);
+  if (!table || !table.querySelector('thead th')) return;
+  table.querySelectorAll('thead th > button.th-sort').forEach(button => {
+    button.addEventListener('click', () => {
+      const th = button.parentElement;
+      sortTable(table, th.cellIndex, SORT_NEXT[th.getAttribute('aria-sort')] || 'ascending');
     });
   });
-
   requestAnimationFrame(() => autoFitColumns(table));
-
-  const widePanel = table.closest('.report-table-panel--wide');
-  if (widePanel) {
-    const wrap = widePanel.querySelector('.report-table-wrap');
-    if (wrap) {
-      wrap.addEventListener('scroll', () => updateWideScrollState(widePanel), { passive: true });
-    }
-  }
 }
 
 function debounce(fn, ms) {

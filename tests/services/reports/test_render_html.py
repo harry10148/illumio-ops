@@ -29,7 +29,8 @@ def test_html_caps_rows_and_says_so(doc_with_rows):
 
 def test_html_shows_every_row_under_the_cap(doc_with_rows):
     out = render_html(doc_with_rows(5), tz=UTC)
-    assert out.count("<tr data-row") == 5 and "Showing the first" not in out
+    assert out.count("<tr data-row") == 5 and "rows are listed here" not in out
+    assert "rows are listed here" in render_html(doc_with_rows(201), tz=UTC)  # the words a cut table does say
 
 
 def test_html_escapes_cells(doc_with_rows):
@@ -636,3 +637,53 @@ def test_rules_that_did_not_run_are_still_said_after_finish(lang):
     assert "Nothing in this report needs action" not in page.text() and "本期沒有需要處理的項目" not in page.text()
     chapter = page.one("id", "findings")  # where the sentence's link lands: the section, saying why it is empty
     assert top.find("a")[0].attrs["href"] == "#findings" and "The rules did not run." in chapter.text()
+
+
+# ── what a column sorts by on screen (report_table.js reads data-sort, never the printed text) ──────────────
+
+def _sorts(columns, rows):
+    block = TableBlock(title="T", columns=columns, rows=tuple(rows), total_rows=len(rows), empty_text="none")
+    root = _dom(render_html(make_doc(sections=(Section(id="s", title="S", blocks=(block,)),)), tz=UTC))
+    types = [th.attrs.get("data-sort-type") for th in root.find("th")]
+    cells = [[td.attrs.get("data-sort") for td in row.find("td")] for row in root.find("tbody")[0].find("tr")]
+    return types, [list(col) for col in zip(*cells, strict=True)]
+
+
+def test_a_cell_carries_the_number_or_the_time_it_sorts_by():
+    columns = (Column(key="n", label="N", kind="number"), Column(key="at", label="At", kind="time"),
+               Column(key="share", label="Share"), Column(key="size", label="Size"), Column(key="rate", label="Rate"))
+    types, by = _sorts(columns, [(1204, "2026-10-22T03:00:00+00:00", "12.5%", "900 KB", "1,204.5"),
+                                 (0.5, "2026-10-22T03:00:01.000+00:00", "100.0%", "1.5 GB", "7"),
+                                 (None, None, "—", "", "—")])
+    assert types == ["number"] * 5
+    assert by[0] == ["1204", "0.5", ""]  # the value itself, not "1,204"; nothing for no value
+    assert float(by[1][1]) - float(by[1][0]) == 1 and by[1][2] == ""  # a second apart: every digit is written
+    assert by[2] == ["12.5", "100.0", ""]
+    assert by[3] == ["900000.0", "1500000000.0", ""]  # sizes in different units: in bytes
+    assert by[4] == ["1204.5", "7.0", ""]
+
+
+def test_a_column_that_is_not_all_numbers_sorts_by_its_text_and_marks_only_its_empty_cells():
+    columns = (Column(key="host", label="Host", kind="host"), Column(key="when", label="When", kind="time"),
+               Column(key="mixed", label="Mixed"), Column(key="units", label="Units"), Column(key="none", label="None"))
+    types, by = _sorts(columns, [("web-1", "not a time", "12", "3 hosts", None), ("10.0.0.1", "2026-10-22T03:00:00+00:00", "n/a", "2 MB", ""),
+                                 ("", None, "—", "5 hosts", "—")])
+    assert types == ["text"] * 5  # an address, a time that cannot be read, a word among numbers, units that do not compare, nothing
+    assert by == [[None, None, ""], [None, None, ""], [None, None, ""], [None, None, None], ["", "", ""]]
+
+
+def test_a_time_sorts_by_the_instant_whatever_zone_it_is_printed_in():
+    columns = (Column(key="host", label="Host"), Column(key="at", label="At", kind="time"))
+    _, by = _sorts(columns, [("a", "2026-10-22T03:00:00+00:00"), ("b", "2026-10-22T04:00:00+02:00"), ("c", "2026-10-22T03:00:01Z")])
+    assert float(by[1][0]) - float(by[1][1]) == 3600 and float(by[1][2]) - float(by[1][0]) == 1
+
+
+def test_a_table_of_one_row_or_one_column_has_no_sort_button_and_no_sort_value():
+    one_row = _dom(render_html(make_doc(sections=(Section(id="s", title="S", blocks=(table([("a", 1)]),)),)), tz=UTC))
+    assert one_row.find("button") == [b for b in one_row.find("button") if "print-btn" in b.attrs.get("class", "")]
+    assert all("data-sort" not in td.attrs for td in one_row.find("td"))
+    assert all("aria-sort" not in th.attrs for th in one_row.find("th"))
+    two = _dom(render_html(make_doc(sections=(Section(id="s", title="S", blocks=(table([("a", 1), ("b", 2)]),)),)), tz=UTC))
+    headers = two.find("th")
+    assert [th.attrs["aria-sort"] for th in headers] == ["none", "none"]
+    assert [th.find("button")[0].text() for th in headers] == ["Col 0", "Col 1"]  # the button's name is the column's
