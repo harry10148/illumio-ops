@@ -139,20 +139,31 @@ def test_edit_prefills_the_plan_and_check_now_says_what_happened(context, live_a
 def test_rule_sets_are_browsed_from_rule_schedules(context, live_app, monkeypatch):
     """5.x #/policy/rulesets (parity 2026-11-06): read-only, deny rules included, reached from rule schedules."""
     from illumio_ops.services import rulesets as rsb
-    view = rsb.RulesetBrowse(total=1, limited=False, items=[rsb.RulesetItem(
+    backups = rsb.RulesetItem(
         href=RS, name="Backups", enabled=True, description="nightly", draft_pending=False, scheduled=True, rules=[
             rsb.RuleItem(href=RS + "/sec_rules/9", kind="allow", label="#9", enabled=True,
                          summary="app=backup → NAS: 445/TCP", description="", draft_pending=False, scheduled=False),
             rsb.RuleItem(href=RS + "/deny_rules/3", kind="override_deny", label="Deny rule 3", enabled=False,
                          summary="All workloads → app=backup: 3389/TCP", description="no RDP", draft_pending=True,
-                         scheduled=False)])])
+                         scheduled=False)])
+    web = rsb.RulesetItem(href="/orgs/1/sec_policy/active/rule_sets/6", name="Web", enabled=True, description="",
+                          draft_pending=False, scheduled=False, rules=[])
     asked = []
-    monkeypatch.setattr("illumio_ops.web.routes.rule_schedules.rulesets.browse",
-                        lambda ctx, q: asked.append(q) or view)
+
+    def browse(ctx, q):
+        # Answers the search it was asked, as the PCE does: the count on screen changes only when the answer to
+        # that search is drawn. With one answer for every search, "Rule sets: 1" was already on screen from the
+        # first load and the test read `asked` before the search had reached the server.
+        asked.append(q)
+        items = [i for i in (backups, web) if q.lower() in i.name.lower()]
+        return rsb.RulesetBrowse(total=len(items), limited=False, items=items)
+    monkeypatch.setattr("illumio_ops.web.routes.rule_schedules.rulesets.browse", browse)
     page = _open(context, live_app)
     page.locator("[data-role=rs-browse-rulesets]").click()
-    panel = page.locator("[data-role=rsb-ruleset]")
-    expect(panel).to_have_count(1)
+    panels = page.locator("[data-role=rsb-ruleset]")
+    expect(panels).to_have_count(2)
+    expect(page.locator("[data-role=rsb-count]")).to_contain_text("Rule sets: 2")
+    panel = panels.nth(0)
     expect(panel).to_contain_text("Backups")
     expect(panel).to_contain_text("Override deny")
     expect(panel).to_contain_text("3389/TCP")
@@ -161,4 +172,6 @@ def test_rule_sets_are_browsed_from_rule_schedules(context, live_app, monkeypatc
     page.fill("input[name=rsb_q]", "back")
     page.get_by_role("button", name="Search").click()
     expect(page.locator("[data-role=rsb-count]")).to_contain_text("Rule sets: 1")
-    assert asked[-1] == "back"
+    expect(panels).to_have_count(1)
+    expect(panels).to_contain_text("Backups")
+    assert asked == ["", "back"]
