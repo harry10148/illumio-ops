@@ -120,9 +120,11 @@ def _scored(score: Maturity) -> frozenset[str]:
     return frozenset(part for part, value in score.parts.items() if value is not None)
 
 
-def _enforced_pct(full: int, selective: int, hosts: int) -> float | None:
-    """Of the managed hosts, the share in Full or Selective; None without a host."""
-    return round(100 * (full + selective) / hosts, 1) if hosts else None
+def _full_pct(full: int, hosts: int) -> float | None:
+    """Of the managed hosts, the share in Full; None without a host. Selective is not in it: a host in Selective blocks
+    only what a Deny Rule names, so its connections no rule allows still pass (user 2026-11-14). The key number keeps
+    its key, enforced_hosts_pct: stored reports and the conclusions name it."""
+    return round(100 * full / hosts, 1) if hosts else None
 
 
 def _ransomware_counts(result: Mapping[str, Any] | None, hrefs: set[str] | None) -> tuple[int, int] | None:
@@ -216,7 +218,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         # Without matching traffic the score would rest on the inventory alone: not shown (Review Focus 1).
         # whole points, as the explanation says them
         "maturity": round(score.score) if score.score is not None and totals.flows else None,
-        "enforced_hosts_pct": _enforced_pct(modes["full"], modes["selective"], len(hosts)),
+        "enforced_hosts_pct": _full_pct(modes["full"], len(hosts)),
         **{k: (now_flow[k] if totals.flows else None) for k in _FLOW_KPIS},
         "critical_high_findings": len(fired) if totals.flows else None,
         "ransomware_protected_pct": round(100 * rw_counts[1] / rw_counts[0], 1) if rw_counts else None,
@@ -240,7 +242,9 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
         maturity_said = " ".join((maturity_said, t("rpt_sec_no_previous_parts")))
     notes.update(
         maturity=maturity_said,
-        enforced_hosts_pct=None if hosts else t("rpt_sec_no_hosts"),
+        # how many more are in Selective, which the share does not count: said only when there are any
+        enforced_hosts_pct=(t("rpt_sec_no_hosts") if not hosts
+                            else t("rpt_sec_selective_beside", n=modes["selective"]) if modes["selective"] else None),
         critical_high_findings=None if totals.flows else no_flows,
         # the one number this report keeps of ransomware protection: where each host and service is listed
         ransomware_protected_pct=t("rpt_sec_see_ransomware", report=t("rpt_title_ransomware")))
@@ -248,8 +252,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
     higher = {"maturity", "enforced_hosts_pct", "allowed_pct", "ransomware_protected_pct"}
     previous: dict[str, float | int | None] = dict(before or {})
     if hosts_before is not None:
-        previous["enforced_hosts_pct"] = _enforced_pct(hosts_before.modes.get("full", 0),
-                                                       hosts_before.modes.get("selective", 0), hosts_before.hosts)
+        previous["enforced_hosts_pct"] = _full_pct(hosts_before.modes.get("full", 0), hosts_before.hosts)
     if same_parts and score_before is not None and score_before.score is not None and values["maturity"] is not None:
         previous["maturity"] = round(score_before.score)
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=previous.get(k),
@@ -360,7 +363,7 @@ def build_security_risk(inp: BuildInput) -> ReportDocument:
                  Column(key="hosts", label=t("rpt_col_managed_hosts"), kind="number"),
                  *(Column(key=m, label=t(MODE_KEYS[m]), kind="number") for m in MODES),
                  Column(key="enforced", label=t("rpt_col_enforced_pct"))),
-        rows=tuple((name, sum(c.values()), *(c[m] for m in MODES), pct(c["full"] + c["selective"], sum(c.values())))
+        rows=tuple((name, sum(c.values()), *(c[m] for m in MODES), pct(c["full"], sum(c.values())))
                    for name, c in ordered),
         total_rows=len(ordered), empty_text=t("rpt_sec_no_hosts"))
 

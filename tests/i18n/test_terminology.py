@@ -18,7 +18,7 @@ ZH = json.loads((Path(__file__).resolve().parents[2] / "illumio_ops" / "i18n" / 
 BANNED = {
     # policy decisions: the console's own words
     r"可能被擋|potentially[_ ]blocked|Potentially blocked": "Potentially Blocked（名稱與句子裡都一樣）",
-    r"開始擋之後會被擋|切到 Full 後會被擋": "Potentially Blocked（名稱不加白話；解釋它的句子改寫成「目的端開始強制後，這些連線就會被擋下」這類說法）",
+    r"開始擋之後會被擋|切到 Full 後會被擋": "Potentially Blocked（名稱不加白話；解釋它的句子要寫 Full：「目的端切到 Full 之後就會被擋下」）",
     r"\bblocked\b|\bBlock\b": "Blocked（判定）或「擋下」（動作）",
     r"\ballowed\b|\bAllow\b|\ballow\b": "Allowed（判定）或「規則允許」",
     r"^允許$|^被擋$|^被擋（|允許$(?<=Deny Rule 允許)":
@@ -84,3 +84,17 @@ def test_potentially_blocked_is_written_one_way_in_both_languages():
         assert {lang[k] for k in ("term_decision_potentially_blocked", "decision_potentially_blocked", "rpt_sec_sec_pb",
                                   "fleet_col_would_block")} == {"Potentially Blocked"}
     assert not [k for k, v in EN.items() if re.search(r"blocked once enforcement starts\)|enforcement would block:", v)]
+
+
+def test_what_blocks_a_potentially_blocked_connection_is_full_not_enforcement_in_general():
+    """A Potentially Blocked connection is blocked once its destination is in Full; a host in Selective blocks only
+    what a Deny Rule names (user 2026-11-14). So no sentence that explains Potentially Blocked, or says what "all
+    enforced" would leave, speaks of enforcement in general — it says Full."""
+    vague_zh = re.compile(r"強制後|切強制|開始擋之後|開始強制|還沒強制|尚未強制|已強制|切換強制|Selective 或 Full，讓預設拒絕")
+    vague_en = re.compile(r"once enforc|enforcement starts|enforcement would|not enforced|enforced mode|test mode|"
+                          r"after enforcement|once all enforced|Enforced counts", re.IGNORECASE)
+    assert sorted(k for k, v in ZH.items() if vague_zh.search(v)) == []
+    assert sorted(k for k, v in EN.items() if vague_en.search(v)) == []
+    for lang in (ZH, EN):
+        assert "Full" in lang["rpt_sec_coverage_intro"] and "Full" in lang["rpt_act_enforce"]
+        assert "Selective" in lang["rpt_act_enforce"] and "Selective" in lang["rpt_sec_measures_enforcement"]

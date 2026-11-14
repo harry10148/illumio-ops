@@ -266,7 +266,7 @@ def test_how_maturity_is_scored_with_this_periods_points(ctx):
     assert doc.sections[0].id == "how"
     parts, grades = _tables(doc, "how")
     assert len(parts.rows) == 5 and {r[3] for r in parts.rows} == {"40", "25", "15", "10"}
-    enforced = next(r for r in parts.rows if r[0] == "Hosts enforced")
+    enforced = next(r for r in parts.rows if r[0] == "Hosts in Full")
     assert enforced[4].startswith("20 of 40")  # half the hosts enforced: 20 of its 40 points
     assert [r[0] for r in grades.rows] == ["A", "B", "C", "D", "F"]
 
@@ -462,9 +462,9 @@ def test_both_numbers_are_compared_once_a_snapshot_knows_the_managed_hosts(ctx):
     _two_periods(ctx)
     maturity, enforced = _compared(_build(ctx))
     assert (maturity.value, maturity.previous) == (MATURITY_NOW, MATURITY_BEFORE) == (71, 63)
-    # 2 of the 3 managed hosts enforced now, 1 of 3 on the previous period's last day; the address without a VEN
-    # is in neither
-    assert (enforced.value, enforced.previous) == (66.7, 33.3)
+    # 1 of the 3 managed hosts in Full now (the one moved to Selective is not counted), 1 of 3 on the previous
+    # period's last day; the address without a VEN is in neither
+    assert (enforced.value, enforced.previous) == (33.3, 33.3)
     assert NO_PREVIOUS_PARTS not in maturity.note
 
 
@@ -472,7 +472,7 @@ def test_no_snapshot_on_the_previous_periods_last_day_is_no_comparison(ctx):
     _two_periods(ctx, snapshot="2026-10-18")  # the day before the one the report reads
     maturity, enforced = _compared(_build(ctx))
     assert (maturity.value, maturity.previous) == (MATURITY_NOW, None)
-    assert (enforced.value, enforced.previous) == (66.7, None)
+    assert (enforced.value, enforced.previous) == (33.3, None)
     assert NO_PREVIOUS_PARTS not in maturity.note  # the snapshot is what is missing: no word of ransomware
 
 
@@ -511,7 +511,7 @@ def test_a_previous_period_not_wholly_collected_is_no_maturity_to_compare(ctx):
     _two_periods(ctx, previous_covered=False)
     maturity, enforced = _compared(_build(ctx))
     assert (maturity.value, maturity.previous) == (MATURITY_NOW, None)
-    assert (enforced.value, enforced.previous) == (66.7, 33.3)
+    assert (enforced.value, enforced.previous) == (33.3, 33.3)
 
 
 def test_the_previous_score_has_its_ransomware_part_where_that_day_has_a_snapshot(ctx):
@@ -527,7 +527,7 @@ def test_the_previous_score_has_its_ransomware_part_where_that_day_has_a_snapsho
     now = round(40 * (1.5 / 3) + 25 * 0.75 + 15 + 10 + 10 * 0.5)
     assert (maturity.value, maturity.previous) == (now, before) == (69, 60)
     assert NO_PREVIOUS_PARTS not in maturity.note
-    assert (enforced.value, enforced.previous) == (66.7, 33.3)
+    assert (enforced.value, enforced.previous) == (33.3, 33.3)
 
 
 def test_no_ransomware_snapshot_that_day_is_no_comparison_and_says_why(ctx):
@@ -541,7 +541,7 @@ def test_no_ransomware_snapshot_that_day_is_no_comparison_and_says_why(ctx):
     maturity, enforced = _compared(doc)
     assert (maturity.value, maturity.previous) == (69, None)
     assert maturity.note.endswith(NO_PREVIOUS_PARTS) and maturity.note.startswith("Grade ")
-    assert (enforced.value, enforced.previous) == (66.7, 33.3)  # the share of hosts has both its values
+    assert (enforced.value, enforced.previous) == (33.3, 33.3)  # the share of hosts has both its values
     zh, _ = _compared(_build(ctx, lang=Language.ZH_TW))
     assert zh.note.endswith("上期那一天沒有勒索防護的快照，計分的部分不同，所以不比較。")
 
@@ -661,7 +661,7 @@ def test_the_snapshot_read_is_the_utc_day_the_previous_period_ends_in(tmp_path, 
 
 
 def test_managed_means_the_same_in_the_snapshot_and_in_the_report(ctx):
-    """One inventory, read both ways: the enforced share the report prints for this period equals the share a
+    """One inventory, read both ways: the share in Full the report prints for this period equals the share a
     snapshot of the same inventory gives — the hosts counted are the same ones (a host with a VEN and no mode is
     one of them, an address without a VEN is not)."""
     hosts = [("a1", "full", 1), ("a2", "selective", 1), ("a3", "visibility_only", 1), ("a4", "idle", 1),
@@ -672,4 +672,38 @@ def test_managed_means_the_same_in_the_snapshot_and_in_the_report(ctx):
         counts = workloads.mode_counts_on(conn, "2026-10-26")
     _, enforced = _compared(_build(ctx))
     assert counts.hosts == 5
-    assert enforced.value == round(100 * (counts.modes["full"] + counts.modes["selective"]) / counts.hosts, 1) == 40.0
+    assert enforced.value == round(100 * counts.modes["full"] / counts.hosts, 1) == 20.0  # in Full: 1 of the 5
+
+
+# ── Selective is not Full (user 2026-11-14): the share is of hosts in Full; Selective is said beside it ──────
+
+def test_the_share_of_hosts_is_of_those_in_full_and_selective_is_said_beside_it(ctx):
+    """a1 Full, a2 Selective, a3 Idle: 1 of 3 in Full, and one more in Selective, which blocks only what a Deny Rule
+    names. On the previous period's last day a2 was in Visibility Only: 1 of 3 in Full then too."""
+    _two_periods(ctx)
+    doc = _build(ctx)
+    _, share = _compared(doc)
+    assert (share.label, share.value, share.previous) == ("Managed hosts in Full enforcement", 33.3, 33.3)
+    assert share.note == "1 more in Selective: it blocks only the connections a Deny Rule names."
+    zh = {k.key: k for k in _build(ctx, lang=Language.ZH_TW).kpis}["enforced_hosts_pct"]
+    assert (zh.label, zh.note) == ("Full 模式的受管主機", "另有 1 台是 Selective：只擋 Deny Rule 指定的連線。")
+    from illumio_ops.i18n import translate
+    assert "managed hosts in Full enforcement: {enforced_hosts_pct}" in translate(Language.EN, "rpt_conclusion_security_risk")
+    assert "Full 模式的受管主機 {enforced_hosts_pct}" in translate(Language.ZH_TW, "rpt_conclusion_security_risk")
+    # the table of modes by app: its last column is the share in Full, beside the count of each mode
+    table = next(b for s in doc.sections if s.id == "enforcement" for b in s.blocks if hasattr(b, "columns"))
+    assert [c.label for c in table.columns][-1] == "In Full" and table.rows[0][-1] == "33.3%"
+
+
+def test_no_host_in_selective_says_nothing_beside_the_share(ctx):
+    _hosts(ctx, [("a1", "full", 1), ("a2", "visibility_only", 1)])
+    _write(ctx, [flow(port=443, conns=3)])
+    _, share = _compared(_build(ctx))
+    assert (share.value, share.note) == (50.0, None)
+
+
+def test_every_host_in_selective_is_no_host_in_full(ctx):
+    _hosts(ctx, [("a1", "selective", 1), ("a2", "selective", 1)])
+    _write(ctx, [flow(port=443, conns=3)])
+    _, share = _compared(_build(ctx))
+    assert share.value == 0.0 and share.note.startswith("2 more in Selective")

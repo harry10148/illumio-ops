@@ -110,7 +110,7 @@ def test_sync_problems_online_only(ctx):
 def test_mode_unknown_not_selective(ctx):
     _inventory(ctx, [host("a", mode="selective"), host("b", mode=None)])
     row = _table(_build(ctx), "modes").rows[0]
-    assert row[0] == "Web (Prod)" and row[1:] == (2, 0, 1, 0, 0, 1, "50.0%")
+    assert row[0] == "Web (Prod)" and row[1:] == (2, 0, 1, 0, 0, 1, "0.0%")  # the share in Full: Selective is not in it
 
 
 def test_versions_and_os(ctx):

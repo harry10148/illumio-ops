@@ -267,7 +267,7 @@ def test_summary_says_how_many_cannot_enforce_and_the_closest(ctx):
     doc = _build(ctx)
     [f] = doc.findings
     assert "1" in f.title and "What to do first" in f.action
-    assert f.what.startswith("The closest is DB (Dev): ") and f.why == "Enforcing them now would block normal traffic."
+    assert f.what.startswith("The closest is DB (Dev): ") and f.why == "Moving them to Full now would block normal traffic."
     assert f.action_code == "write_rules" and f.action_short == "Write rules for the traffic you have confirmed."
 
 

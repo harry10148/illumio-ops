@@ -38,7 +38,7 @@ PINNED: dict[str, dict[str, Numbers]] = {
             "flows": (37, None), "connections": (37, None), "sources": (36, None), "destinations": (25, None),
         },
         "security_risk": {
-            "maturity": (66, None), "enforced_hosts_pct": (100.0, None), "allowed_pct": (94.6, None),
+            "maturity": (66, None), "enforced_hosts_pct": (0.0, None), "allowed_pct": (94.6, None),
             "pb_flows": (1, None), "blocked_flows": (1, None), "unmanaged_connections": (2, None),
             "admin_open_connections": (5, None), "critical_high_findings": (12, None),
             "ransomware_protected_pct": (50.0, None),
@@ -102,7 +102,7 @@ PINNED: dict[str, dict[str, Numbers]] = {
             "flows": (37, None), "connections": (37, None), "sources": (36, None), "destinations": (25, None),
         },
         "security_risk": {
-            "maturity": (68, None), "enforced_hosts_pct": (100.0, None), "allowed_pct": (94.6, None),
+            "maturity": (68, None), "enforced_hosts_pct": (0.0, None), "allowed_pct": (94.6, None),
             "pb_flows": (1, None), "blocked_flows": (1, None), "unmanaged_connections": (2, None),
             "admin_open_connections": (5, None), "critical_high_findings": (11, None),
         },

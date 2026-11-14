@@ -136,7 +136,8 @@ def build_app_summary(inp: BuildInput) -> ReportDocument:
         # No previous period: the daily snapshot the security risk report compares with holds no labels, so the
         # app's hosts of that day cannot be told (this report always has a filter).
         *((Kpi(key="enforced_hosts_pct", label=t("rpt_sec_kpi_enforced_hosts"), unit="percent", better="higher",
-               value=round(100 * (modes["full"] + modes["selective"]) / len(hosts), 1), previous=None),)
+               value=round(100 * modes["full"] / len(hosts), 1), previous=None,
+               note=t("rpt_sec_selective_beside", n=modes["selective"]) if modes["selective"] else None),)
           if hosts else ()),
     )
 

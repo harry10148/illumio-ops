@@ -312,7 +312,7 @@ def build_ven_status(inp: BuildInput) -> ReportDocument:
                  Column(key="unknown", label=t("rpt_ven_unknown"), kind="number"),
                  Column(key="enforced", label=t("rpt_col_enforced_pct"))),
         rows=tuple((g, sum(c.values()), *(c[m] for m in MODES), c["unknown"],
-                    pct(c["full"] + c["selective"], sum(c.values()))) for g, c in ordered),
+                    pct(c["full"], sum(c.values()))) for g, c in ordered),
         total_rows=len(ordered), empty_text=t("rpt_ven_none_hosts"))
 
     tamper_blocks: tuple[TableBlock | TextBlock, ...]
