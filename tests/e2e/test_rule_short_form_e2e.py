@@ -90,14 +90,16 @@ def test_event_short_form_saves_what_the_full_form_saves(page, live_app):
     form = _open(page, live_app, "event:agent_security")
     expect(form.locator("input[name=name]")).to_have_value("VEN security")   # the category's name, to start from
     form.locator("input[name=name]").fill("Short event")
-    form.locator("[data-role=event-checklist] input[data-event-type='agent.tampering']").check()
+    # an event no built-in rule is about alone: nothing but what is typed here goes into the rule
+    form.locator("[data-role=event-checklist] input[data-event-type='agent.activate_clone']").check()
+    expect(form.locator("[data-role=pack-prefill]")).to_have_count(0)
     _save(page, form)
     form = _full(page, live_app, "event")
     form.locator("input[name=name]").fill("Full event")
-    form.locator("input[name=event_types]").fill("agent.tampering")
+    form.locator("input[name=event_types]").fill("agent.activate_clone")
     _save(page, form)
     assert _saved(live_app, "Short event") == _saved(live_app, "Full event")
-    assert _saved(live_app, "Short event")["event_types"] == ["agent.tampering"]
+    assert _saved(live_app, "Short event")["event_types"] == ["agent.activate_clone"]
 
 
 def test_event_short_form_counts_within_a_window(page, live_app):
@@ -263,3 +265,242 @@ def test_nothing_untranslated_in_either_language(browser, live_app, language):
         assert left == [] and "{" not in text, (scenario, left)
         assert ui_rules.violations(page) == {}, scenario
     ctx.close()
+
+
+# ── Task 4: a built-in rule's settings whole or not at all; Advanced opens on any value; channels; preview ──
+
+PACK_FIELDS = ("status", "event_severity", "match_fields", "threshold", "threshold_count", "window_minutes", "severity",
+               "cooldown_minutes", "throttle")
+BLANK_EVENT = {"status": "all", "event_severity": "all", "match_fields": {}, "threshold": "immediate", "threshold_count": 1,
+               "window_minutes": 10, "severity": None, "cooldown_minutes": 30, "throttle": None}
+# Every property of the six rule models, by where a scenario's form puts it. FIXED is never a control: the id and the
+# pack key are the server's, the type is the scenario's.
+FIXED = {"id", "pack_key", "type"}
+SHORT_PROPS = {
+    "event": {"name", "notify", "event_types", "threshold", "threshold_count", "window_minutes"},
+    "traffic": {"name", "notify", "condition", "threshold_connections", "window_minutes"},
+    "bandwidth": {"name", "notify", "condition", "threshold_mbps", "window_minutes"},
+    "volume": {"name", "notify", "condition", "threshold_mb", "window_minutes"},
+    "system": {"name", "notify"},
+    "lateral": {"name", "notify", "min_severity"},
+}
+_VALUE = "(e) => e.type === 'checkbox' ? e.checked : e.value"
+_COMMON = {
+    "severity": ("critical", {"select[name=severity]": "critical"}),
+    "cooldown_minutes": (77, {"input[name=cooldown_minutes]": "77"}),
+    "throttle": ({"count": 2, "period_minutes": 33},
+                 {"input[name=throttle_on]": True, "input[name=throttle_count]": "2", "input[name=throttle_period]": "33"}),
+    "enabled": (False, {"input[name=enabled]": False}),
+}
+# per type, each property under Advanced: a value that is not blank(type)'s, and the controls that must show it
+ADVANCED_PROPS = {
+    "event": _COMMON | {
+        "status": ("failure", {"input[name=status]": "failure"}),
+        "event_severity": ("err", {"input[name=event_severity]": "err"}),
+        "match_fields": ({"notification_type": "hard_limit.exceeded"},
+                         {"textarea[name=match_fields]": "notification_type=hard_limit.exceeded"}),
+    },
+    "traffic": _COMMON, "bandwidth": _COMMON, "volume": _COMMON,
+    "system": _COMMON | {"check": ("disk_low", {"select[name=check]": "disk_low"})},
+    "lateral": _COMMON | {
+        "detectors": (["pivot_chain", "cross_env"], {"input[name=detector_pivot_chain]": True,
+                                                    "input[name=detector_cross_env]": True, "input[name=detector_fanout]": False}),
+        "critical_assets_only": (True, {"input[name=critical_assets_only]": True}),
+        "exclude": ({"public": False, "ips": ["10.9.9.9"]}, {"input[name=exclude_public]": False,
+                                                            "input[name=exclude_ips]": "10.9.9.9"}),
+    },
+}
+_MODELS = {"event": "EventRule", "traffic": "TrafficRule", "bandwidth": "BandwidthRule", "volume": "VolumeRule",
+           "system": "SystemRule", "lateral": "LateralRule"}
+_BASE = {"id": "", "name": "", "pack_key": None, "enabled": True, "notify": True, "cooldown_minutes": 30, "throttle": None}
+BLANK = {   # blank(type) of RuleEditor.tsx
+    "event": _BASE | {"type": "event", "severity": None, "event_types": ["agent.tampering"], "status": "all",
+                      "event_severity": "all", "match_fields": {}, "threshold": "immediate", "threshold_count": 1,
+                      "window_minutes": 10},
+    "traffic": _BASE | {"type": "traffic", "severity": "medium", "condition": {}, "threshold_connections": 25, "window_minutes": 10},
+    "bandwidth": _BASE | {"type": "bandwidth", "severity": "medium", "condition": {}, "threshold_mbps": 100, "window_minutes": 60},
+    "volume": _BASE | {"type": "volume", "severity": "medium", "condition": {}, "threshold_mb": 1024, "window_minutes": 60},
+    "system": _BASE | {"type": "system", "severity": "high", "check": "pce_health", "cooldown_minutes": 60},
+    "lateral": _BASE | {"type": "lateral", "severity": None, "detectors": ["fanout"], "min_severity": "medium",
+                        "critical_assets_only": False, "exclude": {"public": True}, "cooldown_minutes": 0},
+}
+
+
+def _pack(key: str) -> dict:
+    from illumio_ops.domain.alertpack import best_practice_rules
+    return next(r for r in best_practice_rules(notify_new_defaults=True) if r.pack_key == key).model_dump(mode="json")
+
+
+def _tick(form, *types: str) -> None:
+    for t in types:
+        form.locator(f"[data-role=event-checklist] input[data-event-type='{t}']").check()
+
+
+def _is_open(form) -> bool:
+    return bool(form.locator("details[data-role=advanced]").evaluate("(e) => e.open"))
+
+
+def test_the_field_lists_cover_every_property_of_every_rule_model():
+    """A property added to a rule model lands in none of the lists below and turns this red: it then has to be given
+    a place in the short form or under Advanced (where the page opens Advanced when it holds a value)."""
+    import json
+    from pathlib import Path
+    contracts = json.loads((Path(__file__).resolve().parents[2] / "web" / "src" / "api" / "contracts.json").read_text())
+    defs = contracts["operations"]["alert_rules.create"]["request_schema"]["$defs"]
+    for rule_type, model in _MODELS.items():
+        props = set(defs[model]["properties"])
+        assert props == FIXED | SHORT_PROPS[rule_type] | set(ADVANCED_PROPS[rule_type]), rule_type
+        assert props == set(BLANK[rule_type]), rule_type
+        assert not SHORT_PROPS[rule_type] & set(ADVANCED_PROPS[rule_type])
+    assert set(PACK_FIELDS) <= SHORT_PROPS["event"] | set(ADVANCED_PROPS["event"])
+
+
+def test_ticking_a_built_in_rules_events_brings_its_settings_whole(page, live_app):
+    form = _open(page, live_app, "event:user_access")
+    form.locator("input[name=name]").fill("Like the pack")
+    _tick(form, "user.sign_in")
+    expect(form.locator("[data-role=pack-prefill]")).to_have_count(0)
+    assert not _is_open(form)
+    _tick(form, "user.login")
+    expect(form.locator("[data-role=pack-prefill]")).to_have_text("Uses the settings of the built-in rule “Login Failures”.")
+    assert _is_open(form)
+    expect(form.locator("input[name=status]")).to_be_visible()
+    expect(form.locator("input[name=status]")).to_have_value("failure")
+    expect(form.locator("[data-role=short-form] select[name=threshold]")).to_have_value("count")
+    expect(form.locator("[data-role=short-form] input[name=threshold_count]")).to_have_value("5")
+    expect(form.locator("input[name=throttle_period]")).to_have_value("15")
+    _save(page, form)
+    mine, pack = _saved(live_app, "Like the pack"), _pack("rule_login_failed")
+    assert sorted(mine.pop("event_types")) == sorted(pack.pop("event_types"))   # the same set; ticked ones are in catalog order
+    assert mine.pop("pack_key") is None and pack.pop("pack_key") == "rule_login_failed"
+    assert mine == {k: v for k, v in pack.items() if k not in ("id", "name")}
+
+
+def test_one_event_of_a_built_in_rule_brings_nothing(page, live_app):
+    form = _open(page, live_app, "event:user_access")
+    form.locator("input[name=name]").fill("Only sign-in")
+    _tick(form, "user.sign_in")
+    expect(form.locator("[data-role=pack-prefill]")).to_have_count(0)
+    expect(form.locator("[data-role=short-form] select[name=threshold]")).to_have_value("immediate")
+    assert not _is_open(form)
+    _save(page, form)
+    mine = _saved(live_app, "Only sign-in")
+    assert {k: mine[k] for k in PACK_FIELDS} == BLANK_EVENT and mine["event_types"] == ["user.sign_in"]
+
+
+def test_leaving_a_built_in_rules_events_keeps_what_was_changed_by_hand(page, live_app):
+    form = _open(page, live_app, "event:user_access")
+    form.locator("input[name=name]").fill("Was like the pack")
+    _tick(form, "user.sign_in", "user.login")
+    expect(form.locator("input[name=status]")).to_have_value("failure")
+    form.locator("input[name=cooldown_minutes]").fill("45")
+    form.locator("[data-role=event-checklist] input[data-event-type='user.login']").uncheck()
+    expect(form.locator("[data-role=pack-prefill]")).to_have_count(0)
+    expect(form.locator("input[name=cooldown_minutes]")).to_have_value("45")
+    expect(form.locator("input[name=status]")).to_have_value("all")
+    expect(form.locator("[data-role=short-form] select[name=threshold]")).to_have_value("immediate")
+    expect(form.locator("input[name=throttle_on]")).not_to_be_checked()
+    _save(page, form)
+    mine = _saved(live_app, "Was like the pack")
+    assert {k: mine[k] for k in PACK_FIELDS} == BLANK_EVENT | {"cooldown_minutes": 45}
+    # and ticking it again brings the built-in rule's settings back, whole
+    form = _open(page, live_app, "event:user_access")
+    _tick(form, "user.sign_in", "user.login")
+    form.locator("input[name=cooldown_minutes]").fill("45")
+    form.locator("[data-role=event-checklist] input[data-event-type='user.login']").uncheck()
+    _tick(form, "user.login")
+    expect(form.locator("input[name=cooldown_minutes]")).to_have_value("30")
+    expect(form.locator("input[name=status]")).to_have_value("failure")
+
+
+def test_every_built_in_event_rule_shows_each_setting_it_brings(page, live_app):
+    """For each built-in event rule whose events sit in one category: every setting brought in is in a control the
+    reader can see, and Advanced is open exactly when one of them is under it."""
+    from illumio_ops.domain.alertpack import best_practice_rules
+    category = {e.event_type: e.category for e in catalog()}
+    under_advanced = set(PACK_FIELDS) - SHORT_PROPS["event"]
+    seen = 0
+    for rule in best_practice_rules(notify_new_defaults=True):
+        if rule.type != "event" or len({category[t] for t in rule.event_types}) != 1:
+            continue
+        seen += 1
+        pack = rule.model_dump(mode="json")
+        form = _open(page, live_app, f"event:{category[rule.event_types[0]]}")
+        _tick(form, *rule.event_types)
+        expect(form.locator("[data-role=pack-prefill]")).to_have_count(1)
+        assert _is_open(form) == any(pack[f] != BLANK_EVENT[f] for f in under_advanced), rule.pack_key
+        shows = {"select[name=threshold]": pack["threshold"]}
+        if pack["threshold"] == "count":
+            shows |= {"input[name=threshold_count]": str(pack["threshold_count"]), "input[name=window_minutes]": str(pack["window_minutes"])}
+        else:
+            assert pack["threshold_count"] == 1   # "each occurrence" says all of it
+        if _is_open(form):
+            shows |= {"input[name=status]": pack["status"], "input[name=event_severity]": pack["event_severity"],
+                      "select[name=severity]": pack["severity"] or "", "input[name=cooldown_minutes]": str(pack["cooldown_minutes"]),
+                      "input[name=throttle_on]": pack["throttle"] is not None}
+            if pack["throttle"]:
+                shows |= {"input[name=throttle_count]": str(pack["throttle"]["count"]),
+                          "input[name=throttle_period]": str(pack["throttle"]["period_minutes"])}
+        for selector, value in shows.items():
+            control = form.locator(selector)
+            expect(control).to_be_visible()
+            assert control.evaluate(_VALUE) == value, (rule.pack_key, selector)
+        assert pack["match_fields"] == {}
+    assert seen == 15
+
+
+def test_an_edit_page_shows_every_field_and_folds_none(page, live_app):
+    """Each property a scenario's form keeps under Advanced, set alone to a value that is not the blank one: the edit
+    page shows it without anything being opened."""
+    import uuid
+    made = []
+    for rule_type, fields in ADVANCED_PROPS.items():
+        for prop, (value, shows) in fields.items():
+            assert BLANK[rule_type][prop] != value, (rule_type, prop)
+            rule = BLANK[rule_type] | {"id": uuid.uuid4().hex, "name": f"{rule_type} {prop}", prop: value}
+            made.append((rule, shows))
+    s = live_app.ctx.settings
+    s.update(s.current().revision, lambda d: d["alerts"]["rules"].extend(r for r, _ in made))
+    for rule, shows in made:
+        page.goto(f"{live_app.url}/alerts/rules/{rule['id']}")
+        form = page.locator("[data-role=rule-editor]")
+        expect(form.locator("input[name=name]")).to_have_value(rule["name"])
+        expect(form.locator("[data-role=short-form], details[data-role=advanced]")).to_have_count(0)
+        for selector, value in shows.items():
+            control = form.locator(selector)
+            expect(control).to_be_visible()
+            assert control.evaluate(_VALUE) == value, (rule["name"], selector)
+
+
+def test_the_short_form_names_the_channels_that_are_on(page, live_app):
+    form = _open(page, live_app, "system:disk_low")
+    line = form.locator("[data-role=short-form] [data-role=notify-channels]")
+    expect(line).to_contain_text("No notification channel is turned on.")
+    expect(line.locator("a")).to_have_attribute("href", "/alert-rules?tab=channels")
+    s = live_app.ctx.settings
+
+    def turn_on(d):
+        d["alerts"]["channels"]["webhook"].update(enabled=True, url="https://hook.example/in")
+        d["alerts"]["channels"]["smtp"].update(enabled=True, host="mail.example", sender="ops@example.com",
+                                               recipients=["soc@example.com"])
+    s.update(s.current().revision, turn_on)
+    form = _open(page, live_app, "system:disk_low")
+    line = form.locator("[data-role=short-form] [data-role=notify-channels]")
+    expect(line).to_contain_text("Notifications go to: Email (SMTP), Webhook.")
+    assert ui_rules.violations(page) == {}
+    # the full form and an edit page are as they were: no such line
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
+    page.wait_for_selector("[data-role=rule-editor]")
+    expect(page.locator("[data-role=notify-channels]")).to_have_count(0)
+
+
+def test_a_system_scenario_has_no_trial_run(page, live_app):
+    form = _open(page, live_app, "system:disk_low")
+    expect(form.get_by_role("button", name="Try on the last 24 hours")).to_have_count(0)
+    expect(form.locator("[data-role=preview-na]")).to_have_text("A system check cannot be tried on past data.")
+    for scenario in ("event:agent_security", "flow:traffic", "detector:pivot_chain"):
+        form = _open(page, live_app, scenario)
+        expect(form.get_by_role("button", name="Try on the last 24 hours")).to_have_count(1)
+        expect(form.locator("[data-role=preview-na]")).to_have_count(0)
+    form.get_by_role("button", name="Try on the last 24 hours").click()
+    expect(form.locator("[data-role=preview]")).to_be_visible()

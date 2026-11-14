@@ -1,16 +1,16 @@
-import { type FormEvent, type ReactElement, useEffect, useState } from "react";
+import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  CatalogCategory, ConditionChoices, DetectorKind, EventCatalog, EventRule, FlowCondition, RulePreview, RuleWrite, Severity,
-  SystemCheck, ThresholdType,
+  CatalogCategory, ChannelsInput, ConditionChoices, DetectorKind, EventCatalog, EventRule, FlowCondition, PackRule,
+  RulePreview, RuleWrite, Severity, SystemCheck, ThresholdType,
 } from "../../api/generated";
 import { ConditionEditor, NO_CHOICES, Side } from "../../components/ConditionEditor";
 import { Disclosure, Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
-import { CHECK_KEYS, CHECKS, DETECTOR_GROUPS, DETECTOR_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
+import { CHANNEL_KEYS, CHECK_KEYS, CHECKS, DETECTOR_GROUPS, DETECTOR_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
 import { ScenarioList } from "./ScenarioList";
 import { type Scenario, scenarioOf } from "./scenarios";
 
@@ -66,8 +66,23 @@ const SHORT_FIELDS: Record<RuleType, string[]> = {
 function advancedHolds(rule: Rule, start: Rule, listed: string[] | null): boolean {
   const now = rule as unknown as Record<string, unknown>, then = start as unknown as Record<string, unknown>;
   const shown = SHORT_FIELDS[rule.type];
-  if (Object.keys(now).some((k) => !shown.includes(k) && JSON.stringify(now[k]) !== JSON.stringify(then[k]))) return true;
+  if (Object.keys(now).some((k) => !shown.includes(k) && !same(now[k], then[k]))) return true;
   return rule.type === "event" && listed !== null && rule.event_types.some((x) => x.trim() !== "" && !listed.includes(x.trim()));
+}
+
+// What a built-in event rule brings to a new rule that names exactly its events: all of these or none. Its name,
+// whether it is on and whether it notifies are the operator's to choose; its pack key is not copied.
+const PACK_FIELDS = ["status", "event_severity", "match_fields", "threshold", "threshold_count", "window_minutes", "severity",
+                     "cooldown_minutes", "throttle"] as const;
+type PackValues = Record<(typeof PACK_FIELDS)[number], unknown>;
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const typeSet = (types: readonly string[]) => [...new Set(types.map((x) => x.trim()).filter((x) => x !== ""))].sort().join("\n");
+
+/** The built-in event rule whose events are exactly these, if there is one. */
+function packMatch(pack: PackRule[], types: readonly string[]): PackRule | null {
+  const wanted = typeSet(types);
+  if (wanted === "") return null;
+  return pack.find((p) => p.rule.type === "event" && typeSet(p.rule.event_types) === wanted) ?? null;
 }
 
 function Num({ name, value, onChange }: { name: string; value: number; onChange: (n: number) => void }) {
@@ -100,6 +115,12 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const ofCategory = scenario?.group === "event" ? scenario.id : null;
+  const [pack, setPack] = useState<PackRule[] | null>(null);
+  // the built-in rule whose settings the form now carries, and the values it brought (to tell a hand-made change)
+  const [brought, setBrought] = useState<{ key: string; values: PackValues } | null>(null);
+  const broughtNow = useRef(brought);
+  const [fieldsSeq, setFieldsSeq] = useState(0);
+  const [channels, setChannels] = useState<ChannelsInput | null>(null);
 
   useEffect(() => {
     void call("alert_rules.list").then((env) => {
@@ -125,6 +146,38 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
       if (found) setRule((r) => r && r.name === "" ? { ...r, name: t(found.label_key) } : r);
     });
   }, [ofCategory]);
+  const group = scenario?.group ?? null;
+  useEffect(() => {
+    if (group === null) return;
+    if (group === "event") {
+      void call("alert_rules.pack_rules").then((env) => { if (env.ok && env.data) setPack(env.data.rules); });
+    }
+    void call("system.channels.get").then((env) => { if (env.ok && env.data) setChannels(env.data.channels); });
+  }, [group]);
+  // The ticked events are exactly a built-in rule's: its settings come in whole. They stop being so: each setting
+  // goes back to what the scenario started with, unless it was changed by hand since it came in.
+  const types = scenario && rule?.type === "event" ? typeSet(rule.event_types) : null;
+  useEffect(() => {
+    if (!pack || !start || !rule || rule.type !== "event" || types === null) return;
+    const match = packMatch(pack, rule.event_types);
+    const was = broughtNow.current;
+    if ((match?.name_key ?? null) === (was?.key ?? null)) return;
+    const next = { ...rule } as unknown as Record<string, unknown>;
+    const from = start as unknown as Record<string, unknown>;
+    if (was) for (const f of PACK_FIELDS) if (same(next[f], was.values[f])) next[f] = from[f];
+    let now: { key: string; values: PackValues } | null = null;
+    if (match) {
+      const values = Object.fromEntries(PACK_FIELDS.map((f) => [f, (match.rule as unknown as Record<string, unknown>)[f]])) as PackValues;
+      Object.assign(next, values);
+      now = { key: match.name_key, values };
+    }
+    // the field matches are typed into a box that keeps its own text: it is drawn again only when they were replaced
+    if (!same(next.match_fields, rule.match_fields)) setFieldsSeq((n) => n + 1);
+    broughtNow.current = now;
+    setBrought(now);
+    setRule(next as unknown as Rule);
+    setPreview(null);
+  }, [types, pack]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!rule || revision === null) {
     return (
@@ -289,6 +342,17 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
       {t("rule_notify")}
     </label>
   );
+  // where a notification goes is one setting for every rule: the short form says which channels are on now
+  const channelsOn = channels ? (Object.keys(CHANNEL_KEYS) as (keyof ChannelsInput)[]).filter((k) => channels[k]?.enabled) : [];
+  const channelsLine = channels && (
+    <p className="hint" data-role="notify-channels">
+      {channelsOn.length > 0 ? t("scn_channels_on", { channels: channelsOn.map((k) => word(CHANNEL_KEYS, k)).join(", ") })
+        : t("scn_channels_none")}{" "}
+      <Link to="/alert-rules?tab=channels">{t("nav_system_channels")}</Link>
+    </p>
+  );
+  // a system check cannot be tried on past data: its short form says so instead of offering the trial
+  const noTrial = scenario !== null && rule.type === "system";
 
   return (
     <section className="page stack">
@@ -311,17 +375,20 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
                   {category && <EventChecklist category={category} rule={rule} set={set} />}
                   {catalog && !category && <p className="form-error">{t("err_not_found")}</p>}
                   {needEvent && <p className="hint" data-role="need-event">{t("scn_need_event")}</p>}
+                  {brought && <p className="notice" data-role="pack-prefill">{t("scn_pack_prefill", { name: t(brought.key) })}</p>}
                   <ShortThreshold rule={rule} set={set} fieldError={fieldError} />
                 </>
               )}
               {flowFields}
               {minSeverityField}
               {notifyField}
+              {channelsLine}
+              {noTrial && <p className="hint" data-role="preview-na">{t("rule_preview_na")}</p>}
             </div>
             <Disclosure role="advanced" summary={t("scn_advanced")}
                         open={advancedHolds(rule, start, listed) || Boolean(error?.field)}>
               <div className="stack">
-                {rule.type === "event" && <EventFields rule={rule} set={set} fieldError={fieldError} threshold={false} />}
+                {rule.type === "event" && <EventFields rule={rule} set={set} fieldError={fieldError} threshold={false} fieldsSeq={fieldsSeq} />}
                 {checkField}
                 {detectorsField}
                 {lateralRest}
@@ -342,7 +409,7 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
               </label>
             )}
             {nameField}
-            {rule.type === "event" && <EventFields rule={rule} set={set} fieldError={fieldError} threshold />}
+            {rule.type === "event" && <EventFields rule={rule} set={set} fieldError={fieldError} threshold fieldsSeq={0} />}
             {flowFields}
             {checkField}
             {detectorsField}
@@ -374,7 +441,7 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
           ) : (
             <button type="button" className="btn-danger" onClick={() => setConfirmDelete(true)}>{t("rule_delete")}</button>
           ))}
-          <button type="button" className="btn-quiet" onClick={() => void runPreview()}>{t("rule_preview")}</button>
+          {!noTrial && <button type="button" className="btn-quiet" onClick={() => void runPreview()}>{t("rule_preview")}</button>}
           <button type="submit" className="btn-primary" disabled={busy || needEvent}>{t("btn_save")}</button>
         </div>
       </form>
@@ -501,9 +568,10 @@ function EventPicker({ types, onAdd }: { types: string[]; onAdd: (type: string) 
   );
 }
 
-function EventFields({ rule, set, fieldError, threshold }: {
+function EventFields({ rule, set, fieldError, threshold, fieldsSeq }: {
   rule: EventRule; set: (patch: Partial<EventRule>) => void; fieldError: (name: string) => ReactElement | null;
   /** With the threshold sentence: the short form has its own. */ threshold: boolean;
+  /** Counts the times the field matches were replaced from outside their box, which then shows the new ones. */ fieldsSeq: number;
 }) {
   const add = (type: string) => {
     const kept = rule.event_types.map((p) => p.trim()).filter((p) => p !== "");
@@ -535,7 +603,7 @@ function EventFields({ rule, set, fieldError, threshold }: {
         <summary>{t("rule_match_fields")}</summary>
         <label>
           {t("rule_match_fields_label")}
-          <textarea name="match_fields" rows={3} defaultValue={fieldsText(rule.match_fields)}
+          <textarea key={fieldsSeq} name="match_fields" rows={3} defaultValue={fieldsText(rule.match_fields)}
                     placeholder="created_by.user.username=admin@example.com&#10;notification_type=hard_limit.exceeded"
                     onBlur={(e) => set({ match_fields: parseFields(e.target.value) })} />
           <span className="hint">{t("rule_match_fields_hint")}</span>

@@ -3867,5 +3867,8 @@
   "scn_need_event": "Tick at least one event.",
   "scn_when": "Alert",
   "scn_threshold_each": "on each occurrence",
-  "scn_threshold_count": "on a number of events:"
+  "scn_threshold_count": "on a number of events:",
+  "scn_pack_prefill": "Uses the settings of the built-in rule “{name}”.",
+  "scn_channels_on": "Notifications go to: {channels}.",
+  "scn_channels_none": "No notification channel is turned on."
 }

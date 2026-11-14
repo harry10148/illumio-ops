@@ -3867,5 +3867,8 @@
   "scn_need_event": "至少勾一種事件。",
   "scn_when": "告警時機",
   "scn_threshold_each": "每次發生",
-  "scn_threshold_count": "累計到一定次數："
+  "scn_threshold_count": "累計到一定次數：",
+  "scn_pack_prefill": "沿用內建規則「{name}」的設定。",
+  "scn_channels_on": "通知會送到：{channels}。",
+  "scn_channels_none": "目前沒有啟用任何通道。"
 }
