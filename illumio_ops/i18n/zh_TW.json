@@ -3860,5 +3860,12 @@
   "scn_sys_data_loss": "新記錄到一段沒有收齊的時間：那段時間的收集失敗，或 PCE 回傳的筆數達到單次查詢的上限。",
   "scn_sys_job_failing": "本系統的某一個背景工作連續 3 次失敗。",
   "scn_sys_disk_low": "本系統的磁碟可用空間低於「模式與資料來源」頁設定的警戒值。",
-  "scn_sys_siem_backlog": "某個已啟用的 SIEM 目的地，等待送出的筆數超過設定的警戒值，或它的 DLQ 已滿。"
+  "scn_sys_siem_backlog": "某個已啟用的 SIEM 目的地，等待送出的筆數超過設定的警戒值，或它的 DLQ 已滿。",
+  "scn_back": "← 情境清單",
+  "scn_advanced": "進階",
+  "scn_events": "要告警的事件",
+  "scn_need_event": "至少勾一種事件。",
+  "scn_when": "告警時機",
+  "scn_threshold_each": "每次發生",
+  "scn_threshold_count": "累計到一定次數："
 }

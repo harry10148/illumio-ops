@@ -168,18 +168,19 @@ def test_new_rule_on_the_rule_list_opens_the_scenarios(context, live_app):
     # no filled primary action on the page: nothing here is saved
     assert listing.locator("a, button").evaluate_all(
         "(els, fill) => els.filter((e) => getComputedStyle(e).backgroundColor === fill).length", ui_rules.PRIMARY_FILL) == 0
-    # a scenario's "New" goes to the form with its type chosen; the last link to the form as it was
+    # a scenario's "New" opens the short form of that scenario; the last link the form as it was
+    checked = "(e) => e.checked"
     _row(listing, "detector:pivot_chain").locator("[data-role=scenario-new]").click()
-    form = page.locator("[data-role=rule-editor]")
-    expect(form.locator("select[name=type]")).to_have_value("lateral")
-    expect(form.locator("input[name=detector_pivot_chain]")).to_be_checked()
-    expect(form.locator("input[name=detector_fanout]")).not_to_be_checked()
-    page.go_back()
+    form = page.locator("[data-role=rule-editor]:has([data-role=short-form])")
+    expect(form.locator("[data-role=scenario]")).to_contain_text("Pivot chain")
+    assert form.locator("input[name=detector_pivot_chain]").evaluate(checked) is True
+    assert form.locator("input[name=detector_fanout]").evaluate(checked) is False
+    page.locator("[data-role=scenario-back]").click()
     _row(page.locator("[data-role=scenario-list]"), "system:disk_low").locator("[data-role=scenario-new]").click()
-    expect(page.locator("[data-role=rule-editor] select[name=check]")).to_have_value("disk_low")
+    assert page.locator("[data-role=short-form] ~ details select[name=check]").evaluate("(e) => e.value") == "disk_low"
     page.go_back()
     _row(page.locator("[data-role=scenario-list]"), "flow:volume").locator("[data-role=scenario-new]").click()
-    expect(page.locator("[data-role=rule-editor] select[name=type]")).to_have_value("volume")
+    expect(page.locator("[data-role=short-form]")).to_contain_text("MB")
     page.go_back()
     page.locator("[data-role=scenario-list] [data-role=full-form]").click()
     expect(page.locator("[data-role=rule-editor] select[name=type]")).to_have_value("event")

@@ -3,11 +3,11 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  ConditionChoices, DetectorKind, EventCatalog, EventRule, FlowCondition, RulePreview, RuleWrite, Severity, SystemCheck,
-  ThresholdType,
+  CatalogCategory, ConditionChoices, DetectorKind, EventCatalog, EventRule, FlowCondition, RulePreview, RuleWrite, Severity,
+  SystemCheck, ThresholdType,
 } from "../../api/generated";
 import { ConditionEditor, NO_CHOICES, Side } from "../../components/ConditionEditor";
-import { Purpose } from "../../components/ui";
+import { Disclosure, Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { CHECK_KEYS, CHECKS, DETECTOR_GROUPS, DETECTOR_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
@@ -40,14 +40,34 @@ function blank(type: RuleType): Rule {
   }
 }
 
-/** The rule a scenario starts from: blank for its type, with the detector or the check it names chosen. */
+/** The rule a scenario starts from: blank for its type, with the detector or the check it names chosen and named
+ * after it; an event rule starts with no event ticked (its name is the category's, once the catalog is there). */
 function fromScenario(s: Scenario): Rule {
   switch (s.group) {
     case "flow": return blank(s.id as RuleType);
-    case "detector": return { ...blank("lateral"), detectors: [s.id as DetectorKind] } as Rule;
-    case "system": return { ...blank("system"), check: s.id as SystemCheck } as Rule;
-    default: return blank("event");
+    case "detector": return { ...blank("lateral"), name: t(s.labelKey), detectors: [s.id as DetectorKind] } as Rule;
+    case "system": return { ...blank("system"), name: t(s.labelKey), check: s.id as SystemCheck } as Rule;
+    default: return { ...blank("event"), event_types: [] as unknown as [string, ...string[]] } as Rule;
   }
+}
+
+// What the short form shows of each rule type; every other field of the rule is under Advanced.
+const SHORT_FIELDS: Record<RuleType, string[]> = {
+  event: ["name", "notify", "event_types", "threshold", "threshold_count", "window_minutes"],
+  traffic: ["name", "notify", "condition", "threshold_connections", "window_minutes"],
+  bandwidth: ["name", "notify", "condition", "threshold_mbps", "window_minutes"],
+  volume: ["name", "notify", "condition", "threshold_mb", "window_minutes"],
+  system: ["name", "notify"],
+  lateral: ["name", "notify", "min_severity"],
+};
+
+/** Whether Advanced holds a value the short form does not show: a field outside SHORT_FIELDS that differs from the
+ * rule the scenario started from, or an event type the checklist does not list. */
+function advancedHolds(rule: Rule, start: Rule, listed: string[] | null): boolean {
+  const now = rule as unknown as Record<string, unknown>, then = start as unknown as Record<string, unknown>;
+  const shown = SHORT_FIELDS[rule.type];
+  if (Object.keys(now).some((k) => !shown.includes(k) && JSON.stringify(now[k]) !== JSON.stringify(then[k]))) return true;
+  return rule.type === "event" && listed !== null && rule.event_types.some((x) => x.trim() !== "" && !listed.includes(x.trim()));
 }
 
 function Num({ name, value, onChange }: { name: string; value: number; onChange: (n: number) => void }) {
@@ -70,13 +90,16 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
   const navigate = useNavigate();
   const [revision, setRevision] = useState<number | null>(null);
   // blank() runs once, when the form is mounted for its scenario: the condition editor's inputs are uncontrolled
-  const [rule, setRule] = useState<Rule | null>(() => id !== "new" ? null : scenario ? fromScenario(scenario) : blank("event"));
+  const [start] = useState<Rule | null>(() => id !== "new" ? null : scenario ? fromScenario(scenario) : blank("event"));
+  const [rule, setRule] = useState<Rule | null>(start);
   const [choices, setChoices] = useState<ConditionChoices>(NO_CHOICES);
+  const [catalog, setCatalog] = useState<EventCatalog | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [preview, setPreview] = useState<RulePreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const ofCategory = scenario?.group === "event" ? scenario.id : null;
 
   useEffect(() => {
     void call("alert_rules.list").then((env) => {
@@ -92,6 +115,16 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
       if (env.ok && env.data) setChoices(env.data);
     });
   }, [id]);
+  useEffect(() => {
+    if (ofCategory === null) return;
+    void call("alert_rules.event_catalog").then((env) => {
+      if (!env.ok || !env.data) { setError(env.error); return; }
+      setCatalog(env.data);
+      // the rule starts named after its category; a name typed while the catalog was on its way stays
+      const found = env.data.categories.find((c) => c.id === ofCategory);
+      if (found) setRule((r) => r && r.name === "" ? { ...r, name: t(found.label_key) } : r);
+    });
+  }, [ofCategory]);
 
   if (!rule || revision === null) {
     return (
@@ -131,129 +164,196 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
   }
 
   const flow = rule.type === "traffic" || rule.type === "bandwidth" || rule.type === "volume";
+  const category = ofCategory === null ? null : catalog?.categories.find((c) => c.id === ofCategory) ?? null;
+  const listed = category ? category.events.map((e) => e.event_type) : null;
+  // an event rule that names no event cannot be saved: the short form says so instead of sending it
+  const needEvent = scenario !== null && rule.type === "event" && !rule.event_types.some((x) => x.trim() !== "");
+
+  // The form's parts. The full form lays them out in one column; a scenario's form shows a few and keeps the rest
+  // under Advanced. Either way each part is mounted once and stays where it is.
+  const nameField = (
+    <label>
+      {t("rule_name")}
+      <input name="name" value={rule.name} maxLength={120} onChange={(e) => set({ name: e.target.value })}
+             placeholder={rule.pack_key ? t(rule.pack_key) : ""} />
+      {fieldError("name")}
+    </label>
+  );
+  const flowFields = flow && (
+    <>
+      <p className="sentence">
+        {t("rule_window_in")} <Num name="window_minutes" value={rule.window_minutes} onChange={(n) => set({ window_minutes: n })} />{" "}
+        {t("rule_minutes_at_least")}{" "}
+        {rule.type === "traffic" && <><Num name="threshold" value={rule.threshold_connections} onChange={(n) => set({ threshold_connections: n })} /> {t("rule_unit_connections")}</>}
+        {rule.type === "bandwidth" && <><Num name="threshold" value={rule.threshold_mbps} onChange={(n) => set({ threshold_mbps: n })} /> {t("rule_unit_mbps")}</>}
+        {rule.type === "volume" && <><Num name="threshold" value={rule.threshold_mb} onChange={(n) => set({ threshold_mb: n })} /> {t("rule_unit_mb")}</>}
+      </p>
+      {fieldError("window_minutes")}
+      <p className="hint">{t(rule.type === "traffic" ? "rule_traffic_hint" : "rule_bytes_hint")}</p>
+      <ConditionEditor value={rule.condition} choices={choices} onChange={(condition) => set({ condition })}
+                       onInvalid={setLocalError} />
+      {localError && <p className="form-error" data-field={localError}>{t("rule_ports_invalid")}</p>}
+      {fieldError("condition")}
+    </>
+  );
+  const checkField = rule.type === "system" && (
+    <label>
+      {t("rule_check")}
+      <select name="check" value={rule.check} onChange={(e) => set({ check: e.target.value as SystemCheck })}>
+        {CHECKS.map((c) => <option key={c} value={c}>{t(CHECK_KEYS[c] ?? c)}</option>)}
+      </select>
+    </label>
+  );
+  const detectorsField = rule.type === "lateral" && (
+    <fieldset>
+      <legend>{t("rule_detectors")}</legend>
+      {DETECTOR_GROUPS.map((g) => (
+        <div key={g.titleKey} className="stack">
+          <p className="hint">{t(g.titleKey)}</p>
+          <div className="form-grid">
+            {g.kinds.map((d) => (
+              <label key={d} className="check">
+                <input type="checkbox" name={`detector_${d}`} checked={rule.detectors.includes(d)}
+                       onChange={(e) => set({ detectors: (e.target.checked ? [...rule.detectors, d]
+                         : rule.detectors.filter((x) => x !== d)) as [DetectorKind, ...DetectorKind[]] })} />
+                {t(DETECTOR_KEYS[d] ?? d)}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+      {fieldError("detectors")}
+    </fieldset>
+  );
+  const minSeverityField = rule.type === "lateral" && (
+    <label>
+      {t("rule_min_severity")}
+      <select name="min_severity" value={rule.min_severity} onChange={(e) => set({ min_severity: e.target.value as Severity })}>
+        {SEVERITIES.map((s) => <option key={s} value={s}>{word(SEVERITY_KEYS, s)}</option>)}
+      </select>
+    </label>
+  );
+  const lateralRest = rule.type === "lateral" && (
+    <>
+      <label className="check">
+        <input type="checkbox" name="critical_assets_only" checked={rule.critical_assets_only}
+               onChange={(e) => set({ critical_assets_only: e.target.checked })} />
+        {t("rule_critical_only")}
+      </label>
+      <Side name="exclude" value={rule.exclude} choices={choices} onChange={(exclude) => set({ exclude })} />
+    </>
+  );
+  const severityField = (
+    <label>
+      {t("rule_severity")}
+      <select name="severity" value={rule.severity ?? ""} onChange={(e) => set({ severity: (e.target.value || null) as Severity | null })}>
+        {(rule.type === "event" || rule.type === "lateral") && (
+          <option value="">{t(rule.type === "event" ? "rule_severity_from_event" : "rule_severity_from_detection")}</option>
+        )}
+        {SEVERITIES.map((s) => <option key={s} value={s}>{word(SEVERITY_KEYS, s)}</option>)}
+      </select>
+      {fieldError("severity")}
+    </label>
+  );
+  const limits = (
+    <div className="form-grid">
+      <label>
+        {t("rule_cooldown")}
+        <Num name="cooldown_minutes" value={rule.cooldown_minutes} onChange={(n) => set({ cooldown_minutes: n })} />
+        <span className="hint">{t("rule_cooldown_hint")}</span>
+      </label>
+      <label className="check">
+        <input type="checkbox" name="throttle_on" checked={rule.throttle !== null}
+               onChange={(e) => set({ throttle: e.target.checked ? { count: 1, period_minutes: 15 } : null })} />
+        {t("rule_throttle")}
+      </label>
+      {rule.throttle && (
+        <p className="sentence">
+          {t("rule_throttle_at_most")} <Num name="throttle_count" value={rule.throttle.count}
+            onChange={(n) => set({ throttle: { ...rule.throttle!, count: n } })} /> {t("rule_throttle_per")}{" "}
+          <Num name="throttle_period" value={rule.throttle.period_minutes}
+               onChange={(n) => set({ throttle: { ...rule.throttle!, period_minutes: n } })} /> {t("rule_minutes")}
+        </p>
+      )}
+    </div>
+  );
+  const enabledField = (
+    <label className="check">
+      <input type="checkbox" name="enabled" checked={rule.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
+      {t("rule_enabled")}
+    </label>
+  );
+  const notifyField = (
+    <label className="check">
+      <input type="checkbox" name="notify" checked={rule.notify} onChange={(e) => set({ notify: e.target.checked })} />
+      {t("rule_notify")}
+    </label>
+  );
+
   return (
     <section className="page stack">
-      <p><Link to="/alerts/rules">{t("rules_back")}</Link></p>
+      <p>
+        {scenario ? <Link to="/alerts/rules/new" data-role="scenario-back">{t("scn_back")}</Link>
+          : <Link to="/alerts/rules">{t("rules_back")}</Link>}
+      </p>
       <div className="page-title"><h1>{id === "new" ? t("rule_editor_new") : t("rule_editor_title")}</h1><Purpose>{t("purpose_rule_editor")}</Purpose></div>
       <form className="card stack" onSubmit={save} data-role="rule-editor">
-        {id === "new" && (
-          <label>
-            {t("rule_type")}
-            <select name="type" value={rule.type} onChange={(e) => setRule(blank(e.target.value as RuleType))}>
-              {Object.keys(TYPE_KEYS).map((k) => <option key={k} value={k}>{word(TYPE_KEYS, k)}</option>)}
-            </select>
-          </label>
-        )}
-        <label>
-          {t("rule_name")}
-          <input name="name" value={rule.name} maxLength={120} onChange={(e) => set({ name: e.target.value })}
-                 placeholder={rule.pack_key ? t(rule.pack_key) : ""} />
-          {fieldError("name")}
-        </label>
-
-        {rule.type === "event" && <EventFields rule={rule} set={set} fieldError={fieldError} />}
-
-        {flow && (
+        {scenario && start ? (
           <>
-            <p className="sentence">
-              {t("rule_window_in")} <Num name="window_minutes" value={rule.window_minutes} onChange={(n) => set({ window_minutes: n })} />{" "}
-              {t("rule_minutes_at_least")}{" "}
-              {rule.type === "traffic" && <><Num name="threshold" value={rule.threshold_connections} onChange={(n) => set({ threshold_connections: n })} /> {t("rule_unit_connections")}</>}
-              {rule.type === "bandwidth" && <><Num name="threshold" value={rule.threshold_mbps} onChange={(n) => set({ threshold_mbps: n })} /> {t("rule_unit_mbps")}</>}
-              {rule.type === "volume" && <><Num name="threshold" value={rule.threshold_mb} onChange={(n) => set({ threshold_mb: n })} /> {t("rule_unit_mb")}</>}
-            </p>
-            {fieldError("window_minutes")}
-            <p className="hint">{t(rule.type === "traffic" ? "rule_traffic_hint" : "rule_bytes_hint")}</p>
-            <ConditionEditor value={rule.condition} choices={choices} onChange={(condition) => set({ condition })}
-                             onInvalid={setLocalError} />
-            {localError && <p className="form-error" data-field={localError}>{t("rule_ports_invalid")}</p>}
-            {fieldError("condition")}
+            <div className="stack" data-role="short-form">
+              <p data-role="scenario">
+                <strong>{category ? t(category.label_key) : t(scenario.labelKey)}</strong>{" — "}
+                {scenario.descKey ? t(scenario.descKey) : t("scn_event_count", { n: String(category?.events.length ?? 0) })}
+              </p>
+              {nameField}
+              {rule.type === "event" && (
+                <>
+                  {category && <EventChecklist category={category} rule={rule} set={set} />}
+                  {catalog && !category && <p className="form-error">{t("err_not_found")}</p>}
+                  {needEvent && <p className="hint" data-role="need-event">{t("scn_need_event")}</p>}
+                  <ShortThreshold rule={rule} set={set} fieldError={fieldError} />
+                </>
+              )}
+              {flowFields}
+              {minSeverityField}
+              {notifyField}
+            </div>
+            <Disclosure role="advanced" summary={t("scn_advanced")}
+                        open={advancedHolds(rule, start, listed) || Boolean(error?.field)}>
+              <div className="stack">
+                {rule.type === "event" && <EventFields rule={rule} set={set} fieldError={fieldError} threshold={false} />}
+                {checkField}
+                {detectorsField}
+                {lateralRest}
+                {severityField}
+                {limits}
+                {enabledField}
+              </div>
+            </Disclosure>
           </>
-        )}
-
-        {rule.type === "system" && (
-          <label>
-            {t("rule_check")}
-            <select name="check" value={rule.check} onChange={(e) => set({ check: e.target.value as SystemCheck })}>
-              {CHECKS.map((c) => <option key={c} value={c}>{t(CHECK_KEYS[c] ?? c)}</option>)}
-            </select>
-          </label>
-        )}
-
-        {rule.type === "lateral" && (
+        ) : (
           <>
-            <fieldset>
-              <legend>{t("rule_detectors")}</legend>
-              {DETECTOR_GROUPS.map((g) => (
-                <div key={g.titleKey} className="stack">
-                  <p className="hint">{t(g.titleKey)}</p>
-                  <div className="form-grid">
-                    {g.kinds.map((d) => (
-                      <label key={d} className="check">
-                        <input type="checkbox" name={`detector_${d}`} checked={rule.detectors.includes(d)}
-                               onChange={(e) => set({ detectors: (e.target.checked ? [...rule.detectors, d]
-                                 : rule.detectors.filter((x) => x !== d)) as [DetectorKind, ...DetectorKind[]] })} />
-                        {t(DETECTOR_KEYS[d] ?? d)}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {fieldError("detectors")}
-            </fieldset>
-            <label>
-              {t("rule_min_severity")}
-              <select name="min_severity" value={rule.min_severity} onChange={(e) => set({ min_severity: e.target.value as Severity })}>
-                {SEVERITIES.map((s) => <option key={s} value={s}>{word(SEVERITY_KEYS, s)}</option>)}
-              </select>
-            </label>
-            <label className="check">
-              <input type="checkbox" name="critical_assets_only" checked={rule.critical_assets_only}
-                     onChange={(e) => set({ critical_assets_only: e.target.checked })} />
-              {t("rule_critical_only")}
-            </label>
-            <Side name="exclude" value={rule.exclude} choices={choices} onChange={(exclude) => set({ exclude })} />
-          </>
-        )}
-
-        <label>
-          {t("rule_severity")}
-          <select name="severity" value={rule.severity ?? ""} onChange={(e) => set({ severity: (e.target.value || null) as Severity | null })}>
-            {(rule.type === "event" || rule.type === "lateral") && (
-              <option value="">{t(rule.type === "event" ? "rule_severity_from_event" : "rule_severity_from_detection")}</option>
+            {id === "new" && (
+              <label>
+                {t("rule_type")}
+                <select name="type" value={rule.type} onChange={(e) => setRule(blank(e.target.value as RuleType))}>
+                  {Object.keys(TYPE_KEYS).map((k) => <option key={k} value={k}>{word(TYPE_KEYS, k)}</option>)}
+                </select>
+              </label>
             )}
-            {SEVERITIES.map((s) => <option key={s} value={s}>{word(SEVERITY_KEYS, s)}</option>)}
-          </select>
-          {fieldError("severity")}
-        </label>
-        <div className="form-grid">
-          <label>
-            {t("rule_cooldown")}
-            <Num name="cooldown_minutes" value={rule.cooldown_minutes} onChange={(n) => set({ cooldown_minutes: n })} />
-            <span className="hint">{t("rule_cooldown_hint")}</span>
-          </label>
-          <label className="check">
-            <input type="checkbox" name="throttle_on" checked={rule.throttle !== null}
-                   onChange={(e) => set({ throttle: e.target.checked ? { count: 1, period_minutes: 15 } : null })} />
-            {t("rule_throttle")}
-          </label>
-          {rule.throttle && (
-            <p className="sentence">
-              {t("rule_throttle_at_most")} <Num name="throttle_count" value={rule.throttle.count}
-                onChange={(n) => set({ throttle: { ...rule.throttle!, count: n } })} /> {t("rule_throttle_per")}{" "}
-              <Num name="throttle_period" value={rule.throttle.period_minutes}
-                   onChange={(n) => set({ throttle: { ...rule.throttle!, period_minutes: n } })} /> {t("rule_minutes")}
-            </p>
-          )}
-        </div>
-        <label className="check">
-          <input type="checkbox" name="enabled" checked={rule.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
-          {t("rule_enabled")}
-        </label>
-        <label className="check">
-          <input type="checkbox" name="notify" checked={rule.notify} onChange={(e) => set({ notify: e.target.checked })} />
-          {t("rule_notify")}
-        </label>
+            {nameField}
+            {rule.type === "event" && <EventFields rule={rule} set={set} fieldError={fieldError} threshold />}
+            {flowFields}
+            {checkField}
+            {detectorsField}
+            {minSeverityField}
+            {lateralRest}
+            {severityField}
+            {limits}
+            {enabledField}
+            {notifyField}
+          </>
+        )}
 
         {error && !error.field && <p className="form-error">{t(error.message_key, error.params)}</p>}
         {error?.field && <p className="form-error" data-field={error.field}>{t(error.message_key, error.params)}</p>}
@@ -275,10 +375,64 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
             <button type="button" className="btn-danger" onClick={() => setConfirmDelete(true)}>{t("rule_delete")}</button>
           ))}
           <button type="button" className="btn-quiet" onClick={() => void runPreview()}>{t("rule_preview")}</button>
-          <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
+          <button type="submit" className="btn-primary" disabled={busy || needEvent}>{t("btn_save")}</button>
         </div>
       </form>
     </section>
+  );
+}
+
+/** A category's events to tick: each said as the catalog describes it. The ticked ones are the rule's event types in
+ * the catalog's order; a type or pattern typed under Advanced that this category does not list stays after them. */
+function EventChecklist({ category, rule, set }: {
+  category: CatalogCategory; rule: EventRule; set: (patch: Partial<EventRule>) => void;
+}) {
+  const listed = category.events.map((e) => e.event_type);
+  const toggle = (type: string, on: boolean) => {
+    const others = rule.event_types.map((x) => x.trim()).filter((x) => x !== "" && !listed.includes(x));
+    const ticked = listed.filter((x) => x === type ? on : rule.event_types.includes(x));
+    set({ event_types: [...ticked, ...others] as unknown as [string, ...string[]] });
+  };
+  return (
+    <fieldset data-role="event-checklist">
+      <legend>{t("scn_events")}</legend>
+      <div className="scn-checks">
+        {category.events.map((e) => (
+          <label key={e.event_type} className="check">
+            <input type="checkbox" data-event-type={e.event_type} checked={rule.event_types.includes(e.event_type)}
+                   onChange={(ev) => toggle(e.event_type, ev.target.checked)} />
+            {t(e.description_key)}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** The short form's threshold: each occurrence (one event), or a number of events within a number of minutes. A rule
+ * that alerts each time on more than one event per subject can only come from elsewhere; its number is then shown. */
+function ShortThreshold({ rule, set, fieldError }: {
+  rule: EventRule; set: (patch: Partial<EventRule>) => void; fieldError: (name: string) => ReactElement | null;
+}) {
+  return (
+    <p className="sentence" data-role="short-threshold">
+      {t("scn_when")}{" "}
+      <select name="threshold" value={rule.threshold}
+              onChange={(e) => set(e.target.value === "count" ? { threshold: "count" } : { threshold: "immediate", threshold_count: 1 })}>
+        <option value="immediate">{t("scn_threshold_each")}</option>
+        <option value="count">{t("scn_threshold_count")}</option>
+      </select>{" "}
+      {rule.threshold === "count" && (
+        <>
+          {t("rule_window_in")} <Num name="window_minutes" value={rule.window_minutes} onChange={(n) => set({ window_minutes: n })} />{" "}
+          {t("rule_minutes_at_least")}{" "}
+        </>
+      )}
+      {(rule.threshold === "count" || rule.threshold_count !== 1) && (
+        <><Num name="threshold_count" value={rule.threshold_count} onChange={(n) => set({ threshold_count: n })} /> {t("rule_unit_events")}</>
+      )}
+      {fieldError("window_minutes")}
+    </p>
   );
 }
 
@@ -347,8 +501,9 @@ function EventPicker({ types, onAdd }: { types: string[]; onAdd: (type: string) 
   );
 }
 
-function EventFields({ rule, set, fieldError }: {
+function EventFields({ rule, set, fieldError, threshold }: {
   rule: EventRule; set: (patch: Partial<EventRule>) => void; fieldError: (name: string) => ReactElement | null;
+  /** With the threshold sentence: the short form has its own. */ threshold: boolean;
 }) {
   const add = (type: string) => {
     const kept = rule.event_types.map((p) => p.trim()).filter((p) => p !== "");
@@ -387,7 +542,7 @@ function EventFields({ rule, set, fieldError }: {
           {fieldError("match_fields")}
         </label>
       </details>
-      <p className="sentence">
+      {threshold && <p className="sentence">
         <select name="threshold" value={rule.threshold} onChange={(e) => set({ threshold: e.target.value as ThresholdType })}>
           <option value="immediate">{t("rule_threshold_immediate")}</option>
           <option value="count">{t("rule_threshold_count")}</option>
@@ -399,7 +554,7 @@ function EventFields({ rule, set, fieldError }: {
           </>
         )}
         <Num name="threshold_count" value={rule.threshold_count} onChange={(n) => set({ threshold_count: n })} /> {t("rule_unit_events")}
-      </p>
+      </p>}
     </>
   );
 }

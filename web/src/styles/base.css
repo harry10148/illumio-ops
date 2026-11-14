@@ -531,5 +531,6 @@ input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
   padding: var(--space-5) 0; border-top: 1px solid var(--line); }
 .scn-list > li:first-child { border-top: 0; padding-top: 0; }
 .scn-list > li:last-child { padding-bottom: 0; }
+.scn-checks { display: grid; gap: var(--space-4); }
 .scn-text { display: grid; gap: var(--space-2); justify-items: start; min-width: 0; overflow-wrap: anywhere; }
 [data-role=rule-list] th, [data-role=rule-list] td:nth-child(2) { white-space: nowrap; }  /* short headers and the type stay on one line */
