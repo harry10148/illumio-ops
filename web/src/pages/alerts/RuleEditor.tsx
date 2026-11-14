@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactElement, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
@@ -10,43 +10,15 @@ import { ConditionEditor, NO_CHOICES, Side } from "../../components/ConditionEdi
 import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
-import { SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
+import { CHECK_KEYS, CHECKS, DETECTOR_GROUPS, DETECTOR_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
+import { ScenarioList } from "./ScenarioList";
+import { type Scenario, scenarioOf } from "./scenarios";
 
 type Rule = RuleWrite["rule"];
 type RuleType = Rule["type"];
 
 const NEW_ID = "0".repeat(32);
 const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
-// Lateral-movement detectors, then the allowed-traffic anomaly detectors (spec §6.5.8), each group under its title.
-const DETECTOR_GROUPS: { titleKey: string; kinds: DetectorKind[] }[] = [
-  { titleKey: "lateral_detectors_lateral",
-    kinds: ["fanout", "new_admin_connection", "pivot_chain", "blocked_surge", "non_admin_group", "cross_env",
-            "account_fanout", "unexpected_initiator"] },
-  { titleKey: "lateral_detectors_anomaly",
-    kinds: ["peer_deviation", "volume_surge", "account_new_source", "suspicious_tool", "new_process", "auth_to_non_dc",
-            "new_dc_client", "directory_surge", "direction_reversal", "new_pair_port", "quiet_host_wakes", "data_staging",
-            "off_hours"] },
-];
-const DETECTOR_KEYS: Record<string, string> = {
-  fanout: "detector_name_fanout", new_admin_connection: "detector_name_new_admin_connection",
-  pivot_chain: "detector_name_pivot_chain", blocked_surge: "detector_name_blocked_surge",
-  non_admin_group: "detector_name_non_admin_group", cross_env: "detector_name_cross_env",
-  account_fanout: "detector_name_account_fanout", unexpected_initiator: "detector_name_unexpected_initiator",
-  peer_deviation: "detector_name_peer_deviation", volume_surge: "detector_name_volume_surge",
-  account_new_source: "detector_name_account_new_source", suspicious_tool: "detector_name_suspicious_tool",
-  new_process: "detector_name_new_process", auth_to_non_dc: "detector_name_auth_to_non_dc",
-  new_dc_client: "detector_name_new_dc_client", directory_surge: "detector_name_directory_surge",
-  direction_reversal: "detector_name_direction_reversal", new_pair_port: "detector_name_new_pair_port",
-  quiet_host_wakes: "detector_name_quiet_host_wakes", data_staging: "detector_name_data_staging",
-  off_hours: "detector_name_off_hours",
-};
-const CHECKS: SystemCheck[] = ["pce_health", "collection_failing", "data_loss", "job_failing", "disk_low", "siem_backlog"];
-const CHECK_KEYS: Record<string, string> = {
-  pce_health: "rule_system_pce_health", collection_failing: "rule_system_collection_failing",
-  data_loss: "rule_system_data_loss", job_failing: "rule_system_job_failing", disk_low: "rule_system_disk_low",
-  siem_backlog: "rule_system_siem_backlog",
-};
-
 function blank(type: RuleType): Rule {
   const base = { id: NEW_ID, name: "", pack_key: null, enabled: true, notify: true, cooldown_minutes: 30, throttle: null };
   const condition: FlowCondition = {};
@@ -68,16 +40,37 @@ function blank(type: RuleType): Rule {
   }
 }
 
+/** The rule a scenario starts from: blank for its type, with the detector or the check it names chosen. */
+function fromScenario(s: Scenario): Rule {
+  switch (s.group) {
+    case "flow": return blank(s.id as RuleType);
+    case "detector": return { ...blank("lateral"), detectors: [s.id as DetectorKind] } as Rule;
+    case "system": return { ...blank("system"), check: s.id as SystemCheck } as Rule;
+    default: return blank("event");
+  }
+}
+
 function Num({ name, value, onChange }: { name: string; value: number; onChange: (n: number) => void }) {
   return <input name={name} inputMode="decimal" className="narrow" value={String(value)}
                 onChange={(e) => onChange(Number(e.target.value))} />;
 }
 
+/** /alerts/rules/new is the list of scenarios; ?scenario=<group>:<id> is the form started from one of them and
+ * ?form=full the form as it is; /alerts/rules/<id> edits that rule. */
 export function RuleEditor() {
   const { id = "new" } = useParams();
+  const [search] = useSearchParams();
+  if (id !== "new") return <RuleForm key={id} id={id} scenario={null} />;
+  const scenario = scenarioOf(search);
+  if (scenario) return <RuleForm key={`${scenario.group}:${scenario.id}`} id={id} scenario={scenario} />;
+  return search.get("form") === "full" ? <RuleForm key="full" id={id} scenario={null} /> : <ScenarioList />;
+}
+
+function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
   const navigate = useNavigate();
   const [revision, setRevision] = useState<number | null>(null);
-  const [rule, setRule] = useState<Rule | null>(id === "new" ? blank("event") : null);
+  // blank() runs once, when the form is mounted for its scenario: the condition editor's inputs are uncontrolled
+  const [rule, setRule] = useState<Rule | null>(() => id !== "new" ? null : scenario ? fromScenario(scenario) : blank("event"));
   const [choices, setChoices] = useState<ConditionChoices>(NO_CHOICES);
   const [error, setError] = useState<ApiError | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);

@@ -111,7 +111,7 @@ def test_a_segment_is_chosen_from_the_keyboard_and_shows_where_the_focus_is(cont
 def test_a_checkbox_is_drawn_by_the_page_and_sits_on_its_text_line(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     box = page.locator("input[name=enabled]")
     expect(box).to_be_visible()
     off = box.evaluate("""(e) => { const label = e.closest('label'), r = e.getBoundingClientRect();

@@ -12,7 +12,7 @@ RULES: tuple[str, ...] = ("one_primary", "styled_checkbox", "tag_not_button", "c
 PATHS: tuple[str, ...] = (
     "/", "/detect", "/investigate", "/hosts", "/fleet", "/quarantine", "/rule-schedules", "/rule-schedules/rulesets", "/reports",
     "/reports?tab=schedules", "/reports?tab=produced", "/siem", "/siem/dlq", "/alert-rules", "/alert-rules?tab=channels",
-    "/alerts/rules/new", "/system/collection", "/system/pce", "/system/lateral", "/system/jobs", "/system/tls",
+    "/alerts/rules/new", "/alerts/rules/new?form=full", "/system/collection", "/system/pce", "/system/lateral", "/system/jobs", "/system/tls",
     "/system/security", "/system/logs", "/system/display")
 
 PRIMARY_FILL = "rgb(194, 67, 0)"   # --accent-fg: a filled primary action

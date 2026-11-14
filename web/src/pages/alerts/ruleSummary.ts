@@ -4,14 +4,8 @@
 import type { EndpointFilter, FlowCondition, PortProto, RuleListItem } from "../../api/generated";
 import { t } from "../../i18n";
 import { decisionWord } from "../../terms";
-import { DETECTOR_KEYS } from "../system/Lateral";
-import { SEVERITY_KEYS, word } from "./common";
+import { CHECK_KEYS, DETECTOR_KEYS, SEVERITY_KEYS, word } from "./common";
 
-const CHECK_KEYS: Record<string, string> = {
-  pce_health: "rule_system_pce_health", collection_failing: "rule_system_collection_failing",
-  data_loss: "rule_system_data_loss", job_failing: "rule_system_job_failing", disk_low: "rule_system_disk_low",
-  siem_backlog: "rule_system_siem_backlog",
-};
 type AlertRule = RuleListItem["rule"];
 const SEP = "; ";
 const ANY = new Set(["", "*", "any", "all"]);

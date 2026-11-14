@@ -68,7 +68,7 @@ def test_alert_note_persists(context, live_app):
 def test_rule_create_traffic_with_condition(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     form = page.locator("[data-role=rule-editor]")
     form.locator("select[name=type]").select_option("traffic")
     form.locator("input[name=name]").fill("SSH blocked")
@@ -87,7 +87,7 @@ def test_rule_traffic_exclusions_round_trip(context, live_app):
     control existed, and a migrated exclusion could not be seen)."""
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     form = page.locator("[data-role=rule-editor]")
     form.locator("select[name=type]").select_option("traffic")
     form.locator("input[name=name]").fill("Blocked but not the scanner")
@@ -114,7 +114,7 @@ def test_rule_lateral_exclusion_round_trip(context, live_app):
         conn.commit()
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     form = page.locator("[data-role=rule-editor]")
     form.locator("select[name=type]").select_option("lateral")
     form.locator("input[name=name]").fill("Fan-out but not the scanner")
@@ -147,7 +147,7 @@ def test_rule_event_match_fields_round_trip(context, live_app):
     """Task 9: an event rule's advanced field matches, one path=pattern per line (review: no control)."""
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     form = page.locator("[data-role=rule-editor]")
     form.locator("input[name=name]").fill("Hard limit")
     form.locator("input[name=event_types]").fill("system_task.prune_old_log_events")
@@ -165,7 +165,7 @@ def test_rule_event_match_fields_round_trip(context, live_app):
 def test_rule_invalid_regex_field_error(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     form = page.locator("[data-role=rule-editor]")
     form.locator("input[name=name]").fill("bad")
     form.locator("input[name=event_types]").fill("agent.(tampering")
@@ -411,7 +411,7 @@ def test_rule_traffic_parity_conditions_round_trip(context, live_app):
         conn.commit()
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     form = page.locator("[data-role=rule-editor]")
     form.locator("select[name=type]").select_option("traffic")
     form.locator("input[name=name]").fill("Parity conditions")
@@ -447,7 +447,7 @@ def test_rule_event_types_from_the_catalog(context, live_app):
     not list can still be typed, and is said to be unlisted."""
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     form = page.locator("[data-role=rule-editor]")
     form.locator("input[name=name]").fill("Tamper or sign-in")
     picker = form.locator("[data-role=event-picker]")

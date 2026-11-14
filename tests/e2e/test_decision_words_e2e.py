@@ -38,7 +38,7 @@ def _rules_hold(page) -> None:
 
 
 def test_the_condition_editor_names_each_decision(page, live_app):
-    page.goto(f"{live_app.url}/alerts/rules/new")
+    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
     form = page.locator("[data-role=rule-editor]")
     form.locator("select[name=type]").select_option("traffic")
     labels = {d: form.locator(f"label.check:has(input[name=decision_{d}])")

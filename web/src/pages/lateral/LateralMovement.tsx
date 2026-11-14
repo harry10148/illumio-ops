@@ -11,8 +11,8 @@ import { KpiStrip, NeedsAdvanced, PageHead, type Tone } from "../../components/u
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { decisionWord } from "../../terms";
-import { SEVERITY_KEYS, SEVERITY_TONES, word } from "../alerts/common";
-import { DETECTOR_KEYS, STATE_KEYS, STATE_TONES } from "../system/Lateral";
+import { DETECTOR_KEYS, SEVERITY_KEYS, SEVERITY_TONES, word } from "../alerts/common";
+import { STATE_KEYS, STATE_TONES } from "../system/Lateral";
 import { QuarantineDialog } from "../quarantine/QuarantineDialog";
 import { Pulled } from "../workbench/Workbench";
 import { Attention } from "../detect/Attention";
