@@ -346,7 +346,7 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
   const channelsOn = channels ? (Object.keys(CHANNEL_KEYS) as (keyof ChannelsInput)[]).filter((k) => channels[k]?.enabled) : [];
   const channelsLine = channels && (
     <p className="hint" data-role="notify-channels">
-      {channelsOn.length > 0 ? t("scn_channels_on", { channels: channelsOn.map((k) => word(CHANNEL_KEYS, k)).join(", ") })
+      {channelsOn.length > 0 ? t("scn_channels_on", { channels: channelsOn.map((k) => word(CHANNEL_KEYS, k)).join(t("list_separator")) })
         : t("scn_channels_none")}{" "}
       <Link to="/alert-rules?tab=channels">{t("nav_system_channels")}</Link>
     </p>
