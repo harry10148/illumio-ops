@@ -28,7 +28,10 @@ _EVENTS: tuple[tuple[str, str, ThresholdType, int, int, int, str, tuple[int, int
     ("rule_agent_tampering", "agent.tampering", ThresholdType.IMMEDIATE, 1, 10, 30, "all", None),
     ("rule_agent_suspend", "agent.suspend", ThresholdType.IMMEDIATE, 1, 10, 30, "all", None),
     ("rule_agent_clone", "agent.clone_detected", ThresholdType.IMMEDIATE, 1, 10, 30, "all", None),
-    ("rule_agent_heartbeat", "system_task.agent_missed_heartbeats_check", ThresholdType.COUNT, 3, 30, 60, "all",
+    # Each occurrence: the PCE sends one event for a VEN that stops answering, about a quarter of an hour after its
+    # last heartbeat, and no second one (lab, 2026-11-15: a VM's network card disconnected for 30 minutes gave one
+    # event at 17 minutes). "3 in 30 minutes", as it was, never fired for one VEN.
+    ("rule_agent_heartbeat", "system_task.agent_missed_heartbeats_check", ThresholdType.IMMEDIATE, 1, 10, 60, "all",
      (1, 30)),
     ("rule_agent_offline", "system_task.agent_offline_check", ThresholdType.IMMEDIATE, 1, 10, 60, "all", None),
     ("rule_lost_agent", "lost_agent.found", ThresholdType.IMMEDIATE, 1, 10, 60, "all", None),

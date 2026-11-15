@@ -33,7 +33,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 14
+    assert s.schema_version == SCHEMA_VERSION == 15
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -135,7 +135,7 @@ def _v4_dict():
 
 def test_v4_file_upgrades_to_v5_keeping_values():
     s = validate_settings(upgrade(_v4_dict()))
-    assert s.schema_version == SCHEMA_VERSION == 14
+    assert s.schema_version == SCHEMA_VERSION == 15
     lat = s.lateral
     assert lat.detectors.fanout_targets == 12
     assert lat.extra_admin_ports[0].category == "remote" and lat.removed_admin_ports[0].port == 23
@@ -183,7 +183,7 @@ def test_v5_file_upgrades_to_v6_with_reports():
     d["schema_version"] = 5
     del d["reports"]
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 14
+    assert s.schema_version == SCHEMA_VERSION == 15
     assert s.reports.retention_days == 90
 
 
@@ -194,7 +194,7 @@ def test_v6_file_upgrades_to_v7_with_rule_thresholds():
     del d["reports"]["rule_thresholds"]
     d["reports"]["retention_days"] = 30
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 14
+    assert s.schema_version == SCHEMA_VERSION == 15
     assert s.reports.retention_days == 30 and s.reports.rule_thresholds.unmanaged_connection == 50
 
 
@@ -205,7 +205,7 @@ def test_upgrade_keeps_mode(mode):
     d["schema_version"] = 7
     d["collection"]["mode"] = mode
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 14 and s.collection.mode.value == mode
+    assert s.schema_version == SCHEMA_VERSION == 15 and s.collection.mode.value == mode
 
 
 def test_events_only_becomes_lightweight():
@@ -259,7 +259,7 @@ def test_v12_settings_gain_batch2_detector_defaults():
         d["lateral"]["detectors"].pop(key, None)
     d["lateral"]["detectors"]["volume_min_connections"] = 4321
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 14
+    assert s.schema_version == SCHEMA_VERSION == 15
     assert {k: getattr(s.lateral.detectors, k) for k in BATCH2_DETECTORS} == BATCH2_DETECTORS
     assert s.lateral.detectors.volume_min_connections == 4321
 
@@ -524,3 +524,42 @@ def test_a_file_that_cannot_be_written_back_does_not_stop_the_start(tmp_path, mo
     assert p.read_bytes() == before and store.current().reports.schedules[0].report_type.value == "policy_usage"
     monkeypatch.undo()
     assert len(_said(lambda: write_back_settings_upgrade(store))) == 1  # tried again, written and said
+
+
+def _v14_with_heartbeat(**changed):
+    """A schema-14 file holding the built-in heartbeat rule as 6.12.0 and earlier made it, with `changed` on top."""
+    from illumio_ops.domain.alertpack import best_practice_rules
+    d = default_settings(password_hash=HASH, secret_key=KEY).model_dump(mode="json")
+    d["schema_version"] = 14
+    rule = next(r for r in best_practice_rules(notify_new_defaults=True) if r.pack_key == "rule_agent_heartbeat")
+    old = rule.model_dump(mode="json") | {"threshold": "count", "threshold_count": 3, "window_minutes": 30} | changed
+    other = next(r for r in best_practice_rules(notify_new_defaults=True) if r.pack_key == "rule_login_failed")
+    d["alerts"]["rules"] = [old, other.model_dump(mode="json")]
+    return d
+
+
+def test_the_built_in_heartbeat_rule_fires_on_each_occurrence_after_the_upgrade():
+    """Lab, 2026-11-15: the PCE sends one event for a VEN that stops answering; "3 in 30 minutes" never fired."""
+    s = validate_settings(upgrade(_v14_with_heartbeat()))
+    assert s.schema_version == SCHEMA_VERSION == 15
+    hb, login = s.alerts.rules
+    assert (hb.threshold.value, hb.threshold_count, hb.window_minutes) == ("immediate", 1, 10)
+    assert (hb.cooldown_minutes, hb.throttle.count, hb.throttle.period_minutes, hb.enabled) == (60, 1, 30, True)
+    assert (login.threshold.value, login.threshold_count, login.window_minutes) == ("count", 5, 10)  # another rule: as it was
+
+
+@pytest.mark.parametrize("changed", [{"threshold_count": 2}, {"window_minutes": 60}, {"cooldown_minutes": 30},
+                                     {"throttle": None}, {"status": "failure"},
+                                     {"event_types": ["system_task.agent_missed_heartbeats_check", "agent.suspend"]},
+                                     {"pack_key": None, "name": "mine"}])
+def test_a_heartbeat_rule_the_operator_changed_is_left_as_it_is(changed):
+    s = validate_settings(upgrade(_v14_with_heartbeat(**changed)))
+    hb = s.alerts.rules[0]
+    assert hb.threshold.value == "count" and hb.threshold_count == changed.get("threshold_count", 3)
+    assert hb.window_minutes == changed.get("window_minutes", 30)
+
+
+def test_a_new_install_has_the_heartbeat_rule_on_each_occurrence():
+    from illumio_ops.domain.alertpack import best_practice_rules
+    hb = next(r for r in best_practice_rules(notify_new_defaults=True) if r.pack_key == "rule_agent_heartbeat")
+    assert (hb.threshold.value, hb.threshold_count) == ("immediate", 1)

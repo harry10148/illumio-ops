@@ -239,6 +239,27 @@ def _v13_to_v14(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+# The built-in "VEN missed heartbeats" rule as the pack made it up to 6.12.0 (domain/alertpack.py).
+_HEARTBEAT_AS_SHIPPED = {"threshold": "count", "threshold_count": 3, "window_minutes": 30, "cooldown_minutes": 60,
+                         "status": "all", "event_severity": "all", "match_fields": {},
+                         "event_types": ["system_task.agent_missed_heartbeats_check"],
+                         "throttle": {"count": 1, "period_minutes": 30}}
+
+
+def _v14_to_v15(data: dict[str, Any]) -> dict[str, Any]:
+    """The built-in heartbeat rule fires on each occurrence (the PCE sends one event for a VEN that stops answering;
+    "3 in 30 minutes" never fired for one VEN). Only a rule still as the pack made it: one whose threshold, window,
+    cooldown, rate limit, status or events were changed is the operator's, and is left as it is."""
+    alerts = data.get("alerts")
+    rules = alerts.get("rules") if isinstance(alerts, dict) else None
+    if isinstance(rules, list):
+        for r in rules:
+            if (isinstance(r, dict) and r.get("pack_key") == "rule_agent_heartbeat"
+                    and all(r.get(k) == v for k, v in _HEARTBEAT_AS_SHIPPED.items())):
+                r.update(threshold="immediate", threshold_count=1, window_minutes=10)
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -254,6 +275,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     11: _v11_to_v12,
     12: _v12_to_v13,
     13: _v13_to_v14,
+    14: _v14_to_v15,
 }
 
 

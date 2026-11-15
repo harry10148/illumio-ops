@@ -259,7 +259,7 @@ def test_first_start_on_a_file_with_rule_hit_count_schedules_writes_it_back_and_
     f.write_text(json.dumps(d))
     first = _serve_until_listening(tmp_path, port)
     on_disk = json.loads(f.read_text())
-    assert on_disk["schema_version"] == 14 and on_disk["revision"] == d["revision"]
+    assert on_disk["schema_version"] == 15 and on_disk["revision"] == d["revision"]
     assert [(s["id"][0], s["report_type"], s["lookback_days"]) for s in on_disk["reports"]["schedules"]] == [
         ("a", "policy_usage", 30), ("c", "policy_usage", 7)]
     log = (resolve_paths(tmp_path).logs_dir / "illumio-ops.log").read_text(encoding="utf-8")

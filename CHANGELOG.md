@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.12.1] - 2026-11-15
+
+### Fixed
+
+- The built-in rule "VEN missed heartbeats" fires on each occurrence. It asked for three events in 30 minutes, and the
+  PCE sends one event for a VEN that stops answering (lab: a VM's network card disconnected for 30 minutes gave one
+  event, 17 minutes in), so one VEN losing contact never raised it; the operator heard an hour later, from "VEN
+  offline". The cooldown (60 minutes) and the rate limit are as before. On an upgrade a heartbeat rule still as the
+  pack made it is changed the same way (settings schema 15); one the operator changed is left as it is.
+
 ## [6.12.0] - 2026-11-14
 
 ### Added

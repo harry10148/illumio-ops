@@ -116,7 +116,7 @@ FIVE_X = [
     ("rule_agent_tampering", "agent.tampering", "immediate", 1, 10, 30, "all", None),
     ("rule_agent_suspend", "agent.suspend", "immediate", 1, 10, 30, "all", None),
     ("rule_agent_clone", "agent.clone_detected", "immediate", 1, 10, 30, "all", None),
-    ("rule_agent_heartbeat", "system_task.agent_missed_heartbeats_check", "count", 3, 30, 60, "all", (1, 30)),
+    ("rule_agent_heartbeat", "system_task.agent_missed_heartbeats_check", "immediate", 1, 10, 60, "all", (1, 30)),
     ("rule_agent_offline", "system_task.agent_offline_check", "immediate", 1, 10, 60, "all", None),
     ("rule_lost_agent", "lost_agent.found", "immediate", 1, 10, 60, "all", None),
     ("rule_login_failed", "user.sign_in,user.login", "count", 5, 10, 30, "failure", (1, 15)),
