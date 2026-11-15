@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
@@ -425,19 +425,41 @@ _NEW_COLUMNS = ("e.id, e.href, e.event_type, e.severity, e.status, e.timestamp, 
                 "('user', 'service_account') THEN e.created_by_name END AS actor")
 
 
-def _new_event(r: Any) -> NewEvent:
+def _new_event(r: Any, by_ven: Mapping[str, tuple[str, str | None]]) -> NewEvent:
     """host_key from the store's own matching (the event's workload column, else the VEN that sent it). When that
     finds none, the workloads the event itself names: until 6.8.0 a system task's event had no host at all, so an
-    offline alert could not say which host went offline (lab 2026-11-12). One named workload is the event's host;
-    several are listed, and the event is no single host's."""
+    offline alert could not say which host went offline (lab 2026-11-12). The missed-heartbeats check names VENs,
+    not workloads (lab 2026-11-15: its alert named no host): `by_ven` is the inventory's workload of each. One named
+    workload is the event's host; several are listed, and the event is no single host's. A VEN the inventory does
+    not hold still gives the event its host name."""
     row = _event_row(r)
     key, name = r["host_key"], r["hostname"]
     named = event_hosts(row.raw)
-    hosts: tuple[str, ...] = (key,) if key else tuple(sorted(named.workload_hrefs))
+    of_vens = {by_ven[v][0]: by_ven[v][1] for v in named.ven_hrefs if v in by_ven}
+    hosts: tuple[str, ...] = (key,) if key else tuple(sorted(named.workload_hrefs | of_vens.keys()))
     if not key and len(hosts) == 1:
         key = hosts[0]
-        name = name or next((n for _, href, n in named.entities if href == key and n), None)
+        name = name or next((n for _, href, n in named.entities if href == key and n), None) or of_vens.get(key)
+    if not key and not hosts and len(named.hostnames) == 1:
+        name = name or next(iter(named.hostnames))
     return NewEvent(**row.model_dump(), id=r["id"], host_key=key, hostname=name, actor=r["actor"], hosts=hosts)
+
+
+def _new_events(ctx: AppContext, found: Sequence[Any]) -> list[NewEvent]:
+    """The rows as NewEvents; the VENs an event names without a workload (no host matched in the row) are looked
+    up in the inventory once for the batch."""
+    vens: set[str] = set()
+    for r in found:
+        if not r["host_key"]:
+            vens |= event_hosts(json.loads(r["raw_json"])).ven_hrefs
+    by_ven: dict[str, tuple[str, str | None]] = {}
+    ordered = sorted(vens)
+    for i in range(0, len(ordered), 500):
+        chunk = ordered[i:i + 500]
+        for w in _ingest_read(ctx, "SELECT ven_href, href, hostname FROM workloads WHERE ven_href IN "
+                                   f"({','.join('?' * len(chunk))})", chunk):
+            by_ven[w[0]] = (w[1], w[2])
+    return [_new_event(r, by_ven) for r in found]
 
 
 def _ingest_read(ctx: AppContext, sql: str, params: list[Any]) -> list[Any]:
@@ -457,7 +479,7 @@ def events_after(ctx: AppContext, after_id: int, *, limit: int) -> tuple[list[Ne
     The second value says whether more are waiting."""
     found = _ingest_read(ctx, f"SELECT {_NEW_COLUMNS} {EVENT_FROM} WHERE e.id > ? AND e.origin = 'ingest' "
                               "ORDER BY e.id LIMIT ?", [after_id, limit + 1])
-    rows = [_new_event(r) for r in found]
+    rows = _new_events(ctx, found)
     return rows[:limit], len(rows) > limit
 
 
@@ -476,7 +498,7 @@ def events_in_window(ctx: AppContext, *, start: datetime, end: datetime,
             return []
         sql += f" AND e.event_type IN ({','.join('?' * len(exact_types))})"
         params.extend(exact_types)
-    return [_new_event(r) for r in _ingest_read(ctx, sql + " ORDER BY e.timestamp", params)]
+    return _new_events(ctx, _ingest_read(ctx, sql + " ORDER BY e.timestamp", params))
 
 
 # ── SIEM forwarding (P7) ──────────────────────────────────────────────────────

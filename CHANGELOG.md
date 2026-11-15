@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.12.3] - 2026-11-15
+
+### Fixed
+
+- 6.12.2 did not do what it said: the missed-heartbeats event names a VEN, and the alert needs that VEN's workload,
+  which was not looked up — on the lab box the alert still listed no host. The VENs an event names are now matched to
+  the inventory's workloads when alerts are evaluated; a VEN the inventory does not hold still gives its host name.
+
 ## [6.12.2] - 2026-11-15
 
 ### Fixed

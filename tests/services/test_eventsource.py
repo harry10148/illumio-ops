@@ -200,3 +200,55 @@ def test_an_offline_check_event_is_about_the_workload_it_names(collected):
     assert two.hosts == ("/orgs/1/workloads/ftp", "/orgs/1/workloads/game")
     sent = next(r for r in rows if r.event_type == "agent.tampering")
     assert sent.hosts == ((sent.host_key,) if sent.host_key else ())  # a VEN-sent event: the host it is matched to
+
+
+# ── the missed-heartbeats check names VENs under notifications (lab 2026-11-15: a VM's network card disconnected) ──
+
+def _missed_heartbeats(href, vens):
+    """system_task.agent_missed_heartbeats_check as the lab PCE 26.2 sends it: created by the system, nothing under
+    resource_changes, the VEN that stopped answering under notifications[].info.ven."""
+    return {"href": href, "timestamp": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "pce_fqdn": "pce.lab.local",
+            "created_by": {"system": {}}, "event_type": "system_task.agent_missed_heartbeats_check",
+            "status": "success", "severity": "warning", "resource_changes": [],
+            "notifications": [{"uuid": f"n{i}", "notification_type": "agent.missed_heartbeats",
+                               "info": {"severity": 4, "ven": {"href": f"/orgs/1/vens/{name}", "hostname": name},
+                                        "agent": {"href": f"/orgs/1/agents/{i}", "name": None, "hostname": name}}}
+                              for i, name in enumerate(vens)]}
+
+
+def _inventory_with_vens(ctx, names):
+    with ctx.flows().connect() as conn:
+        workloads.replace_inventory(conn, [workloads.WorkloadRow(
+            href=f"/orgs/1/workloads/{n}", hostname=n, name=None, managed=1, enforcement_mode=None,
+            visibility_level=None, os_id=None, ven_version=None, ven_href=f"/orgs/1/vens/{n}", label_set=None,
+            online=1, risk_exposure=None, risk_percent=None, risk_updated_at=None, fetched_at="x") for n in names])
+
+
+def test_a_missed_heartbeats_event_is_about_the_workload_of_the_ven_it_names(collected):
+    from illumio_ops.services.eventsource import events_after, events_in_window
+    _inventory_with_vens(collected, ["d-web2", "d-api"])
+    _store_events(collected, [_missed_heartbeats("/orgs/1/events/hb1", ["d-web2"]),
+                              _missed_heartbeats("/orgs/1/events/hb2", ["d-web2", "d-api"]),
+                              _missed_heartbeats("/orgs/1/events/hb3", ["gone"])])
+    rows, _ = events_after(collected, 0, limit=100)
+    one = next(r for r in rows if r.href.endswith("hb1"))
+    assert (one.host_key, one.hostname, one.hosts) == ("/orgs/1/workloads/d-web2", "d-web2", ("/orgs/1/workloads/d-web2",))
+    two = next(r for r in rows if r.href.endswith("hb2"))
+    assert two.host_key is None and two.hosts == ("/orgs/1/workloads/d-api", "/orgs/1/workloads/d-web2")
+    gone = next(r for r in rows if r.href.endswith("hb3"))  # a VEN the inventory does not hold: named, no workload
+    assert (gone.host_key, gone.hostname, gone.hosts) == (None, "gone", ())
+    window = events_in_window(collected, start=NOW - minutes(5), end=NOW + minutes(1),
+                              exact_types=("system_task.agent_missed_heartbeats_check",))
+    assert {r.host_key for r in window} == {"/orgs/1/workloads/d-web2", None}
+
+
+def test_the_alert_for_a_missed_heartbeat_names_the_host(collected):
+    """The built-in rule's alert: it said an event had occurred and not on which host."""
+    from illumio_ops.domain.alertpack import best_practice_rules
+    from illumio_ops.services.alerts.rules import preview_rule
+    _inventory_with_vens(collected, ["d-web2"])
+    _store_events(collected, [_missed_heartbeats("/orgs/1/events/hb1", ["d-web2"])])
+    rule = next(r for r in best_practice_rules(notify_new_defaults=True) if r.pack_key == "rule_agent_heartbeat")
+    p = preview_rule(collected, rule, hours=24, now=NOW + minutes(1))
+    assert p.would_fire == 1 and p.samples[0]["params"]["hosts"] == ["d-web2"]
+    assert p.samples[0]["message_key"] != "alert_event_immediate_none"
