@@ -85,3 +85,21 @@ def test_offline_precursor_only_on_online_to_offline():
               "notifications": [{"info": {"event_classification": "signal"}}]}
     assert precursor_of(tamper)[0] is PrecursorKind.TAMPER and precursor_of(tamper)[2] is True
     assert precursor_of({"event_type": "user.sign_in", "created_by": {"user": {}}}) is None
+
+
+def test_the_missed_heartbeats_check_names_its_ven_under_notifications():
+    """Lab, 2026-11-15 (a VM's network card disconnected): created_by is the system, resource_changes is empty, and
+    the host is under notifications[].info.ven — the alert the event raised named no host."""
+    from illumio_ops.domain.events import event_hosts
+    raw = {"href": "/orgs/1/events/a205", "event_type": "system_task.agent_missed_heartbeats_check",
+           "created_by": {"system": {}}, "resource_changes": [],
+           "notifications": [{"uuid": "5967", "notification_type": "agent.missed_heartbeats",
+                              "info": {"severity": 4, "ven": {"href": "/orgs/1/vens/82f2", "hostname": "d-web2"},
+                                       "agent": {"href": "/orgs/1/agents/1334", "name": None, "hostname": "d-web2"}}}]}
+    hosts = event_hosts(raw)
+    assert hosts.ven_hrefs == {"/orgs/1/vens/82f2"} and hosts.hostnames == {"d-web2"}
+    assert hosts.entities == (("/orgs/1/vens/82f2", None, "d-web2"),) and hosts.workload_hrefs == frozenset()
+    # two VENs in one check are two hosts; a notification without a ven adds none
+    raw["notifications"].append({"info": {"ven": {"href": "/orgs/1/vens/9a", "hostname": "d-api"}}})
+    raw["notifications"].append({"info": {"src_ip": "10.0.0.1"}})
+    assert event_hosts(raw).hostnames == {"d-web2", "d-api"} and len(event_hosts(raw).entities) == 2

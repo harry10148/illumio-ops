@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.12.2] - 2026-11-15
+
+### Fixed
+
+- A "VEN missed heartbeats" alert names its host. The PCE's event carries the VEN under its notifications, where it
+  was not read, so the alert said that an event had occurred and not on which host (lab: the alert for a VM whose
+  network card was disconnected listed no host).
+
 ## [6.12.1] - 2026-11-15
 
 ### Fixed

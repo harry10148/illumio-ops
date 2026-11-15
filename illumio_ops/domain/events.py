@@ -120,11 +120,29 @@ def _hosts(cb: Mapping[str, Any], resource_changes: list[Any], *, online_lost_on
 
 
 def event_hosts(raw: Mapping[str, Any]) -> EventHosts:
-    """The hosts an event is about, in the three shapes events carry them: created_by.ven / created_by.agent
-    (VEN-sent events) and resource_changes[].resource.workload (system tasks such as the offline check)."""
+    """The hosts an event is about, in the shapes events carry them: created_by.ven / created_by.agent (VEN-sent
+    events), resource_changes[].resource.workload (system tasks such as the offline check) and
+    notifications[].info.ven (the missed-heartbeats check)."""
     cb = raw.get("created_by") if isinstance(raw.get("created_by"), Mapping) else {}
     changes = raw.get("resource_changes") if isinstance(raw.get("resource_changes"), list) else []
-    return _hosts(cb or {}, changes or [], online_lost_only=False)
+    found = _hosts(cb or {}, changes or [], online_lost_only=False)
+    # The missed-heartbeats check names its VEN in neither: created_by is the system and resource_changes is empty;
+    # the host is under notifications[].info.ven (lab, 2026-11-15 — its alert named no host).
+    vens, names, entities = set(found.ven_hrefs), set(found.hostnames), list(found.entities)
+    for note in raw.get("notifications") or []:
+        info = note.get("info") if isinstance(note, Mapping) else None
+        ven = info.get("ven") if isinstance(info, Mapping) else None
+        if not isinstance(ven, Mapping) or not (ven.get("href") or ven.get("hostname")):
+            continue
+        href = str(ven["href"]) if ven.get("href") else None
+        name = str(ven["hostname"]) if ven.get("hostname") else None
+        if href:
+            vens.add(href)
+        if name:
+            names.add(name)
+        if (href, None, name) not in entities:
+            entities.append((href, None, name))
+    return EventHosts(frozenset(vens), found.workload_hrefs, frozenset(names), tuple(entities))
 
 
 PRECURSOR_EVENT_TYPES: Mapping[str, PrecursorKind] = {
