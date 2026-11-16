@@ -225,7 +225,7 @@ def test_lateral_alert_marked_known_then_removed(context, live_app):
     form = page.locator("[data-role=mark-known]")
     form.locator("input[name=known_reason]").fill("Nightly backup host")
     form.get_by_label("Every detection of this kind about this host (or account)").check()
-    form.get_by_role("button", name="Stop alerting on this").click()
+    form.get_by_role("button", name="Stop notifying for this kind").click()
     expect(form.locator(".form-ok")).to_have_text("Marked known; this alert now counts as handled.")
     page.click(".sidenav .nav-item[data-nav='/system']")
     page.click(".subnav >> a[href=\"/system/lateral\"]")
