@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.12.4] - 2026-11-17
+
+### Fixed — text that said more than the code does
+
+Every user-visible sentence added or changed since 6.7.0 (547 keys) was checked against the code that fills it; 134 were
+reworded to say only what is computed. The ones a reader would notice:
+
+- "Mark as known" is now "Stop notifying for this kind": a marked kind is still recorded and listed, only not sent.
+  The guidance under each detection points to it by that name and no longer says the kind will not alert again.
+- The enforcement modes read "Blocking what no rule allows (Full)", "Blocking only what a Deny Rule names
+  (Selective)", "Not blocking (Idle)". Full was "blocking everything".
+- Draft predictions read "would be blocked", not "blocked".
+- The readiness and maturity factor that counts Selective as half says so; grade descriptions give the score range and
+  the factor that loses the most points instead of describing every host; "Ready" no longer advises a move to Full
+  (it is shown only when every host is already in Full); the scores table says it is ordered by name.
+- Detection guidance and findings no longer state causes the code does not know ("usually a scan", "a weaker
+  environment", "the password was guessed").
+- A gap count in "before you read the numbers" counts overlapping gaps once; a share of users under 0.1% is said so,
+  not printed as 0.0%; a VEN out of contact for less than an hour says so instead of "1 hour".
+
 ## [6.12.3] - 2026-11-15
 
 ### Fixed
