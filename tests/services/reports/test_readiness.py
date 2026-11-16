@@ -267,7 +267,7 @@ def test_summary_says_how_many_cannot_enforce_and_the_closest(ctx):
     doc = _build(ctx)
     [f] = doc.findings
     assert "1" in f.title and "What to do first" in f.action
-    assert f.what.startswith("The highest-scoring app is DB (Dev): ") and f.why == "These apps score under 55; the factor losing the most points is under “Why”, and the factors are explained under “How this report is worked out”."
+    assert f.what.startswith("The highest-scoring app is DB (Dev): ") and f.why == "Apps graded D or F score under 55; the factor each loses the most points on is under “Why”, and the factors are explained under “How this report is worked out”."
     assert f.action_code == "write_rules" and f.action_short == "Write rules for the traffic you have confirmed."
 
 
