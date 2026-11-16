@@ -184,7 +184,7 @@ def test_a_report_read_from_the_archive_says_under_the_conclusion_which_days_it_
     lacking = next(q for q in doc.data_quality if "neither the store nor the archive" in q)
     n = int(lacking.split(" ", 1)[0])
     assert n > 0 and len(doc.caveats) == 2  # the collection gap, then the archive
-    assert doc.caveats[1] == f"Days of the period the archive could not supply: {n}; the details are in “Data notes” at the end."
+    assert doc.caveats[1] == f"Days with no archive file in what the report read: {n}; the details are in “Data notes” at the end of the report."
 
 
 def test_with_a_gap_and_undecided_flows_the_archives_days_stay_in_the_data_notes(tmp_path, monkeypatch):
@@ -198,8 +198,8 @@ def test_with_a_gap_and_undecided_flows_the_archives_days_stay_in_the_data_notes
     assert generate.run_queued(ctx, now=NOW) == rid
     doc = docs[0]
     assert len(doc.caveats) == 2
-    assert doc.caveats[0].startswith("Stretches of the period with no data collected")
-    assert doc.caveats[1].startswith("Flows without a decision: 25.0% of the period's flows")  # 1 of the 4 read
-    assert not any("the archive could not supply" in c for c in doc.caveats)
+    assert doc.caveats[0].startswith("Stretches of the period with missing or incomplete data")
+    assert doc.caveats[1].startswith("Flows without a decision: 25.0% of the flows this report covers")  # 1 of the 4 read
+    assert not any("no archive file" in c for c in doc.caveats)
     assert any("neither the store nor the archive" in q for q in doc.data_quality)
     assert "monitor_only" in [s.id for s in doc.sections]

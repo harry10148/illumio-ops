@@ -83,8 +83,8 @@ def moved_sample():
 # chapter or report keeps its title, its columns and every row.
 MOVED_PORT_GAPS = ("Uncovered connections by port / protocol", ["service", "n"],
                    (("8080/TCP", 9), ("3306/TCP", 5), ("53/UDP", 1)))
-MOVED_USERS_SAID = ("38.5% of the period's flows carry the initiating user and 23.1% the initiating process; these "
-                    "rankings cover only those.")
+MOVED_USERS_SAID = ("38.5% of the flows this report covers carry the initiating user and 23.1% the initiating "
+                    "process; these rankings cover only those.")
 MOVED_USERS = ("Users by distinct destinations", ["user", "n"], (("corp\\alice", 3), ("corp\\bob", 2)))
 MOVED_PROCESSES = ("Processes by connections", ["process", "n"], (("sshd", 10), ("System", 3)))
 
@@ -95,9 +95,10 @@ def as_moved(table):
 
 
 # What the first page says of undecided_sample()'s flows: 5 of 9 flows, 69 of 109 connections.
-UNDECIDED_EN = ("Flows without a decision: 55.6% of the period's flows (63.3% by connections). The report's shares "
-                "count only the flows with a decision; the rest are in “Traffic that can only be watched”.")
-UNDECIDED_ZH = "期間內有 55.6% 的流量（依連線數是 63.3%）沒有判定；報表的比例只算有判定的，其餘見〈只能監看的流量〉。"
+UNDECIDED_EN = ("Flows without a decision: 55.6% of the flows this report covers (63.3% by connections). The shares by "
+                "decision (Allowed, Potentially Blocked, Blocked) count only the flows with a decision; the rest are in "
+                "“Traffic that can only be watched”.")
+UNDECIDED_ZH = "本報表涵蓋的流量中有 55.6%（依連線數是 63.3%）沒有判定；各判定（Allowed、Potentially Blocked、Blocked）的比例只算有判定的，其餘見〈只能監看的流量〉。"
 
 
 def covered(ctx):
@@ -443,10 +444,10 @@ def test_findings_say_the_fact_apart_from_the_reason(ctx):
     _write(ctx, [flow(port=5900)])
     (f,) = findings.as_findings(list(run(ctx).values()), Language.EN)  # L006 (no exposure graph) is no finding
     assert f.what.startswith("1 allowed flows from 1 sources on secondary remote-access ports.")
-    assert f.why == "These remote-access ports let someone outside keep control of a host."
+    assert f.why == "Among these ports, TeamViewer and VNC let someone operate a host remotely."
     assert f.action.startswith("1) Verify each allowed flow") and f.action_code == "narrow_rules"
-    assert f.action_short == ("Narrow the rules that allow management, database and identity ports to the sources "
-                              "that need them.")
+    assert f.action_short == ("Let only the sources that need them reach these ports: narrow the rules that allow "
+                              "them, and block what no rule allows.")
 
 
 def test_b001_action_follows_the_recommendation_the_data_chose(tmp_path):

@@ -314,8 +314,8 @@ def users_section(inp: BuildInput, spec: FilterSpec, fc: FieldCoverage) -> tuple
     def t(msg: str, /, **params: object) -> str:
         return tr(lang, msg, **params)
 
-    def share(n: int) -> str:
-        return f"{100 * n / fc.total:.1f}" if fc.total else "0.0"
+    def share(n: int) -> str:  # a share that is there is never "0.0%" (share_text)
+        return share_text(lang, n, fc.total)
     by_user = (GroupBy(dimension=SegmentDimension.INITIATOR_USER),)
     by_process = (GroupBy(dimension=SegmentDimension.INITIATOR_PROCESS),)
     blocks: list[TableBlock | TextBlock] = [TextBlock(paragraphs=(t(

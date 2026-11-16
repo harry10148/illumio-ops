@@ -266,7 +266,7 @@ def test_how_maturity_is_scored_with_this_periods_points(ctx):
     assert doc.sections[0].id == "how"
     parts, grades = _tables(doc, "how")
     assert len(parts.rows) == 5 and {r[3] for r in parts.rows} == {"40", "25", "15", "10"}
-    enforced = next(r for r in parts.rows if r[0] == "Hosts in Full")
+    enforced = next(r for r in parts.rows if r[0] == "Hosts in Full (Selective counts half)")
     assert enforced[4].startswith("20 of 40")  # half the hosts enforced: 20 of its 40 points
     assert [r[0] for r in grades.rows] == ["A", "B", "C", "D", "F"]
 
@@ -281,7 +281,7 @@ def test_maturity_note_names_the_part_losing_most_and_the_score_without_it(ctx):
 
 # ── stage 3b: a share counts only the flows the PCE gave a decision for ──────────────────────────────────────
 
-NO_DECIDED = "No flow in this period carries a decision, so no share can be worked out."
+NO_DECIDED = "None of the flows this report covers carries a decision, so no share can be worked out."
 DECISIONS = ["Allowed (a rule allows it)", "Potentially Blocked", "Blocked"]
 
 
@@ -543,7 +543,7 @@ def test_no_ransomware_snapshot_that_day_is_no_comparison_and_says_why(ctx):
     assert maturity.note.endswith(NO_PREVIOUS_PARTS) and maturity.note.startswith("Grade ")
     assert (enforced.value, enforced.previous) == (33.3, 33.3)  # the share of hosts has both its values
     zh, _ = _compared(_build(ctx, lang=Language.ZH_TW))
-    assert zh.note.endswith("上期那一天沒有勒索防護的快照，計分的部分不同，所以不比較。")
+    assert zh.note.endswith("上期最後一天沒有勒索防護的快照，兩期計分的項目不同，所以不比較。")
 
 
 def test_a_ransomware_snapshot_with_nothing_rated_is_no_comparison_and_not_that_sentence(ctx):
@@ -692,7 +692,7 @@ def test_the_share_of_hosts_is_of_those_in_full_and_selective_is_said_beside_it(
     assert "Full 模式的受管主機 {enforced_hosts_pct}" in translate(Language.ZH_TW, "rpt_conclusion_security_risk")
     # the table of modes by app: its last column is the share in Full, beside the count of each mode
     table = next(b for s in doc.sections if s.id == "enforcement" for b in s.blocks if hasattr(b, "columns"))
-    assert [c.label for c in table.columns][-1] == "In Full" and table.rows[0][-1] == "33.3%"
+    assert [c.label for c in table.columns][-1] == "Share in Full" and table.rows[0][-1] == "33.3%"
 
 
 def test_no_host_in_selective_says_nothing_beside_the_share(ctx):

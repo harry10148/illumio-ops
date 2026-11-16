@@ -115,7 +115,7 @@ def test_xlsx_caveats_before_the_numbers_and_the_headers_stay_bold():
 def test_xlsx_rules_not_evaluated_are_never_nothing_to_do():
     from tests.services.reports.test_render_html import _unevaluated
     values = [r[0] for r in _summary(make_doc(sections=(_unevaluated([]),)))[1] if r]
-    assert "This period has no traffic to evaluate the rules on; see “Rules not evaluated”." in values
+    assert "No traffic in this period matches this report, so the rules were not evaluated; see “Rules not evaluated”." in values
     assert "Nothing in this report needs action this period." not in values
     assert "Nothing in this report needs action this period." in [r[0] for r in _summary(make_doc())[1] if r]
 

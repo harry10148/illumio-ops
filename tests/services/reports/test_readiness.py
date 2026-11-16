@@ -154,13 +154,13 @@ def test_unknown_decisions_left_out(ctx):
     # stage 3b: said under the conclusion, in the flow reports' sentence (1 of the period's 2 flows, 8 of its 10
     # connections), naming the three factors that leave such connections out; this report has no chapter for them
     (said,) = doc.caveats
-    assert said == ("Flows without a decision: 50.0% of the period's flows (80.0% by connections). The factors "
+    assert said == ("Flows without a decision: 50.0% of the flows this report covers (80.0% by connections). The factors "
                     "“Allowed by a rule”, “Not Potentially Blocked” and “Remote access with a rule” count only "
                     "the connections with a decision.")
     assert not any("no reported decision" in q for q in doc.data_quality)
     assert "monitor_only" not in {s.id for s in doc.sections}
     (zh,) = _build(ctx, lang=Language.ZH_TW).caveats
-    assert zh == ("期間內有 50.0% 的流量（依連線數是 80.0%）沒有判定；「有規則允許」「不是 Potentially Blocked」與「遠端管理有規則」"
+    assert zh == ("本報表涵蓋的流量中有 50.0%（依連線數是 80.0%）沒有判定；「有規則允許」「不是 Potentially Blocked」與「遠端管理有規則」"
                   "三個因子只算有判定的連線。")
 
 
@@ -267,7 +267,7 @@ def test_summary_says_how_many_cannot_enforce_and_the_closest(ctx):
     doc = _build(ctx)
     [f] = doc.findings
     assert "1" in f.title and "What to do first" in f.action
-    assert f.what.startswith("The closest is DB (Dev): ") and f.why == "Moving them to Full now would block normal traffic."
+    assert f.what.startswith("The highest-scoring app is DB (Dev): ") and f.why == "These apps score under 55; the factor losing the most points is under “Why”, and the factors are explained under “How this report is worked out”."
     assert f.action_code == "write_rules" and f.action_short == "Write rules for the traffic you have confirmed."
 
 

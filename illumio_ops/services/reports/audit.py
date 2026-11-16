@@ -290,7 +290,8 @@ def build_audit(inp: BuildInput) -> ReportDocument:
                             what=t("rpt_aud_failed_change_what", users=named,
                                    minutes=FAILED_THEN_CHANGE_MINUTES),
                             why=t("rpt_aud_failed_change_why"), action=t("rpt_aud_failed_change_action"),
-                            action_code="failed_then_change", action_short=t("rpt_act_failed_then_change")),
+                            action_code="failed_then_change",
+                            action_short=t("rpt_act_failed_then_change", minutes=FAILED_THEN_CHANGE_MINUTES)),
                     *findings)[:ATTENTION_FINDINGS]
 
     quality = [t("rpt_aud_quality_gaps", n=len(counts.coverage.gaps)) if counts.coverage.gaps

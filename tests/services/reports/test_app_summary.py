@@ -178,7 +178,7 @@ def test_exposure_finding_limited_to_the_app(ctx):
 
 # ── stage 3b: a share counts only the flows the PCE gave a decision for ──────────────────────────────────────
 
-NO_DECIDED = "No flow in this period carries a decision, so no share can be worked out."
+NO_DECIDED = "None of the flows this report covers carries a decision, so no share can be worked out."
 
 
 def _words(doc, sid):
@@ -243,8 +243,9 @@ def test_the_apps_undecided_flows_have_their_chapter_and_a_sentence_on_the_first
     assert (sum(r[1] for r in src.rows), sum(r[2] for r in src.rows)) == (4, 17)
     assert "Top sources, neither end has a VEN" not in tables
     (said,) = doc.caveats
-    assert said == ("Flows without a decision: 80.0% of the period's flows (63.0% by connections). The report's shares "
-                    "count only the flows with a decision; the rest are in “Traffic that can only be watched”.")
+    assert said == ("Flows without a decision: 80.0% of the flows this report covers (63.0% by connections). The shares "
+                    "by decision (Allowed, Potentially Blocked, Blocked) count only the flows with a decision; the rest "
+                    "are in “Traffic that can only be watched”.")
 
 
 def test_an_app_whose_flows_all_carry_a_decision_has_no_chapter_and_no_sentence(ctx):

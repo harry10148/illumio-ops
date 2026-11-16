@@ -491,19 +491,22 @@ GAP_HOURS_LEAST = 0.1  # the smallest total the gap sentence gives as a number; 
 def gap_caveats(gaps: Sequence[tuple[datetime, datetime, str]], lang: Language) -> tuple[str, ...]:
     """One sentence for every gap there is (not only the MAX_GAP_LINES the notes list): how many, and the hours they
     cover to one decimal (under GAP_HOURS_LEAST: "less than 0.1 hours", never "0.0"). Two gaps over the same time
-    (a failed read and a truncated one) are that time once."""
+    (a failed read and a truncated one) are that time once, and one stretch: the count and the hours are of the same
+    merged stretches."""
     if not gaps:
         return ()
-    seconds, upto = 0.0, None
+    seconds, upto, stretches = 0.0, None, 0
     for a, b, _ in sorted(gaps, key=lambda g: g[0]):
-        a = a if upto is None or a > upto else upto
-        if b > a:
-            seconds += (b - a).total_seconds()
+        if upto is None or a > upto:  # starts after the stretch so far: a new one
+            stretches += 1
+            upto = a
+        if b > upto:
+            seconds += (b - upto).total_seconds()
             upto = b
     hours = seconds / 3600
     if hours < GAP_HOURS_LEAST:  # one decimal would print "0.0 hours" for gaps that are there
-        return (translate(lang, "rpt_caveat_gaps_brief", {"n": str(len(gaps)), "least": f"{GAP_HOURS_LEAST:.1f}"}),)
-    return (translate(lang, "rpt_caveat_gaps", {"n": str(len(gaps)), "hours": f"{hours:.1f}"}),)
+        return (translate(lang, "rpt_caveat_gaps_brief", {"n": str(stretches), "least": f"{GAP_HOURS_LEAST:.1f}"}),)
+    return (translate(lang, "rpt_caveat_gaps", {"n": str(stretches), "hours": f"{hours:.1f}"}),)
 
 
 def caveats_in_order(chosen: Sequence[str] = (), *, gaps: Sequence[str] = (), undecided: Sequence[str] = (),

@@ -82,7 +82,7 @@ def test_zero_findings_sentence():
 
 @pytest.mark.parametrize("rows,words", [
     ([("L006", "no exposure analysis")], "Rules that could not be evaluated: 1; see “Rules not evaluated”."),
-    ([], "This period has no traffic to evaluate the rules on; see “Rules not evaluated”.")])
+    ([], "No traffic in this period matches this report, so the rules were not evaluated; see “Rules not evaluated”.")])
 def test_rules_not_evaluated_are_never_nothing_to_do(rows, words):
     r = render_email(make_doc(sections=(_unevaluated(rows),)), tz=UTC)
     for part in (r.text, _said(r.html)):

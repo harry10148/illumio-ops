@@ -90,7 +90,7 @@ def test_findings_from_rules(ctx):
     doc = _build(ctx)
     first = doc.findings[0]
     assert first.title == "Ransomware Risk Port (High)" and "1 allowed flows" in first.what
-    assert first.why == "These remote-access ports let someone outside keep control of a host."
+    assert first.why == "Among these ports, TeamViewer and VNC let someone operate a host remotely."
     assert first.action_code == "narrow_rules" and first.action_short
     # a rule that fired is a finding, never a row of the closing section
     assert not any(r[0] == "B002" for s in doc.sections if s.id == "findings" for r in s.blocks[0].rows)
@@ -231,7 +231,7 @@ def test_one_day_of_traffic_draws_no_trend_and_no_unknown_note(ctx):
 
 # ── stage 3b: a share counts only the flows the PCE gave a decision for ──────────────────────────────────────
 
-NO_DECIDED = "No flow in this period carries a decision, so no share can be worked out."
+NO_DECIDED = "None of the flows this report covers carries a decision, so no share can be worked out."
 
 
 def test_decision_table_is_the_three_decisions_with_their_share_of_the_decided_flows(ctx):

@@ -328,7 +328,7 @@ def test_when_the_pce_cannot_give_the_traffic_the_report_is_still_made(tmp_path,
     assert row.conclusion == "Alerts this period: 1; VENs out of contact: 1; policy provisions: 1."
     page = dom(_html(ctx, row))
     text = page.text()
-    assert "The traffic of this period could not be had from the PCE: the PCE did not answer the query" in text
+    assert "The traffic of this period could not be had from the PCE: the query to the PCE failed" in text
     assert "no traffic to evaluate the rules" not in text and "No traffic in this period" not in text
     assert "Nothing in this report needs action" not in text
     top = page.one("data-role", "top-actions")
@@ -358,7 +358,7 @@ def test_the_failed_pull_as_a_document(tmp_path, pce):
     assert "could not be had from the PCE, so the rules were not evaluated" in render_email(doc, tz=UTC).text
     zh = finish(_build(ctx, lang=Language.ZH_TW))
     assert to_do(zh).held == "流量向 PCE 取不到，所以規則沒有評估。見〈沒有評估的規則〉。"
-    assert _section(zh, "flows").blocks[0].paragraphs == ("這段期間的流量向 PCE 取不到：PCE 沒有回答查詢。",)
+    assert _section(zh, "flows").blocks[0].paragraphs == ("這段期間的流量向 PCE 取不到：向 PCE 查詢失敗。",)
     # the PCE's own error is said once, in the data notes
     assert sum("traffic query poll failed" in line for line in doc.data_quality) == 1
     assert "poll failed" not in " ".join(k.note or "" for k in doc.kpis)
@@ -383,14 +383,14 @@ def test_a_pull_with_older_flows_and_none_in_the_period_is_a_period_without_traf
     assert _kpi(doc, "pb_connections").value is None and _kpi(doc, "pb_connections").note == "No traffic in this period."
     assert _kpi(doc, "new_connections").value == 0
     assert "could not be had" not in " ".join(doc.data_quality)
-    assert to_do(doc).held.startswith("This period has no traffic to evaluate the rules on")
+    assert to_do(doc).held.startswith("No traffic in this period matches this report")
 
 
 def test_a_long_pce_error_is_cut_with_a_mark(tmp_path, pce, monkeypatch):
     pce.fail = True
     monkeypatch.setattr(weekly_overview, "DETAIL_MAX", 20)
     doc = _build(_light(tmp_path))
-    note = next(line for line in doc.data_quality if line.startswith("What the PCE query returned"))
+    note = next(line for line in doc.data_quality if line.startswith("The error from the PCE query"))
     assert note.endswith("…") and len(note) < 60
 
 
@@ -477,7 +477,7 @@ def test_full_mode_reads_its_own_store_and_asks_the_pce_nothing(tmp_path, pce):
 def test_a_week_with_no_traffic_in_the_store_says_no_traffic_not_that_the_pce_failed(tmp_path, pce):
     doc = finish(_build(configured_ctx(tmp_path, mode="full")))
     assert _kpi(doc, "pb_connections").value is None and _kpi(doc, "pb_connections").note == "No traffic in this period."
-    assert to_do(doc).held.startswith("This period has no traffic to evaluate the rules on")
+    assert to_do(doc).held.startswith("No traffic in this period matches this report")
     assert [s.id for s in doc.sections][:5] == ["alerts", "vens", "flows", "new_connections", "policy"]
 
 
@@ -555,4 +555,4 @@ def test_only_a_registered_reason_changes_what_the_first_page_says_of_rules_that
         doc = make_doc(sections=findings.unevaluated_section([], Language.EN, **same, not_run_key=key))
         assert to_do(doc).held == f"{translate(Language.EN, key, {})} See “Rules not evaluated”."
     plain = make_doc(sections=findings.unevaluated_section([], Language.EN, **same))
-    assert to_do(plain).held == "This period has no traffic to evaluate the rules on; see “Rules not evaluated”."
+    assert to_do(plain).held == "No traffic in this period matches this report, so the rules were not evaluated; see “Rules not evaluated”."

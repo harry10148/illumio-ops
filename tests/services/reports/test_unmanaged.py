@@ -136,7 +136,7 @@ def test_findings_run_from_the_highest_severity_down(tmp_path):
     from illumio_ops.domain.actions import group_actions
     assert all(f.action_code == "unmanaged" and f.action_short for f in doc.findings)
     (action,) = group_actions(doc.findings)
-    assert action.focus == ("8.8.4.4 reaches 1 managed hosts.", "10.4.4.4 reaches 3 managed hosts.")
+    assert action.focus == ("8.8.4.4 reaches 1 managed hosts on management ports.", "10.4.4.4 reaches 3 managed hosts on management ports.")
 
 
 def test_shared_address_space_is_not_called_private(tmp_path):

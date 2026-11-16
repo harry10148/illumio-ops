@@ -455,16 +455,16 @@ def test_a_rule_not_evaluated_is_never_said_as_nothing_to_do():
     assert t.find("a")[0].attrs["href"] == "#findings"
     # the rules did not run at all: only that
     t = top((), not_run)
-    assert t.text() == "This period has no traffic to evaluate the rules on; see “Rules not evaluated”."
+    assert t.text() == "No traffic in this period matches this report, so the rules were not evaluated; see “Rules not evaluated”."
     assert t.find("a")[0].attrs["href"] == "#findings"
     # the rules did not run, another part of the report found something
     t = top(two, not_run)
     assert len(t.find_attr("data-role", "top-action")) == 2
     assert t.text_of("data-role", "actions-unevaluated") == (
-        "This period has no traffic to evaluate the rules on; see “Rules not evaluated”.")
+        "No traffic in this period matches this report, so the rules were not evaluated; see “Rules not evaluated”.")
     zh = _dom(render_html(make_doc(lang=Language.ZH_TW, findings=(), sections=(not_run,)), tz=UTC))
     assert "本期沒有需要處理的項目" not in zh.text()
-    assert zh.one("data-role", "top-actions").text() == "這段期間沒有流量可以評估規則，見〈Rules not evaluated〉。"
+    assert zh.one("data-role", "top-actions").text() == "期間內沒有符合此報表的流量，規則沒有評估，見〈Rules not evaluated〉。"
 
 
 def test_a_custom_report_has_no_things_to_do_and_no_cards():
@@ -632,8 +632,8 @@ def test_rules_that_did_not_run_are_still_said_after_finish(lang):
     assert [s.id for s in doc.sections] == ["hosts", "findings"]
     page = _dom(render_html(doc, tz=UTC))
     top = page.one("data-role", "top-actions")
-    assert top.text() == {Language.EN: "This period has no traffic to evaluate the rules on; see “Rules not evaluated”.",
-                          Language.ZH_TW: "這段期間沒有流量可以評估規則，見〈Rules not evaluated〉。"}[lang]
+    assert top.text() == {Language.EN: "No traffic in this period matches this report, so the rules were not evaluated; see “Rules not evaluated”.",
+                          Language.ZH_TW: "期間內沒有符合此報表的流量，規則沒有評估，見〈Rules not evaluated〉。"}[lang]
     assert "Nothing in this report needs action" not in page.text() and "本期沒有需要處理的項目" not in page.text()
     chapter = page.one("id", "findings")  # where the sentence's link lands: the section, saying why it is empty
     assert top.find("a")[0].attrs["href"] == "#findings" and "The rules did not run." in chapter.text()

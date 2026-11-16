@@ -255,11 +255,11 @@ def test_the_first_pages_sentence_gives_both_shares(sample):
     totals, _ = _monitor(sample)
     saw = flowsections.seen(totals)
     from tests.services.reports.test_findings import UNDECIDED_EN, UNDECIDED_ZH
-    assert UNDECIDED_EN.startswith("Flows without a decision: 55.6% of the period's flows (63.3% by connections).")
+    assert UNDECIDED_EN.startswith("Flows without a decision: 55.6% of the flows this report covers (63.3% by connections).")
     assert flowsections.undecided_caveat(Language.EN, saw) == (UNDECIDED_EN,)
     assert flowsections.undecided_caveat(Language.ZH_TW, saw) == (UNDECIDED_ZH,)
     plain = flowsections.undecided_caveat(Language.ZH_TW, saw, chapter=False)[0]
-    assert plain.startswith("期間內有 55.6% 的流量（依連線數是 63.3%）沒有判定；") and "只能監看" not in plain
+    assert plain.startswith("本報表涵蓋的流量中有 55.6%（依連線數是 63.3%）沒有判定；") and "只能監看" not in plain
 
 
 def test_a_share_one_decimal_cannot_show_is_not_said_as_0_or_100():
@@ -273,7 +273,7 @@ def test_a_share_one_decimal_cannot_show_is_not_said_as_0_or_100():
     saw = flowsections.Seen(flows=10_000, connections=40_000, undecided=Undecided(
         flows=1, connections=1, managed_flows=1, managed_connections=1))
     (said,) = flowsections.undecided_caveat(Language.EN, saw)
-    assert "less than 0.1% of the period's flows (less than 0.1% by connections)" in said and "0.0%" not in said
+    assert "less than 0.1% of the flows this report covers (less than 0.1% by connections)" in said and "0.0%" not in said
 
 
 def test_seen_adds_up_disjoint_reads(sample):

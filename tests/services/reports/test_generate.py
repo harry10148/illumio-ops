@@ -191,7 +191,7 @@ def _at(day, hour, minute=0):
 def test_two_gaps_are_one_sentence_under_the_conclusion(ctx):
     start, end = _gaps(ctx, [(_at(22, 3), _at(22, 5), "failed"), (_at(24, 10), _at(24, 13, 30), "failed")])
     got = generate.coverage_text(ctx, start, end, Language.ZH_TW, now=NOW, tz=UTC)
-    assert got.caveats == ("期間內有 2 段、共 5.5 小時沒有收集到資料；明細在最後的「資料註記」。",)
+    assert got.caveats == ("期間內有 2 段、共 5.5 小時的資料不完整或沒有資料；明細在報表最後的「資料註記」。",)
     assert got.lines == generate.coverage_note(ctx, start, end, Language.ZH_TW, now=NOW, tz=UTC)
     assert sum("缺口" in line for line in got.lines) == 2
     en = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
@@ -206,16 +206,21 @@ def test_the_sentence_counts_every_gap_though_the_notes_list_ten(ctx):
     assert got.lines[-1] == "…and 2 more gaps."
 
 
-def test_hours_of_two_gaps_over_the_same_time_are_counted_once(ctx):
+def test_two_gaps_over_the_same_time_are_one_stretch_counted_once(ctx):
+    """The number of stretches and their hours are of the same merged time: overlapping gaps are one stretch."""
     start, end = _gaps(ctx, [(_at(22, 3), _at(22, 5), "failed"), (_at(22, 4), _at(22, 6), "truncated")])
     got = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
-    assert ": 2," in got.caveats[0] and "3.0 hours" in got.caveats[0]  # 03:00-06:00, not 2 + 2
+    assert ": 1," in got.caveats[0] and "3.0 hours" in got.caveats[0]  # 03:00-06:00, not 2 + 2
+    at = datetime(2026, 10, 22, 3, tzinfo=UTC)
+    apart = [(at, at + timedelta(hours=1), "failed"), (at + timedelta(hours=1, minutes=30), at + timedelta(hours=2), "failed"),
+             (at + timedelta(hours=1, minutes=40), at + timedelta(hours=1, minutes=50), "truncated")]  # the last inside
+    assert ": 2, 1.5 hours" in generate.gap_caveats(apart, Language.EN)[0]
 
 
 def test_gaps_under_a_tenth_of_an_hour_are_not_said_as_zero_hours(ctx):
     start, end = _gaps(ctx, [(_at(22, 3), _at(22, 3, 2), "failed"), (_at(23, 3), _at(23, 3, 3), "failed")])
     zh = generate.coverage_text(ctx, start, end, Language.ZH_TW, now=NOW, tz=UTC)
-    assert zh.caveats == ("期間內有 2 段、共不到 0.1 小時沒有收集到資料；明細在最後的「資料註記」。",)
+    assert zh.caveats == ("期間內有 2 段、共不到 0.1 小時的資料不完整或沒有資料；明細在報表最後的「資料註記」。",)
     en = generate.coverage_text(ctx, start, end, Language.EN, now=NOW, tz=UTC)
     assert ": 2, less than 0.1 hours in all" in en.caveats[0] and "0.0" not in en.caveats[0]
     # six minutes is 0.1 hours: said as the number
@@ -239,7 +244,7 @@ def _archive(missing):
 def test_days_the_archive_lacks_are_one_sentence(ctx):
     res = _archive({"flows": ["2026-10-01", "2026-10-02"], "events": ["2026-10-02", "2026-10-03"]})
     zh = generate.archive_caveat(res, Language.ZH_TW)
-    assert zh == ("期間內有 3 天的封存讀不到；明細在最後的「資料註記」。",)  # a day both lack is one day
+    assert zh == ("報表讀取的範圍內有 3 天沒有封存檔；明細在報表最後的「資料註記」。",)  # a day both lack is one day
     assert "3" in generate.archive_caveat(res, Language.EN)[0]
     assert generate.archive_caveat(_archive({"flows": []}), Language.EN) == ()  # no missing day, no sentence
     # after a builder's one sentence it is the second

@@ -456,7 +456,7 @@ def test_a_period_without_traffic_is_not_said_as_nothing_to_do(ctx, report_type)
     assert doc.findings == () and "findings" in [s.id for s in doc.sections]
     page = dom(render_html(doc, tz=UTC))
     top = page.one("data-role", "top-actions")
-    assert top.text().startswith("This period has no traffic to evaluate the rules on; see “")
+    assert top.text().startswith("No traffic in this period matches this report, so the rules were not evaluated; see “")
     assert top.find("a")[0].attrs["href"] == "#findings" and len(page.find_attr("id", "findings")) == 1
     assert "Nothing in this report needs action" not in page.text()
 

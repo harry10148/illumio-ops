@@ -170,12 +170,12 @@ def test_failed_sign_in_then_high_risk_change_same_user(ctx):
     assert (row["user"], row["change"], row["failures"], row["gap"]) == ("eve", "api_key.create", 2, 7.0)
     first = doc.findings[0]
     assert first.severity is Severity.HIGH and "eve" in first.what and "within 30 minutes" in first.what
-    assert first.why == "A guessed or stolen password looks like this."  # the reason, apart from who and when
+    assert first.why == "A high-risk change soon after a failure, under the same name or from the same address, needs its user to confirm it was theirs."  # the reason, apart from who and when
     assert first.action_code == "failed_then_change" and first.action_short
     # the event-type findings: the thing to do follows the sentence each severity carries
     by_code = {f.title.split(":")[0]: f.action_code for f in doc.findings[1:]}
     assert by_code["workloads.unpair"] == "review_events" and by_code["api_key.create"] == "change_records"
-    assert all(f.action_short and f.what.startswith("Users behind them: ") for f in doc.findings[1:])
+    assert all(f.action_short and f.what.startswith("Users with the most of these events (up to 3): ") for f in doc.findings[1:])
 
 
 def test_failed_then_change_none_says_so(ctx):
@@ -254,7 +254,7 @@ def test_event_type_no_user_made_says_so(ctx):
     _write(ctx, [event("agent.tampering", D, system=True)])
     doc = _build(ctx)
     assert _tables(doc, "attention")[0].rows[0][3] == "None (not made by a user)"
-    assert doc.findings[0].what == "Users behind them: None (not made by a user)."
+    assert doc.findings[0].what == "Users with the most of these events (up to 3): None (not made by a user)."
     assert "list of event types with an audit risk" in doc.findings[0].why
     assert doc.findings[0].action_code == "review_events"  # critical: confirm each event
 
@@ -267,4 +267,4 @@ def test_an_event_gap_is_one_sentence_under_the_conclusion(ctx):
     with ctx.flows().connect() as conn:
         ingest_state.record_gap(conn, IngestSource.EVENTS, D, D + timedelta(hours=1, minutes=30), kind="failed",
                                 detail="x", at=NOW)
-    assert _build(ctx, Language.ZH_TW).caveats == ("期間內有 1 段、共 1.5 小時沒有收集到資料；明細在最後的「資料註記」。",)
+    assert _build(ctx, Language.ZH_TW).caveats == ("期間內有 1 段、共 1.5 小時的資料不完整或沒有資料；明細在報表最後的「資料註記」。",)

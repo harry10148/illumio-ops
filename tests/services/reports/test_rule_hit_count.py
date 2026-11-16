@@ -150,7 +150,7 @@ def test_the_other_sample_keeps_its_rows_too(ctx, monkeypatch):
     assert _numbers(doc, HITS) == (2, 1, 2)  # what the old report's hit, zero and no_record were
     assert [q for q in doc.data_quality if "Rule Hit Count" in q or "counted rule" in q or "could not be read" in q] == [
         ("The hit counts in “Hits on the rules in force” come from the PCE's Rule Hit Count report, counted by the "
-         "VENs; the PCE keeps them 90 days."),
+         "VENs."),
         "1 row(s) of the PCE's report had a hit count that could not be read; they are left out, not counted as 0.",
         ("1 counted rule(s) are no longer in the provisioned policy (deleted or changed since); they are listed under "
          "the ruleset name the PCE reported.")]
@@ -165,7 +165,7 @@ def test_the_three_numbers_count_the_rows_of_the_three_tables(ctx):
     by = {k.key: k for k in doc.kpis}
     assert all(by[k].note is None and by[k].previous is None for k in HITS)
     assert (by["rhc_hit"].label, by["rhc_hit"].better, by["rhc_zero"].better, by["rhc_no_record"].better) == (
-        "Rules in force: hit in the period", "higher", "lower", "neutral")
+        "Rules hit in the period (including ones deleted since)", "higher", "lower", "neutral")
 
 
 @pytest.mark.parametrize("lang", list(Language))
