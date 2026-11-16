@@ -198,8 +198,7 @@ def test_the_list_fits_the_narrow_width(narrow_context, live_app):
 
 # ── a scenario says what fires it first, its conditions after ──
 
-WITHOUT_NOTES = {"detector:fanout", "detector:pivot_chain", "detector:cross_env", "detector:auth_to_non_dc",
-                 "flow:traffic", *(f"system:{c.value}" for c in SystemCheck)}
+WITHOUT_NOTES = {"detector:fanout", "detector:cross_env", "flow:traffic", *(f"system:{c.value}" for c in SystemCheck)}
 
 
 @pytest.mark.parametrize(("language", "width"), [("en", 1280), ("zh_TW", 1280), ("en", NARROW)])
@@ -228,7 +227,7 @@ def test_a_row_says_what_fires_it_then_its_conditions(browser, live_app, languag
         else:
             assert notes == translate(lang, key + "_notes"), scenario
             assert before == "scenario-desc" and float(notes_size[:-2]) < float(desc_size[:-2]), scenario   # under it, as a hint
-    assert sum(1 for r in rows if r[0].startswith("detector:") and r[2]) == 17
+    assert sum(1 for r in rows if r[0].startswith("detector:") and r[2]) == 19
     assert ui_rules.violations(page) == {}
     ctx.close()
 
@@ -255,6 +254,6 @@ def test_every_notes_key_belongs_to_a_scenario_sentence():
     for lang in (Language.EN, Language.ZH_TW):
         d = dictionary(lang)
         notes = {k for k in d if k.startswith("scn_") and k.endswith("_notes")}
-        assert len(notes) == 19 and all(k[:-len("_notes")] in d for k in notes)
+        assert len(notes) == 21 and all(k[:-len("_notes")] in d for k in notes)
         group = {"scn_det_": "detector", "scn_flow_": "flow", "scn_sys_": "system"}
         assert {f"{group[k[:k.index('_', 4) + 1]]}:{k[k.index('_', 4) + 1:-len('_notes')]}" for k in notes}.isdisjoint(WITHOUT_NOTES)

@@ -625,8 +625,10 @@ function conclusion(profile: Profile, name: string, alerts: AlertList | null): s
   const beat = id.last_heartbeat_at ? new Date(id.last_heartbeat_at).getTime() : null;
   const read = new Date(id.fetched_at).getTime();
   const hours = beat === null ? null : Math.floor(((Number.isNaN(read) ? Date.now() : read) - beat) / 3_600_000);
+  // under an hour is said as such, never rounded up to "1 hour" (an offline VEN can be that recent)
   const ven = hours === null ? t("host_ven_unknown")
-    : id.online !== false && hours < 1 ? t("host_ven_online") : t("host_ven_lost", { n: String(Math.max(1, hours)) });
+    : id.online !== false && hours < 1 ? t("host_ven_online")
+    : hours < 1 ? t("host_ven_lost_under_hour") : t("host_ven_lost", { n: String(hours) });
   const level = profile.labels["Quarantine"];
   return t("host_conclusion_managed", {
     name, n, ven, mode: id.enforcement_mode ? modeWord(id.enforcement_mode) : "—",

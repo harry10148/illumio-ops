@@ -82,14 +82,14 @@ def test_a_mode_is_said_in_plain_words_with_the_pce_word_beside():
     said = {(lang, mode): mode_word(lang, mode) for lang in Language
             for mode in ("idle", "visibility_only", "selective", "full")}
     assert said == {
-        (Language.EN, "idle"): "Not blocking yet (Idle)",
+        (Language.EN, "idle"): "Not blocking (Idle)",
         (Language.EN, "visibility_only"): "Recording only (Visibility Only)",
-        (Language.EN, "selective"): "Blocking some (Selective)",
-        (Language.EN, "full"): "Blocking everything (Full)",
-        (Language.ZH_TW, "idle"): "還沒開始擋（Idle）",
+        (Language.EN, "selective"): "Blocking only what a Deny Rule names (Selective)",
+        (Language.EN, "full"): "Blocking what no rule allows (Full)",
+        (Language.ZH_TW, "idle"): "不擋（Idle）",
         (Language.ZH_TW, "visibility_only"): "只記錄、不擋（Visibility Only）",
-        (Language.ZH_TW, "selective"): "只擋部分（Selective）",
-        (Language.ZH_TW, "full"): "全部都擋（Full）",
+        (Language.ZH_TW, "selective"): "只擋 Deny Rule 指定的（Selective）",
+        (Language.ZH_TW, "full"): "擋下沒有規則允許的（Full）",
     }
     assert mode_word(Language.EN, "something_new") == "something_new"  # a mode this table does not know: as it is
 

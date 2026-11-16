@@ -85,8 +85,8 @@ def test_enforcement_progress_by_app(ctx):
                      ("a3", "visibility_only", "Web", "Prod"), ("b1", "idle", "DB", "Prod")])
     _write(ctx, [flow(port=443)])
     table = _tables(_build(ctx), "enforcement")[0]
-    assert [c.label for c in table.columns[2:6]] == ["Blocking everything (Full)", "Blocking some (Selective)",
-                                                     "Recording only (Visibility Only)", "Not blocking yet (Idle)"]
+    assert [c.label for c in table.columns[2:6]] == ["Blocking what no rule allows (Full)", "Blocking only what a Deny Rule names (Selective)",
+                                                     "Recording only (Visibility Only)", "Not blocking (Idle)"]
     rows = {r[0]: r for r in table.rows}
     assert rows["Web (Prod)"][1:6] == (3, 1, 1, 1, 0) and rows["DB (Prod)"][1:6] == (1, 0, 0, 0, 1)
 

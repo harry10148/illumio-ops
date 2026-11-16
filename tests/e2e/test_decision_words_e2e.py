@@ -70,7 +70,7 @@ def test_the_predicted_rows_name_the_decision_now_and_the_draft_s(page, live_app
     panel.locator("[data-role=pred-run]").click()
     cells = panel.locator("[data-role=pred-rows] tbody tr td")
     expect(cells.nth(3)).to_have_text(PB)          # the decision the PCE reported
-    expect(cells.nth(4)).to_have_text("Blocked (Override Deny)")  # what the draft policy would decide
+    expect(cells.nth(4)).to_have_text("Would be blocked by an Override Deny under the Draft policy (Blocked)")  # what the draft policy would decide
     _rules_hold(page)
 
 

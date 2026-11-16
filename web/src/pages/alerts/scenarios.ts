@@ -40,7 +40,8 @@ const CHECK_DESC: Record<SystemCheck, string> = {
 
 const FLOW_NOTES: Record<string, string> = { bandwidth: "scn_flow_bandwidth_notes", volume: "scn_flow_volume_notes" };
 const DETECTOR_NOTES: Partial<Record<DetectorKind, string>> = {
-  new_admin_connection: "scn_det_new_admin_connection_notes", blocked_surge: "scn_det_blocked_surge_notes",
+  new_admin_connection: "scn_det_new_admin_connection_notes", pivot_chain: "scn_det_pivot_chain_notes",
+  blocked_surge: "scn_det_blocked_surge_notes", auth_to_non_dc: "scn_det_auth_to_non_dc_notes",
   non_admin_group: "scn_det_non_admin_group_notes", account_fanout: "scn_det_account_fanout_notes",
   unexpected_initiator: "scn_det_unexpected_initiator_notes", peer_deviation: "scn_det_peer_deviation_notes",
   volume_surge: "scn_det_volume_surge_notes", account_new_source: "scn_det_account_new_source_notes",

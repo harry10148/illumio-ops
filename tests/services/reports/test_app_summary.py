@@ -101,7 +101,7 @@ def test_hosts_of_the_app(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="Finance", port=443)])
     doc = _build(ctx, _app("Finance"))
     hosts = _table(doc, "hosts")
-    assert hosts.rows == (("f1", "Prod", "Blocking everything (Full)"),)  # the mode in plain words, the PCE's beside
+    assert hosts.rows == (("f1", "Prod", "Blocking what no rule allows (Full)"),)  # the mode in plain words, the PCE's beside
     assert hosts.host_keys == {"host": ("/orgs/1/workloads/f1",)} and hosts.columns[0].kind == "host"
     assert {k.key: k.value for k in doc.kpis}["enforced_hosts_pct"] == 100.0
 

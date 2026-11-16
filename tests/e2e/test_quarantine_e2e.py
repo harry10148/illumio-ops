@@ -143,7 +143,7 @@ def test_the_page_lists_what_is_quarantined_now_and_who_did_it(context, live_app
     ours = page.locator(f"[data-role=quarantined] tr[data-host='{WL}']")
     expect(ours).to_contain_text("Severe")
     expect(ours).to_contain_text("illumio")
-    expect(ours).to_contain_text("Blocking some (Selective)")
+    expect(ours).to_contain_text("Blocking only what a Deny Rule names (Selective)")
     other = page.locator(f"[data-role=quarantined] tr[data-host='{IDLE}']")
     expect(other).to_contain_text("not put on by this tool")
     expect(other.locator("[data-role=action-note]")).to_be_visible()

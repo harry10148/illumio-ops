@@ -88,8 +88,8 @@ def test_enforcement_from_inventory_exact_labels(ctx):
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
     row = {r[0]: r for r in _joined(_build(ctx))}["DB (Dev)"]
     assert row[6] == "75.0%"
-    assert row[9] == ("Blocking everything (Full): 1, Blocking some (Selective): 1, "
-                      "Recording only (Visibility Only): 0, Not blocking yet (Idle): 0")
+    assert row[9] == ("Blocking what no rule allows (Full): 1, Blocking only what a Deny Rule names (Selective): 1, "
+                      "Recording only (Visibility Only): 0, Not blocking (Idle): 0")
 
 
 def test_predicted_grouped_by_rule(ctx):
