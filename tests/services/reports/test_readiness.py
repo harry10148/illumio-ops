@@ -267,8 +267,20 @@ def test_summary_says_how_many_cannot_enforce_and_the_closest(ctx):
     doc = _build(ctx)
     [f] = doc.findings
     assert "1" in f.title and "What to do first" in f.action
-    assert f.what.startswith("The highest-scoring app is DB (Dev): ") and f.why == "Apps graded D or F score under 55; the factor each loses the most points on is under “Why”, and the factors are explained under “How this report is worked out”."
+    assert f.what.startswith("The highest-scoring D or F app is DB (Dev): ") and f.why == "Apps graded D or F score under 55; the factor each loses the most points on is under “Why”, and the factors are explained under “How this report is worked out”."
     assert f.action_code == "write_rules" and f.action_short == "Write rules for the traffic you have confirmed."
+
+
+def test_the_finding_names_a_held_back_app_not_the_best_app(ctx):
+    """Text review 2026-11-17: the finding is about the D and F apps, but it named the highest-scoring app of all."""
+    _inventory(ctx, [("w1", "Web", "full"), ("d1", "DB", "selective")])
+    _write(ctx, [flow(src_app="Api", dst_app="Web", port=443, conns=50),
+                 flow(src_app="Web", dst_app="DB", port=5432, decision="potentially_blocked", conns=9)])
+    doc = _build(ctx)
+    grades = {r[0]: r[2] for r in _joined(doc)}
+    assert grades["Web (Dev)"] in ("A", "B") and grades["DB (Dev)"] in ("D", "F")
+    [f] = doc.findings
+    assert f.what.startswith("The highest-scoring D or F app is DB (Dev): ")
 
 
 def test_average_score_in_points(ctx):

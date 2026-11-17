@@ -184,7 +184,8 @@ def rhc_chapter(inp: BuildInput) -> RhcChapter:
                     rule_scope(r, any_text)) for r in no_record[:ROWS]),
         total_rows=len(no_record), empty_text=t("rpt_rhc_none_no_record"), limit_note=limit(len(no_record)))
 
-    # what its table lists: a Draft-only, deleted or later rule is no rule here
+    # what each table lists. A rule hit in the period and deleted since counts as hit (traffic did go through it, and
+    # the label says so); a Draft-only, deleted or later rule at 0 is not "0 hits" (no count, see above)
     values = {"rhc_hit": len(hit), "rhc_zero": len(zero), "rhc_no_record": len(no_record)}
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=None, unit="count", better=_KPI_BETTER[k])
                  for k, label in _KPI_KEYS.items())

@@ -251,8 +251,10 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
         total_rows=len(_GRADE_KEYS), empty_text="")
 
     findings: tuple[Finding, ...] = ()
-    if values["held_back"] and closest:
-        first_key, first, _ = closest[0]
+    # the finding is about the D and F apps: it names the highest-scoring of those, not of every app
+    held = sorted((x for x in scored if x[1].grade in ("D", "F")), key=lambda x: (-(x[1].score or 0), name(x[0])))
+    if held:
+        first_key, first, _ = held[0]
         findings = (Finding(severity=Severity.MEDIUM,
                             title=t("rpt_rdy_finding_title", n=values["held_back"], total=values["apps"]),
                             what=t("rpt_rdy_finding_what", app=name(first_key), explain=explain(first)),

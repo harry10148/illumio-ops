@@ -81,7 +81,7 @@ def test_host_of_another_pce_refused(ctx):
 
 
 def test_ransomware_details_state(ctx):
-    """Final review #3: details never read (or failed) are not "no high-risk service"."""
+    """Final review #3: details never read (or failed) are not "no ransomware-risk service"."""
     from illumio_ops.store.flowdb import ransomware as rstore
     p = hosts.profile(ctx, HOST, now=NOW)
     assert p.ransomware_details == "not_rated"  # the PCE gave this host no rating

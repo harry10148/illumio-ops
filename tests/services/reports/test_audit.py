@@ -221,6 +221,23 @@ def test_failed_then_change_names_five_users_and_counts_the_rest(ctx):
     assert "2 more" in _build(ctx, Language.EN).findings[0].what
 
 
+def test_failed_then_change_users_cover_rows_past_the_table(ctx, monkeypatch):
+    """Text review 2026-11-17: the finding counts every such change but named only the users of the newest rows the
+    table keeps; a user whose changes are all older was left out."""
+    from illumio_ops.services.reports import audit
+    monkeypatch.setattr(audit, "DETAIL_ROWS", 2)
+    records = []
+    for i, user in enumerate(("old", "mid", "new")):
+        at = D + timedelta(hours=i)
+        records += [event("request.authentication_failed", at, user=user, ip=f"10.1.1.{i}", status="failure"),
+                    event("api_key.create", at + timedelta(minutes=5), user=user, ip=f"10.1.1.{i}")]
+    _write(ctx, records)
+    doc = _build(ctx)
+    table = _tables(doc, "failed_then_change")[0]
+    assert len(table.rows) == 2 and table.total_rows == 3 and "old" not in {r[1] for r in table.rows}
+    assert "old" in doc.findings[0].what and "3" in doc.findings[0].title
+
+
 def test_agent_event_status_reads_as_words(ctx):
     # 2026-11-10 report review: the status column printed the PCE's raw "success" in a zh_TW report.
     at = START + timedelta(days=1)

@@ -286,10 +286,11 @@ _CHANGE_ADDR = "json_extract(c.raw_json, '$.action.src_ip')"
 
 def failed_then_change(ctx: AppContext, *, start: datetime, end: datetime, window_minutes: int, failure_types:
                        Sequence[str], change_types: Sequence[str], limit: int,
-                       now: datetime | None = None) -> tuple[list[FailedThenChange], int]:
+                       now: datetime | None = None) -> tuple[list[FailedThenChange], int, list[str]]:
     """Changes of `change_types` in [start, end) by a user or service account preceded, within `window_minutes`
     (which may reach before `start`), by `failure_types` events under the same user name or from the same source
-    address (5.x audit_mod04 matched on either). Newest first, at most `limit`, with how many there are."""
+    address (5.x audit_mod04 matched on either). Newest first, at most `limit`, with how many there are and every
+    user who made one (all of them, not only the users of the `limit` rows)."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     seg = EventSegment(filter=EventFilter(start=start, end=end), view=SegmentView.DETAIL, limit=1)
     kinds = ",".join("?" * len(USER_KINDS))
@@ -313,7 +314,7 @@ def failed_then_change(ctx: AppContext, *, start: datetime, end: datetime, windo
         rows.append(FailedThenChange(at=when, user=user, change=change, address=addr,
                                      matched="user" if by_user else "address", failures=n, last_failure=prior,
                                      gap_minutes=round((when - prior).total_seconds() / 60, 1)))
-    return rows, len(found)
+    return rows, len(found), sorted({r[1] for r in found})
 
 
 class PrecursorEvents(BaseModel):

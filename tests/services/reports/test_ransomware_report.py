@@ -216,7 +216,7 @@ def test_how_to_read_explains_the_numbers(ctx):
 def test_each_host_says_what_its_numbers_mean(ctx):
     _std(ctx)
     rows = {r[0]: r for r in _tables(_build(ctx), "hosts")[0].rows}
-    assert "1 high-risk service(s) unprotected" in rows["bad"][-1] and "SMB" in rows["bad"][-1]
+    assert "1 ransomware-risk service(s) unprotected" in rows["bad"][-1] and "SMB" in rows["bad"][-1]
     assert "protected" in rows["good"][-1].lower()
     assert "Selective" in rows["liar"][-1] and "Deny Rule" in rows["liar"][-1]  # why, and how to raise it
 

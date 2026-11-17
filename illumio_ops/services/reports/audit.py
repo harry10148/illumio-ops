@@ -265,7 +265,7 @@ def build_audit(inp: BuildInput) -> ReportDocument:
         total_rows=len(found), empty_text=t("rpt_aud_none_brute") if counts.total else none)
 
     # ── failed sign-ins followed by a high-risk change ────────────────────────
-    chained, chained_total = failed_then_change(
+    chained, chained_total, who = failed_then_change(
         inp.ctx, start=inp.start, end=inp.end, window_minutes=FAILED_THEN_CHANGE_MINUTES,
         failure_types=SIGN_IN_FAILURES, change_types=HIGH_RISK_CHANGES, limit=DETAIL_ROWS, now=inp.now)
     chain = TableBlock(
@@ -281,8 +281,7 @@ def build_audit(inp: BuildInput) -> ReportDocument:
                     c.last_failure.isoformat(), c.gap_minutes) for c in chained),
         total_rows=chained_total, empty_text=t("rpt_aud_none_failed_change", minutes=FAILED_THEN_CHANGE_MINUTES) if counts.total else none,
         limit_note=t("rpt_aud_newest_n", n=DETAIL_ROWS) if chained_total > len(chained) else None)
-    if chained:
-        who = sorted({c.user for c in chained})
+    if chained:  # `who` is every such change's user, past the table's DETAIL_ROWS too
         named = ", ".join(who[:USERS_NAMED])
         if len(who) > USERS_NAMED:
             named = t("rpt_aud_users_more", users=named, n=len(who) - USERS_NAMED)

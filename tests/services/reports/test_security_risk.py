@@ -161,7 +161,7 @@ def test_ransomware_is_one_number_that_names_its_report(tmp_path):
     assert "ransomware" not in {s.id for s in doc.sections}
     assert "ransomware_protected_pct" not in {k.key for k in doc.kpis}
     (note,) = [q for q in doc.data_quality if "ransomware analysis has not been computed" in q]
-    assert "section" not in note and "ransomware services protected" in note
+    assert "section" not in note and "ransomware-risk services protected" in note
     b = configured_ctx(tmp_path / "b")
     _write(b, [flow(port=443)])
     _ransomware_result(b)
@@ -170,7 +170,7 @@ def test_ransomware_is_one_number_that_names_its_report(tmp_path):
     kpi = {k.key: k for k in doc.kpis}["ransomware_protected_pct"]
     assert kpi.value == 50.0 and kpi.note == "Every host and service is in the “Ransomware protection” report."
     # the score still counts the part: 1 of the 2 critical and high services is protected, 5 of its 10 points
-    part = next(r for r in _tables(doc, "how")[0].rows if r[0] == "Ransomware services protected")
+    part = next(r for r in _tables(doc, "how")[0].rows if r[0] == "Ransomware-risk services protected")
     assert part[4].startswith("5 of 10")
     zh = {k.key: k for k in _build(b, lang=Language.ZH_TW).kpis}["ransomware_protected_pct"]
     assert zh.note == "各主機與服務的明細見〈勒索防護〉報表。"
