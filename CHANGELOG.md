@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.12.5] - 2026-11-17
+
+### Fixed — follow-ups from the text review
+
+- Readiness: the finding about the D and F apps named the highest-scoring app of all, often an A or B app. It now
+  names the highest-scoring D or F app.
+- Audit: "Failed sign-ins followed by a high-risk change" named only the users of the newest 1,000 changes while its
+  title counted all of them. The users named now come from every such change.
+- The PCE's ransomware service list is called "ransomware-risk services" everywhere (ransomware report, host page,
+  lateral movement page, the security risk report's ransomware part). It was "high-risk services", though it holds
+  medium and low ones too; the parts that count only critical and high ones say "of critical or high severity".
+- Rule usage: no change in what is counted. A rule hit in the period and deleted since stays among the rules hit (the
+  label says so since 6.12.4); the code comment that said otherwise is corrected.
+
 ## [6.12.4] - 2026-11-17
 
 ### Fixed — text that said more than the code does
