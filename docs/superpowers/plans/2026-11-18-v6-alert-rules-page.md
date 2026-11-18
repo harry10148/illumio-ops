@@ -74,7 +74,8 @@ writeStatus(p): string                                 // 兩個 → "all"
 type Verb = "create" | "update" | "delete" | "other";
 verbOf(eventType: string): Verb        // 最後一個 "." 之後的那段
 resourceOf(eventType: string): string  // 第一個 "." 之前
-splitTypes(types: string[]): { listed: string[]; other: string[] }  // 依目錄分：確切類型在目錄裡的 vs 其他（a|b、樣式、目錄外）
+splitTypes(types: string[], catalog: ReadonlySet<string>): { listed: string[]; other: string[] }
+  // 依目錄分：確切類型在 catalog 裡的 vs 其他（a|b、樣式、目錄外）；兩邊都保持原順序
 isPattern(p: string): boolean          // 搬 RuleEditor.tsx:524 的判斷（與 domain/alertrules._looks_like_regex 一致）
 owners(items: Item[], exceptId: string | null): Map<string, Item[]>  // 確切類型 → 列出它的規則；a|b 拆開；* 與樣式不算；不論啟用
 showSeverity(scopeAll: boolean, picked: CatalogEventView[], value: string): boolean // §4.4 何時顯示；showStatus 同理
