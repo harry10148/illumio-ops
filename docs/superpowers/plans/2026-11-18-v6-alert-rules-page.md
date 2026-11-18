@@ -100,16 +100,21 @@ blank(type): Rule   // 從 RuleEditor.tsx 搬來，RuleEditor 改成 import 這�
 
 **Files:** Modify `web/src/components/ConditionEditor.tsx`；Test：新增 `tests/e2e/test_condition_editor_fields_e2e.py`（告警規則的完整表單與報表篩選各一組）。
 
-- 埠（§4.5）：`portsText`／`parsePorts` 要能原樣表示並讀回：沒有 `proto`（例 `445`）、`proto=6`（`445/tcp`）、`proto=17`、其他協定號（`/proto:47` 或照
-  `rsum_proto` 的寫法，自訂一個可解析的語法並寫在 placeholder 與 hint）、只有協定沒有埠、`port=-1`、範圍。**現在把無協定寫成 TCP 是錯的**：
-  `parsePorts("445")` 要回 `{port:445, to_port:null, proto:null}`。注意報表篩選也用它，行為改變要在 CHANGELOG 寫。
+- 埠（§4.5）：**輸入的意思不變**——只打數字（`445`、`135-139`）仍是 TCP（現有測試 `test_alerts_e2e.py:78` 等靠這個）。
+  新增可解析的寫法讓每種已存的形狀都寫得出來、讀得回去：`445/any`＝沒有協定（`proto: null`）、`445/udp`、`445/proto:47`（其他協定號）、
+  `proto:1`（只有協定沒有埠）、`-1/proto:1`（`port=-1`）。`portsText` 依這套寫出，`parsePorts` 依這套讀回；placeholder 與 hint 寫出新寫法。
+  以前存成 `proto: null` 的埠，現在打開時顯示成 `445`、一 blur 就變 TCP——這就是要修的缺陷。
 - 補編輯器（§4.5）：`service_process`、`service_user`、`text`（文字框，空字串存 `null`）；`initiator_processes`、`initiator_users`、
-  `service_processes`、`service_users`（每行一筆的 textarea，空存 `[]`）；`Side` 的 `hrefs` 以 chip 顯示（Workload 名稱查不到就顯示 href）可移除；
-  `match`（any／all）只在同一端同時有標籤和主機時出現。全部用受控或 `onBlur`，與既有欄位一致。
+  `service_processes`、`service_users`（每行一筆的 textarea，空存 `[]`）；`Side` 的 `hrefs` 以 chip 顯示可移除——`condition_choices` 沒有 Workload，
+  chip 一律顯示 href 本身，**不要為此加後端呼叫**；`match`（any／all）只在同一端同時有標籤和主機時出現。全部用受控或 `onBlur`，與既有欄位一致。
+- 這些新控制項**只在告警規則表單出現**：`ConditionEditor` 加一個 opt-in prop（例 `full`），報表篩選不傳，版面與行為不變（埠的修正例外，兩邊都受惠，寫進 CHANGELOG）。
 - 新欄位放在「排除」以外的進階區（實作者決定版面），任一有值時該區預設展開。
 
-- [ ] Step 1：失敗測試：用 settings 寫入一條 traffic 規則，condition 含上面每一個欄位與各種埠（無協定、UDP、協定 47、`-1`、範圍），
-      在完整表單打開不動存回，逐欄相等；再在報表篩選（`ReportFilter.tsx`）做同樣的埠來回。
+- [ ] Step 1：失敗測試（**不可只做「打開不動存回」——那在現在的程式也會過**，因為埠只在 blur 時重新解析、沒有編輯器的欄位本來就原封帶過）：
+      - 埠：用 settings 寫入一條 traffic 規則，`ports` 含無協定、TCP、UDP、協定 47、只有協定、`-1`、範圍；在表單裡**對埠欄 focus 再 blur**
+        （另一個情況：在尾端加一個 `, 8080`），存回後原有的每一筆協定都不變、新加的是 TCP。報表篩選做同樣兩個情況。
+      - 新欄位：每個欄位先斷言**畫面上有控制項顯示存著的值**，再改它、存，斷言送出的 JSON 是改後的值；`hrefs` 移除一個 chip 後存回少了那一個。
+      - 報表篩選：斷言新控制項**不**出現。
 - [ ] Step 2：實作；Step 3：測試過、全套綠；Step 4：commit `fix(v6-ui): the condition editor keeps every field and port as it is`。
 
 ### Task 3: 規則頁：三張表、狀態、搜尋、頁首
@@ -161,8 +166,9 @@ blank(type): Rule   // 從 RuleEditor.tsx 搬來，RuleEditor 改成 import 這�
   ≤720px 下拉）；搜尋（不限分類）；動作篩選；同資源分組（兩種以上才有標題與「這組全勾」，全勾存當下列出的確切類型）；
   「已有規則」提示（`owners`，排除正在編輯的那條；結果不是全部時加說明；停用的加「停用中」）；隱藏已有規則（已勾的不藏）；
   點已有規則的名稱：確認後打開那條。
-- 「更多條件」：`EventTypesBox` 只管 `splitTypes().other`，存回時 `event_types` 依「目錄裡的（照原順序）＋其他」重組——**順序**：
-  原本規則裡的順序要保留（存回不變），新勾的接在後面；`match_fields` 沿用現有那塊。
+- 「更多條件」：`EventTypesBox` 只顯示與編輯 `splitTypes().other`；`match_fields` 沿用現有那塊。
+- `event_types` 陣列**只有在使用者改動時才重寫**；改動時的規則只有一條：既有項目留在原位置，取消勾選或在手動框刪掉的項目拿掉，新勾或新打的接在最後。
+  不排序、不依「目錄＋其他」重組（`OTHER_SHAPES` 有樣式或目錄外類型排在第一個的規則）。
 - 事件等級與結果：`readSeverity`／`readStatus`；raw 時換文字框；**沒動控制項就送回原字串**；何時顯示用 `showSeverity`／`showStatus`，
   不顯示時那一行說明。都不勾不能存（欄位錯誤）。
 - 失敗測試：`OTHER_SHAPES` 的每條事件規則打開不動存回不變（含 `err|warning`、`!admin`、逗號樣式、`a|b`、目錄外）；`event_severity` 為
@@ -176,7 +182,7 @@ blank(type): Rule   // 從 RuleEditor.tsx 搬來，RuleEditor 改成 import 這�
 **Files:** Create `rules/FlowCondition.tsx`；Modify `RuleForm.tsx`；測試。
 
 - 第一層：來源、目的（`Side`）、埠、四個判定（含 `Unknown`）；「更多條件」放 `ConditionEditor` 其餘的全部（含 Task 2 補的）。
-  實作者可以把 `ConditionEditor` 拆成兩塊（常用／其餘），但報表篩選的行為與版面不可變（Task 2 的報表測試要照過）。
+  實作者可以把 `ConditionEditor` 拆成兩塊（常用／其餘），但報表篩選的行為與版面不可變（Task 2 的報表測試要照過；Task 2 的新控制項只在 opt-in 時出現）。
 - 任一「更多條件」欄位有值時預設展開。
 - 失敗測試：`OTHER_SHAPES` 的三條流量規則與 Task 2 那條全欄位規則打開不動存回不變；勾 `unknown` 存出 `["unknown"]`。
 - 改寫：`test_decision_words_e2e.py:41`（改走新表單選流量）、`test_alerts_e2e.py` 的 `test_rule_traffic_exclusions_round_trip`（:88）、
@@ -188,7 +194,8 @@ blank(type): Rule   // 從 RuleEditor.tsx 搬來，RuleEditor 改成 import 這�
 **Files:** Modify `RuleForm.tsx`、`RulesPage.tsx`；i18n；測試。
 
 - 範本選單（只在新增時）、`?rule=new&template=<pack_key>`、`fromTemplate`、名稱加「（複本）」、表單有改動時確認、帶入後重新掛載。
-- 範本說明：17 個新鍵 `rule_why_<pack_key 去掉 rule_ 前綴>`，中英。**寫之前**用 microseg-kb（Illumio）查 §5 列的六件事，查到什麼寫進
+- 範本說明：17 個新鍵 `rule_why_<pack_key 去掉 rule_ 前綴>`，中英。程式裡用**字面對照表**（`{ rule_login_failed: "rule_why_login_failed", … }`），
+  不可用字串拼出鍵名（i18n 閘門只認字面 `t("key")`）。**寫之前**用 microseg-kb（Illumio）查 §5 列的六件事，查到什麼寫進
   `tmp/alert-rules-page/why-sources.md`（每句一行：鍵、句子、出處）。不確定的寫保守的、只描述事件本身。
 - 編輯內建規則時同一句顯示在表單標題下。
 - 「和預設不同」小標（列上）與「還原成內建預設」按鈕用同一個 `differsFromPack`；還原後重新掛載、要按儲存才存。
@@ -217,10 +224,13 @@ blank(type): Rule   // 從 RuleEditor.tsx 搬來，RuleEditor 改成 import 這�
 - `test_every_built_in_rule_opens_and_saves_unchanged`、`test_rules_of_other_shapes_open_and_save_unchanged`：事件與流量走新表單，偵測與系統走完整表單；
   `OTHER_SHAPES` 加入 Task 2、5 的難例（每個 `FlowCondition` 欄位、各種埠、`event_severity` 的四種非標準值、非標準 `status`）。
 - `test_alerts_e2e.py` 的 :149（事件欄位比對來回）走新表單；:109（lateral）照舊。逐支確認 71、181、328、448、473、522、548 行的測試已在前面的 task 改好或在這裡改好。
-- 欄位涵蓋守門（取代 `test_rule_short_form_e2e.py:343`）：從 `contracts.json` 讀 `EventRule`、`TrafficRule`、`BandwidthRule`、`VolumeRule`、
-  `FlowCondition`、`EndpointFilter`、`PortProto`、`Throttle` 的每個屬性，每個屬性都要在 Task 9 的難例裡有非預設值，且存回相等——
-  新增一個屬性而沒有表單支援時這支要紅。**先注入缺陷確認會紅**（例：暫時讓表單丟掉 `service_user`），結果寫在 commit 訊息
-  （[[gate-measurement-validity]]）。
+- 欄位涵蓋守門（取代 `test_rule_short_form_e2e.py:343`；先讀它：它比對 contracts 的屬性集合等於幾份手寫清單的聯集）。新的寫法兩半：
+  1. 靜態：從 `contracts.json`（`operations["alert_rules.create"]["request_schema"]["$defs"]`）讀 `EventRule`、`TrafficRule`、`BandwidthRule`、
+     `VolumeRule`、`FlowCondition`、`EndpointFilter`、`PortProto`、`Throttle` 的屬性集合，必須等於測試裡一份手寫對照表的鍵：
+     每個屬性對應「表單上的控制項選擇器」或明列在「原樣保留」清單（只有 `id`、`pack_key` 這類不給編輯的）。模型多一個屬性就紅。
+  2. 動態：對照表裡每個有控制項的屬性，用一條該屬性有非預設值的規則打開表單，斷言那個選擇器**看得到且顯示存著的值**。
+  **先注入缺陷確認會紅**：暫時拿掉 `service_user` 的控制項（不是讓它丟值），動態那半要紅；暫時在對照表刪一個鍵，靜態那半要紅。
+  結果寫在 commit 訊息（[[gate-measurement-validity]]）。
 - commit `test(v6-alerts): every rule shape saves back unchanged through the new form`。
 
 ### Task 10: 文字審閱、版本、真機驗收（主對話執行）
