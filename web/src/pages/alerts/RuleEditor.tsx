@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { type ApiError, call } from "../../api/client";
 import type {
-  CatalogCategory, ChannelsInput, ConditionChoices, DetectorKind, EventCatalog, EventRule, FlowCondition, PackRule,
+  CatalogCategory, ChannelsInput, ConditionChoices, DetectorKind, EventCatalog, EventRule, PackRule,
   RulePreview, RuleWrite, Severity, SystemCheck, ThresholdType,
 } from "../../api/generated";
 import { ConditionEditor, NO_CHOICES, Side } from "../../components/ConditionEditor";
@@ -11,34 +11,14 @@ import { Disclosure, Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { CHANNEL_KEYS, CHECK_KEYS, CHECKS, DETECTOR_GROUPS, DETECTOR_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "./common";
+import { blank, isPattern } from "./rules/model";
 import { ScenarioList } from "./ScenarioList";
 import { type Scenario, scenarioOf } from "./scenarios";
 
 type Rule = RuleWrite["rule"];
 type RuleType = Rule["type"];
 
-const NEW_ID = "0".repeat(32);
 const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
-function blank(type: RuleType): Rule {
-  const base = { id: NEW_ID, name: "", pack_key: null, enabled: true, notify: true, cooldown_minutes: 30, throttle: null };
-  const condition: FlowCondition = {};
-  switch (type) {
-    case "event":
-      return { ...base, type, severity: null, event_types: [""], status: "all", event_severity: "all", match_fields: {},
-               threshold: "immediate", threshold_count: 1, window_minutes: 10 };
-    case "traffic":
-      return { ...base, type, severity: "medium", condition, threshold_connections: 25, window_minutes: 10 };
-    case "bandwidth":
-      return { ...base, type, severity: "medium", condition, threshold_mbps: 100, window_minutes: 60 };
-    case "volume":
-      return { ...base, type, severity: "medium", condition, threshold_mb: 1024, window_minutes: 60 };
-    case "system":
-      return { ...base, type, severity: "high", check: "pce_health", cooldown_minutes: 60 };
-    default:
-      return { ...base, type: "lateral", severity: null, detectors: ["fanout"], min_severity: "medium",
-               critical_assets_only: false, exclude: { public: true }, cooldown_minutes: 0 };
-  }
-}
 
 /** The rule a scenario starts from: blank for its type, with the detector or the check it names chosen and named
  * after it; an event rule starts with no event ticked (its name is the category's, once the catalog is there). */
@@ -519,9 +499,6 @@ function parseFields(text: string): Record<string, string> {
   }
   return out;
 }
-
-// A pattern (regular expression) rather than event type names: as domain/alertrules._looks_like_regex.
-const isPattern = (p: string) => /^\^|\$$|[*+?[\](){}$\\]/.test(p);
 
 /** The event catalog: a picker that adds to the typed list (which still takes types it does not list, or patterns),
  * and what each chosen type is. */

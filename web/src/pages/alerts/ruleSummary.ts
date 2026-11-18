@@ -1,7 +1,6 @@
 // A rule's condition and exclusion as one line of words for the rule list (UI spec §4.9). Every part is read from
-// the rule itself: values are shown as stored, objects known only by href (label groups, IP lists, services, hosts)
-// are counted, never named from a guess.
-import type { EndpointFilter, FlowCondition, PortProto, RuleListItem } from "../../api/generated";
+// the rule itself: values are shown as stored, objects known only by href are counted unless choices supply their names.
+import type { ConditionChoices, EndpointFilter, FlowCondition, PortProto, RuleListItem } from "../../api/generated";
 import { t } from "../../i18n";
 import { decisionWord } from "../../terms";
 import { CHECK_KEYS, DETECTOR_KEYS, SEVERITY_KEYS, word } from "./common";
@@ -10,7 +9,7 @@ type AlertRule = RuleListItem["rule"];
 const SEP = "; ";
 const ANY = new Set(["", "*", "any", "all"]);
 
-function ports(list: PortProto[] | undefined): string {
+export function ports(list: PortProto[] | undefined): string {
   return (list ?? []).map((p) => {
     const range = p.to_port != null ? `${p.port}-${p.to_port}` : p.port != null && p.port >= 0 ? String(p.port) : "";
     // no protocol on the rule: every protocol matches (domain/filter.py), so the port stands alone
@@ -20,24 +19,45 @@ function ports(list: PortProto[] | undefined): string {
   }).join(", ");
 }
 
-function side(name: string, f: EndpointFilter | null | undefined): string[] {
+export function side(name: string, f: EndpointFilter | null | undefined, choices?: ConditionChoices): string[] {
   if (!f) return [];
   const out: string[] = [];
   for (const l of f.labels ?? []) out.push(`${name} ${l.key} = ${l.values.join(t("rsum_or"))}`);
-  const counted: [number, string][] = [
-    [(f.label_groups ?? []).length, "rsum_label_groups"], [(f.ip_lists ?? []).length, "rsum_ip_lists"],
-    [(f.hrefs ?? []).length + (f.ips ?? []).length, "rsum_hosts"],
-  ];
-  for (const [n, key] of counted) if (n > 0) out.push(`${name} ${t(key, { n: String(n) })}`);
+  const groups = f.label_groups ?? [];
+  if (!choices) {
+    if (groups.length > 0) out.push(`${name} ${t("rsum_label_groups", { n: String(groups.length) })}`);
+  } else {
+    let missing = 0;
+    for (const href of groups) {
+      const found = choices.label_groups.find((row) => row.href === href);
+      if (found) out.push(`${name} ${t("rsum_label_group_named", { name: found.name })}`);
+      else missing += 1;
+    }
+    if (missing > 0) out.push(`${name} ${t("rsum_label_groups", { n: String(missing) })}`);
+  }
+  const lists = f.ip_lists ?? [];
+  if (!choices) {
+    if (lists.length > 0) out.push(`${name} ${t("rsum_ip_lists", { n: String(lists.length) })}`);
+  } else {
+    let missing = 0;
+    for (const href of lists) {
+      const found = choices.ip_lists.find((row) => row.href === href);
+      if (found) out.push(`${name} ${t("rsum_ip_list_named", { name: found.name })}`);
+      else missing += 1;
+    }
+    if (missing > 0) out.push(`${name} ${t("rsum_ip_lists", { n: String(missing) })}`);
+  }
+  const hosts = (f.hrefs ?? []).length + (f.ips ?? []).length;
+  if (hosts > 0) out.push(`${name} ${t("rsum_hosts", { n: String(hosts) })}`);
   if (f.public) out.push(`${name} ${t("rsum_public")}`);
   return out;
 }
 
-function included(c: FlowCondition): string[] {
+export function included(c: FlowCondition, choices?: ConditionChoices): string[] {
   const out: string[] = [];
   if ((c.decisions ?? []).length) out.push((c.decisions ?? []).map(decisionWord).join(t("rsum_or")));
-  out.push(...side(t("rsum_src"), c.src), ...side(t("rsum_dst"), c.dst), ...side(t("rsum_either"), c.either));
-  if ((c.ports ?? []).length) out.push(`port ${ports(c.ports)}`);
+  out.push(...side(t("rsum_src"), c.src, choices), ...side(t("rsum_dst"), c.dst, choices), ...side(t("rsum_either"), c.either, choices));
+  if ((c.ports ?? []).length) out.push(`${t("rsum_port")} ${ports(c.ports)}`);
   if ((c.services ?? []).length) out.push(t("rsum_services", { n: String((c.services ?? []).length) }));
   if ((c.windows_services ?? []).length) out.push(`${t("rsum_windows_services")} ${(c.windows_services ?? []).join(", ")}`);
   if ((c.transmissions ?? []).length) out.push(`${t("rsum_transmission")} ${(c.transmissions ?? []).join(", ")}`);
@@ -49,10 +69,10 @@ function included(c: FlowCondition): string[] {
   return out;
 }
 
-function excluded(c: FlowCondition): string[] {
-  const out = [...side(t("rsum_src"), c.src_exclude), ...side(t("rsum_dst"), c.dst_exclude),
-    ...side(t("rsum_either"), c.either_exclude)];
-  if ((c.exclude_ports ?? []).length) out.push(`port ${ports(c.exclude_ports)}`);
+export function excluded(c: FlowCondition, choices?: ConditionChoices): string[] {
+  const out = [...side(t("rsum_src"), c.src_exclude, choices), ...side(t("rsum_dst"), c.dst_exclude, choices),
+    ...side(t("rsum_either"), c.either_exclude, choices)];
+  if ((c.exclude_ports ?? []).length) out.push(`${t("rsum_port")} ${ports(c.exclude_ports)}`);
   if ((c.exclude_services ?? []).length) out.push(t("rsum_services", { n: String((c.exclude_services ?? []).length) }));
   if ((c.exclude_windows_services ?? []).length) out.push(`${t("rsum_windows_services")} ${(c.exclude_windows_services ?? []).join(", ")}`);
   if ((c.exclude_transmissions ?? []).length) out.push(`${t("rsum_transmission")} ${(c.exclude_transmissions ?? []).join(", ")}`);
@@ -62,7 +82,7 @@ function excluded(c: FlowCondition): string[] {
 }
 
 /** What makes the rule fire. */
-export function conditionSummary(rule: AlertRule): string {
+export function conditionSummary(rule: AlertRule, choices?: ConditionChoices): string {
   switch (rule.type) {
     case "event": {
       const parts = [rule.event_types.join(", ")];
@@ -76,13 +96,13 @@ export function conditionSummary(rule: AlertRule): string {
       return parts.join(SEP);
     }
     case "traffic":
-      return [...included(rule.condition), t("rsum_connections", { n: rule.threshold_connections.toLocaleString(),
+      return [...included(rule.condition, choices), t("rsum_connections", { n: rule.threshold_connections.toLocaleString(),
         minutes: String(rule.window_minutes) })].join(SEP);
     case "bandwidth":
-      return [...included(rule.condition), t("rsum_mbps", { n: String(rule.threshold_mbps),
+      return [...included(rule.condition, choices), t("rsum_mbps", { n: String(rule.threshold_mbps),
         minutes: String(rule.window_minutes) })].join(SEP);
     case "volume":
-      return [...included(rule.condition), t("rsum_mb", { n: String(rule.threshold_mb),
+      return [...included(rule.condition, choices), t("rsum_mb", { n: String(rule.threshold_mb),
         minutes: String(rule.window_minutes) })].join(SEP);
     case "system":
       return t(CHECK_KEYS[rule.check] ?? rule.check);
@@ -98,8 +118,8 @@ export function conditionSummary(rule: AlertRule): string {
 }
 
 /** What the rule leaves out; "" when nothing. */
-export function exclusionSummary(rule: AlertRule): string {
-  if (rule.type === "traffic" || rule.type === "bandwidth" || rule.type === "volume") return excluded(rule.condition).join(SEP);
-  if (rule.type === "lateral") return side(t("rsum_host"), rule.exclude).join(SEP);
+export function exclusionSummary(rule: AlertRule, choices?: ConditionChoices): string {
+  if (rule.type === "traffic" || rule.type === "bandwidth" || rule.type === "volume") return excluded(rule.condition, choices).join(SEP);
+  if (rule.type === "lateral") return side(t("rsum_host"), rule.exclude, choices).join(SEP);
   return "";
 }
