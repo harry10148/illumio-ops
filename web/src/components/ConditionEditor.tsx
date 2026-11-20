@@ -14,6 +14,10 @@ const DECISIONS: PolicyDecision[] = ["allowed", "potentially_blocked", "blocked"
 type Transmission = NonNullable<FlowCondition["transmissions"]>[number];
 const TRANSMISSIONS: Transmission[] = ["unicast", "broadcast", "multicast"];
 const TX_KEYS: Record<string, string> = { unicast: "cond_tx_unicast", broadcast: "cond_tx_broadcast", multicast: "cond_tx_multicast" };
+const ADVANCED_LIST_KEYS = {
+  initiator_processes: "cond_initiator_processes", initiator_users: "cond_initiator_users",
+  service_processes: "cond_service_processes", service_users: "cond_service_users",
+} as const;
 
 const SIDE_KEYS: Record<string, string> = {
   src: "cond_src", dst: "cond_dst", src_exclude: "cond_src_exclude", dst_exclude: "cond_dst_exclude", exclude: "rule_exclude",
@@ -27,17 +31,77 @@ const list = (text: string) => text.split(/[\s,]+/).map((s) => s.trim()).filter(
 const names = (text: string) => text.split(",").map((s) => s.trim()).filter(Boolean);
 
 function portsText(ports: PortProto[] | undefined): string {
-  return (ports ?? []).map((p) => `${p.port ?? ""}${p.to_port != null ? `-${p.to_port}` : ""}${p.proto === 17 ? "/udp" : ""}`).join(", ");
+  return (ports ?? []).map((p) => {
+    const port = p.port == null ? "" : `${p.port}${p.to_port != null ? `-${p.to_port}` : ""}`;
+    const proto = p.proto == null ? "any" : p.proto === 6 ? "tcp" : p.proto === 17 ? "udp" : `proto:${p.proto}`;
+    return port ? `${port}/${proto}` : proto === "any" ? "" : `proto:${p.proto}`;
+  }).join(", ");
 }
 
 function parsePorts(text: string): PortProto[] | null {
   const out: PortProto[] = [];
   for (const token of list(text)) {
-    const m = /^(\d+)(?:-(\d+))?(?:\/(tcp|udp))?$/i.exec(token);
+    const onlyProto = /^proto:(\d+)$/i.exec(token);
+    if (onlyProto) {
+      const proto = Number(onlyProto[1]);
+      if (proto > 255) return null;
+      out.push({ port: null, to_port: null, proto });
+      continue;
+    }
+    const m = /^(-?\d+)(?:-(\d+))?(?:\/(any|tcp|udp|proto:\d+))?$/i.exec(token);
     if (!m) return null;
-    out.push({ port: Number(m[1]), to_port: m[2] ? Number(m[2]) : null, proto: m[3]?.toLowerCase() === "udp" ? 17 : 6 });
+    const port = Number(m[1]);
+    const toPort = m[2] ? Number(m[2]) : null;
+    const rawProto = m[3]?.toLowerCase();
+    const proto = rawProto === undefined ? 6 : rawProto === "any" ? null : rawProto === "tcp" ? 6
+      : rawProto === "udp" ? 17 : Number(rawProto.slice("proto:".length));
+    if (port < -1 || port > 65535 || (toPort !== null && (port < 0 || toPort > 65535 || toPort < port))
+        || (typeof proto === "number" && proto > 255)) return null;
+    out.push({ port, to_port: toPort, proto });
   }
   return out;
+}
+
+function endpointHasAdvanced(value: EndpointFilter | null | undefined): boolean {
+  return Boolean(value?.hrefs?.length || (value?.hasOwnProperty("match") && value.match === "all"));
+}
+
+function EndpointAdvanced({ name, value, onChange }: {
+  name: string; value: EndpointFilter | null | undefined; onChange: (next: EndpointFilter | null) => void;
+}) {
+  const endpoint = value ?? {};
+  const labels = Boolean(endpoint.labels?.length || endpoint.label_groups?.length);
+  const hosts = Boolean(endpoint.ips?.length || endpoint.hrefs?.length || endpoint.ip_lists?.length || endpoint.public);
+  const set = (next: EndpointFilter) => onChange((next.labels?.length || next.label_groups?.length || next.ips?.length
+    || next.hrefs?.length || next.ip_lists?.length || next.public) ? next : null);
+  return (
+    <div className="stack" data-role={`${name}-advanced`}>
+      {endpoint.hrefs?.length ? (
+        <div className="stack">
+          <span>{t("cond_workload_hrefs")}</span>
+          <ul className="chips">
+            {endpoint.hrefs.map((href) => (
+              <li className="chip" key={href} data-href={href}>
+                {href}
+                <button type="button" className="btn-quiet" aria-label={t("lateral_remove_label")}
+                        onClick={() => set({ ...endpoint, hrefs: endpoint.hrefs?.filter((item) => item !== href) })}>×</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {labels && hosts && (
+        <label>
+          {t("cond_match")}
+          <select name={`${name}_match`} value={endpoint.match ?? "any"}
+                  onChange={(event) => set({ ...endpoint, match: event.target.value as EndpointFilter["match"] })}>
+            <option value="any">{t("cond_match_any")}</option>
+            <option value="all">{t("cond_match_all")}</option>
+          </select>
+        </label>
+      )}
+    </div>
+  );
 }
 
 /** PCE objects named by href: chips (a name the PCE no longer has says so) and a picker of the known ones. */
@@ -167,15 +231,19 @@ function Transmissions({ name, legendKey, value, onChange }: {
   );
 }
 
-export function ConditionEditor({ value, choices, onChange, onInvalid }: {
+export function ConditionEditor({ value, choices, onChange, onInvalid, full = false }: {
   value: FlowCondition; choices: ConditionChoices; onChange: (next: FlowCondition) => void;
-  onInvalid: (field: string | null) => void;
+  onInvalid: (field: string | null) => void; full?: boolean;
 }) {
   const decisions = value.decisions ?? [];
   const services = choices.services;
   const excluding = Boolean(value.src_exclude || value.dst_exclude || value.either_exclude || value.exclude_ports?.length
     || value.exclude_services?.length || value.exclude_processes?.length || value.exclude_windows_services?.length
     || value.exclude_transmissions?.length);
+  const advancedSides = ["src", "dst", "either", "src_exclude", "dst_exclude", "either_exclude"] as const;
+  const advancedFields = Boolean(value.service_process || value.service_user || value.text || value.initiator_processes?.length
+    || value.initiator_users?.length || value.service_processes?.length || value.service_users?.length
+    || advancedSides.some((side) => endpointHasAdvanced(value[side])));
   const ports = (field: "ports" | "exclude_ports", text: string) => {
     const parsed = parsePorts(text);
     if (parsed === null) onInvalid(`condition.${field}`);
@@ -193,9 +261,10 @@ export function ConditionEditor({ value, choices, onChange, onInvalid }: {
       </details>
       <label>
         {t("cond_ports")}
-        <input name="ports" defaultValue={portsText(value.ports)} placeholder="22, 3389, 135-139, 53/udp"
+        <input name="ports" defaultValue={portsText(value.ports)} placeholder={t("cond_ports_placeholder")}
                onBlur={(e) => ports("ports", e.target.value)} />
       </label>
+      <p className="hint">{t("cond_ports_hint")}</p>
       <HrefPicker name="service" kind="service" title={t("cond_services")} hint={t("cond_services_hint")} picked={value.services ?? []}
                   options={services} gone={t("cond_service_gone")} addKey="cond_add_service"
                   onChange={(next) => onChange({ ...value, services: next })} />
@@ -237,6 +306,44 @@ export function ConditionEditor({ value, choices, onChange, onInvalid }: {
                onChange={(e) => onChange({ ...value, exclude_system_accounts: e.target.checked })} />
         {t("cond_exclude_system")}
       </label>
+      {full && (
+        <details open={advancedFields}>
+          <summary>{t("cond_advanced")}</summary>
+          <div className="stack">
+            {advancedSides.map((side) => (
+              <EndpointAdvanced key={side} name={side} value={value[side]}
+                                onChange={(next) => onChange({ ...value, [side]: next })} />
+            ))}
+            <div className="form-grid">
+              <label>
+                {t("cond_service_process")}
+                <input name="service_process" value={value.service_process ?? ""}
+                       onChange={(event) => onChange({ ...value, service_process: event.target.value || null })} />
+              </label>
+              <label>
+                {t("cond_service_user")}
+                <input name="service_user" value={value.service_user ?? ""}
+                       onChange={(event) => onChange({ ...value, service_user: event.target.value || null })} />
+              </label>
+              <label>
+                {t("cond_text")}
+                <input name="text" value={value.text ?? ""}
+                       onChange={(event) => onChange({ ...value, text: event.target.value || null })} />
+              </label>
+            </div>
+            <div className="form-grid">
+              {(["initiator_processes", "initiator_users", "service_processes", "service_users"] as const).map((field) => (
+                <label key={field}>
+                  {t(ADVANCED_LIST_KEYS[field])}
+                  {/* parsed when the box is left: parsing each keystroke would swallow the new line being typed */}
+                  <textarea name={field} rows={3} defaultValue={(value[field] ?? []).join("\n")}
+                            onBlur={(event) => onChange({ ...value, [field]: event.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })} />
+                </label>
+              ))}
+            </div>
+          </div>
+        </details>
+      )}
       <details open={excluding}>
         <summary>{t("cond_exclusions")}</summary>
         <div className="stack">
@@ -250,7 +357,8 @@ export function ConditionEditor({ value, choices, onChange, onInvalid }: {
                 onChange={(either_exclude) => onChange({ ...value, either_exclude })} />
           <label>
             {t("cond_exclude_ports")}
-            <input name="exclude_ports" defaultValue={portsText(value.exclude_ports)} placeholder="53/udp, 123/udp"
+            <input name="exclude_ports" defaultValue={portsText(value.exclude_ports)}
+                   placeholder={t("cond_ports_placeholder")}
                    onBlur={(e) => ports("exclude_ports", e.target.value)} />
           </label>
           <HrefPicker name="exclude_service" kind="service" title={t("cond_exclude_services")} picked={value.exclude_services ?? []}

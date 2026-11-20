@@ -224,7 +224,7 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
       {fieldError("window_minutes")}
       <p className="hint">{t(rule.type === "traffic" ? "rule_traffic_hint" : "rule_bytes_hint")}</p>
       <ConditionEditor value={rule.condition} choices={choices} onChange={(condition) => set({ condition })}
-                       onInvalid={setLocalError} />
+                       onInvalid={setLocalError} full />
       {localError && <p className="form-error" data-field={localError}>{t("rule_ports_invalid")}</p>}
       {fieldError("condition")}
     </>
