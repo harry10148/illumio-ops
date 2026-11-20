@@ -1,26 +1,33 @@
 """python -m illumio_ops.crosscheck {events|alerts|reports|all} --out DIR [--days N] [--margin-minutes M] [--root PATH]
 
 Runs beside the service: it takes no service lock, opens the databases read-only and creates nothing but --out.
-Exit codes: 0 nothing inconsistent (unchecked items are listed, they are not a pass); 1 something inconsistent;
-2 the settings cannot be read, the PCE is not configured or cannot be reached, the results cannot be written (and
-argparse's usage errors).
+Each area runs on its own: one that fails (the PCE unreachable, an unexpected error) becomes one unchecked finding
+naming the error's class, and the other areas still run; what was gathered is always written.
+
+Exit codes (also written at the top of report.md, io.EXIT_CODES):
+  0  nothing inconsistent and every area ran (unchecked items are listed; they are not a pass)
+  1  at least one inconsistent finding (whatever else happened)
+  2  cannot run: the settings cannot be read, the PCE is not configured, --out cannot be written, or a usage error
+  3  nothing inconsistent, but at least one area could not run
 
 The one module in this package allowed to print.
 """
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from illumio_ops import __version__
-from illumio_ops.crosscheck import io
+from illumio_ops.crosscheck import events, io
 from illumio_ops.crosscheck.model import STATUSES, Finding, Run
 from illumio_ops.paths import resolve_paths
 from illumio_ops.pce.client import (
     PceBudgetExhausted,
+    PceClient,
     PceNotConfigured,
     PceTransportError,
 )
@@ -31,6 +38,7 @@ from illumio_ops.settings.store import SettingsInvalid, SettingsStore
 EXIT_OK = 0
 EXIT_INCONSISTENT = 1
 EXIT_CANNOT_RUN = 2
+EXIT_AREA_FAILED = 3
 DAYS_MIN, DAYS_MAX = 1, 90
 AREAS = ("events", "alerts", "reports")
 
@@ -43,6 +51,7 @@ def _not_implemented(area: str) -> Callable[[Run], list[Finding]]:
 
 # area -> check; later tasks replace the placeholders (tests swap entries in).
 CHECKS: dict[str, Callable[[Run], list[Finding]]] = {area: _not_implemented(area) for area in AREAS}
+CHECKS["events"] = events.check
 
 
 def _days(raw: str) -> int:
@@ -101,31 +110,51 @@ def _load_settings(store: SettingsStore) -> Settings | None:
     return None
 
 
-def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
+def _failure(exc: Exception) -> str:
+    """The class of an area's failure and, only for errors whose text is known to be safe, why. Never str() of an
+    unknown exception: it may carry a credential or a raw response body."""
+    name = type(exc).__name__
+    if isinstance(exc, PceTransportError):
+        return f"{name}: the PCE cannot be reached ({exc.kind})"
+    if isinstance(exc, PceBudgetExhausted):
+        return f"{name}: no PCE request budget left"
+    if isinstance(exc, events.EventsUnavailable | sqlite3.Error):
+        return f"{name}: {exc}"
+    return name
+
+
+def _run_areas(run: Run, areas: tuple[str, ...]) -> tuple[list[Finding], list[str]]:
+    findings: list[Finding] = []
+    failed: list[str] = []
+    for area in areas:
+        try:
+            findings += CHECKS[area](run)
+        except Exception as exc:  # noqa: BLE001 - area boundary: one area's failure must not cost the others theirs
+            failed.append(area)
+            why = _failure(exc)
+            findings.append(Finding(area, f"{area} check", "unchecked", f"could not run: {why}"))
+            _err(f"{area}: could not run ({why})")
+    return findings, failed
+
+
+def main(argv: list[str] | None = None, *, now: datetime | None = None,
+         pce_factory: Callable[[Settings], PceClient] = io.pce) -> int:
     args = parse_args(argv)
     paths = resolve_paths(args.root)
     settings = _load_settings(SettingsStore(paths.settings_file))
     if settings is None:
         return EXIT_CANNOT_RUN
     try:
-        client = io.pce(settings)
+        client = pce_factory(settings)
     except PceNotConfigured:
         _err(f"the PCE connection is not configured in {paths.settings_file} (URL, org ID, API key and secret)")
         return EXIT_CANNOT_RUN
-    started = now if now is not None else datetime.now(UTC)
+    started = (now if now is not None else datetime.now(UTC)).astimezone(UTC)
     start, end = period(started, args.days, args.margin_minutes)
     areas = AREAS if args.command == "all" else (args.command,)
-    run = Run(paths=paths, settings=settings, pce=client, start=start, end=end)
-    findings: list[Finding] = []
+    run = Run(paths=paths, settings=settings, pce=client, start=start, end=end, now=started)
     try:
-        for area in areas:
-            findings += CHECKS[area](run)
-    except PceTransportError as exc:
-        _err(f"the PCE at {settings.pce.url} cannot be reached ({exc.kind} on {exc.path}); nothing was written")
-        return EXIT_CANNOT_RUN
-    except PceBudgetExhausted as exc:
-        _err(f"no PCE request budget left for {exc}; nothing was written")
-        return EXIT_CANNOT_RUN
+        findings, failed = _run_areas(run, areas)
     finally:
         client.close()
     meta = {
@@ -138,8 +167,10 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         "org_id": settings.pce.org_id,
         "version": __version__,
         "generated_at": pce_time(started),
+        "failed_areas": failed,
         "limitations": [
             f"The period ends {args.margin_minutes} minutes before the run, to leave room for late-arriving PCE data.",
+            "Settings (event collection, retention, intervals) are compared as they are now; they keep no history.",
         ],
     }
     try:
@@ -149,9 +180,12 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         _err(f"cannot write the results to {args.out}: {exc.strerror or type(exc).__name__}")
         return EXIT_CANNOT_RUN
     counts = {s: sum(1 for f in findings if f.status == s) for s in STATUSES}
-    print(f"{pce_time(start)} to {pce_time(end)}: " + ", ".join(f"{s} {counts[s]}" for s in STATUSES))
+    print(f"{pce_time(start)} to {pce_time(end)}: " + ", ".join(f"{s} {counts[s]}" for s in STATUSES)
+          + (f"; could not run: {', '.join(failed)}" if failed else ""))
     print(f"wrote {args.out / 'report.md'} and {args.out / 'findings.json'}")
-    return EXIT_INCONSISTENT if counts["inconsistent"] else EXIT_OK
+    if counts["inconsistent"]:
+        return EXIT_INCONSISTENT
+    return EXIT_AREA_FAILED if failed else EXIT_OK
 
 
 if __name__ == "__main__":

@@ -15,6 +15,12 @@ from illumio_ops.pce.rate_limit import RateLimiter
 from illumio_ops.settings.schema import Settings
 
 AREA_ORDER = ("events", "alerts", "reports")
+EXIT_CODES = (
+    "0 nothing inconsistent and every area ran",
+    "1 at least one inconsistent finding",
+    "2 could not run at all (settings, PCE not configured, output directory, usage)",
+    "3 nothing inconsistent, but at least one area could not run",
+)
 
 
 def open_ro(path: Path) -> sqlite3.Connection:
@@ -61,8 +67,11 @@ def render(findings: Sequence[Finding], meta: Mapping[str, Any]) -> str:
     for key, label in (("command", "Command"), ("generated_at", "Generated at (UTC)")):
         if key in meta:
             lines.append(f"- {label}: {meta[key]}")
+    failed = list(meta.get("failed_areas", []))
+    lines.append(f"- Areas that could not run: {', '.join(failed)}" if failed else "- Every area ran")
     lines += ["", "Totals: " + ", ".join(f"{s} {counts[s]}" for s in STATUSES),
-              "", "`unchecked` means the item could not be compared; it is not a pass.", ""]
+              "", "`unchecked` means the item could not be compared; it is not a pass.",
+              "", "Exit codes: " + "; ".join(EXIT_CODES) + ".", ""]
     limits = list(meta.get("limitations", []))
     if limits:
         lines += ["## Limitations", ""] + [f"- {x}" for x in limits] + [""]

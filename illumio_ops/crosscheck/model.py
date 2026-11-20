@@ -32,9 +32,11 @@ class Finding:
 
 @dataclass(frozen=True)
 class Run:
-    """One invocation: where the install is, its settings, a PCE client, and the period [start, end] (UTC)."""
+    """One invocation: where the install is, its settings, a PCE client, the period [start, end) and the moment the
+    run began (`now`: retention and collection lag are measured from it, not from `end`), all UTC."""
     paths: InstallPaths
     settings: Settings
     pce: PceClient
     start: datetime
     end: datetime
+    now: datetime

@@ -8,7 +8,7 @@ import illumio_ops.crosscheck.__main__ as cli
 from illumio_ops.crosscheck import io
 from illumio_ops.crosscheck.model import Finding
 from illumio_ops.paths import resolve_paths
-from illumio_ops.pce.client import PceClient
+from illumio_ops.pce.client import PceClient, PceResponse, PceTransportError
 from illumio_ops.settings.store import SettingsStore
 from tests.web.conftest import cached_hash
 
@@ -129,26 +129,48 @@ def test_finding_rejects_unknown_status():
 
 # --- end to end and exit codes --------------------------------------------------------------------------------
 
+class EmptyPce:
+    """A PCE with no events in the period."""
+
+    def request(self, method, path, **kw):
+        return PceResponse(200, b"[]")
+
+    def close(self):
+        pass
+
+
+def _factory(settings):
+    io.pce(settings).close()  # the real factory still decides "not configured"
+    return EmptyPce()
+
+
+def _main(args):
+    return cli.main(args, now=NOW, pce_factory=_factory)
+
+
 def test_all_writes_both_files_and_exits_0_with_nothing_inconsistent(tmp_path, capsys):
     root = _root(tmp_path)
     out = tmp_path / "new" / "out"  # created when missing
-    assert cli.main(["all", "--root", str(root), "--out", str(out)], now=NOW) == 0
+    assert _main(["all", "--root", str(root), "--out", str(out)]) == 0
     data = json.loads((out / "findings.json").read_text())
     assert {f["area"] for f in data["findings"]} == {"events", "alerts", "reports"}
-    assert all(f["status"] == "unchecked" for f in data["findings"])  # nothing checked is never "consistent"
+    # what is not implemented yet is never "consistent"
+    assert all(f["status"] == "unchecked" for f in data["findings"] if f["area"] != "events")
     assert data["meta"]["period_end"] == "2026-11-20T11:30:00Z"
     assert data["meta"]["period_start"] == "2026-11-13T11:30:00Z"
+    assert data["meta"]["failed_areas"] == []
     md = (out / "report.md").read_text()
     printed = capsys.readouterr()
     for text in (md, (out / "findings.json").read_text(), printed.out, printed.err):
         assert API_SECRET not in text and API_KEY not in text
     assert "unchecked" in printed.out
+    assert "Exit codes" in md and "3 " in md
 
 
 def test_single_area_runs_only_that_area(tmp_path):
     root = _root(tmp_path)
     out = tmp_path / "out"
-    assert cli.main(["events", "--root", str(root), "--out", str(out)], now=NOW) == 0
+    assert _main(["events", "--root", str(root), "--out", str(out)]) == 0
     assert {f["area"] for f in json.loads((out / "findings.json").read_text())["findings"]} == {"events"}
 
 
@@ -156,12 +178,12 @@ def test_inconsistent_exits_1(tmp_path, monkeypatch):
     root = _root(tmp_path)
     monkeypatch.setitem(cli.CHECKS, "alerts", lambda run: [Finding("alerts", "rule r1", "inconsistent", "missed")])
     out = tmp_path / "out"
-    assert cli.main(["all", "--root", str(root), "--out", str(out)], now=NOW) == 1
+    assert _main(["all", "--root", str(root), "--out", str(out)]) == 1
     assert "missed" in (out / "report.md").read_text()
 
 
 def test_missing_settings_exits_2(tmp_path, capsys):
-    assert cli.main(["all", "--root", str(tmp_path / "none"), "--out", str(tmp_path / "out")], now=NOW) == 2
+    assert _main(["all", "--root", str(tmp_path / "none"), "--out", str(tmp_path / "out")]) == 2
     assert "settings" in capsys.readouterr().err
     assert not (tmp_path / "out" / "report.md").exists()
 
@@ -172,31 +194,59 @@ def test_invalid_settings_exits_2_naming_the_field_not_the_value(tmp_path, capsy
     d = json.loads(f.read_text())
     d["pce"]["org_id"] = "not-a-number"
     f.write_text(json.dumps(d))
-    assert cli.main(["all", "--root", str(root), "--out", str(tmp_path / "out")], now=NOW) == 2
+    assert _main(["all", "--root", str(root), "--out", str(tmp_path / "out")]) == 2
     err = capsys.readouterr().err
     assert "pce.org_id" in err and API_SECRET not in err
 
 
 def test_unconfigured_pce_exits_2(tmp_path, capsys):
     root = _root(tmp_path, configured=False)
-    assert cli.main(["all", "--root", str(root), "--out", str(tmp_path / "out")], now=NOW) == 2
+    assert _main(["all", "--root", str(root), "--out", str(tmp_path / "out")]) == 2
     assert "PCE" in capsys.readouterr().err
 
 
 def test_out_that_is_a_file_exits_2(tmp_path, capsys):
     root = _root(tmp_path)
     (tmp_path / "taken").write_text("x")
-    assert cli.main(["all", "--root", str(root), "--out", str(tmp_path / "taken")], now=NOW) == 2
+    assert _main(["all", "--root", str(root), "--out", str(tmp_path / "taken")]) == 2
     assert "cannot write" in capsys.readouterr().err
 
 
-def test_pce_unreachable_during_a_check_exits_2(tmp_path, monkeypatch, capsys):
-    from illumio_ops.pce.client import PceTransportError
-
+def test_pce_unreachable_in_one_area_exits_3_and_the_others_still_run(tmp_path, monkeypatch, capsys):
     def boom(run):
         raise PceTransportError("/events", "refused")
     root = _root(tmp_path)
     monkeypatch.setitem(cli.CHECKS, "events", boom)
-    assert cli.main(["all", "--root", str(root), "--out", str(tmp_path / "out")], now=NOW) == 2
-    err = capsys.readouterr().err
-    assert "refused" in err and API_SECRET not in err
+    out = tmp_path / "out"
+    assert _main(["all", "--root", str(root), "--out", str(out)]) == 3
+    data = json.loads((out / "findings.json").read_text())
+    assert {f["area"] for f in data["findings"]} == {"events", "alerts", "reports"}
+    ev = [f for f in data["findings"] if f["area"] == "events"]
+    assert len(ev) == 1 and ev[0]["status"] == "unchecked"
+    assert "PceTransportError" in ev[0]["detail"] and "refused" in ev[0]["detail"]
+    assert data["meta"]["failed_areas"] == ["events"]
+    md = (out / "report.md").read_text()
+    assert "could not run: events" in md
+    assert API_SECRET not in md + capsys.readouterr().err
+
+
+def test_an_unexpected_error_names_its_class_never_its_message(tmp_path, monkeypatch, capsys):
+    def boom(run):
+        raise RuntimeError(f"api_secret={API_SECRET} body=<html>raw response</html>")
+    root = _root(tmp_path)
+    monkeypatch.setitem(cli.CHECKS, "reports", boom)
+    out = tmp_path / "out"
+    assert _main(["all", "--root", str(root), "--out", str(out)]) == 3
+    printed = capsys.readouterr()
+    for text in ((out / "report.md").read_text(), (out / "findings.json").read_text(), printed.out, printed.err):
+        assert API_SECRET not in text and "raw response" not in text
+    assert "RuntimeError" in (out / "report.md").read_text()
+
+
+def test_inconsistent_wins_over_a_failed_area(tmp_path, monkeypatch):
+    def boom(run):
+        raise ValueError("x")
+    root = _root(tmp_path)
+    monkeypatch.setitem(cli.CHECKS, "events", boom)
+    monkeypatch.setitem(cli.CHECKS, "alerts", lambda run: [Finding("alerts", "rule r1", "inconsistent", "missed")])
+    assert _main(["all", "--root", str(root), "--out", str(tmp_path / "out")]) == 1
