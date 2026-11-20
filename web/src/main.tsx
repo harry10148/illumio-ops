@@ -5,7 +5,7 @@ import { App } from "./App";
 import "./pages/alerts/AlertsHome";
 import "./pages/quarantine/Quarantine";
 import "./pages/alerts/AlertDetail";
-import "./pages/alerts/Rules";
+import "./pages/alerts/rules/RulesPage";
 import "./pages/alerts/RuleEditor";
 import "./pages/alerts/RulesAndChannels";
 import "./pages/reports/Reports";

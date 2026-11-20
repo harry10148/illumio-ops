@@ -76,18 +76,22 @@ def test_a_gap_in_the_collection_is_said_once_on_the_host_page(live_app, fake_pc
     ctx.close()
 
 
-def test_the_state_column_of_the_rule_list_is_drawn_only_when_a_rule_has_one(live_app, browser):
+def test_rule_state_is_always_available_and_non_ok_status_is_shown_under_activity(live_app, browser):
     ctx, page = _wide(browser, live_app)
     page.goto(f"{live_app.url}/alert-rules")
-    heads = page.locator("[data-role=rule-list] thead th")
+    heads = page.locator("[data-role=rules-event] thead th")
     expect(heads.first).to_be_visible()
-    assert "State" not in " | ".join(heads.all_inner_texts()) and "Status" not in " | ".join(heads.all_inner_texts())
+    # the headings are set in capitals by the style sheet: their text is compared without case
+    assert "state" in " | ".join(heads.all_inner_texts()).lower()
+    assert page.locator("[data-role=rules-event] [data-role=rule-state]").count() > 0
     before = heads.count()
     c = live_app.ctx
+    rid = c.settings.current().alerts.rules[0].id
     with c.db() as conn:
-        store.set_rule_status(conn, c.settings.current().alerts.rules[0].id, "accumulating", datetime.now(UTC))
+        store.set_rule_status(conn, rid, "accumulating", datetime.now(UTC))
     page.reload()
-    expect(page.locator("[data-role=rule-list] thead th")).to_have_count(before + 1)
+    expect(page.locator("[data-role=rules-event] thead th")).to_have_count(before)
+    expect(page.locator(f"tr[data-rule-id='{rid}'] [data-role=rule-last-status]")).to_have_text("accumulating")
     ctx.close()
 
 

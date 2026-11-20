@@ -22,7 +22,7 @@ def _named(live_app, name: str) -> dict:
 
 def _save(page) -> None:
     page.locator("[data-role=rule-editor]").get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-event]")
 
 
 def _from_the_list(page, live_app, scenario: str):

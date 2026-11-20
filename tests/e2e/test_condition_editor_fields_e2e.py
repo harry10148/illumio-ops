@@ -35,7 +35,7 @@ def _ports() -> list[dict]:
 def _save_rule(page) -> None:
     form = page.locator("[data-role=rule-editor]")
     form.get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-event]")
 
 
 def _rule_ports_case(page, live_app, append: bool) -> None:

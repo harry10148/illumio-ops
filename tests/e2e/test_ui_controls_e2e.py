@@ -66,32 +66,34 @@ def _rules_page(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/alert-rules")
-    switch = page.locator("[data-role=rule-list] [role=switch]").first
-    expect(switch).to_be_visible()
-    return page, switch
+    state = page.locator("[data-role=rules-event] [data-role=rule-state]").first
+    expect(state).to_be_visible()
+    return page, state
 
 
-def test_a_switch_that_fails_to_save_goes_back_and_says_so(context, live_app):
-    page, switch = _rules_page(context, live_app)
-    before = switch.get_attribute("aria-checked")
+def test_a_rule_state_that_fails_to_save_goes_back_and_says_so(context, live_app):
+    page, state = _rules_page(context, live_app)
+    before = state.locator("input:checked").get_attribute("value")
     page.route("**/api/alert-rules/*", lambda route: route.fulfill(
         status=500, content_type="application/json",
         body='{"ok": false, "data": null, "error": {"code": "internal", "message_key": "error_internal", "params": {}}}')
         if route.request.method == "PUT" else route.continue_())
-    switch.click()
-    expect(switch).to_have_attribute("data-state", "failed")
-    expect(switch).to_have_attribute("aria-checked", before)
+    target = "off" if before != "off" else "rec"
+    state.locator(f"input[value={target}]").check()
+    expect(state).to_have_attribute("data-state", "failed")
+    expect(state.locator("input:checked")).to_have_attribute("value", before)
     expect(page.locator(".form-error")).to_be_visible()
 
 
-def test_a_switch_that_saves_shows_it_and_the_change_is_kept(context, live_app):
-    page, switch = _rules_page(context, live_app)
-    after = "false" if switch.get_attribute("aria-checked") == "true" else "true"
-    switch.click()
-    expect(switch).to_have_attribute("data-state", "saved")
-    expect(switch).to_have_attribute("aria-checked", after)
+def test_a_rule_state_that_saves_shows_it_and_the_change_is_kept(context, live_app):
+    page, state = _rules_page(context, live_app)
+    before = state.locator("input:checked").get_attribute("value")
+    after = "off" if before != "off" else "on"
+    state.locator(f"input[value={after}]").check()
+    expect(state).to_have_attribute("data-state", "saved")
+    expect(state.locator("input:checked")).to_have_attribute("value", after)
     page.reload()
-    expect(page.locator("[data-role=rule-list] [role=switch]").first).to_have_attribute("aria-checked", after)
+    expect(page.locator("[data-role=rules-event] [data-role=rule-state]").first.locator("input:checked")).to_have_attribute("value", after)
 
 
 def test_a_segment_is_chosen_from_the_keyboard_and_shows_where_the_focus_is(context, live_app):

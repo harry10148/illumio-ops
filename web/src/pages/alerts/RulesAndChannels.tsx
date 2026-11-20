@@ -10,7 +10,7 @@ import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { Channels } from "../system/Channels";
 import { CHANNEL_KEYS, word } from "./common";
-import { Rules } from "./Rules";
+import { RulesPage } from "./rules/RulesPage";
 
 type Tab = "rules" | "channels";
 
@@ -93,7 +93,7 @@ export function RulesAndChannels() {
       </div>
       {tab === "rules" ? (
         <div className="stack">
-          <Rules embedded />
+          <RulesPage embedded />
           <RuleTest />
         </div>
       ) : <Channels embedded />}

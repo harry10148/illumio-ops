@@ -229,13 +229,21 @@ export function switchMetric(rule: FlowRule, to: "traffic" | "bandwidth" | "volu
 }
 
 const SEP = "; ";
-const ANY_FILTER = new Set(["", "*", "any", "all"]);
-
 export function conditionText(rule: Rule, choices: ConditionChoices): { main: string; excluded: string } {
   if (rule.type === "event") {
-    const parts = [rule.event_types.map((eventType) => eventType === "*" ? t("rsum_all_events") : eventType).join(", ")];
-    if (!ANY_FILTER.has(rule.event_severity.trim().toLowerCase())) parts.push(`${t("rsum_event_severity")} ${rule.event_severity}`);
-    if (!ANY_FILTER.has(rule.status.trim().toLowerCase())) parts.push(`${t("rsum_status")} ${rule.status}`);
+    const parts = [rule.event_types.map((eventType) => eventType === "*" ? t("rsum_all_events") : eventType).join(t("rule_condition_separator"))];
+    const severity = readSeverity(rule.event_severity);
+    if (severity.kind === "raw") parts.push(`${t("rsum_event_severity")} ${severity.text}`);
+    else if (severity.values.length !== ALL_SEVERITIES.length) {
+      const words: Record<SeverityPick, string> = { info: t("severity_info"), warning: t("severity_warning"), err: t("severity_error") };
+      parts.push(`${t("rule_condition_severity")} ${severity.values.map((value) => words[value]).join(t("rule_condition_separator"))}`);
+    }
+    const status = readStatus(rule.status);
+    if (status.kind === "raw") parts.push(`${t("rsum_status")} ${status.text}`);
+    else if (status.values.length !== ALL_STATUSES.length) {
+      const words: Record<StatusPick, string> = { success: t("rule_condition_success"), failure: t("rule_condition_failure") };
+      parts.push(`${t("rule_condition_status")} ${status.values.map((value) => words[value]).join(t("rule_condition_separator"))}`);
+    }
     for (const [path, pattern] of Object.entries(rule.match_fields ?? {})) parts.push(`${path} = ${pattern}`);
     return { main: parts.join(SEP), excluded: "" };
   }

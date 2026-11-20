@@ -47,8 +47,8 @@ export function side(name: string, f: EndpointFilter | null | undefined, choices
     }
     if (missing > 0) out.push(`${name} ${t("rsum_ip_lists", { n: String(missing) })}`);
   }
-  const hosts = (f.hrefs ?? []).length + (f.ips ?? []).length;
-  if (hosts > 0) out.push(`${name} ${t("rsum_hosts", { n: String(hosts) })}`);
+  for (const ip of f.ips ?? []) out.push(`${name} ${ip}`);
+  for (const href of f.hrefs ?? []) out.push(`${name} ${href}`);
   if (f.public) out.push(`${name} ${t("rsum_public")}`);
   return out;
 }

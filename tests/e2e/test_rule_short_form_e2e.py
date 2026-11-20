@@ -41,7 +41,7 @@ def _full(page, live_app, rule_type: str):
 
 def _save(page, form) -> None:
     form.get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-event]")
 
 
 def _saved(live_app, name: str) -> dict:

@@ -93,6 +93,6 @@ def test_a_rule_s_line_of_words_names_its_decisions(page, live_app):
     ctx = live_app.ctx
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["alerts"]["rules"].append(rule))
     page.goto(f"{live_app.url}/alert-rules")
-    cond = page.locator(f"[data-role=rule-list] tr[data-rule-id='{'d' * 32}'] [data-role=rule-condition]")
+    cond = page.locator(f"[data-role=rules-flow] tr[data-rule-id='{'d' * 32}'] [data-role=rule-condition]")
     assert f"{PB} or {ALLOWED}" in cond.inner_text()
     _rules_hold(page)

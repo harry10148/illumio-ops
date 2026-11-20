@@ -79,8 +79,8 @@ def test_rule_create_traffic_with_condition(context, live_app):
     form.locator("input[name=ports]").blur()
     form.locator("input[name=decision_blocked]").check()
     form.get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
-    expect(page.locator("[data-role=rule-list]")).to_contain_text("SSH blocked")
+    page.wait_for_selector("[data-role=rules-flow]")
+    expect(page.locator("[data-role=rules-flow]")).to_contain_text("SSH blocked")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "SSH blocked")
     assert [p.port for p in mine.condition.ports] == [22] and [d.value for d in mine.condition.decisions] == ["blocked"]
 
@@ -99,7 +99,7 @@ def test_rule_traffic_exclusions_round_trip(context, live_app):
     form.locator("input[name=src_exclude_ips]").fill("10.9.9.9")
     form.locator("input[name=src_exclude_ips]").blur()
     form.get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-flow]")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Blocked but not the scanner")
     assert mine.condition.src_exclude is not None and mine.condition.src_exclude.ips == ("10.9.9.9",)
     page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
@@ -129,7 +129,7 @@ def test_rule_lateral_exclusion_round_trip(context, live_app):
     side.get_by_role("button", name="Add IP list").click()
     expect(side.locator("[data-ip-list]")).to_have_text("Scanners×")
     form.get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-special]")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Fan-out but not the scanner")
     assert mine.exclude is not None and mine.exclude.public and mine.exclude.ips == ("10.9.9.9",)
     assert mine.exclude.ip_lists == ("/orgs/1/sec_policy/active/ip_lists/7",)
@@ -142,7 +142,7 @@ def test_rule_lateral_exclusion_round_trip(context, live_app):
     side.locator("input[name=exclude_ips]").fill("")
     side.locator("input[name=exclude_ips]").blur()
     page.locator("[data-role=rule-editor]").get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-special]")
     assert next(r for r in live_app.ctx.settings.current().alerts.rules if r.id == mine.id).exclude is None
 
 
@@ -158,7 +158,7 @@ def test_rule_event_match_fields_round_trip(context, live_app):
     form.locator("textarea[name=match_fields]").fill("notification_type=hard_limit.exceeded")
     form.locator("textarea[name=match_fields]").blur()
     form.get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-event]")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Hard limit")
     assert dict(mine.match_fields) == {"notification_type": "hard_limit.exceeded"}
     page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
@@ -190,7 +190,7 @@ def test_pack_append_missing(context, live_app):
     expect(pack).to_contain_text("1 built-in rule(s) were deleted.")
     pack.get_by_role("button", name="Add missing built-in rules").click()
     pack.get_by_role("button", name="Confirm").click()
-    expect(page.locator(f"tr[data-rule-id='{rid}']")).to_contain_text("Agent Clone Detected")
+    expect(page.locator(f"[data-role=rules-event] tr[data-rule-id='{rid}']")).to_contain_text("Agent Clone Detected")
 
 
 def test_direct_link_detail_note(context, live_app):
@@ -330,11 +330,11 @@ def test_rules_tab_columns(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.click(".sidenav .nav-item[data-nav='/alert-rules']")
-    table = page.locator("[data-role=rule-list]")
-    expect(table).to_contain_text("Triggers (7 days)")
+    table = page.locator(".rules-table")
+    expect(page.locator("[data-role=rules-summary]")).to_contain_text("Triggers in the last 7 days")
     row = table.locator(f"tr[data-rule-id='{'a' * 32}'] [data-role=fired-7d]")
     expect(row).to_have_count(0)  # the seeded alert's rule id is not a configured rule
-    expect(table.locator("[data-role=fired-7d]").first).to_have_text("0")
+    expect(table.locator("[data-role=fired-7d]").first).to_have_text("0 in 7 days")
 
 
 def test_rule_test_shows_matches(context, live_app):
@@ -372,7 +372,7 @@ def test_rules_no_overflow_760(narrow_context, live_app):
     page = narrow_context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/alert-rules")
-    page.locator("[data-role=rule-list]").wait_for()
+    page.locator("[data-role=rules-event]").wait_for()
     assert no_horizontal_overflow(page)
 
 
@@ -431,7 +431,7 @@ def test_rule_traffic_parity_conditions_round_trip(context, live_app):
     form.locator("input[name=exclude_processes]").blur()
     form.locator("input[name=exclude_transmission_multicast]").check()
     form.get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-flow]")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Parity conditions")
     c = mine.condition
     assert c.src is not None and c.src.label_groups == ("/orgs/1/sec_policy/active/label_groups/3",)
@@ -465,7 +465,7 @@ def test_rule_event_types_from_the_catalog(context, live_app):
     form.locator("textarea[name=event_types]").fill("agent.tampering\nuser.sign_in\nvendor.brand_new")
     expect(picker.locator("[data-event-type='vendor.brand_new']")).to_contain_text("not in the event catalog")
     form.get_by_role("button", name="Save").click()
-    page.wait_for_selector("[data-role=rule-list]")
+    page.wait_for_selector("[data-role=rules-event]")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Tamper or sign-in")
     assert mine.event_types == ("agent.tampering", "user.sign_in", "vendor.brand_new")
 
@@ -488,13 +488,13 @@ def test_rules_page_holds_resets_evaluates_and_keeps(context, live_app):
         page = context.new_page()
         sign_in(page, live_app.url)
         page.goto(f"{live_app.url}/alert-rules")
-        held = page.locator(f"tr[data-rule-id='{rid}'] [data-role=held]")
+        held = page.locator(f"[data-role=rules-event] tr[data-rule-id='{rid}'] [data-role=held]")
         expect(held).to_contain_text("In cooldown until")
         expect(held).to_contain_text("(1 held back)")
         held.locator("[data-role=reset]").click()
         held.locator("[data-role=reset-confirm]").click()
-        expect(page.locator(f"tr[data-rule-id='{rid}'] [data-role=held]")).to_have_count(0)
-        page.locator("[data-role=evaluate-now]").click()
+        expect(page.locator(f"[data-role=rules-event] tr[data-rule-id='{rid}'] [data-role=held]")).to_have_count(0)
+        page.locator("[data-role=evaluate] [data-role=evaluate-now]").click()
         expect(page.locator("[data-role=evaluate-requested]")).to_contain_text("Requested at")
         assert live_app.ctx.scheduler.get_job("collect_events").next_run_time <= datetime.now(UTC)
         keep = page.locator("[data-role=retention]")
@@ -519,30 +519,32 @@ def _traffic_rule(live_app):
     ctx.settings.update(ctx.settings.current().revision, lambda d: d["alerts"]["rules"].append(rule))
 
 
-def test_rule_list_states_condition_and_exclusion_and_filters_by_type(context, live_app):
-    """6.5.0 B6 (UI spec §4.9): each rule's condition and exclusion in a line of words, and a filter by type."""
+def test_rule_tables_show_conditions_exclusions_and_search(context, live_app):
+    """The traffic table keeps its condition and exclusion readable; search filters the rendered rule rows."""
     _traffic_rule(live_app)
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/alert-rules")
-    table = page.locator("[data-role=rule-list]")
-    row = table.locator(f"tr[data-rule-id='{'c' * 32}']")
+    table = page.locator(".rules-table")
+    flow = page.locator("[data-role=rules-flow]")
+    row = flow.locator(f"tr[data-rule-id='{'c' * 32}']")
     cond = row.locator("[data-role=rule-condition]").inner_text()
     assert "Blocked" in cond and "3389" in cond and "env = Prod or DR" in cond
-    assert "25 connections in 60 minutes" in cond
     excl = row.locator("[data-role=rule-exclusion]").inner_text()
     assert "app = Jumpbox" in excl and "22" in excl
-    # a rule with nothing excluded says so; a system rule names what it watches
-    system = table.locator("tr[data-rule-type=system]").first
-    assert system.locator("[data-role=rule-exclusion]").inner_text() == "None"
+    threshold = row.locator("[data-role=rule-threshold]").inner_text()
+    assert "60 min" in threshold and "≥ 25 connections" in threshold
+    system = page.locator("[data-role=rules-special] tr[data-rule-type=system]").first
     assert system.locator("[data-role=rule-condition]").inner_text().strip()
-    total = table.locator("tbody tr").count()
-    page.select_option("[data-role=rule-type-filter]", "traffic")
-    expect(table.locator("tbody tr:not([data-rule-type=traffic])")).to_have_count(0)
-    shown = table.locator("tbody tr").count()
-    assert 0 < shown < total and row.count() == 1  # only traffic rules, the new one among them
-    page.select_option("[data-role=rule-type-filter]", "")
-    expect(table.locator("tbody tr")).to_have_count(total)
+    expect(system.locator("[data-role=rule-exclusion]")).to_have_count(0)  # nothing left out: no second line
+    expect(system.locator("[data-role=rule-explanation]")).to_be_visible()
+    total = table.locator("tbody tr[data-rule-id]").count()
+    assert total > flow.locator("tbody tr[data-rule-id]").count()
+    assert flow.locator("tbody tr[data-rule-type=event], tbody tr[data-rule-type=system], tbody tr[data-rule-type=lateral]").count() == 0
+    page.get_by_role("searchbox", name="Search rules").fill("RDP blocked")
+    expect(flow.locator("tbody tr[data-rule-id]")).to_have_count(1)
+    expect(flow.locator("tbody tr[data-rule-id]").first).to_contain_text("RDP blocked")
+    assert table.locator("tbody tr[data-rule-id]").count() < total
 
 
 def test_rule_list_with_long_conditions_fits_1280_and_760(context, narrow_context, live_app):
