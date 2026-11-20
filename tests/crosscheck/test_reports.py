@@ -279,7 +279,7 @@ def _reports(run, *rows):
                 "INSERT INTO reports (report_type, params_json, status, trigger, pce_label, period_start, period_end, "
                 "created_at, kpis_json, pce_target) VALUES (?, ?, 'done', 'manual', 'x', ?, ?, ?, ?, ?)",
                 (rtype, json.dumps({"report_type": rtype, "filter": flt}), START.isoformat(), END.isoformat(),
-                 NOW.isoformat(), json.dumps([{"key": k, "value": v} for k, v in values.items()]),
+                 (END + timedelta(hours=1)).isoformat(), json.dumps([{"key": k, "value": v} for k, v in values.items()]),
                  pce_target(URL, "3")))
         conn.commit()
     finally:
@@ -406,3 +406,45 @@ def test_one_report_failing_leaves_the_others(tmp_path, monkeypatch):
     assert t[0].status == "unchecked" and "RuntimeError" in t[0].detail and "secret-ish" not in t[0].detail
     assert _by(f, "consistent", "weekly_overview #2: provisions")
     assert len(_by(f, None, "traffic #1")) == 4  # its other numbers are still listed
+
+
+# ── .106 triage (2026-11-20): what the first real run showed ──────────────────────
+
+def test_draft_change_events_are_recognised():
+    t = START
+    raws = [_audit_raw(1, "rule_sets.delete", t=t), _audit_raw(2, "rule_set.create", t=t),
+            _audit_raw(3, "sec_rule.update", t=t), _audit_raw(4, "workload.update", t=t),
+            _audit_raw(5, "workload.online", t=t), _audit_raw(6, "sec_policy.create", t=t),
+            _audit_raw(7, "user.sign_in", t=t), _audit_raw(8, "ip_list.update", t=t)]
+    got = kpis.draft_changes([kpis.parse_audit_event(r) for r in raws])
+    assert set(got) == {"rule_sets.delete", "rule_set.create", "sec_rule.update", "workload.update", "ip_list.update"}
+
+
+def _draft_setup(tmp_path, evs, records):
+    sets = [{"href": "/orgs/3/sec_policy/draft/rule_sets/1", "rules": [{"href": "/r/a"}], "deny_rules": []}]
+    pce = FakePce(records, rule_sets=sets, evs=evs)
+    run = _run(tmp_path, pce)
+    _reports(run, ("policy_usage", {"used": 1, "unused": 0, "deny_hit": 0, "no_rule": 0}, None),
+             ("readiness", {"predicted_blocked": 0}, None))
+    return run, pce
+
+
+def test_a_draft_changed_after_the_report_leaves_the_draft_numbers_unchecked(tmp_path):
+    t = datetime(2026, 11, 18, 3, tzinfo=UTC)
+    changed = [_audit_raw(1, "rule_sets.delete", "user", "ann", t=NOW - timedelta(hours=2))]  # after the report ran
+    run, pce = _draft_setup(tmp_path, changed, [rec("10.0.0.1", "10.0.0.2", first=t, draft="allowed", allow=["/r/a"])])
+    f = reports.check(run)
+    for item in ("policy_usage #1: used", "policy_usage #1: no_rule", "readiness #2: predicted_blocked"):
+        got = _by(f, None, item)
+        assert got[0].status == "unchecked" and "changed after the report ran" in got[0].detail, item
+    assert not pce.queries  # no draft recompute was spent on it
+
+
+def test_weekly_records_leave_the_draft_numbers_unchecked(tmp_path):
+    week = datetime(2026, 11, 16, tzinfo=UTC)
+    long = rec("10.0.0.1", "10.0.0.2", first=week, last=week + timedelta(days=6), draft="allowed", allow=["/r/a"])
+    run, _ = _draft_setup(tmp_path, [], [long])
+    f = reports.check(run)
+    for item in ("policy_usage #1: no_rule", "readiness #2: predicted_blocked"):
+        got = _by(f, None, item)
+        assert got[0].status == "unchecked" and "by the week" in got[0].detail, item

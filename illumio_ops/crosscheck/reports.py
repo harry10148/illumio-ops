@@ -233,6 +233,7 @@ class Report:
     start: datetime
     end: datetime
     kpis: dict[str, Any]  # key -> value as the report stored it
+    ran_at: datetime  # when it started (the draft and the inventory it read were as of then)
 
 
 @dataclass(frozen=True)
@@ -352,14 +353,34 @@ def draft_rule_sets(client: PceClient) -> list[dict[str, Any]]:
     return sets
 
 
+def _draft_unchanged(run: Run, r: Report) -> None:
+    """A draft recompute answers for the draft as it is now: the report's numbers can be compared only when nothing
+    that changes that answer happened since the report ran (from the PCE's own events)."""
+    evs, _ = _events_of(run, r.ran_at, run.now)
+    changes = kpis.draft_changes(evs)
+    if changes:
+        first = min(e.timestamp for e in evs if e.event_type in changes)
+        raise CannotCheck(f"the draft or the workloads changed after the report ran ({sum(changes.values())} events "
+                          f"from {pce_time(first)}: {', '.join(f'{t} x{n}' for t, n in sorted(changes.items()))}); "
+                          "a recompute now answers for another draft")
+
+
+def _daily(f: Fetched) -> None:
+    if kpis.long_records(f.flows.values()):
+        raise CannotCheck("the PCE answered with records longer than two days: it keeps traffic this old by the "
+                          "week, so a recompute now counts whole weeks where the report counted days")
+
+
 def _policy_usage(run: Run, r: Report, leftovers: list[str]) -> Recomputed:
     carried_decisions(r.params)
+    _draft_unchanged(run, r)
     f = fetch(run.pce, day_windows(r.start, r.end), decisions=frozenset(), draft=True, max_results=D_MAX_RESULTS,
               leftovers=leftovers)
     if f.unsupported:
         return Recomputed(dict.fromkeys(("used", "unused", "deny_hit", "no_rule")),
                           "the PCE does not recompute drafts (update_rules answered 404): the report gives none")
     _whole(f, "draft recompute")
+    _daily(f)
     hits = kpis.rule_hits(kpis.pair(f.flows.values()))
     sets = draft_rule_sets(run.pce)
     return Recomputed(kpis.policy_usage_values(sets, hits),
@@ -369,12 +390,14 @@ def _policy_usage(run: Run, r: Report, leftovers: list[str]) -> Recomputed:
 
 def _readiness(run: Run, r: Report, leftovers: list[str]) -> Recomputed:
     decisions = carried_decisions(r.params)
+    _draft_unchanged(run, r)
     f = fetch(run.pce, day_windows(r.start, r.end), decisions=decisions, draft=True, max_results=D_MAX_RESULTS,
               leftovers=leftovers)
     if f.unsupported:
         return Recomputed({"predicted_blocked": None},
                           "the PCE does not recompute drafts (update_rules answered 404): the report gives none")
     _whole(f, "draft recompute")
+    _daily(f)
     p = kpis.predicted(kpis.pair(f.flows.values()))
     return Recomputed({"predicted_blocked": p.value()},
                       f"{f.describe(decisions)}; {p.blocked_flows:,} connections into managed hosts the draft blocks, "
@@ -393,12 +416,13 @@ def latest_reports(run: Run) -> dict[str, Report]:
     target = pce_target(run.settings.pce.url, run.settings.pce.org_id)
     conn = open_ro(run.paths.app_db)
     try:
-        rows = conn.execute("SELECT id, report_type, params_json, period_start, period_end, kpis_json, pce_target "
-                            "FROM reports WHERE status = 'done' ORDER BY id DESC").fetchall()
+        rows = conn.execute("SELECT id, report_type, params_json, period_start, period_end, kpis_json, pce_target, "
+                            "COALESCE(started_at, created_at) FROM reports WHERE status = 'done' "
+                            "ORDER BY id DESC").fetchall()
     finally:
         conn.close()
     out: dict[str, Report] = {}
-    for rid, rtype, params, start, end, kpis_json, tgt in rows:
+    for rid, rtype, params, start, end, kpis_json, tgt, ran in rows:
         if rtype in out or rtype not in kpis.KPI_KEYS or tgt != target:
             continue
         try:
@@ -407,7 +431,8 @@ def latest_reports(run: Run) -> dict[str, Report]:
                 continue
             out[rtype] = Report(int(rid), str(rtype), given, datetime.fromisoformat(start),
                                 datetime.fromisoformat(end),
-                                {str(k["key"]): k.get("value") for k in stored if isinstance(k, dict) and "key" in k})
+                                {str(k["key"]): k.get("value") for k in stored if isinstance(k, dict) and "key" in k},
+                                datetime.fromisoformat(ran))
         except (ValueError, TypeError):
             continue  # an unreadable row: the next older one of the type is used
     return out

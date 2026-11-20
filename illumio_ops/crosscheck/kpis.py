@@ -415,6 +415,27 @@ def audit_values(evs: Sequence[AuditEvent]) -> dict[str, int | None]:
     }
 
 
+# What changes the draft's answer: its rules and the objects they name, and the workloads (labels, enforcement). A
+# provision (sec_policy.create) makes the draft active and leaves it as it is.
+DRAFT_RESOURCES = frozenset({"rule_set", "rule_sets", "sec_rule", "sec_rules", "deny_rule", "deny_rules",
+                             "enforcement_boundary", "enforcement_boundaries", "ip_list", "ip_lists", "service",
+                             "services", "label_group", "label_groups"})
+WORKLOAD_RESOURCES = frozenset({"workload", "workloads"})
+WORKLOAD_CHANGES = frozenset({"create", "update", "delete", "unpair", "bulk_update", "bulk_delete"})
+DRAFT_REVERTS = frozenset({"sec_policy.delete", "sec_policy.restore"})
+
+
+def draft_changes(evs: Iterable[AuditEvent]) -> dict[str, int]:
+    """The event types among `evs` that change what a draft recompute answers, with how many of each."""
+    out: dict[str, int] = {}
+    for e in evs:
+        resource, _, action = e.event_type.partition(".")
+        if (resource in DRAFT_RESOURCES or e.event_type in DRAFT_REVERTS
+                or (resource in WORKLOAD_RESOURCES and action in WORKLOAD_CHANGES)):
+            out[e.event_type] = out.get(e.event_type, 0) + 1
+    return out
+
+
 def provisions_value(evs: Sequence[AuditEvent]) -> int | None:
     """The weekly overview's provisions: None when the period has no event at all."""
     return sum(1 for e in evs if e.event_type == PROVISION) if evs else None
