@@ -14,7 +14,7 @@
   （傳輸層）、`illumio_ops.pce.timefmt`、`illumio_ops.settings.*`、`illumio_ops.paths`、`illumio_ops.domain.event_catalog`（要檢查的清單本身）、
   `illumio_ops.domain.values`、`illumio_ops.pce.rate_limit`。其他一律禁止（Task 1 的 AST 守門測試）。
 - 資料庫一律 `sqlite3.connect(f"file:{path}?mode=ro", uri=True)`；不呼叫 `illumio_ops.store.db.connect`（它可能跑 migration）。
-- 對 PCE 只用 GET；唯一例外是 async traffic query 的建立與輪詢（Task 5）。
+- 對 PCE 只用 GET。例外只有 async traffic query：建立與輪詢查詢；對本工具建立的查詢 PUT `update_rules`；DELETE 本工具建立的查詢（一定放在 `finally`；刪除失敗時在 report.md 列為殘留並附 href）。其他一律不寫入（使用者 2026-11-20：lab 與 NFR 都允許上述三種）。
 - 輸出不可含憑證；事件範例只印欄位名與 event_type／timestamp／href，不印其他內容值。
 - 工作目錄 `/home/harry/rd/illumio-ops/.worktrees/v6-crosscheck`，分支 `feat/v6-crosscheck`。每個 brief 開頭驗證 `pwd`、分支、`git status` 乾淨。
 - commit：英文 conventional commits；只 `git add` 明確路徑；不在閘門後用 `;` 或管線接 commit；不 push；結尾兩行

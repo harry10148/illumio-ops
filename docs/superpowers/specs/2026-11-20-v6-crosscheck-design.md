@@ -30,7 +30,7 @@
 
 - **檢查器呼叫了它要檢查的程式**：那只會證明程式跟自己一致。檢查器不可 import `normalize_event`、`event_matches`、`eventsource`、`flowsource`、
   報表產生器、偵測器；只可用 `PceClient`（傳輸層）、設定讀取、資料庫連線。比對邏輯自己寫，寫得比產品簡單也沒關係，寫不出來的情況列成「沒檢查」。
-- 對 PCE 寫入任何東西。唯一例外是 async traffic query 會在 PCE 上建立查詢工作（報表本來就會），這是讀取用途。
+- 對 PCE 寫入任何東西。例外只有 async traffic query 本身：建立與輪詢查詢、對本工具建立的查詢呼叫 `update_rules`（PUT，取得 draft 判定）、刪除本工具建立的查詢（DELETE）。報表本來就做同樣的呼叫，這些都是讀取用途【使用者 2026-11-20：lab 與 NFR 都允許】。
 - 寫入本系統的資料庫（一律唯讀開啟 `mode=ro`）。
 - 把「沒檢查」說成「沒問題」：每一項輸出都要分「一致」「不一致」「沒檢查（原因）」。
 
@@ -146,7 +146,7 @@ PCE /events（期間切到不被 10,000 筆上限截斷為止；上限時 PCE �
 - 差異來源：漏收或多收（由事件區負責），以及 PCE 刪除的事件。
 
 **D（draft 重算類）**：async traffic query 之後再呼叫 `update_rules` 取得 draft 判定（`pce/async_query.py:3`、`:121`，`compute_draft=True`）；產品查完會刪掉這個查詢。
-- **待確認**：本計畫 Global Constraints 只允許「async traffic query 的建立與輪詢」。`update_rules` 與刪除查詢是否在允許範圍內，需要使用者確認。
+- **已決定（使用者 2026-11-20）**：允許。對本工具建立的查詢呼叫 `update_rules`（PUT），並刪除該查詢（DELETE，一定放在 `finally`）；lab 與 NFR 都適用，因為產品產出 policy_usage／readiness 報表時本來就做同樣的呼叫。刪除失敗時在 report.md 列為殘留，附上查詢的 href。
 - 差異來源：報表產出後 draft 被改過。
 
 ### A.2 weekly_overview（`weekly_overview.py`）
@@ -358,8 +358,8 @@ RHC 未開啟時三個值都是 None，並附原因（`rule_hit_count.py:94-104`
 
 | # | 項目 | 原因 |
 |---|---|---|
-| 1 | D 類：`policy_usage` 的 `used`／`unused`／`deny_hit`／`no_rule`、`readiness` 的 `predicted_blocked` | 需要 async query 的 `update_rules`（PUT），產品查完還會刪除查詢；計畫只允許「建立與輪詢」 |
-| 2 | `rhc_hit`／`rhc_zero`／`rhc_no_record` | 重產需要 `POST /reports`（寫入）；PCE 是否保留產品產生的那份報表、能否只用 GET 讀回，未查 |
+| 1 | ~~D 類：`policy_usage` 的 `used`／`unused`／`deny_hit`／`no_rule`、`readiness` 的 `predicted_blocked`~~ | **已解決（使用者 2026-11-20）**：允許對本工具建立的查詢 PUT `update_rules` 與 DELETE（lab、NFR 皆可）。Task 5 v1 會重算這 5 個 |
+| 2 | `rhc_hit`／`rhc_zero`／`rhc_no_record` | 重產需要 `POST /reports`（寫入），**不允許**（2026-11-20 維持）；這 3 個在報告裡列為 unchecked 並寫原因。PCE 是否保留產品產生的那份報表、能否只用 GET 讀回，未查 |
 | 3 | traffic `flows`（以及所有「主要列筆數」類：`pb_flows`、`blocked_flows`） | store 以每小時重抓並依 `record_key`（含 `first_detected`）合併，一個連線每天是否只留一列，需要用真資料確認 |
 | 4 | security_risk `admin_open_connections`、new_connections `admin`、unmanaged `admin_sources` | 管理 port 清單含「PCE 管理服務」那部分，能否只用 GET 從 PCE 讀到未查；內建清單需自備 |
 | 5 | app_summary 三個方向的連線數 | PCE async query 的 include／exclude 語意是否與產品 SQL 的 `dst=app AND NOT src=app` 等價 |
