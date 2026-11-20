@@ -40,3 +40,5 @@ class Run:
     start: datetime
     end: datetime
     now: datetime
+    # What one area gathered that another may reuse (the PCE's events: read once for events and alerts).
+    cache: dict[str, Any] = field(default_factory=dict)

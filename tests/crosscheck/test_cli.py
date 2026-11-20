@@ -10,6 +10,7 @@ from illumio_ops.crosscheck.model import Finding
 from illumio_ops.paths import resolve_paths
 from illumio_ops.pce.client import PceClient, PceResponse, PceTransportError
 from illumio_ops.settings.store import SettingsStore
+from illumio_ops.store.db import connect, migrate
 from tests.web.conftest import cached_hash
 
 NOW = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
@@ -23,6 +24,9 @@ def _root(tmp_path, *, configured=True):
     paths.ensure_dirs()
     store = SettingsStore(paths.settings_file)
     store.create_initial(password_hash=cached_hash("illumio"), secret_key="ab" * 32)
+    conn = connect(paths.app_db)  # the service creates it at its first start
+    migrate(conn)
+    conn.close()
     if configured:
         store.update(store.current().revision, lambda d: d["pce"].update(
             url="https://pce.example.test:8443", org_id="3", api_key=API_KEY, api_secret=API_SECRET))
@@ -155,7 +159,7 @@ def test_all_writes_both_files_and_exits_0_with_nothing_inconsistent(tmp_path, c
     data = json.loads((out / "findings.json").read_text())
     assert {f["area"] for f in data["findings"]} == {"events", "alerts", "reports"}
     # what is not implemented yet is never "consistent"
-    assert all(f["status"] == "unchecked" for f in data["findings"] if f["area"] != "events")
+    assert all(f["status"] == "unchecked" for f in data["findings"] if f["area"] == "reports")
     assert data["meta"]["period_end"] == "2026-11-20T11:30:00Z"
     assert data["meta"]["period_start"] == "2026-11-13T11:30:00Z"
     assert data["meta"]["failed_areas"] == []

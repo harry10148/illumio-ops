@@ -55,6 +55,7 @@ class Harvest:
     unchecked: list[Slice] = field(default_factory=list)
     requests: int = 0
     windows: int = 0
+    non_objects: int = 0  # response items that are not JSON objects (counted as incomplete events)
 
 
 @dataclass(frozen=True)
@@ -69,8 +70,8 @@ class PceEvent:
 
 
 def _fetch(client: PceClient, a: datetime, b: datetime, *, timeout: float, cap: int,
-           h: Harvest) -> list[dict[str, Any]] | str:
-    """The events of [a, b], or why they could not be read. Timeouts, 429, 5xx and an empty request budget are
+           h: Harvest) -> list[Any] | str:
+    """The raw items of [a, b] (objects or not: the cap is judged on all of them), or why they could not be read. Timeouts, 429, 5xx and an empty request budget are
     retried RETRIES times; another transport failure propagates (the PCE cannot be reached at all)."""
     query = urlencode({"timestamp[gte]": pce_time(a), "timestamp[lte]": pce_time(b), "max_results": str(cap)})
     reason = ""
@@ -98,7 +99,7 @@ def _fetch(client: PceClient, a: datetime, b: datetime, *, timeout: float, cap: 
                 return "the response is not JSON"
             if not isinstance(items, list):
                 return "the response is not a list"
-            return [i for i in items if isinstance(i, dict)]
+            return items
         reason = f"HTTP {resp.status}"
         if resp.status not in RETRYABLE:
             return reason
@@ -129,6 +130,9 @@ def harvest(client: PceClient, start: datetime, end: datetime, *, timeout: float
                                            "the others of that second cannot be read"))
         h.windows += 1
         for item in got:
+            if not isinstance(item, dict):
+                h.non_objects += 1
+                continue
             href = item.get("href")
             if isinstance(href, str) and href:
                 by_href.setdefault(href, item)
@@ -180,8 +184,8 @@ def _samples(count: int) -> str:
     return f" (the first {SAMPLE_MAX} of {count} below)" if count > SAMPLE_MAX else ""
 
 
-def _incomplete(raws: Iterable[dict[str, Any]]) -> Finding | None:
-    bad = []
+def _incomplete(raws: Iterable[dict[str, Any]], non_objects: int) -> Finding | None:
+    bad: list[dict[str, Any]] = [{"not_a_json_object": True}] * non_objects
     for raw in raws:
         missing = [k for k, ok in (("href", _text(raw.get("href"))), ("event_type", _text(raw.get("event_type"))),
                                    ("timestamp", _parse_time(raw.get("timestamp")))) if ok is None]
@@ -190,8 +194,8 @@ def _incomplete(raws: Iterable[dict[str, Any]]) -> Finding | None:
     if not bad:
         return None
     return Finding(AREA, "incomplete PCE events", "unchecked",
-                   f"{_n(len(bad), 'PCE event')} without a readable href, event_type or timestamp could not be "
-                   f"compared{_samples(len(bad))}", sample=bad[:SAMPLE_MAX])
+                   f"{_n(len(bad), 'PCE event')} without a readable href, event_type or timestamp ({non_objects} of "
+                   f"them not a JSON object at all) could not be compared{_samples(len(bad))}", sample=bad[:SAMPLE_MAX])
 
 
 def _catalog(evs: Sequence[PceEvent], *, partial: bool, read: str) -> list[Finding]:
@@ -312,14 +316,31 @@ def _timeout(run: Run) -> float:
     return 180.0 if p.deployment_type is DeploymentType.SAAS else 30.0  # SaaS /events answers slowly
 
 
+CACHE_KEY = "events.harvest"
+
+
+def gather(run: Run, *, cap: int = CAP) -> Harvest:
+    """The PCE's events of the run's period, read once per run (the alerts area reuses what this area read)."""
+    h = run.cache.get(CACHE_KEY)
+    if not isinstance(h, Harvest):
+        h = harvest(run.pce, run.start, run.end, timeout=_timeout(run), cap=cap)
+        run.cache[CACHE_KEY] = h
+    return h
+
+
+def in_period(run: Run, h: Harvest) -> tuple[list[dict[str, Any]], list[PceEvent]]:
+    """The raw items within [start, end) (and those whose time cannot be read), and the readable events among them."""
+    raws = [r for r in h.items if (t := _parse_time(r.get("timestamp"))) is None or run.start <= t < run.end]
+    return raws, [e for e in (parse(r) for r in raws) if e is not None]
+
+
 def check(run: Run, *, cap: int = CAP) -> list[Finding]:
-    h = harvest(run.pce, run.start, run.end, timeout=_timeout(run), cap=cap)
+    h = gather(run, cap=cap)
     findings = [Finding(AREA, f"PCE window {_span(s.start, s.end)}", "unchecked", s.reason) for s in h.unchecked]
-    in_period = [r for r in h.items if (t := _parse_time(r.get("timestamp"))) is None or run.start <= t < run.end]
-    inc = _incomplete(in_period)
+    raws, evs = in_period(run, h)
+    inc = _incomplete(raws, h.non_objects)
     if inc is not None:
         findings.append(inc)
-    evs = [e for e in (parse(r) for r in in_period) if e is not None]
     read = (f"Read from the PCE: {_n(len(evs), 'event')} in the period, {_n(h.windows, 'window')}, "
             f"{_n(h.requests, 'request')}.")
     findings += _catalog(evs, partial=bool(h.unchecked), read=read)

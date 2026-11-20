@@ -22,7 +22,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from illumio_ops import __version__
-from illumio_ops.crosscheck import events, io
+from illumio_ops.crosscheck import alerts, events, io
 from illumio_ops.crosscheck.model import STATUSES, Finding, Run
 from illumio_ops.paths import resolve_paths
 from illumio_ops.pce.client import (
@@ -52,6 +52,7 @@ def _not_implemented(area: str) -> Callable[[Run], list[Finding]]:
 # area -> check; later tasks replace the placeholders (tests swap entries in).
 CHECKS: dict[str, Callable[[Run], list[Finding]]] = {area: _not_implemented(area) for area in AREAS}
 CHECKS["events"] = events.check
+CHECKS["alerts"] = alerts.check
 
 
 def _days(raw: str) -> int:
@@ -171,6 +172,8 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None,
         "limitations": [
             f"The period ends {args.margin_minutes} minutes before the run, to leave room for late-arriving PCE data.",
             "Settings (event collection, retention, intervals) are compared as they are now; they keep no history.",
+            ("Event alert rules are compared as they are now (enabled, conditions, cooldown, throttle): a rule added "
+             "or changed during the period may show differences before that change."),
         ],
     }
     try:

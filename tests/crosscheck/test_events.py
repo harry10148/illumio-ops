@@ -303,3 +303,22 @@ def test_reads_the_store_read_only(tmp_path, monkeypatch):
     _store(run, pce.items)
     events.check(run)
     assert seen == [run.paths.flows_db]
+
+
+def test_full_is_judged_on_the_raw_response_and_non_objects_are_counted(tmp_path):
+    t = NOW - timedelta(days=1)
+    good = [ev(i, t + timedelta(hours=i % 5, minutes=i)) for i in range(3)]
+    pce = FakePce(good)
+    real = pce.request
+
+    def request(method, path, **kw):  # every answer carries one non-object besides the events
+        resp = real(method, path, **kw)
+        return PceResponse(200, json.dumps(json.loads(resp.body) + ["not an event"]).encode())
+    pce.request = request
+    h = events.harvest(pce, t - timedelta(hours=1), t + timedelta(hours=6), timeout=30, cap=4)
+    assert len(pce.calls) > 1  # 3 events + 1 non-object = 4 = the cap: the window was full and was split
+    assert sorted(e["href"] for e in h.items) == sorted(e["href"] for e in good) and h.non_objects >= 1
+    run = _run(tmp_path, pce)
+    _store(run, good)
+    inc = _by(events.check(run, cap=4), "unchecked", "incomplete")
+    assert len(inc) == 1 and "not a JSON object" in inc[0].detail
