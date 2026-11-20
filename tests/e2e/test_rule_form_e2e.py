@@ -34,7 +34,7 @@ def test_new_event_rule_sends_every_expected_field(context, live_app):
     sign_in(page, live_app.url)
     form = _new(page, live_app)
     form.locator("input[name=name]").fill("Sign-in errors")
-    form.locator("textarea[name=event_types]").fill("user.sign_in")
+    form.locator("input[data-event-type='user.sign_in']").check()
     actual = _create_and_capture(page, form)
     expected = _expected_base("Sign-in errors") | {
         "type": "event", "severity": None, "event_types": ["user.sign_in"], "status": "all",
@@ -110,7 +110,7 @@ def test_changed_rule_is_not_overwritten_and_reload_is_offered(context, live_app
     page.goto(f"{live_app.url}/alert-rules?rule={rid}")
     form = page.locator("[data-role=rule-form]")
     # the form must hold the rule as it was before someone else changes it
-    expect(form.locator("textarea[name=event_types]")).to_have_value("agent.tampering")
+    expect(form.locator("[data-role=event-picker] input[data-event-type='agent.tampering']")).to_be_checked()
     ctx = live_app.ctx
     def change_rule(data):
         next(item for item in data["alerts"]["rules"] if item["id"] == rid).update(cooldown_minutes=999)

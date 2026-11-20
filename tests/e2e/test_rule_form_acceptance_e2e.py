@@ -57,12 +57,11 @@ def test_three_rules_made_from_the_rule_list(context, live_app):
     # 1. an event rule: pick the category, tick an event, save
     form = _from_the_list(page, live_app, "event:policy")
     form.locator("input[name=name]").fill("Label deleted")
-    # TODO(Task 5): tick label.delete in the event picker once the form has it
-    form.locator("textarea[name=event_types]").fill("label.delete")
+    form.locator("input[data-event-type='label.delete']").check()
     _save(page)
     form = _full_form(page, live_app, "event")
     form.locator("input[name=name]").fill("Label deleted, full form")
-    form.locator("textarea[name=event_types]").fill("label.delete")
+    form.locator("input[data-event-type='label.delete']").check()
     _save(page)
     assert _named(live_app, "Label deleted") == _named(live_app, "Label deleted, full form")
 
@@ -86,7 +85,7 @@ def test_three_rules_made_from_the_rule_list(context, live_app):
     before = _rules(live_app)
     page.goto(f"{live_app.url}/alert-rules?rule={rid}")
     form = page.locator("[data-role=rule-form]")
-    expect(form.locator("textarea[name=event_types]")).to_have_value("agent.tampering")
+    expect(form.locator("[data-role=event-picker] input[data-event-type='agent.tampering']")).to_be_checked()
     form.locator("[data-role=rule-form-advanced] > summary").click()  # folded: the pack's own cooldown
     form.locator("input[name=cooldown_minutes]").fill("90")
     _save(page)
@@ -200,19 +199,17 @@ def test_a_pattern_with_a_comma_is_one_entry_opened_saved_and_edited(context, li
     page.goto(f"{live_app.url}/alert-rules?rule={rid}")
     form = page.locator("[data-role=rule-form]")
     box = form.locator("textarea[name=event_types]")
-    expect(box).to_have_value(f"{COMMA}\nuser.login")   # two entries, one per line
+    expect(box).to_have_value(COMMA)   # catalog entries are controlled by the picker
     page.wait_for_load_state("networkidle")
     _save(page)
     assert _rules(live_app)[rid]["event_types"] == [COMMA, "user.login"]   # saved unchanged: the same list
 
     page.goto(f"{live_app.url}/alert-rules?rule={rid}")
-    box = page.locator("[data-role=rule-form] textarea[name=event_types]")
-    expect(box).to_have_value(f"{COMMA}\nuser.login")
-    box.press("Control+End")          # the second entry is edited where it stands: the keys a reader presses
-    for _ in range(len("login")):
-        box.press("Backspace")
-    box.press_sequentially("sign_in")
-    expect(box).to_have_value(f"{COMMA}\nuser.sign_in")
+    form = page.locator("[data-role=rule-form]")
+    box = form.locator("textarea[name=event_types]")
+    expect(box).to_have_value(COMMA)
+    form.locator("input[data-event-type='user.login']").uncheck()
+    form.locator("input[data-event-type='user.sign_in']").check()
     _save(page)
     assert _rules(live_app)[rid]["event_types"] == [COMMA, "user.sign_in"]   # the first is whole
 
@@ -222,17 +219,14 @@ def test_a_pattern_with_a_comma_typed_into_a_new_rule_is_one_entry(context, live
     sign_in(page, live_app.url)
     form = _full_form(page, live_app, "event")
     form.locator("input[name=name]").fill("Typed comma")
+    more = form.locator("details.event-more")
+    if not more.evaluate("(e) => e.open"):
+        more.locator("summary").click()
     box = form.locator("textarea[name=event_types]")
-    box.press_sequentially(COMMA)
-    box.press("Enter")
-    box.press_sequentially("user.sign_in")
-    box.press("Enter")                 # a line left empty at the end is not an entry
-    expect(box).to_have_value(f"{COMMA}\nuser.sign_in\n")
-    # the catalog's picker adds a line of its own
-    picker = form.locator("[data-role=event-picker]")
-    picker.locator("select[name=event_pick]").select_option("agent.tampering")
-    picker.get_by_role("button", name="Add event type").click()
-    expect(box).to_have_value(f"{COMMA}\nuser.sign_in\nagent.tampering")
+    box.fill(COMMA)
+    expect(box).to_have_value(COMMA)
+    form.locator("input[data-event-type='user.sign_in']").check()
+    form.locator("input[data-event-type='agent.tampering']").check()
     _save(page)
     assert _named(live_app, "Typed comma")["event_types"] == [COMMA, "user.sign_in", "agent.tampering"]
 
@@ -242,6 +236,9 @@ def test_a_rule_with_no_event_type_typed_is_refused_at_the_field(context, live_a
     sign_in(page, live_app.url)
     form = _full_form(page, live_app, "event")
     form.locator("input[name=name]").fill("Nothing typed")
+    more = form.locator("details.event-more")
+    if not more.evaluate("(e) => e.open"):
+        more.locator("summary").click()
     form.locator("textarea[name=event_types]").fill("  \n\n")
     form.locator("button[type=submit]").click()
     expect(form.locator(".field-error[data-field*=event_types]").first).to_be_visible()

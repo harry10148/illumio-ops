@@ -158,8 +158,10 @@ def test_rule_event_match_fields_round_trip(context, live_app):
     sign_in(page, live_app.url)
     form = _new_rule_form(page, live_app)
     form.locator("input[name=name]").fill("Hard limit")
-    form.locator("textarea[name=event_types]").fill("system_task.prune_old_log_events")
-    form.get_by_text("Advanced: match event fields").click()
+    form.locator("input[data-event-type='system_task.prune_old_log_events']").check()
+    more = form.locator("details.event-more")
+    if not more.evaluate("(e) => e.open"):
+        more.locator("summary").click()
     form.locator("textarea[name=match_fields]").fill("notification_type=hard_limit.exceeded")
     form.locator("textarea[name=match_fields]").blur()
     form.locator("button[type=submit]").click()
@@ -176,6 +178,9 @@ def test_rule_invalid_regex_field_error(context, live_app):
     sign_in(page, live_app.url)
     form = _new_rule_form(page, live_app)
     form.locator("input[name=name]").fill("bad")
+    more = form.locator("details.event-more")
+    if not more.evaluate("(e) => e.open"):
+        more.locator("summary").click()
     form.locator("textarea[name=event_types]").fill("agent.(tampering")
     form.locator("button[type=submit]").click()
     err = form.locator(".field-error[data-field*=event_types]").first
@@ -450,23 +455,23 @@ def test_rule_traffic_parity_conditions_round_trip(context, live_app):
 
 
 def test_rule_event_types_from_the_catalog(context, live_app):
-    """5.x parity 2026-11-06: event types are picked from the catalog with their descriptions; a type the catalog does
-    not list can still be typed, and is said to be unlisted."""
+    """Catalog events are checked in place; unlisted types remain editable as manual entries."""
     page = context.new_page()
     sign_in(page, live_app.url)
     form = _new_rule_form(page, live_app)
     form.locator("input[name=name]").fill("Tamper or sign-in")
     picker = form.locator("[data-role=event-picker]")
-    picker.locator("select[name=event_pick]").select_option("agent.tampering")
-    picker.get_by_role("button", name="Add event type").click()
-    expect(form.locator("textarea[name=event_types]")).to_have_value("agent.tampering")
-    expect(picker.locator("[data-event-type='agent.tampering']")).to_contain_text("firewall")
-    expect(picker.locator("[data-role=status-unmarked]")).to_be_visible()
-    picker.locator("select[name=event_pick]").select_option("user.sign_in")
-    picker.get_by_role("button", name="Add event type").click()
-    expect(picker.locator("[data-role=status-unmarked]")).to_have_count(0)
-    form.locator("textarea[name=event_types]").fill("agent.tampering\nuser.sign_in\nvendor.brand_new")
-    expect(picker.locator("[data-event-type='vendor.brand_new']")).to_contain_text("not in the event catalog")
+    picker.locator("input[data-event-type='agent.tampering']").check()
+    expect(picker.locator("input[data-event-type='agent.tampering']")).to_be_checked()
+    expect(picker.locator(".event-picker-row").filter(has=page.locator("input[data-event-type='agent.tampering']"))).to_contain_text("firewall")
+    expect(form).to_contain_text("one result")
+    picker.locator("input[data-event-type='user.sign_in']").check()
+    expect(form.locator("select[name=status]")).to_be_visible()
+    more = form.locator("details.event-more")
+    if not more.evaluate("(e) => e.open"):
+        more.locator("summary").click()
+    form.locator("textarea[name=event_types]").fill("vendor.brand_new")
+    expect(form.locator(".event-chip", has_text="vendor.brand_new")).to_contain_text("Outside catalog")
     form.locator("button[type=submit]").click()
     page.wait_for_selector("[data-role=rules-event]")
     expect(page.locator("[data-role=rule-form]")).to_have_count(0)  # saved: the form has closed

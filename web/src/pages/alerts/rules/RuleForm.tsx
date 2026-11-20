@@ -2,13 +2,14 @@ import { type FormEvent, type ReactElement, type ReactNode, useEffect, useMemo, 
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../../api/client";
-import type { ChannelsInput, ConditionChoices, PackRule, RulePreview, RuleWrite, RulesView, Severity, ThresholdType } from "../../../api/generated";
+import type { ChannelsInput, ConditionChoices, EventRule, PackRule, RulePreview, RuleWrite, RulesView, Severity, ThresholdType } from "../../../api/generated";
 import { ConditionEditor, NO_CHOICES } from "../../../components/ConditionEditor";
 import { Disclosure } from "../../../components/ui";
 import { t } from "../../../i18n";
 import { CHANNEL_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "../common";
-import { EventFields, Num } from "../RuleEditor";
+import { Num } from "../RuleEditor";
 import { blank, stateOf, switchMetric, withState, type FlowRule, type State } from "./model";
+import { EventCondition } from "./EventCondition";
 
 type Rule = RuleWrite["rule"];
 type FlowType = FlowRule["type"];
@@ -242,13 +243,17 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
       </div> : <strong>{t(rule.type === "event" ? "alert_type_event" : "alert_type_traffic")}</strong>}
     </Step>
     <Step number={2} label={t("rule_form_step_condition")} kind={rule.type}>
-      {eventRule && <EventFields rule={eventRule} set={(patch) => set(patch)} fieldError={fieldError} threshold={false} fieldsSeq={fieldsSeq}
-        forceMatchFieldsOpen={Boolean(error?.field?.includes("match_fields"))} />}
+      {eventRule && <EventCondition rule={eventRule as EventRule} set={(patch) => set(patch)} fieldError={fieldError} fieldsSeq={fieldsSeq}
+        forceOpen={Boolean(error?.field?.includes("match_fields") || error?.field?.includes("event_types"))}
+        items={view?.items ?? []} onOpenOwner={(ownerId) => {
+          if (dirty && !window.confirm(t("rule_form_unsaved_confirm"))) return;
+          setParams({ rule: ownerId });
+        }} />}
       {flowRule && <ConditionEditor key={`condition-${rule.type}`} value={flowRule.condition} choices={choices}
         onChange={(condition) => set({ condition })} onInvalid={setLocalError} full
         forceAdvancedOpen={Boolean(error?.field?.includes("condition."))}
         forceExclusionsOpen={Boolean(error?.field?.includes("exclude"))} />}
-      {localError && <p className="field-error" data-field={localError}>{t("rule_ports_invalid")}</p>}
+      {localError && <p className="field-error" data-field={localError}>{t(localError === "event_severity_empty" ? "rule_event_severity_empty" : "rule_ports_invalid")}</p>}
       {fieldError("condition")}
     </Step>
     <Step number={3} label={t("rule_form_step_threshold")}>

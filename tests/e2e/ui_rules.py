@@ -88,7 +88,19 @@ _JS = r"""
 
   // no_overlap: two things to press or read as a heading never share space
   const layer = (el) => el.closest('[role=dialog], dialog, .overlay');
-  const things = all('button, a, input, select, textarea, th').map((el) => [el, el.getBoundingClientRect()]);
+  // what a scrolling box clips away is not on screen: only the part inside every clipping ancestor counts
+  const clippedBox = (el) => {
+    const r = el.getBoundingClientRect();
+    let left = r.left, top = r.top, right = r.right, bottom = r.bottom;
+    for (let p = el.parentElement; p && p !== root && root.contains(p); p = p.parentElement) {   // the page scroller itself is not a clip: below the fold still counts
+      const cs = getComputedStyle(p);
+      if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+      const c = p.getBoundingClientRect();
+      left = Math.max(left, c.left); top = Math.max(top, c.top); right = Math.min(right, c.right); bottom = Math.min(bottom, c.bottom);
+    }
+    return { left, top, right: Math.max(left, right), bottom: Math.max(top, bottom) };
+  };
+  const things = all('button, a, input, select, textarea, th').map((el) => [el, clippedBox(el)]);
   for (let i = 0; i < things.length; i++) {
     const [a, ra] = things[i];
     for (let j = i + 1; j < things.length; j++) {

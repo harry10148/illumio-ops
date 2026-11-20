@@ -296,8 +296,8 @@ _COMMON = {
 # per type, each property under Advanced: a value that is not blank(type)'s, and the controls that must show it
 ADVANCED_PROPS = {
     "event": _COMMON | {
-        "status": ("failure", {"input[name=status]": "failure"}),
-        "event_severity": ("err", {"input[name=event_severity]": "err"}),
+        "status": ("failure", {"select[name=status]": "failure"}),
+        "event_severity": ("err", {"input[name=event_severity_err]": True}),
         "match_fields": ({"notification_type": "hard_limit.exceeded"},
                          {"textarea[name=match_fields]": "notification_type=hard_limit.exceeded"}),
     },
