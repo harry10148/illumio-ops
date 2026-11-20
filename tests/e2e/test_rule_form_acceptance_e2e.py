@@ -21,23 +21,32 @@ def _named(live_app, name: str) -> dict:
 
 
 def _save(page) -> None:
-    page.locator("[data-role=rule-editor]").get_by_role("button", name="Save").click()
+    form = page.locator("[data-role=rule-form]")
+    if form.count():
+        form.locator("button[type=submit]").click()
+        expect(form).to_have_count(0)  # the form closes once the rule is saved
+        return
+    page.locator("[data-role=rule-editor]").locator("button[type=submit]").click()
     page.wait_for_selector("[data-role=rules-event]")
 
 
 def _from_the_list(page, live_app, scenario: str):
-    """Rule list → New rule → the scenario's "New": only what a reader can press."""
+    """Rule list → the one event/flow form; the type is the only starting choice."""
     page.goto(f"{live_app.url}/alert-rules")
     page.get_by_role("link", name="New rule").click()
-    page.locator(f"[data-role=scenario-list] [data-scenario='{scenario}'] [data-role=scenario-new]").click()
-    page.wait_for_selector("[data-role=short-form]")
-    return page.locator("[data-role=rule-editor]")
+    form = page.locator("[data-role=rule-form]")
+    if scenario.startswith("flow:"):
+        form.locator("input[name=rule_kind][value=flow]").check()
+    return form
 
 
 def _full_form(page, live_app, rule_type: str):
-    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
-    form = page.locator("[data-role=rule-editor]")
-    form.locator("select[name=type]").select_option(rule_type)
+    page.goto(f"{live_app.url}/alert-rules?rule=new")
+    form = page.locator("[data-role=rule-form]")
+    if rule_type in ("traffic", "bandwidth", "volume"):
+        form.locator("input[name=rule_kind][value=flow]").check()
+        if rule_type != "traffic":
+            form.locator(f"input[name=flow_metric][value={rule_type}]").check()
     return form
 
 
@@ -48,7 +57,8 @@ def test_three_rules_made_from_the_rule_list(context, live_app):
     # 1. an event rule: pick the category, tick an event, save
     form = _from_the_list(page, live_app, "event:policy")
     form.locator("input[name=name]").fill("Label deleted")
-    form.locator("[data-role=event-checklist] input[data-event-type='label.delete']").check()
+    # TODO(Task 5): tick label.delete in the event picker once the form has it
+    form.locator("textarea[name=event_types]").fill("label.delete")
     _save(page)
     form = _full_form(page, live_app, "event")
     form.locator("input[name=name]").fill("Label deleted, full form")
@@ -74,11 +84,10 @@ def test_three_rules_made_from_the_rule_list(context, live_app):
     # 3. an existing rule opened from the scenario that names it, its quiet time changed
     rid = pack_rule_id("rule_agent_tampering")
     before = _rules(live_app)
-    page.goto(f"{live_app.url}/alert-rules")
-    page.get_by_role("link", name="New rule").click()
-    page.locator(f"[data-scenario='event:agent_security'] [data-role=covered-by][href='/alerts/rules/{rid}']").click()
-    form = page.locator("[data-role=rule-editor]")
+    page.goto(f"{live_app.url}/alert-rules?rule={rid}")
+    form = page.locator("[data-role=rule-form]")
     expect(form.locator("textarea[name=event_types]")).to_have_value("agent.tampering")
+    form.locator("[data-role=rule-form-advanced] > summary").click()  # folded: the pack's own cooldown
     form.locator("input[name=cooldown_minutes]").fill("90")
     _save(page)
     after = _rules(live_app)
@@ -86,10 +95,14 @@ def test_three_rules_made_from_the_rule_list(context, live_app):
     assert {k: v for k, v in after.items() if k != rid} == {k: v for k, v in before.items() if k != rid}
 
 
-def _open_and_save_each(page, live_app, ids) -> None:
-    for rid in ids:
-        page.goto(f"{live_app.url}/alerts/rules/{rid}")
-        form = page.locator("[data-role=rule-editor]")
+def _open_and_save_each(page, live_app, rules) -> None:
+    for rid, saved in rules.items():
+        if saved["type"] in ("event", "traffic", "bandwidth", "volume"):
+            page.goto(f"{live_app.url}/alert-rules?rule={rid}")
+            form = page.locator("[data-role=rule-form]")
+        else:
+            page.goto(f"{live_app.url}/alerts/rules/{rid}")
+            form = page.locator("[data-role=rule-editor]")
         expect(form.locator("select[name=severity]")).to_be_visible()
         page.wait_for_load_state("networkidle")
         _save(page)
@@ -101,7 +114,7 @@ def test_every_built_in_rule_opens_and_saves_unchanged(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     revision = live_app.ctx.settings.current().revision
-    _open_and_save_each(page, live_app, list(before))
+    _open_and_save_each(page, live_app, before)
     assert live_app.ctx.settings.current().revision == revision + len(before)   # each one really was saved
     after = _rules(live_app)
     assert list(after) == list(before)
@@ -160,7 +173,7 @@ def test_rules_of_other_shapes_open_and_save_unchanged(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     revision = s.current().revision
-    _open_and_save_each(page, live_app, list(before))
+    _open_and_save_each(page, live_app, before)
     assert s.current().revision == revision + len(before)
     after = _rules(live_app)
     for rid, rule in before.items():
@@ -184,16 +197,16 @@ def test_a_pattern_with_a_comma_is_one_entry_opened_saved_and_edited(context, li
     rid = _event_rule(live_app, "Comma", [COMMA, "user.login"])
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/{rid}")
-    form = page.locator("[data-role=rule-editor]")
+    page.goto(f"{live_app.url}/alert-rules?rule={rid}")
+    form = page.locator("[data-role=rule-form]")
     box = form.locator("textarea[name=event_types]")
     expect(box).to_have_value(f"{COMMA}\nuser.login")   # two entries, one per line
     page.wait_for_load_state("networkidle")
     _save(page)
     assert _rules(live_app)[rid]["event_types"] == [COMMA, "user.login"]   # saved unchanged: the same list
 
-    page.goto(f"{live_app.url}/alerts/rules/{rid}")
-    box = page.locator("[data-role=rule-editor] textarea[name=event_types]")
+    page.goto(f"{live_app.url}/alert-rules?rule={rid}")
+    box = page.locator("[data-role=rule-form] textarea[name=event_types]")
     expect(box).to_have_value(f"{COMMA}\nuser.login")
     box.press("Control+End")          # the second entry is edited where it stands: the keys a reader presses
     for _ in range(len("login")):
@@ -230,6 +243,6 @@ def test_a_rule_with_no_event_type_typed_is_refused_at_the_field(context, live_a
     form = _full_form(page, live_app, "event")
     form.locator("input[name=name]").fill("Nothing typed")
     form.locator("textarea[name=event_types]").fill("  \n\n")
-    form.get_by_role("button", name="Save").click()
-    expect(form.locator(".form-error[data-field*=event_types]").first).to_be_visible()
+    form.locator("button[type=submit]").click()
+    expect(form.locator(".field-error[data-field*=event_types]").first).to_be_visible()
     assert "Nothing typed" not in [r["name"] for r in _rules(live_app).values()]

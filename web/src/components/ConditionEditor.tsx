@@ -231,9 +231,9 @@ function Transmissions({ name, legendKey, value, onChange }: {
   );
 }
 
-export function ConditionEditor({ value, choices, onChange, onInvalid, full = false }: {
+export function ConditionEditor({ value, choices, onChange, onInvalid, full = false, forceAdvancedOpen = false, forceExclusionsOpen = false }: {
   value: FlowCondition; choices: ConditionChoices; onChange: (next: FlowCondition) => void;
-  onInvalid: (field: string | null) => void; full?: boolean;
+  onInvalid: (field: string | null) => void; full?: boolean; forceAdvancedOpen?: boolean; forceExclusionsOpen?: boolean;
 }) {
   const decisions = value.decisions ?? [];
   const services = choices.services;
@@ -307,7 +307,7 @@ export function ConditionEditor({ value, choices, onChange, onInvalid, full = fa
         {t("cond_exclude_system")}
       </label>
       {full && (
-        <details open={advancedFields}>
+        <details open={advancedFields || forceAdvancedOpen}>
           <summary>{t("cond_advanced")}</summary>
           <div className="stack">
             {advancedSides.map((side) => (
@@ -344,7 +344,7 @@ export function ConditionEditor({ value, choices, onChange, onInvalid, full = fa
           </div>
         </details>
       )}
-      <details open={excluding}>
+      <details open={excluding || forceExclusionsOpen}>
         <summary>{t("cond_exclusions")}</summary>
         <div className="stack">
           <div className="form-grid">

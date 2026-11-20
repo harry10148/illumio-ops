@@ -20,6 +20,14 @@ def seed(ctx, *, channels=("line",), hold=None):
                                   trigger=t, at=now, channels=list(channels), hold=hold)
 
 
+def _new_rule_form(page, live_app, kind="event"):
+    page.goto(f"{live_app.url}/alert-rules?rule=new")
+    form = page.locator("[data-role=rule-form]")
+    if kind == "flow":
+        form.locator("input[name=rule_kind][value=flow]").check()
+    return form
+
+
 def test_alerts_nav_and_list(context, live_app):
     seed(live_app.ctx)
     seed(live_app.ctx, hold=DeliveryStatus.NOT_NOTIFIED)
@@ -71,15 +79,14 @@ def test_alert_note_persists(context, live_app):
 def test_rule_create_traffic_with_condition(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
-    form = page.locator("[data-role=rule-editor]")
-    form.locator("select[name=type]").select_option("traffic")
+    form = _new_rule_form(page, live_app, "flow")
     form.locator("input[name=name]").fill("SSH blocked")
     form.locator("input[name=ports]").fill("22")
     form.locator("input[name=ports]").blur()
     form.locator("input[name=decision_blocked]").check()
-    form.get_by_role("button", name="Save").click()
+    form.locator("button[type=submit]").click()
     page.wait_for_selector("[data-role=rules-flow]")
+    expect(page.locator("[data-role=rule-form]")).to_have_count(0)  # saved: the form has closed
     expect(page.locator("[data-role=rules-flow]")).to_contain_text("SSH blocked")
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "SSH blocked")
     assert [p.port for p in mine.condition.ports] == [22] and [d.value for d in mine.condition.decisions] == ["blocked"]
@@ -90,19 +97,18 @@ def test_rule_traffic_exclusions_round_trip(context, live_app):
     control existed, and a migrated exclusion could not be seen)."""
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
-    form = page.locator("[data-role=rule-editor]")
-    form.locator("select[name=type]").select_option("traffic")
+    form = _new_rule_form(page, live_app, "flow")
     form.locator("input[name=name]").fill("Blocked but not the scanner")
     form.locator("input[name=decision_blocked]").check()
     form.get_by_text("Exclusions").click()
     form.locator("input[name=src_exclude_ips]").fill("10.9.9.9")
     form.locator("input[name=src_exclude_ips]").blur()
-    form.get_by_role("button", name="Save").click()
+    form.locator("button[type=submit]").click()
     page.wait_for_selector("[data-role=rules-flow]")
+    expect(page.locator("[data-role=rule-form]")).to_have_count(0)  # saved: the form has closed
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Blocked but not the scanner")
     assert mine.condition.src_exclude is not None and mine.condition.src_exclude.ips == ("10.9.9.9",)
-    page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
+    page.goto(f"{live_app.url}/alert-rules?rule={mine.id}")
     expect(page.locator("input[name=src_exclude_ips]")).to_have_value("10.9.9.9")
 
 
@@ -150,30 +156,29 @@ def test_rule_event_match_fields_round_trip(context, live_app):
     """Task 9: an event rule's advanced field matches, one path=pattern per line (review: no control)."""
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
-    form = page.locator("[data-role=rule-editor]")
+    form = _new_rule_form(page, live_app)
     form.locator("input[name=name]").fill("Hard limit")
     form.locator("textarea[name=event_types]").fill("system_task.prune_old_log_events")
     form.get_by_text("Advanced: match event fields").click()
     form.locator("textarea[name=match_fields]").fill("notification_type=hard_limit.exceeded")
     form.locator("textarea[name=match_fields]").blur()
-    form.get_by_role("button", name="Save").click()
+    form.locator("button[type=submit]").click()
     page.wait_for_selector("[data-role=rules-event]")
+    expect(page.locator("[data-role=rule-form]")).to_have_count(0)  # saved: the form has closed
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Hard limit")
     assert dict(mine.match_fields) == {"notification_type": "hard_limit.exceeded"}
-    page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
+    page.goto(f"{live_app.url}/alert-rules?rule={mine.id}")
     expect(page.locator("textarea[name=match_fields]")).to_have_value("notification_type=hard_limit.exceeded")
 
 
 def test_rule_invalid_regex_field_error(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
-    form = page.locator("[data-role=rule-editor]")
+    form = _new_rule_form(page, live_app)
     form.locator("input[name=name]").fill("bad")
     form.locator("textarea[name=event_types]").fill("agent.(tampering")
-    form.get_by_role("button", name="Save").click()
-    err = form.locator(".form-error[data-field*=event_types]").first
+    form.locator("button[type=submit]").click()
+    err = form.locator(".field-error[data-field*=event_types]").first
     expect(err).to_be_visible()
     assert not [r for r in live_app.ctx.settings.current().alerts.rules if r.name == "bad"]
 
@@ -414,9 +419,7 @@ def test_rule_traffic_parity_conditions_round_trip(context, live_app):
         conn.commit()
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
-    form = page.locator("[data-role=rule-editor]")
-    form.locator("select[name=type]").select_option("traffic")
+    form = _new_rule_form(page, live_app, "flow")
     form.locator("input[name=name]").fill("Parity conditions")
     form.locator("[data-side=src]").get_by_role("button", name="Add label group").click()
     form.get_by_text("Either end").first.click()
@@ -430,8 +433,9 @@ def test_rule_traffic_parity_conditions_round_trip(context, live_app):
     form.locator("input[name=exclude_processes]").fill("svchost.exe")
     form.locator("input[name=exclude_processes]").blur()
     form.locator("input[name=exclude_transmission_multicast]").check()
-    form.get_by_role("button", name="Save").click()
+    form.locator("button[type=submit]").click()
     page.wait_for_selector("[data-role=rules-flow]")
+    expect(page.locator("[data-role=rule-form]")).to_have_count(0)  # saved: the form has closed
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Parity conditions")
     c = mine.condition
     assert c.src is not None and c.src.label_groups == ("/orgs/1/sec_policy/active/label_groups/3",)
@@ -439,7 +443,7 @@ def test_rule_traffic_parity_conditions_round_trip(context, live_app):
     assert c.services == ("/orgs/1/sec_policy/active/services/2",)
     assert c.windows_services == ("wuauserv", "Spooler") and c.transmissions == ("broadcast",)
     assert c.exclude_processes == ("svchost.exe",) and c.exclude_transmissions == ("multicast",)
-    page.goto(f"{live_app.url}/alerts/rules/{mine.id}")
+    page.goto(f"{live_app.url}/alert-rules?rule={mine.id}")
     expect(page.locator("[data-side=src] [data-label-group]")).to_contain_text("Live (env)")
     expect(page.locator("[data-role=service] [data-service]")).to_contain_text("Web")
     expect(page.locator("input[name=windows_services]")).to_have_value("wuauserv, Spooler")
@@ -450,8 +454,7 @@ def test_rule_event_types_from_the_catalog(context, live_app):
     not list can still be typed, and is said to be unlisted."""
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/new?form=full")
-    form = page.locator("[data-role=rule-editor]")
+    form = _new_rule_form(page, live_app)
     form.locator("input[name=name]").fill("Tamper or sign-in")
     picker = form.locator("[data-role=event-picker]")
     picker.locator("select[name=event_pick]").select_option("agent.tampering")
@@ -464,8 +467,9 @@ def test_rule_event_types_from_the_catalog(context, live_app):
     expect(picker.locator("[data-role=status-unmarked]")).to_have_count(0)
     form.locator("textarea[name=event_types]").fill("agent.tampering\nuser.sign_in\nvendor.brand_new")
     expect(picker.locator("[data-event-type='vendor.brand_new']")).to_contain_text("not in the event catalog")
-    form.get_by_role("button", name="Save").click()
+    form.locator("button[type=submit]").click()
     page.wait_for_selector("[data-role=rules-event]")
+    expect(page.locator("[data-role=rule-form]")).to_have_count(0)  # saved: the form has closed
     mine = next(r for r in live_app.ctx.settings.current().alerts.rules if r.name == "Tamper or sign-in")
     assert mine.event_types == ("agent.tampering", "user.sign_in", "vendor.brand_new")
 

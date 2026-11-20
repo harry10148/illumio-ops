@@ -584,8 +584,29 @@ input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
 .rules-state[data-state=failed] { box-shadow: 0 0 0 3px var(--tone-crit-bg); }
 .rules-empty { padding: var(--space-5) var(--space-6) !important; color: var(--text-3); }
 .rules-retention { flex-wrap: wrap; align-items: center; }
+.rule-form { border: 1px solid var(--accent-fg); box-shadow: 0 0 0 1px var(--accent-fg); min-width: 0; }
+.rule-form-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.rule-form-head h2 { margin: 0; font-size: var(--fs-lead); }
+.rule-form-step { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line-soft); min-width: 0; }
+.rule-form-step-label { padding-top: var(--space-2); color: var(--brand-deep); font-weight: 600; }
+.rule-form-step-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.rule-form-step-body > .form-grid { margin-bottom: 0; }
+.rule-form-segments { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); }
+.rule-form-segments > label.check { display: inline-flex; align-items: center; }
+.rule-form-segments.rules-state { gap: 0; }
+.rule-form-threshold { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.rule-form-threshold > .sentence { align-items: center; }
+.rule-form-alert-fields { width: 100%; }
+.rule-form-name { min-width: 0; }
+.rule-form-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-4); padding-top: var(--space-5); border-top: 1px solid var(--line-soft); }
+.rule-form-actions > :first-child { margin-right: auto; }
+.rule-form-flash { animation: rule-form-flash 1.5s ease-out; }
+@keyframes rule-form-flash { from { background: var(--tone-warn-bg); } to { background: transparent; } }
+.rule-form-loading { color: var(--text-3); }
 @media (max-width: 860px) {
   .rules-head-actions { flex: 1 1 100%; }
+  .rule-form-step { grid-template-columns: 1fr; gap: var(--space-2); }
+  .rule-form-step-label { padding-top: 0; }
   .rules-table, .rules-table tbody { display: block; width: 100%; }
   .rules-table thead { display: none; }
   .rules-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); padding: var(--space-4) var(--space-5);

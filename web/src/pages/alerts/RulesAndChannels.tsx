@@ -81,7 +81,11 @@ function RuleTest() {
 export function RulesAndChannels() {
   const [params, setParams] = useSearchParams();
   const tab: Tab = params.get("tab") === "channels" ? "channels" : "rules";
-  const pick = (next: Tab) => setParams(next === "rules" ? {} : { tab: next }, { replace: true });
+  const pick = (next: Tab) => {
+    const form = document.querySelector<HTMLFormElement>("[data-role=rule-form][data-dirty=true]");
+    if (form && !window.confirm(t("rule_form_unsaved_confirm"))) return;
+    setParams(next === "rules" ? {} : { tab: next }, { replace: true });
+  };
   return (
     <section className="page" data-role="rules-and-channels">
       <PageHead title={t("nav_alert_rules")} purpose={t("purpose_alert_rules")} />

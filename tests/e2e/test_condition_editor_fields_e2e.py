@@ -33,17 +33,20 @@ def _ports() -> list[dict]:
 
 
 def _save_rule(page) -> None:
-    form = page.locator("[data-role=rule-editor]")
-    form.get_by_role("button", name="Save").click()
+    form = page.locator("[data-role=rule-form]")
+    if not form.count():
+        form = page.locator("[data-role=rule-editor]")
+    form.locator("button[type=submit]").click()
     page.wait_for_selector("[data-role=rules-event]")
+    expect(page.locator("[data-role=rule-form]")).to_have_count(0)  # saved: the form has closed
 
 
 def _rule_ports_case(page, live_app, append: bool) -> None:
     rule = _traffic_rule({"ports": _ports()})
     live_app.ctx.settings.update(live_app.ctx.settings.current().revision,
                                  lambda d: d["alerts"]["rules"].append(rule))
-    page.goto(f"{live_app.url}/alerts/rules/{rule['id']}")
-    ports = page.locator("[data-role=rule-editor] input[name=ports]")
+    page.goto(f"{live_app.url}/alert-rules?rule={rule['id']}")
+    ports = page.locator("[data-role=rule-form] input[name=ports]")
     ports.focus()
     if append:
         ports.press("End")
@@ -117,8 +120,8 @@ def test_alert_full_condition_fields_are_editable_and_saved(context, live_app):
                                  lambda d: d["alerts"]["rules"].append(rule))
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/alerts/rules/{rule['id']}")
-    form = page.locator("[data-role=rule-editor]")
+    page.goto(f"{live_app.url}/alert-rules?rule={rule['id']}")
+    form = page.locator("[data-role=rule-form]")
     text_values = {
         "service_process": ("old-service.exe", "new-service.exe"),
         "service_user": ("old-service-user", "new-service-user"),

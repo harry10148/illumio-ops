@@ -95,9 +95,9 @@ def test_a_scenario_names_the_rules_that_cover_it(context, live_app):
     expect(quiet.locator("[data-role=covered-by]")).to_have_count(0)
     assert quiet.locator("[data-role=scenario-new]").count() == 1
     link.click()
-    page.wait_for_selector("[data-role=rule-editor]")
-    assert page.url.endswith(f"/alerts/rules/{pack_rule_id('rule_agent_tampering')}")
-    expect(page.locator("[data-role=rule-editor] textarea[name=event_types]")).to_have_value("agent.tampering")
+    page.wait_for_selector("[data-role=rule-form]")
+    assert page.url.endswith(f"/alert-rules?rule={pack_rule_id('rule_agent_tampering')}")
+    expect(page.locator("[data-role=rule-form] textarea[name=event_types]")).to_have_value("agent.tampering")
 
 
 def test_covered_scenarios_come_first_in_their_group(context, live_app):
@@ -161,7 +161,12 @@ def test_new_rule_on_the_rule_list_opens_the_scenarios(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/alert-rules")
+    # the rule list's "New rule" opens the one form for event and traffic rules (alert rules page spec §4.3)
     page.get_by_role("link", name="New rule").click()
+    expect(page.locator("[data-role=rule-form]")).to_be_visible()
+    assert "rule=new" in page.url
+    # detection and system rules still start from their scenarios (spec §4.6)
+    page.goto(f"{live_app.url}/alerts/rules/new")
     listing = page.locator("[data-role=scenario-list]")
     expect(listing).to_be_visible()
     assert page.url.endswith("/alerts/rules/new")

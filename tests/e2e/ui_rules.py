@@ -5,6 +5,8 @@ violations(page) runs one script in the page and answers, per rule, what breaks 
 <main> is measured (the navigation is not a page)."""
 from __future__ import annotations
 
+from illumio_ops.domain.alertpack import pack_rule_id
+
 RULES: tuple[str, ...] = ("one_primary", "styled_checkbox", "tag_not_button", "cards_apart", "no_overlap",
                           "header_one_line", "no_overflow_x", "button_font", "link_not_accent", "buttons_apart")
 
@@ -15,7 +17,9 @@ PATHS: tuple[str, ...] = (
     "/alerts/rules/new", "/alerts/rules/new?form=full", "/alerts/rules/new?scenario=event:policy",
     "/alerts/rules/new?scenario=flow:traffic", "/alerts/rules/new?scenario=detector:fanout",
     "/alerts/rules/new?scenario=system:disk_low", "/system/collection", "/system/pce", "/system/lateral", "/system/jobs", "/system/tls",
-    "/system/security", "/system/logs", "/system/display")
+    "/alert-rules?rule=new", f"/alert-rules?rule={pack_rule_id('rule_agent_tampering')}",
+    f"/alert-rules?rule={pack_rule_id('rule_high_blocked')}",
+    "/alert-rules?rule=new&kind=flow", "/system/security", "/system/logs", "/system/display")
 
 PRIMARY_FILL = "rgb(194, 67, 0)"   # --accent-fg: a filled primary action
 ACCENT_TEXT = "rgb(186, 64, 0)"    # --accent-text: what links used to be drawn in

@@ -42,6 +42,7 @@ def _full(page, live_app, rule_type: str):
 def _save(page, form) -> None:
     form.get_by_role("button", name="Save").click()
     page.wait_for_selector("[data-role=rules-event]")
+    expect(page.locator("[data-role=rule-form]")).to_have_count(0)  # saved: the form has closed
 
 
 def _saved(live_app, name: str) -> dict:
@@ -462,8 +463,16 @@ def test_an_edit_page_shows_every_field_and_folds_none(page, live_app):
     s = live_app.ctx.settings
     s.update(s.current().revision, lambda d: d["alerts"]["rules"].extend(r for r, _ in made))
     for rule, shows in made:
-        page.goto(f"{live_app.url}/alerts/rules/{rule['id']}")
-        form = page.locator("[data-role=rule-editor]")
+        if rule["type"] in ("event", "traffic", "bandwidth", "volume"):
+            page.goto(f"{live_app.url}/alert-rules?rule={rule['id']}")
+            form = page.locator("[data-role=rule-form]")
+            # the new form says enabled with its off / record / notify control, not a check box
+            if "input[name=enabled]" in shows:
+                shows = {k: v for k, v in shows.items() if k != "input[name=enabled]"}
+                shows["input[name=form_rule_state]:checked"] = "off" if not rule["enabled"] else "on"
+        else:
+            page.goto(f"{live_app.url}/alerts/rules/{rule['id']}")
+            form = page.locator("[data-role=rule-editor]")
         expect(form.locator("input[name=name]")).to_have_value(rule["name"])
         expect(form.locator("[data-role=short-form], details[data-role=advanced]")).to_have_count(0)
         for selector, value in shows.items():

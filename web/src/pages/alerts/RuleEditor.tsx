@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
 import type {
@@ -65,7 +65,7 @@ function packMatch(pack: PackRule[], types: readonly string[]): PackRule | null 
   return pack.find((p) => p.rule.type === "event" && typeSet(p.rule.event_types) === wanted) ?? null;
 }
 
-function Num({ name, value, onChange }: { name: string; value: number; onChange: (n: number) => void }) {
+export function Num({ name, value, onChange }: { name: string; value: number; onChange: (n: number) => void }) {
   return <input name={name} inputMode="decimal" className="narrow" value={String(value)}
                 onChange={(e) => onChange(Number(e.target.value))} />;
 }
@@ -75,10 +75,28 @@ function Num({ name, value, onChange }: { name: string; value: number; onChange:
 export function RuleEditor() {
   const { id = "new" } = useParams();
   const [search] = useSearchParams();
-  if (id !== "new") return <RuleForm key={id} id={id} scenario={null} />;
-  const scenario = scenarioOf(search);
-  if (scenario) return <RuleForm key={`${scenario.group}:${scenario.id}`} id={id} scenario={scenario} />;
-  return search.get("form") === "full" ? <RuleForm key="full" id={id} scenario={null} /> : <ScenarioList />;
+  if (id === "new") {
+    const scenario = scenarioOf(search);
+    if (scenario) return <RuleForm key={`${scenario.group}:${scenario.id}`} id={id} scenario={scenario} />;
+    return search.get("form") === "full" ? <RuleForm key="full" id={id} scenario={null} /> : <ScenarioList />;
+  }
+  return <ExistingRuleRoute key={id} id={id} />;
+}
+
+function ExistingRuleRoute({ id }: { id: string }) {
+  const [redirect, setRedirect] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    void call("alert_rules.list").then((env) => {
+      if (!active) return;
+      const rule = env.ok && env.data?.items.find((item) => item.rule.id === id)?.rule;
+      setRedirect(Boolean(rule && (rule.type === "event" || rule.type === "traffic" || rule.type === "bandwidth" || rule.type === "volume")));
+    });
+    return () => { active = false; };
+  }, [id]);
+  if (redirect === null) return <section className="page" />;
+  if (redirect) return <Navigate to={`/alert-rules?rule=${id}`} replace />;
+  return <RuleForm id={id} scenario={null} />;
 }
 
 function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
@@ -573,10 +591,11 @@ function EventTypesBox({ types, onChange }: { types: readonly string[]; onChange
   );
 }
 
-function EventFields({ rule, set, fieldError, threshold, fieldsSeq }: {
+export function EventFields({ rule, set, fieldError, threshold, fieldsSeq, forceMatchFieldsOpen = false }: {
   rule: EventRule; set: (patch: Partial<EventRule>) => void; fieldError: (name: string) => ReactElement | null;
   /** With the threshold sentence: the short form has its own. */ threshold: boolean;
   /** Counts the times the field matches were replaced from outside their box, which then shows the new ones. */ fieldsSeq: number;
+  forceMatchFieldsOpen?: boolean;
 }) {
   const add = (type: string) => {
     const kept = rule.event_types.map((p) => p.trim()).filter((p) => p !== "");
@@ -603,7 +622,7 @@ function EventFields({ rule, set, fieldError, threshold, fieldsSeq }: {
           {fieldError("event_severity")}
         </label>
       </div>
-      <details open={Object.keys(rule.match_fields ?? {}).length > 0}>
+      <details open={Object.keys(rule.match_fields ?? {}).length > 0 || forceMatchFieldsOpen}>
         <summary>{t("rule_match_fields")}</summary>
         <label>
           {t("rule_match_fields_label")}

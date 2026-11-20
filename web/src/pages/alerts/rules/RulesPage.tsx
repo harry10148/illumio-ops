@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../../api/client";
 import type { ConditionChoices, EvaluateRequested, PackRule, RuleListItem, RulesView } from "../../../api/generated";
@@ -10,6 +10,7 @@ import { registerNav } from "../../../shell/nav";
 import { SEVERITY_KEYS, STATUS_KEYS, word } from "../common";
 import { conditionText, differsFromPack, order, stateOf, tableOf, thresholdText, withState, type State, type Table } from "./model";
 import { scenariosOf } from "../scenarios";
+import { RuleForm } from "./RuleForm";
 
 type PackMode = "append_missing" | "replace";
 type Row = RuleListItem & { rendered: string };
@@ -32,6 +33,11 @@ function stateLabel(value: State): string {
   if (value === "off") return t("rules_state_off");
   if (value === "rec") return t("rules_state_record");
   return t("rules_state_notify");
+}
+
+function confirmFormLeave(): boolean {
+  const form = document.querySelector<HTMLFormElement>("[data-role=rule-form][data-dirty=true]");
+  return !form || window.confirm(t("rule_form_unsaved_confirm"));
 }
 
 function ruleSeverity(item: RuleListItem): string {
@@ -61,6 +67,8 @@ function pageRows(items: RuleListItem[], choices: ConditionChoices, pack: PackRu
 }
 
 export function RulesPage({ embedded = false }: { embedded?: boolean }) {
+  const [params] = useSearchParams();
+  const formId = params.get("rule");
   const lang = useLang();
   const [view, setView] = useState<RulesView | null>(null);
   const [pack, setPack] = useState<PackRule[]>([]);
@@ -109,7 +117,7 @@ export function RulesPage({ embedded = false }: { embedded?: boolean }) {
       window.clearTimeout(savedTimer.current);
       savedTimer.current = window.setTimeout(() => setSavedId(null), 1500);
     }
-    else { setError(env.error); setFailedId(item.rule.id); }
+    else { setError(env.error); setFailedId(item.rule.id); setView({ ...view }); }
   }
 
   async function reset(id: string) {
@@ -158,9 +166,18 @@ export function RulesPage({ embedded = false }: { embedded?: boolean }) {
           <label className="rules-search"><span className="sr-only">{t("rules_search_label")}</span>
             <input type="search" value={query} placeholder={t("rules_search_placeholder")} onChange={(e) => setQuery(e.target.value)} />
           </label>
-          <Link className="btn-primary" to="/alerts/rules/new">{t("rules_new")}</Link>
+          <Link className={formId ? "btn-quiet" : "btn-primary"} to="/alert-rules?rule=new"
+            onClick={(event) => { if (!confirmFormLeave()) event.preventDefault(); }}>{t("rules_new")}</Link>
         </div>
       </div>
+      {formId && <RuleForm key={formId} id={formId} view={view} pack={pack} onView={setView}
+        onCreated={() => setQuery("")}
+        stateSaving={savingId === formId}
+        sharedState={pending?.id === formId ? pending.state : undefined}
+        onStateChange={(id, state) => {
+          const item = view?.items.find((entry) => entry.rule.id === id);
+          if (item) void saveState(item, state);
+        }} />}
       {view && <div className="rules-summary" data-role="rules-summary">
         <span>{t("rules_count_event", { n: String(counts.event) })}</span>
         <span>{t("rules_count_flow", { n: String(counts.flow) })}</span>
@@ -247,7 +264,8 @@ export function RulesPage({ embedded = false }: { embedded?: boolean }) {
                         <span>{stateLabel(value)}</span>
                       </label>)}
                     </div></td>
-                    <td className="rules-edit-cell"><Link to={`/alerts/rules/${rule.id}`}>{t("rules_edit")}</Link></td>
+                    <td className="rules-edit-cell"><Link to={`/alert-rules?rule=${rule.id}`}
+                      onClick={(event) => { if (!confirmFormLeave()) event.preventDefault(); }}>{t("rules_edit")}</Link></td>
                   </tr>;
                 })}
                 {rows[id].length === 0 && <tr><td colSpan={6} className="rules-empty">{t("rules_no_match")}</td></tr>}
