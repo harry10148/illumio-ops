@@ -22,7 +22,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from illumio_ops import __version__
-from illumio_ops.crosscheck import alerts, events, io
+from illumio_ops.crosscheck import alerts, events, io, reports
 from illumio_ops.crosscheck.model import STATUSES, Finding, Run
 from illumio_ops.paths import resolve_paths
 from illumio_ops.pce.client import (
@@ -53,6 +53,7 @@ def _not_implemented(area: str) -> Callable[[Run], list[Finding]]:
 CHECKS: dict[str, Callable[[Run], list[Finding]]] = {area: _not_implemented(area) for area in AREAS}
 CHECKS["events"] = events.check
 CHECKS["alerts"] = alerts.check
+CHECKS["reports"] = reports.check
 
 
 def _days(raw: str) -> int:
@@ -169,6 +170,7 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None,
         "version": __version__,
         "generated_at": pce_time(started),
         "failed_areas": failed,
+        "leftovers": list(run.cache.get(reports.LEFTOVERS, [])),
         "limitations": [
             f"The period ends {args.margin_minutes} minutes before the run, to leave room for late-arriving PCE data.",
             "Settings (event collection, retention, intervals) are compared as they are now; they keep no history.",
@@ -186,6 +188,8 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None,
     print(f"{pce_time(start)} to {pce_time(end)}: " + ", ".join(f"{s} {counts[s]}" for s in STATUSES)
           + (f"; could not run: {', '.join(failed)}" if failed else ""))
     print(f"wrote {args.out / 'report.md'} and {args.out / 'findings.json'}")
+    for href in meta["leftovers"]:
+        _err(f"left on the PCE (could not delete this traffic query): {href}")
     if counts["inconsistent"]:
         return EXIT_INCONSISTENT
     return EXIT_AREA_FAILED if failed else EXIT_OK

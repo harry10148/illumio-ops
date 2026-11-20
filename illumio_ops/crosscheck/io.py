@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from illumio_ops.crosscheck.model import STATUSES, Finding
 from illumio_ops.pce.client import PceClient, client_from_settings
@@ -29,6 +29,25 @@ def open_ro(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(f"file:{quote(str(path))}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+_DEFAULT_PORTS = {"https": 443, "http": 80}
+
+
+def pce_target(url: str, org_id: str) -> str:
+    """A PCE's identity as the reports table keeps it (`url#org`): scheme and host lower-cased, a default port and a
+    trailing slash dropped, a zero-padded org ID read as a number. Written again here, not imported."""
+    parts = urlsplit(url.strip())
+    scheme, host = parts.scheme.lower(), (parts.hostname or "").lower()
+    if ":" in host:
+        host = f"[{host}]"
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    authority = host if port is None or _DEFAULT_PORTS.get(scheme) == port else f"{host}:{port}"
+    org = org_id.strip()
+    return f"{scheme}://{authority}{parts.path.rstrip('/')}#{int(org) if org.isdigit() else org}"
 
 
 def pce(settings: Settings) -> PceClient:
@@ -72,6 +91,11 @@ def render(findings: Sequence[Finding], meta: Mapping[str, Any]) -> str:
     lines += ["", "Totals: " + ", ".join(f"{s} {counts[s]}" for s in STATUSES),
               "", "`unchecked` means the item could not be compared; it is not a pass.",
               "", "Exit codes: " + "; ".join(EXIT_CODES) + ".", ""]
+    leftovers = list(meta.get("leftovers", []))
+    if leftovers:
+        lines += ["## Leftovers on the PCE", "",
+                  "Traffic queries this tool created and could not delete; delete them on the PCE:", ""]
+        lines += [f"- `{href}`" for href in leftovers] + [""]
     limits = list(meta.get("limitations", []))
     if limits:
         lines += ["## Limitations", ""] + [f"- {x}" for x in limits] + [""]

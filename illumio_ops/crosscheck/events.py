@@ -309,7 +309,7 @@ def _store(run: Run, evs: Sequence[PceEvent], h: Harvest) -> list[Finding]:
     return out
 
 
-def _timeout(run: Run) -> float:
+def request_timeout(run: Run) -> float:
     p = run.settings.pce
     if p.events_timeout_seconds is not None:
         return float(p.events_timeout_seconds)
@@ -323,7 +323,7 @@ def gather(run: Run, *, cap: int = CAP) -> Harvest:
     """The PCE's events of the run's period, read once per run (the alerts area reuses what this area read)."""
     h = run.cache.get(CACHE_KEY)
     if not isinstance(h, Harvest):
-        h = harvest(run.pce, run.start, run.end, timeout=_timeout(run), cap=cap)
+        h = harvest(run.pce, run.start, run.end, timeout=request_timeout(run), cap=cap)
         run.cache[CACHE_KEY] = h
     return h
 
