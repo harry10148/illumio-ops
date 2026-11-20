@@ -421,7 +421,9 @@ DRAFT_RESOURCES = frozenset({"rule_set", "rule_sets", "sec_rule", "sec_rules", "
                              "enforcement_boundary", "enforcement_boundaries", "ip_list", "ip_lists", "service",
                              "services", "label_group", "label_groups"})
 WORKLOAD_RESOURCES = frozenset({"workload", "workloads"})
-WORKLOAD_CHANGES = frozenset({"create", "update", "delete", "unpair", "bulk_update", "bulk_delete"})
+# the event catalog's workload changes: labels and enforcement among them (a VEN's own status events are not)
+WORKLOAD_CHANGES = frozenset({"create", "update", "delete", "unpair", "bulk_create", "bulk_update", "bulk_delete",
+                              "set_labels", "remove_labels", "apply_policy"})
 DRAFT_REVERTS = frozenset({"sec_policy.delete", "sec_policy.restore"})
 
 

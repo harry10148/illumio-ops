@@ -415,9 +415,13 @@ def test_draft_change_events_are_recognised():
     raws = [_audit_raw(1, "rule_sets.delete", t=t), _audit_raw(2, "rule_set.create", t=t),
             _audit_raw(3, "sec_rule.update", t=t), _audit_raw(4, "workload.update", t=t),
             _audit_raw(5, "workload.online", t=t), _audit_raw(6, "sec_policy.create", t=t),
-            _audit_raw(7, "user.sign_in", t=t), _audit_raw(8, "ip_list.update", t=t)]
+            _audit_raw(7, "user.sign_in", t=t), _audit_raw(8, "ip_list.update", t=t),
+            _audit_raw(9, "workloads.set_labels", t=t), _audit_raw(10, "workloads.remove_labels", t=t),
+            _audit_raw(11, "workloads.bulk_create", t=t), _audit_raw(12, "workloads.apply_policy", t=t)]
     got = kpis.draft_changes([kpis.parse_audit_event(r) for r in raws])
-    assert set(got) == {"rule_sets.delete", "rule_set.create", "sec_rule.update", "workload.update", "ip_list.update"}
+    assert set(got) == {"rule_sets.delete", "rule_set.create", "sec_rule.update", "workload.update", "ip_list.update",
+                        "workloads.set_labels", "workloads.remove_labels", "workloads.bulk_create",
+                        "workloads.apply_policy"}
 
 
 def _draft_setup(tmp_path, evs, records):
