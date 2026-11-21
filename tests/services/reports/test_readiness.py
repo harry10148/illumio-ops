@@ -120,7 +120,24 @@ def test_predicted_error_report_still_built(ctx, monkeypatch):
 def test_predicted_capped_disclosed(ctx, monkeypatch):
     monkeypatch.setattr(readiness_report, "predicted_summary", lambda ctx, spec, **kw: summary(capped=True))
     _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
-    assert _table(_build(ctx), "predicted").limit_note
+    doc = _build(ctx)
+    assert _table(doc, "predicted").limit_note
+    # the number itself says it is a floor (crosscheck 2026-11-20), and an undetermined note is kept beside it
+    kpi = next(k for k in doc.kpis if k.key == "predicted_blocked")
+    assert kpi.value == 7 and kpi.note and "50,000" in kpi.note
+
+
+def test_predicted_capped_and_undetermined_both_on_the_kpi(ctx, monkeypatch):
+    monkeypatch.setattr(readiness_report, "predicted_summary",
+                        lambda ctx, spec, **kw: summary(capped=True, undetermined_flows=4))
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
+    note = next(k for k in _build(ctx).kpis if k.key == "predicted_blocked").note or ""
+    assert "50,000" in note and "4 flows" in note
+
+
+def test_predicted_kpi_has_no_note_when_complete(ctx):
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
+    assert next(k for k in _build(ctx).kpis if k.key == "predicted_blocked").note is None
 
 
 def test_queue_orders_by_score(ctx):

@@ -129,12 +129,19 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
         "overall": round(sum(rated) / len(rated)) if rated else None,  # points, as each app's score
         "predicted_blocked": predicted.blocked_connections if usable and predicted else None}
     no_data = t("rpt_no_flows_filtered" if inp.params.filter is not None else "rpt_rdy_no_apps")
+    # A capped answer is a floor: the number says so where it is read, not only under the table (crosscheck
+    # 2026-11-20: a lab week past the cap gave a KPI with no word of it).
+    predicted_notes: list[str] = []
+    if predicted is not None and not predicted.unsupported:
+        if predicted.capped:
+            predicted_notes.append(t("rpt_rdy_predicted_capped", n=f"{PREDICTED_MAX_RESULTS:,}"))
+        if predicted.undetermined_flows:
+            predicted_notes.append(t("rpt_rdy_predicted_undetermined", n=f"{predicted.undetermined_flows:,}"))
     notes = {"overall": None if rated else no_data,
              "predicted_blocked": (
                  t("rpt_rdy_predicted_failed", error=failure or "") if predicted is None
                  else t("rpt_rdy_predicted_unsupported") if predicted.unsupported
-                 else t("rpt_rdy_predicted_undetermined", n=f"{predicted.undetermined_flows:,}")
-                 if predicted.undetermined_flows else None)}
+                 else " ".join(predicted_notes) or None)}
     before = previous_values(inp)
     kpis = tuple(Kpi(key=k, label=t(label), value=values[k], previous=before.get(k) if before else None,
                      unit="count",
