@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactElement, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../../api/client";
@@ -8,13 +8,32 @@ import { Disclosure } from "../../../components/ui";
 import { t } from "../../../i18n";
 import { CHANNEL_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "../common";
 import { Num } from "../RuleEditor";
-import { blank, stateOf, switchMetric, withState, type FlowRule, type State } from "./model";
+import { blank, differsFromPack, fromTemplate, restored, stateOf, switchMetric, withState, type FlowRule, type State } from "./model";
 import { EventCondition } from "./EventCondition";
 import { FlowCondition } from "./FlowCondition";
 
 type Rule = RuleWrite["rule"];
 type FlowType = FlowRule["type"];
 const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
+const WHY_KEYS: Record<string, string> = {
+  rule_agent_tampering: "rule_why_agent_tampering",
+  rule_agent_suspend: "rule_why_agent_suspend",
+  rule_agent_clone: "rule_why_agent_clone",
+  rule_agent_heartbeat: "rule_why_agent_heartbeat",
+  rule_agent_offline: "rule_why_agent_offline",
+  rule_lost_agent: "rule_why_lost_agent",
+  rule_login_failed: "rule_why_login_failed",
+  rule_api_auth_failed: "rule_why_api_auth_failed",
+  rule_api_authz_failed: "rule_why_api_authz_failed",
+  rule_policy_fail: "rule_why_policy_fail",
+  rule_ruleset_change: "rule_why_ruleset_change",
+  rule_sec_rule_change: "rule_why_sec_rule_change",
+  rule_policy_provision: "rule_why_policy_provision",
+  rule_api_key_change: "rule_why_api_key_change",
+  rule_bulk_unpair: "rule_why_bulk_unpair",
+  rule_auth_settings_change: "rule_why_auth_settings_change",
+  rule_high_blocked: "rule_why_high_blocked",
+};
 
 function same(left: unknown, right: unknown): boolean {
   const normalize = (value: unknown): unknown => {
@@ -82,6 +101,8 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
   const [localError, setLocalError] = useState<string | null>(null);
   const [fieldsSeq, setFieldsSeq] = useState(0);
   const [touched, setTouched] = useState({ window: false, threshold: false });
+  const initialTemplateApplied = useRef(false);
+  const templateParam = params.get("template");
   useEffect(() => {
     if (!isNew && view) {
       const found = view.items.find((item) => item.rule.id === id)?.rule;
@@ -92,6 +113,19 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
       }
     } else if (isNew && !revision && view) setRevision(view.revision);
   }, [id, isNew, view, baseline, revision]);
+
+  useEffect(() => {
+    if (!isNew || initialTemplateApplied.current || pack.length === 0) return;
+    if (templateParam) {
+      const template = pack.find((entry) => entry.name_key === templateParam &&
+        (entry.rule.type === "event" || entry.rule.type === "traffic" || entry.rule.type === "bandwidth" || entry.rule.type === "volume"));
+      if (template) {
+        setRule(fromTemplate(template, `${t(template.name_key)}${t("rule_template_copy_suffix")}`));
+        setFieldsSeq((sequence) => sequence + 1);
+      }
+    }
+    initialTemplateApplied.current = true;
+  }, [isNew, pack, templateParam]);
 
   useEffect(() => {
     let active = true;
@@ -224,17 +258,68 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
   const eventRule = rule.type === "event" ? rule : null;
   const flowRule = flow ? rule : null;
   const customNameRequired = rule.pack_key === null;
+  const templates = pack.filter((entry) => entry.rule.type === "event" || entry.rule.type === "traffic" ||
+    entry.rule.type === "bandwidth" || entry.rule.type === "volume");
+  const selectedTemplate = templates.find((entry) => entry.name_key === templateParam);
+  const whyKey = rule.pack_key ? WHY_KEYS[rule.pack_key] : undefined;
+  const restoreTemplate = rule.pack_key ? pack.find((entry) => entry.name_key === rule.pack_key) : undefined;
+  const canRestore = Boolean(!isNew && restoreTemplate && differsFromPack(rule, pack));
   const headingName = view?.items.find((item) => item.rule.id === id)?.display_name || baseline?.name || rule.name;
   const channelsOn = channels ? Object.keys(CHANNEL_KEYS).filter((key) => key !== "-")
     .filter((key) => channels[key as keyof ChannelsInput].enabled) as (keyof ChannelsInput)[] : [];
   const hasNameError = Boolean(error?.field?.includes("name"));
   const state = stateOf(rule);
 
+  function chooseTemplate(key: string) {
+    if (!rule) return;
+    if (dirty && !window.confirm(t("rule_template_replace_confirm"))) {
+      return;
+    }
+    if (!key) {
+      setRule(blank(rule.type));
+      setFieldsSeq((sequence) => sequence + 1);
+      setPreview(null);
+      setParams((current) => { current.delete("template"); return current; }, { replace: true });
+      return;
+    }
+    const template = templates.find((entry) => entry.name_key === key);
+    if (!template) return;
+    setRule(fromTemplate(template, `${t(template.name_key)}${t("rule_template_copy_suffix")}`));
+    setFieldsSeq((sequence) => sequence + 1);
+    setPreview(null);
+    setParams((current) => { current.set("template", key); return current; }, { replace: true });
+  }
+
+  function restoreDefault() {
+    if (!rule || !restoreTemplate || !window.confirm(t("rule_restore_confirm"))) return;
+    setRule(restored(rule, restoreTemplate));
+    setFieldsSeq((sequence) => sequence + 1);
+    setPreview(null);
+  }
+
   return <form className="card stack rule-form" data-role="rule-form" data-dirty={dirty} onSubmit={(event) => void save(event)}>
     <header className="rule-form-head">
-      <h2>{isNew ? t("rule_form_new_title") : t("rule_form_edit_title", { name: headingName })}</h2>
+      <div><h2>{isNew ? t("rule_form_new_title") : t("rule_form_edit_title", { name: headingName })}</h2>
+        {!isNew && whyKey && <p className="hint">{t(whyKey)}</p>}
+      </div>
       <button type="button" className="btn-text" onClick={close}>{t("rule_form_close")}</button>
     </header>
+    {isNew && <div className="rule-template-picker">
+      <label>{t("rule_template_label")}
+        <select name="template" value={selectedTemplate?.name_key ?? ""} onChange={(event) => chooseTemplate(event.target.value)}>
+          <option value="">{t("rule_template_blank")}</option>
+          <optgroup label={t("rule_template_event_group")}>
+            {templates.filter((entry) => entry.rule.type === "event").map((entry) =>
+              <option key={entry.name_key} value={entry.name_key}>{t(entry.name_key)}</option>)}
+          </optgroup>
+          <optgroup label={t("rule_template_flow_group")}>
+            {templates.filter((entry) => entry.rule.type !== "event").map((entry) =>
+              <option key={entry.name_key} value={entry.name_key}>{t(entry.name_key)}</option>)}
+          </optgroup>
+        </select>
+      </label>
+      {selectedTemplate && WHY_KEYS[selectedTemplate.name_key] && <p className="hint">{t(WHY_KEYS[selectedTemplate.name_key]!)}</p>}
+    </div>}
     <Step number={1} label={t("rule_form_step_watch")}>
       {isNew ? <div className="rule-form-segments" role="radiogroup" aria-label={t("rule_form_step_watch")}>
         {(["event", "flow"] as const).map((kind) => <label className="check" key={kind}>
@@ -354,6 +439,7 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
       {preview.coverage_note && <p className="hint">{t(preview.coverage_note)}</p>}
     </div>}
     <footer className="rule-form-actions">
+      {canRestore && <button type="button" className="btn-quiet" onClick={restoreDefault}>{t("rule_restore_default")}</button>}
       {!isNew && (confirmDelete ? <>
         <span>{t("rule_delete_confirm")}</span>
         <button type="button" className="btn-danger" data-role="delete-confirm" onClick={() => void remove()}>{t("btn_confirm")}</button>
