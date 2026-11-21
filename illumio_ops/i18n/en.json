@@ -767,6 +767,7 @@
   "rule_form_flow_traffic_clause": "minutes, matching connections ≥",
   "rule_form_flow_bandwidth_clause": "minutes, any one connection's rate ≥",
   "rule_form_flow_volume_clause": "minutes, these connections total ≥",
+  "rule_flow_raw_values": "Stored condition values without a matching control",
   "rule_form_unit_connections": "connections",
   "rule_form_unit_mbps": "Mbps",
   "rule_form_unsaved_confirm": "Discard unsaved changes and close this form?",

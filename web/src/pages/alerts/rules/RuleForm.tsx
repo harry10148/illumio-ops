@@ -3,13 +3,14 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../../api/client";
 import type { ChannelsInput, ConditionChoices, EventRule, PackRule, RulePreview, RuleWrite, RulesView, Severity, ThresholdType } from "../../../api/generated";
-import { ConditionEditor, NO_CHOICES } from "../../../components/ConditionEditor";
+import { NO_CHOICES } from "../../../components/ConditionEditor";
 import { Disclosure } from "../../../components/ui";
 import { t } from "../../../i18n";
 import { CHANNEL_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "../common";
 import { Num } from "../RuleEditor";
 import { blank, stateOf, switchMetric, withState, type FlowRule, type State } from "./model";
 import { EventCondition } from "./EventCondition";
+import { FlowCondition } from "./FlowCondition";
 
 type Rule = RuleWrite["rule"];
 type FlowType = FlowRule["type"];
@@ -249,8 +250,9 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
           if (dirty && !window.confirm(t("rule_form_unsaved_confirm"))) return;
           setParams({ rule: ownerId });
         }} />}
-      {flowRule && <ConditionEditor key={`condition-${rule.type}`} value={flowRule.condition} choices={choices}
-        onChange={(condition) => set({ condition })} onInvalid={setLocalError} full
+      {flowRule && <FlowCondition key={`flow-condition-${fieldsSeq}`} condition={flowRule.condition} choices={choices}
+        onChange={(condition) => set({ condition })} onInvalid={setLocalError}
+        forceMoreOpen={Boolean(error?.field?.includes("condition."))}
         forceAdvancedOpen={Boolean(error?.field?.includes("condition."))}
         forceExclusionsOpen={Boolean(error?.field?.includes("exclude"))} />}
       {localError && <p className="field-error" data-field={localError}>{t(localError === "event_severity_empty" ? "rule_event_severity_empty" : "rule_ports_invalid")}</p>}

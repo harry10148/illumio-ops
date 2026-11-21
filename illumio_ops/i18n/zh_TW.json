@@ -767,6 +767,7 @@
   "rule_form_flow_traffic_clause": "分鐘，符合條件的連線數 ≥",
   "rule_form_flow_bandwidth_clause": "分鐘，任何一條連線的速率 ≥",
   "rule_form_flow_volume_clause": "分鐘，這些連線合計 ≥",
+  "rule_flow_raw_values": "沒有對應控制項的已儲存條件值",
   "rule_form_unit_connections": "條連線",
   "rule_form_unit_mbps": "Mbps",
   "rule_form_unsaved_confirm": "要捨棄尚未儲存的變更並關閉表單嗎？",

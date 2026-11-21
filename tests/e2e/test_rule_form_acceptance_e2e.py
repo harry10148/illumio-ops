@@ -99,6 +99,13 @@ def _open_and_save_each(page, live_app, rules) -> None:
         if saved["type"] in ("event", "traffic", "bandwidth", "volume"):
             page.goto(f"{live_app.url}/alert-rules?rule={rid}")
             form = page.locator("[data-role=rule-form]")
+            if saved["type"] in ("traffic", "bandwidth", "volume"):
+                more = form.locator("details[data-role=flow-more]")
+                expect(more).to_have_count(1)
+                expect(form.locator("input[name=decision_unknown]")).to_be_visible()
+                has_more_values = any(key not in {"src", "dst", "ports", "decisions"} and bool(value)
+                                      for key, value in saved["condition"].items())
+                assert more.evaluate("element => element.open") is has_more_values, saved["name"]
         else:
             page.goto(f"{live_app.url}/alerts/rules/{rid}")
             form = page.locator("[data-role=rule-editor]")
@@ -177,6 +184,21 @@ def test_rules_of_other_shapes_open_and_save_unchanged(context, live_app):
     after = _rules(live_app)
     for rid, rule in before.items():
         assert after[rid] == rule, rule["name"]
+
+
+def test_unknown_decision_can_be_saved_from_the_traffic_form(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alert-rules?rule=new")
+    form = page.locator("[data-role=rule-form]")
+    form.locator("input[name=rule_kind][value=flow]").check()
+    expect(form.locator("details[data-role=flow-more]")).to_have_count(1)
+    form.locator("input[name=name]").fill("Unknown decision")
+    form.locator("input[name=decision_unknown]").check()
+    form.locator("button[type=submit]").click()
+    expect(form).to_have_count(0)
+    saved = next(r for r in _rules(live_app).values() if r["name"] == "Unknown decision")
+    assert saved["condition"]["decisions"] == ["unknown"]
 
 
 # ── an event pattern may hold a comma: the form edits the list as a list, one pattern per line ─────────────

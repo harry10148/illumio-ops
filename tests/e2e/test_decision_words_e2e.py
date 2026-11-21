@@ -38,9 +38,11 @@ def _rules_hold(page) -> None:
 
 
 def test_the_condition_editor_names_each_decision(page, live_app):
-    page.goto(f"{live_app.url}/alert-rules?rule=new")
+    page.goto(f"{live_app.url}/alert-rules")
+    page.get_by_role("link", name="New rule").click()
     form = page.locator("[data-role=rule-form]")
     form.locator("input[name=rule_kind][value=flow]").check()
+    expect(form.locator("input[name=decision_unknown]")).to_be_visible()
     labels = {d: form.locator(f"label.check:has(input[name=decision_{d}])")
               for d in ("allowed", "potentially_blocked", "blocked", "unknown")}
     assert {d: lab.inner_text().strip() for d, lab in labels.items()} == {

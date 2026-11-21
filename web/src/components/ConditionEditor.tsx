@@ -231,9 +231,10 @@ function Transmissions({ name, legendKey, value, onChange }: {
   );
 }
 
-export function ConditionEditor({ value, choices, onChange, onInvalid, full = false, forceAdvancedOpen = false, forceExclusionsOpen = false }: {
+export function ConditionEditor({ value, choices, onChange, onInvalid, full = false, forceAdvancedOpen = false, forceExclusionsOpen = false, section = "all" }: {
   value: FlowCondition; choices: ConditionChoices; onChange: (next: FlowCondition) => void;
   onInvalid: (field: string | null) => void; full?: boolean; forceAdvancedOpen?: boolean; forceExclusionsOpen?: boolean;
+  section?: "all" | "common" | "rest";
 }) {
   const decisions = value.decisions ?? [];
   const services = choices.services;
@@ -249,26 +250,28 @@ export function ConditionEditor({ value, choices, onChange, onInvalid, full = fa
     if (parsed === null) onInvalid(`condition.${field}`);
     else { onInvalid(null); onChange({ ...value, [field]: parsed }); }
   };
+  const common = section !== "rest";
+  const rest = section !== "common";
   return (
     <div className="stack" data-role="condition">
-      <div className="form-grid">
+      {common && <div className="form-grid">
         <Side name="src" value={value.src} choices={choices} onChange={(src) => onChange({ ...value, src })} />
         <Side name="dst" value={value.dst} choices={choices} onChange={(dst) => onChange({ ...value, dst })} />
-      </div>
-      <details open={Boolean(value.either)}>
+      </div>}
+      {rest && <details open={Boolean(value.either)}>
         <summary>{t("cond_either")}</summary>
         <Side name="either" value={value.either} choices={choices} onChange={(either) => onChange({ ...value, either })} />
-      </details>
-      <label>
+      </details>}
+      {common && <><label>
         {t("cond_ports")}
         <input name="ports" defaultValue={portsText(value.ports)} placeholder={t("cond_ports_placeholder")}
                onBlur={(e) => ports("ports", e.target.value)} />
       </label>
-      <p className="hint">{t("cond_ports_hint")}</p>
-      <HrefPicker name="service" kind="service" title={t("cond_services")} hint={t("cond_services_hint")} picked={value.services ?? []}
+      <p className="hint">{t("cond_ports_hint")}</p></>}
+      {rest && <HrefPicker name="service" kind="service" title={t("cond_services")} hint={t("cond_services_hint")} picked={value.services ?? []}
                   options={services} gone={t("cond_service_gone")} addKey="cond_add_service"
-                  onChange={(next) => onChange({ ...value, services: next })} />
-      <fieldset>
+                  onChange={(next) => onChange({ ...value, services: next })} />}
+      {common && <fieldset>
         <legend>{t("cond_decisions")}</legend>
         <div className="row">
           {DECISIONS.map((d) => (
@@ -280,7 +283,8 @@ export function ConditionEditor({ value, choices, onChange, onInvalid, full = fa
           ))}
         </div>
         <p className="hint">{t("cond_decisions_hint")}</p>
-      </fieldset>
+      </fieldset>}
+      {rest && <>
       <div className="form-grid">
         <label>
           {t("cond_initiator_process")}
@@ -383,6 +387,7 @@ export function ConditionEditor({ value, choices, onChange, onInvalid, full = fa
           <p className="hint">{t("cond_exclude_hint")}</p>
         </div>
       </details>
+      </>}
     </div>
   );
 }

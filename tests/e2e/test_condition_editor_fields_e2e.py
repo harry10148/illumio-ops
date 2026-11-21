@@ -165,6 +165,34 @@ def test_alert_full_condition_fields_are_editable_and_saved(context, live_app):
     page.close()
 
 
+def test_alert_full_condition_fields_open_and_save_untouched(context, live_app):
+    condition = {
+        "service_process": "saved-service.exe", "service_user": "saved-service-user", "text": "saved search",
+        "initiator_processes": ["saved-init.exe"], "initiator_users": ["saved-init-user"],
+        "service_processes": ["saved-svc.exe"], "service_users": ["saved-svc-user"],
+        "src": {"hrefs": ["/orgs/1/workloads/untouched"], "labels": [{"key": "env", "values": ["Prod"]}],
+                "ips": ["10.0.0.1"], "match": "all"},
+    }
+    rule = _traffic_rule(condition)
+    live_app.ctx.settings.update(live_app.ctx.settings.current().revision,
+                                 lambda d: d["alerts"]["rules"].append(rule))
+    before = _rules(live_app)[rule["id"]]
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/alert-rules?rule={rule['id']}")
+    form = page.locator("[data-role=rule-form]")
+    more = form.locator("details[data-role=flow-more]")
+    expect(more).to_have_count(1)
+    assert more.evaluate("element => element.open")
+    expect(form.locator("input[name=service_process]")).to_have_value("saved-service.exe")
+    expect(form.locator("textarea[name=initiator_processes]")).to_have_value("saved-init.exe")
+    expect(form.locator("[data-href='/orgs/1/workloads/untouched']")).to_be_visible()
+    form.locator("button[type=submit]").click()
+    expect(form).to_have_count(0)
+    assert _rules(live_app)[rule["id"]] == before
+    page.close()
+
+
 def test_report_filter_does_not_show_alert_only_fields(context, live_app):
     _schedule(live_app, {"service_process": "kept", "initiator_processes": ["kept.exe"],
                          "src": {"hrefs": ["/orgs/1/workloads/report-only"]}})
