@@ -14,8 +14,7 @@ RULES: tuple[str, ...] = ("one_primary", "styled_checkbox", "tag_not_button", "c
 PATHS: tuple[str, ...] = (
     "/", "/detect", "/investigate", "/hosts", "/fleet", "/quarantine", "/rule-schedules", "/rule-schedules/rulesets", "/reports",
     "/reports?tab=schedules", "/reports?tab=produced", "/siem", "/siem/dlq", "/alert-rules", "/alert-rules?tab=channels",
-    "/alerts/rules/new", "/alerts/rules/new?form=full", "/alerts/rules/new?scenario=event:policy",
-    "/alerts/rules/new?scenario=flow:traffic", "/alerts/rules/new?scenario=detector:fanout",
+    "/alerts/rules/new?only=special", "/alerts/rules/new?form=full", "/alerts/rules/new?scenario=detector:fanout",
     "/alerts/rules/new?scenario=system:disk_low", "/system/collection", "/system/pce", "/system/lateral", "/system/jobs", "/system/tls",
     "/alert-rules?rule=new", f"/alert-rules?rule={pack_rule_id('rule_agent_tampering')}",
     f"/alert-rules?rule={pack_rule_id('rule_high_blocked')}",

@@ -49,7 +49,7 @@ function threshold(item: RuleListItem): string {
   const rule = item.rule;
   if (rule.type === "lateral") return t("rules_threshold_detected", { severity: word(SEVERITY_KEYS, rule.min_severity) });
   if (rule.type === "system") {
-    const key = scenariosOf("system", null).find((s) => s.id === rule.check)?.descKey;
+    const key = scenariosOf("system").find((s) => s.id === rule.check)?.descKey;
     return key ? t(key) : "";
   }
   return thresholdText(rule);
@@ -209,7 +209,12 @@ export function RulesPage({ embedded = false }: { embedded?: boolean }) {
       {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {view && TABLES.map(({ id }) => {
         return <section key={id} className="rules-block" data-role={`rules-${id}`}>
-          <header className="rules-block-head"><div><h2>{tableLabel(id)} <span className="rules-block-count">{rows[id].length}</span></h2><p>{tableHint(id)}</p></div></header>
+          <header className="rules-block-head"><div><h2>{tableLabel(id)} <span className="rules-block-count">{rows[id].length}</span></h2><p>{tableHint(id)}</p></div>
+            {id === "special" && <div className="rules-special-links">
+              <Link className="btn-quiet" to="/alerts/rules/new?only=special">{t("rules_new_special")}</Link>
+              <Link className="btn-quiet" to="/alerts/rules/new?form=full">{t("scn_full_form")}</Link>
+            </div>}
+          </header>
           <div className="table-wrap rules-table-wrap">
             <table className="table rules-table">
               <thead><tr><th>{t("rules_col_name")}</th><th>{t("rules_col_condition")}</th><th>{t("rules_col_threshold")}</th>
@@ -221,8 +226,8 @@ export function RulesPage({ embedded = false }: { embedded?: boolean }) {
                   const condition = conditionText(rule, choices);
                   const heldCount = (item.summary?.suppressed_cooldown ?? 0) + (item.summary?.suppressed_throttle ?? 0);
                   const note = item.summary?.last_status && item.summary.last_status !== "ok" ? word(STATUS_KEYS, item.summary.last_status) : "";
-                  const scenarios = rule.type === "lateral" ? scenariosOf("detector", null).filter((s) => rule.detectors.some((detector) => detector === s.id))
-                    : rule.type === "system" ? scenariosOf("system", null).filter((s) => s.id === rule.check) : [];
+                  const scenarios = rule.type === "lateral" ? scenariosOf("detector").filter((s) => rule.detectors.some((detector) => detector === s.id))
+                    : rule.type === "system" ? scenariosOf("system").filter((s) => s.id === rule.check) : [];
                   const specialOpen = id === "special" && Boolean(item.held || note);
                   const stateResult = savingId === rule.id ? "saving" : savedId === rule.id ? "saved" : failedId === rule.id ? "failed" : undefined;
                   return <tr key={rule.id} data-rule-id={rule.id} data-rule-type={rule.type}>

@@ -534,7 +534,6 @@ input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
 .scn-checks { display: grid; gap: var(--space-4); }
 .scn-text { display: grid; gap: var(--space-2); justify-items: start; min-width: 0; overflow-wrap: anywhere; }
 .scn-text > p { margin: 0; }
-[data-role=rule-list] th, [data-role=rule-list] td:nth-child(2) { white-space: nowrap; }  /* short headers and the type stay on one line */
 
 /* Alert rules v6: three readable tables with a compact status choice and no page-level sideways scroll. */
 .rules-page { min-width: 0; }
@@ -549,6 +548,7 @@ input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
 .rules-actions > [data-role=pack] { min-width: 0; }
 .rules-block { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-l); background: var(--surface-0); overflow: hidden; }
 .rules-block-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); padding: var(--space-5) var(--space-6); }
+.rules-special-links { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .rules-block-head h2 { margin: 0; font-size: var(--fs-lead); }
 .rules-block-head p { margin: var(--space-1) 0 0; color: var(--text-3); font-size: var(--fs-mini); }
 .rules-block-count { color: var(--text-3); font: 500 var(--fs-mini)/1 var(--font-num); }
@@ -647,6 +647,7 @@ input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
 }
 @media (max-width: 860px) {
   .rules-head-actions { flex: 1 1 100%; }
+  .rules-block-head { align-items: flex-start; flex-direction: column; }
   .rule-form-step { grid-template-columns: 1fr; gap: var(--space-2); }
   .rule-form-step-label { padding-top: 0; }
   .rules-table, .rules-table tbody { display: block; width: 100%; }
