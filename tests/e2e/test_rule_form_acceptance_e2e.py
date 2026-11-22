@@ -7,7 +7,7 @@ import uuid
 
 from playwright.sync_api import expect
 
-from illumio_ops.domain.alertpack import pack_rule_id
+from illumio_ops.domain.alertpack import best_practice_rules, pack_rule_id
 from tests.e2e.conftest import sign_in
 
 
@@ -116,6 +116,8 @@ def _open_and_save_each(page, live_app, rules) -> None:
 
 def test_every_built_in_rule_opens_and_saves_unchanged(context, live_app):
     before = _rules(live_app)
+    pack = {rule.id: rule.model_dump(mode="json") for rule in best_practice_rules(notify_new_defaults=True)}
+    assert before == pack
     assert len(before) == 35 and all(r["pack_key"] for r in before.values())
     page = context.new_page()
     sign_in(page, live_app.url)
@@ -132,11 +134,43 @@ _EVENT = {"name": "", "pack_key": None, "enabled": True, "notify": True, "severi
           "throttle": None, "type": "event", "event_types": ["*"], "status": "all", "event_severity": "all",
           "match_fields": {}, "threshold": "immediate", "threshold_count": 1, "window_minutes": 10}
 # shapes the built-in pack does not have
+_ALL_FLOW_FIELDS = {
+    "src": {"labels": [{"key": "env", "values": ["Prod"]}], "ips": ["10.1.2.3"],
+            "hrefs": ["/orgs/1/workloads/123"], "ip_lists": ["/orgs/1/sec_policy/active/ip_lists/7"],
+            "label_groups": ["/orgs/1/sec_policy/active/label_groups/3"], "public": True, "match": "all"},
+    "dst": {"ips": ["10.2.3.4"]},
+    "src_exclude": {"ips": ["10.3.4.5"]},
+    "dst_exclude": {"public": True},
+    "either": {"ips": ["10.4.5.6"]},
+    "either_exclude": {"ips": ["10.5.6.7"]},
+    "ports": [{"port": 445, "proto": 6}, {"port": 8080, "proto": None},
+               {"port": 8000, "to_port": 8100, "proto": 47},
+               {"port": 1000, "to_port": 1005, "proto": None}, {"port": -1, "proto": 1},
+               {"port": None, "proto": 47}],
+    "exclude_ports": [{"port": 53, "proto": 17}, {"port": 8080, "to_port": 8081, "proto": None}],
+    "decisions": ["blocked", "potentially_blocked"],
+    "initiator_process": "initiator.exe", "initiator_user": "corp\\initiator",
+    "service_process": "service.exe", "service_user": "corp\\service",
+    "initiator_processes": ["first.exe", "second.exe"], "initiator_users": ["first-user", "second-user"],
+    "service_processes": ["worker.exe", "agent.exe"], "service_users": ["worker-user", "agent-user"],
+    "text": "stored flow text", "exclude_system_accounts": True,
+    "services": ["/orgs/1/sec_policy/active/services/2"],
+    "exclude_services": ["/orgs/1/sec_policy/active/services/4"],
+    "windows_services": ["wuauserv"], "exclude_windows_services": ["Spooler"],
+    "transmissions": ["broadcast"], "exclude_transmissions": ["multicast"],
+    "exclude_processes": ["excluded.exe"],
+}
 OTHER_SHAPES = [
     _EVENT | {"name": "either of two", "event_types": ["agent.tampering|agent.suspend"]},
     _EVENT | {"name": "a regular expression", "event_types": ["^user\\.(sign_in|login)$", "rule_set\\..*"]},
     _EVENT | {"name": "a pattern with a comma", "event_types": ["^agent\\.(a|b){1,3}$", "user.login"]},
     _EVENT | {"name": "everything", "event_types": ["*"], "status": "failure", "event_severity": "err|warning"},
+    _EVENT | {"name": "event severity error alias", "event_types": ["user.login"], "event_severity": "error"},
+    _EVENT | {"name": "event severity wildcard", "event_types": ["user.login"], "event_severity": "*"},
+    _EVENT | {"name": "event severity empty", "event_types": ["user.login"], "event_severity": ""},
+    _EVENT | {"name": "event severity negated", "event_types": ["user.login"], "event_severity": "!info"},
+    _EVENT | {"name": "event severity pattern", "event_types": ["user.login"], "event_severity": "^warn.*$"},
+    _EVENT | {"name": "nonstandard status", "event_types": ["user.login"], "status": "!success"},
     _EVENT | {"name": "not in the catalog", "event_types": ["vendor.brand_new", "agent.tampering"], "enabled": False},
     _EVENT | {"name": "field matches", "event_types": ["system_task.prune_old_log_events"], "threshold": "count",
               "threshold_count": 3, "window_minutes": 45, "severity": "critical", "notify": False,
@@ -154,6 +188,9 @@ OTHER_SHAPES = [
                    "either_exclude": {"public": True}, "exclude_ports": [{"port": 53, "proto": 17}, {"port": 8000, "to_port": 8100}],
                    "exclude_processes": ["svchost.exe"], "exclude_windows_services": ["Spooler"],
                    "exclude_transmissions": ["multicast"], "exclude_system_accounts": True}},
+    {"name": "traffic with every flow field", "pack_key": None, "enabled": True, "notify": True, "severity": "medium",
+     "cooldown_minutes": 17, "throttle": None, "type": "traffic", "threshold_connections": 73, "window_minutes": 25,
+     "condition": _ALL_FLOW_FIELDS},
     {"name": "bandwidth by half an Mbps", "pack_key": None, "enabled": True, "notify": True, "severity": "high",
      "cooldown_minutes": 0, "throttle": None, "type": "bandwidth", "threshold_mbps": 0.5, "window_minutes": 60,
      "condition": {"dst": {"public": True}}},
@@ -176,6 +213,14 @@ def test_rules_of_other_shapes_open_and_save_unchanged(context, live_app):
     s.update(s.current().revision, lambda d: d["alerts"].__setitem__("rules", rules))
     before = _rules(live_app)   # as the settings file holds them once validated
     assert list(before) == [r["id"] for r in rules]
+    # Settings parses these through the domain AlertRule adapter; retain a direct validation assertion so a fixture
+    # cannot silently stop exercising a valid stored shape.
+    from pydantic import TypeAdapter
+
+    from illumio_ops.domain.alertrules import AlertRule
+    adapter = TypeAdapter(AlertRule)
+    for rule in before.values():
+        adapter.validate_python(rule)
     page = context.new_page()
     sign_in(page, live_app.url)
     revision = s.current().revision

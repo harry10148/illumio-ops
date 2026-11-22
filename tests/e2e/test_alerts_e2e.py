@@ -158,7 +158,7 @@ def test_rule_lateral_exclusion_round_trip(context, live_app):
 
 
 def test_rule_event_match_fields_round_trip(context, live_app):
-    """Task 9: an event rule's advanced field matches, one path=pattern per line (review: no control)."""
+    """The new event form round-trips the advanced path=pattern field unchanged after editing it."""
     page = context.new_page()
     sign_in(page, live_app.url)
     form = _new_rule_form(page, live_app)

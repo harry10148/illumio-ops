@@ -203,19 +203,186 @@ BLANK = {   # blank(type) of RuleEditor.tsx
 }
 
 
-def test_the_field_lists_cover_every_property_of_every_rule_model():
-    """A property added to a rule model lands in none of the lists below and turns this red: it then has to be given
-    a place in the short form or under Advanced (where the page opens Advanced when it holds a value)."""
+RULE_FORM_FIELD_COVERAGE = {
+    "EventRule": {
+        "cooldown_minutes": "input[name=cooldown_minutes]", "enabled": "input[name=form_rule_state]",
+        "event_severity": "input[name=event_severity]", "event_types": "[data-role=event-picker]",
+        "match_fields": "textarea[name=match_fields]", "name": "input[name=name]",
+        "notify": "input[name=form_rule_state]", "severity": "select[name=severity]",
+        "status": "input[name=status]", "threshold": "input[name=threshold]",
+        "threshold_count": "input[name=threshold_count]", "throttle": "input[name=throttle_on]",
+        "window_minutes": "input[name=window_minutes]",
+    },
+    "TrafficRule": {
+        "condition": "[data-role=flow-condition]", "cooldown_minutes": "input[name=cooldown_minutes]",
+        "enabled": "input[name=form_rule_state]", "name": "input[name=name]",
+        "notify": "input[name=form_rule_state]", "severity": "select[name=severity]",
+        "threshold_connections": "input[name=threshold]", "throttle": "input[name=throttle_on]",
+        "window_minutes": "input[name=window_minutes]",
+    },
+    "BandwidthRule": {
+        "condition": "[data-role=flow-condition]", "cooldown_minutes": "input[name=cooldown_minutes]",
+        "enabled": "input[name=form_rule_state]", "name": "input[name=name]",
+        "notify": "input[name=form_rule_state]", "severity": "select[name=severity]",
+        "threshold_mbps": "input[name=threshold]", "throttle": "input[name=throttle_on]",
+        "window_minutes": "input[name=window_minutes]",
+    },
+    "VolumeRule": {
+        "condition": "[data-role=flow-condition]", "cooldown_minutes": "input[name=cooldown_minutes]",
+        "enabled": "input[name=form_rule_state]", "name": "input[name=name]",
+        "notify": "input[name=form_rule_state]", "severity": "select[name=severity]",
+        "threshold_mb": "input[name=threshold]", "throttle": "input[name=throttle_on]",
+        "window_minutes": "input[name=window_minutes]",
+    },
+    "FlowCondition": {
+        "decisions": "input[name=decision_blocked]", "dst": "[data-side=dst]", "dst_exclude": "[data-side=dst_exclude]",
+        "either": "[data-side=either]", "either_exclude": "[data-side=either_exclude]",
+        "exclude_ports": "input[name=exclude_ports]", "exclude_processes": "input[name=exclude_processes]",
+        "exclude_services": "[data-role=exclude_service]", "exclude_system_accounts": "input[name=exclude_system_accounts]",
+        "exclude_transmissions": "input[name=exclude_transmission_multicast]",
+        "exclude_windows_services": "input[name=exclude_windows_services]", "initiator_process": "input[name=initiator_process]",
+        "initiator_processes": "textarea[name=initiator_processes]", "initiator_user": "input[name=initiator_user]",
+        "initiator_users": "textarea[name=initiator_users]", "ports": "input[name=ports]",
+        "service_process": "input[name=service_process]", "service_processes": "textarea[name=service_processes]",
+        "service_user": "input[name=service_user]", "service_users": "textarea[name=service_users]",
+        "services": "[data-role=service]", "src": "[data-side=src]", "src_exclude": "[data-side=src_exclude]",
+        "text": "input[name=text]", "transmissions": "input[name=transmission_broadcast]",
+        "windows_services": "input[name=windows_services]",
+    },
+    "EndpointFilter": {
+        "hrefs": "[data-role=src-advanced] [data-href]", "ip_lists": "[data-role=src_ip_list] [data-ip-list]",
+        "ips": "input[name=src_ips]", "label_groups": "[data-role=src_label_group] [data-label-group]",
+        "labels": "[data-side=src] .chip", "match": "select[name=src_match]", "public": "input[name=src_public]",
+    },
+    "PortProto": {"port": "input[name=ports]", "proto": "input[name=ports]", "to_port": "input[name=ports]"},
+    "Throttle": {"count": "input[name=throttle_count]", "period_minutes": "input[name=throttle_period]"},
+}
+RULE_FORM_KEPT_AS_STORED = {
+    "EventRule": {"id", "pack_key", "type"}, "TrafficRule": {"id", "pack_key", "type"},
+    "BandwidthRule": {"id", "pack_key", "type"}, "VolumeRule": {"id", "pack_key", "type"},
+    "FlowCondition": set(), "EndpointFilter": set(), "PortProto": set(), "Throttle": set(),
+}
+
+
+def test_field_lists_cover_every_property_of_every_rule_model():
+    """Contract properties must all have a selector or be explicitly retained by the editor."""
     import json
     from pathlib import Path
     contracts = json.loads((Path(__file__).resolve().parents[2] / "web" / "src" / "api" / "contracts.json").read_text())
     defs = contracts["operations"]["alert_rules.create"]["request_schema"]["$defs"]
+    for model, fields in RULE_FORM_FIELD_COVERAGE.items():
+        kept = RULE_FORM_KEPT_AS_STORED[model]
+        assert set(defs[model]["properties"]) == set(fields) | kept, model
+        assert set(fields).isdisjoint(kept), model
+        assert all(selector.startswith(("input", "select", "textarea", "[")) for selector in fields.values()), model
+        assert kept <= {"id", "pack_key", "type"}, model
+    # The full forms for detection and system rules remain covered while those rules keep their existing editor.
     for rule_type, model in _MODELS.items():
-        props = set(defs[model]["properties"])
-        assert props == FIXED | SHORT_PROPS[rule_type] | set(ADVANCED_PROPS[rule_type]), rule_type
-        assert props == set(BLANK[rule_type]), rule_type
+        if rule_type in ("system", "lateral"):
+            props = set(defs[model]["properties"])
+            assert props == FIXED | SHORT_PROPS[rule_type] | set(ADVANCED_PROPS[rule_type]), rule_type
+            assert props == set(BLANK[rule_type]), rule_type
         assert not SHORT_PROPS[rule_type] & set(ADVANCED_PROPS[rule_type])
     assert set(PACK_FIELDS) <= SHORT_PROPS["event"] | set(ADVANCED_PROPS["event"])
+
+
+def test_rule_form_field_controls_show_stored_nondefault_values(page, live_app):
+    """Every mapped control is mounted for a stored non-default value and renders that value."""
+    import uuid
+
+    from tests.e2e.test_rule_form_acceptance_e2e import _ALL_FLOW_FIELDS
+
+    event = {
+        "id": uuid.uuid4().hex, "name": "Coverage event", "pack_key": None, "enabled": True, "notify": False,
+        "severity": "high", "cooldown_minutes": 43, "throttle": {"count": 4, "period_minutes": 90},
+        "type": "event", "event_types": ["user.sign_in", "vendor.off_catalog"], "status": "!success",
+        "event_severity": "^warn.*$", "match_fields": {"created_by.user.username": "admin"},
+        "threshold": "count", "threshold_count": 3, "window_minutes": 45,
+    }
+    flows = []
+    for rule_type, threshold_key, threshold_value in (
+        ("traffic", "threshold_connections", 73), ("bandwidth", "threshold_mbps", 2.5),
+        ("volume", "threshold_mb", 2048.5),
+    ):
+        flows.append({
+            "id": uuid.uuid4().hex, "name": f"Coverage {rule_type}", "pack_key": None, "enabled": True,
+            "notify": True, "severity": "critical", "cooldown_minutes": 47,
+            "throttle": {"count": 5, "period_minutes": 91}, "type": rule_type, "window_minutes": 35,
+            threshold_key: threshold_value, "condition": _ALL_FLOW_FIELDS,
+        })
+    s = live_app.ctx.settings
+    s.update(s.current().revision, lambda d: d["alerts"]["rules"].extend([event, *flows]))
+
+    for rule in [event, *flows]:
+        page.goto(f"{live_app.url}/alert-rules?rule={rule['id']}")
+        form = page.locator("[data-role=rule-form]")
+        model = {"event": "EventRule", "traffic": "TrafficRule", "bandwidth": "BandwidthRule", "volume": "VolumeRule"}[rule["type"]]
+        for selector in RULE_FORM_FIELD_COVERAGE[model].values():
+            expect(form.locator(selector).first).to_be_visible()
+        expect(form.locator("input[name=cooldown_minutes]")).to_have_value(str(rule["cooldown_minutes"]))
+        expect(form.locator("input[name=throttle_on]")).to_be_checked()
+        expect(form.locator("input[name=throttle_count]")).to_have_value(str(rule["throttle"]["count"]))
+        expect(form.locator("input[name=throttle_period]")).to_have_value(str(rule["throttle"]["period_minutes"]))
+        expect(form.locator("select[name=severity]")).to_have_value(rule["severity"])
+        expect(form.locator("input[name=window_minutes]")).to_have_value(str(rule["window_minutes"]))
+        if rule["type"] != "event":
+            threshold = rule[{"traffic": "threshold_connections", "bandwidth": "threshold_mbps", "volume": "threshold_mb"}[rule["type"]]]
+            expect(form.locator("input[name=threshold]")).to_have_value(str(threshold))
+
+    # Check representative values through the exact selectors mapped above, including the controls that render
+    # their state as a chip or as a radio selection rather than an input's value string.
+    page.goto(f"{live_app.url}/alert-rules?rule={event['id']}")
+    form = page.locator("[data-role=rule-form]")
+    expect(form.locator("input[name=name]")).to_have_value(event["name"])
+    expect(form.locator("select[name=severity]")).to_have_value("high")
+    expect(form.locator("input[name=form_rule_state][value=rec]")).to_be_checked()
+    expect(form.locator("input[name=cooldown_minutes]")).to_have_value("43")
+    expect(form.locator("input[name=throttle_count]")).to_have_value("4")
+    expect(form.locator("input[name=throttle_period]")).to_have_value("90")
+    expect(form.locator("input[name=event_severity]")).to_have_value("^warn.*$")
+    expect(form.locator("input[name=status]")).to_have_value("!success")
+    expect(form.locator("input[name=threshold][value=count]")).to_be_checked()
+    expect(form.locator("input[name=threshold_count]")).to_have_value("3")
+    expect(form.locator("input[name=window_minutes]")).to_have_value("45")
+    expect(form.locator("[data-role=event-picker] input[data-event-type='user.sign_in']")).to_be_checked()
+    expect(form.locator(".event-chip code")).to_have_text(["user.sign_in", "vendor.off_catalog"])
+    expect(form.locator("textarea[name=match_fields]")).to_have_value("created_by.user.username=admin")
+
+    flow = flows[0]
+    page.goto(f"{live_app.url}/alert-rules?rule={flow['id']}")
+    form = page.locator("[data-role=rule-form]")
+    expect(form.locator("input[name=form_rule_state][value=on]")).to_be_checked()
+    expect(form.locator("input[name=threshold]")).to_have_value("73")
+    expect(form.locator("input[name=window_minutes]")).to_have_value("35")
+    values = {
+        "ports": "445/tcp, 8080/any, 8000-8100/proto:47, 1000-1005/any, -1/proto:1, proto:47",
+        "exclude_ports": "53/udp, 8080-8081/any",
+        "initiator_process": "initiator.exe", "initiator_user": "corp\\initiator",
+        "service_process": "service.exe", "service_user": "corp\\service", "text": "stored flow text",
+        "initiator_processes": "first.exe\nsecond.exe", "initiator_users": "first-user\nsecond-user",
+        "service_processes": "worker.exe\nagent.exe", "service_users": "worker-user\nagent-user",
+        "windows_services": "wuauserv", "exclude_windows_services": "Spooler",
+        "exclude_processes": "excluded.exe", "src_ips": "10.1.2.3", "dst_ips": "10.2.3.4",
+        "src_exclude_ips": "10.3.4.5", "either_ips": "10.4.5.6", "either_exclude_ips": "10.5.6.7",
+    }
+    for name, value in values.items():
+        expect(form.locator(f"[name={name}]")).to_have_value(value)
+    for selector in ("input[name=decision_blocked]", "input[name=exclude_system_accounts]",
+                     "input[name=transmission_broadcast]", "input[name=exclude_transmission_multicast]",
+                     "input[name=src_public]", "input[name=dst_exclude_public]", "input[name=src_public]"):
+        expect(form.locator(selector)).to_be_checked()
+    expect(form.locator("[data-side=src] .chip", has_text="env=Prod")).to_have_count(1)
+    expect(form.locator("[data-role=src-advanced] [data-href]")).to_have_attribute("data-href", "/orgs/1/workloads/123")
+    expect(form.locator("[data-role=src_label_group] [data-label-group]")).to_have_attribute(
+        "data-label-group", "/orgs/1/sec_policy/active/label_groups/3")
+    expect(form.locator("[data-role=src_ip_list] [data-ip-list]")).to_have_attribute(
+        "data-ip-list", "/orgs/1/sec_policy/active/ip_lists/7")
+    expect(form.locator("select[name=src_match]")).to_have_value("all")
+    expect(form.locator("[data-role=service] [data-service]")).to_have_attribute(
+        "data-service", "/orgs/1/sec_policy/active/services/2")
+    expect(form.locator("[data-role=exclude_service] [data-service]")).to_have_attribute(
+        "data-service", "/orgs/1/sec_policy/active/services/4")
+    expect(form.locator("[data-side=dst_exclude] input[name=dst_exclude_public]")).to_be_checked()
 
 
 def test_an_edit_page_shows_every_field_and_folds_none(page, live_app):
