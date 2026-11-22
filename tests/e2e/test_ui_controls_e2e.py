@@ -102,10 +102,12 @@ def test_a_segment_is_chosen_from_the_keyboard_and_shows_where_the_focus_is(cont
     sign_in(page, live_app.url)
     choice = page.locator("[data-role=alert-seen] button[data-value=new]")
     expect(choice).to_have_attribute("aria-pressed", "false")
+    page.wait_for_load_state("networkidle")  # a late re-render would take the focus away from under the keys
     choice.focus()
     page.keyboard.press("Tab")
     page.keyboard.press("Shift+Tab")  # arrive by keyboard, so the focus ring is the visible kind
-    assert choice.evaluate("(e) => e === document.activeElement && getComputedStyle(e).outlineStyle !== 'none'")
+    expect(choice).to_be_focused()
+    assert choice.evaluate("(e) => getComputedStyle(e).outlineStyle !== 'none'")
     page.keyboard.press("Space")
     expect(choice).to_have_attribute("aria-pressed", "true")
 
