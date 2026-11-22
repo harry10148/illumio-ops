@@ -157,3 +157,40 @@ def test_pce_health_alert_names_the_http_status_of_a_server_error():
 def test_pce_health_alert_from_before_the_reasons_still_reads():
     v = _pce_health({"failures": ["health"], "checked_at": NOW.isoformat()})
     assert summary(v, Language.EN).startswith("The PCE health check failed: PCE health")
+
+
+def test_mail_html_card_per_alert_with_its_severity_in_words_and_colour():
+    """The alert email is laid out as the report email is (it was a bare list from 6.0.0 to 6.12.5): a card per
+    alert, the severity named in words and its colour on the card's edge, from the report shell's tokens."""
+    import re
+
+    from illumio_ops.services.mail_tokens import SEVERITY_BORDER, TOKENS
+    alerts = [view(1, severity=Severity.CRITICAL), view(2, severity=Severity.MEDIUM), view(3, severity=Severity.LOW)]
+    r = render(alerts, ChannelKind.SMTP, lang=Language.EN, tz=UTC, console_url="https://pce:8443")
+    cards = re.findall(r'<div data-severity="(\w+)" style="border-left:4px solid (#[0-9A-Fa-f]{6})', r.html)
+    assert cards == [(s.value, TOKENS[SEVERITY_BORDER[s]]) for s in (Severity.CRITICAL, Severity.MEDIUM, Severity.LOW)]
+    assert len({colour for _, colour in cards}) == 3
+    for word in ("[Critical]", "[Medium]", "[Low]"):
+        assert word in r.html
+    assert "2026-10-26 04:00" in r.html and 'href="https://pce:8443"' in r.html and "<!DOCTYPE html>" in r.html
+
+
+def test_mail_html_escapes_what_the_pce_sent():
+    r = render([view(hosts=['<img src=x onerror="a">'])], ChannelKind.SMTP, lang=Language.EN, tz=UTC,
+               console_url='https://pce"><script>')
+    assert "<img" not in r.html and "<script>" not in r.html
+    assert "&lt;img src=x onerror=&quot;a&quot;&gt;" in r.html
+
+
+def test_mail_html_says_how_many_are_left_out():
+    r = render([view(i) for i in range(51)], ChannelKind.SMTP, lang=Language.EN, tz=UTC, console_url=None)
+    assert r.html.count("data-severity=") == 50 and "1 more" in r.html
+
+
+def test_telegram_subject_is_bold_and_the_body_has_no_tags():
+    r = render([view(hosts=["<b>x"])], ChannelKind.TELEGRAM, lang=Language.EN, tz=UTC, console_url=None)
+    head, body = r.text.split("\n", 1)
+    assert head.startswith("<b>[illumio-ops] HIGH") and head.endswith("</b>")
+    assert "<" not in body
+    line = render([view()], ChannelKind.LINE, lang=Language.EN, tz=UTC, console_url=None)
+    assert "<b>" not in line.text

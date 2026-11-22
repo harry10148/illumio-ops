@@ -13,39 +13,21 @@ report_shell.css, never a second palette)."""
 from __future__ import annotations
 
 import html
-import re
 from datetime import tzinfo
-from functools import cache
 
 from illumio_ops.domain.report import Kpi, ReportDocument, period_text
-from illumio_ops.domain.values import Language, Severity
+from illumio_ops.domain.values import Language
 from illumio_ops.services.alerts.messages import Rendered
+from illumio_ops.services.mail_tokens import SEVERITY_BORDER, TOKENS
 from illumio_ops.services.reports.render_html import (
     BETTER_KEYS,
     LEAD_KPIS,
-    asset,
     fmt_number,
     kpi_trend,
     solves_titles,
     to_do,
     tr,
 )
-
-_TOKEN = re.compile(r"--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})\s*;")
-_USED = ("text-1", "text-2", "text-3", "line", "surface-2", "accent-fg", "tone-crit-border", "tone-warn-border",
-         "tone-info-border", "tone-neutral-border")
-
-
-@cache
-def _tokens() -> dict[str, str]:
-    root = asset("report_shell.css").split(":root", 1)[1].split("}", 1)[0]
-    found = dict(_TOKEN.findall(root))
-    return {k: found[k] for k in _USED}
-
-
-TOKENS = _tokens()
-SEVERITY_BORDER = {Severity.CRITICAL: "tone-crit-border", Severity.HIGH: "tone-crit-border",
-                   Severity.MEDIUM: "tone-warn-border", Severity.LOW: "tone-info-border"}
 
 
 def _value(k: Kpi, lang: Language) -> str:

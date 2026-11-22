@@ -22,6 +22,7 @@ from illumio_ops.domain.values import (
     TamperPattern,
 )
 from illumio_ops.i18n import translate
+from illumio_ops.services.mail_tokens import SEVERITY_BORDER, TOKENS
 from illumio_ops.settings.schema import DisplaySettings, PceSettings
 
 SAAS_CONSOLE = "https://console.illum.io"
@@ -176,11 +177,53 @@ def caveats(v: AlertView, lang: Language) -> list[str]:
     return out
 
 
+@dataclass(frozen=True)
+class _Parts:
+    """One alert's words: every shape is written from these, so the text and the HTML say the same."""
+    severity: str
+    title: str
+    summary: str
+    when: str
+    caveats: list[str]
+    steps: list[str]
+
+
+def _parts(v: AlertView, lang: Language, tz: tzinfo | None, label: str | None) -> _Parts:
+    return _Parts(severity=translate(lang, SEVERITY_KEYS[v.severity]), title=rule_title(v, lang),
+                  summary=summary(v, lang), when=_when(v.fired_at, tz, label), caveats=caveats(v, lang),
+                  steps=next_steps(v, lang))
+
+
 def _line(v: AlertView, lang: Language, tz: tzinfo | None, label: str | None) -> str:
-    sev = translate(lang, SEVERITY_KEYS[v.severity])
-    parts = [f"[{sev}] {rule_title(v, lang)} — {summary(v, lang)}", _when(v.fired_at, tz, label)]
-    parts += caveats(v, lang)
-    return " · ".join(parts)
+    p = _parts(v, lang, tz, label)
+    return " · ".join([f"[{p.severity}] {p.title} — {p.summary}", p.when, *p.caveats])
+
+
+def _mail_html(subj: str, alerts: Sequence[AlertView], lang: Language, tz: tzinfo | None, label: str | None,
+               more: str | None, console_url: str | None) -> str:
+    """Laid out as the report email is (inline styles, the report shell's colours): a card per alert with its
+    severity named in words and its colour on the left edge, then the time and caveats, then what to do next."""
+    t = TOKENS
+    e = html.escape
+    cards = []
+    for v in alerts:
+        p = _parts(v, lang, tz, label)
+        border = t[SEVERITY_BORDER.get(v.severity, "tone-neutral-border")]
+        meta = " · ".join([p.when, *p.caveats])
+        steps = "".join(f'<div style="color:{t["text-2"]};margin-top:4px">→ {e(s)}</div>' for s in p.steps)
+        cards.append(
+            f'<div data-severity="{e(v.severity.value)}" style="border-left:4px solid {border};'
+            f'background:{t["surface-2"]};padding:8px 12px;margin:8px 0">'
+            f'<div style="color:{t["text-1"]};font-weight:600">[{e(p.severity)}] {e(p.title)}</div>'
+            f'<div style="color:{t["text-1"]};margin-top:2px">{e(p.summary)}</div>'
+            f'<div style="color:{t["text-3"]};font-size:12px;margin-top:2px">{e(meta)}</div>{steps}</div>')
+    foot = f'<p style="color:{t["text-2"]}">{e(more)}</p>' if more else ""
+    link = (f'<p><a style="color:{t["accent-fg"]}" href="{e(console_url)}">'
+            f'{e(translate(lang, "alert_msg_console_link"))}</a></p>' if console_url else "")
+    body = (f'<div style="font-family:sans-serif;color:{t["text-1"]};max-width:720px;overflow-wrap:anywhere">'
+            f'<h2 style="margin:0 0 4px">{e(subj)}</h2>{"".join(cards)}{foot}{link}</div>')
+    lang_attr = "zh-TW" if lang is Language.ZH_TW else "en"
+    return f'<!DOCTYPE html><html lang="{lang_attr}"><head><meta charset="utf-8"></head><body>{body}</body></html>'
 
 
 def subject(alerts: Sequence[AlertView], lang: Language) -> str:
@@ -233,7 +276,9 @@ def render(alerts: Sequence[AlertView], channel: ChannelKind, *, lang: Language,
         if len(alerts) == 1:
             lines = [_with_steps(lines[0], alerts[0], lang)]
         escape = channel is ChannelKind.TELEGRAM
-        head = html.escape(subj) if escape else subj
+        # Telegram: only the subject line is bold. The body carries no tags, so a cut in _fit cannot leave one
+        # unclosed (Telegram refuses a message whose markup does not parse).
+        head = f"<b>{html.escape(subj)}</b>" if escape else subj
         body = _fit(lines, LIMITS[channel] - len(head) - 1, lang, escape=escape)
         return Rendered(subject=subj, text=f"{head}\n{body}", html=None, card=None, payload=None)
     cap = MAX_ITEMS[channel]
@@ -260,13 +305,7 @@ def render(alerts: Sequence[AlertView], channel: ChannelKind, *, lang: Language,
         plain = "\n".join([subj, "", *(_with_steps(line, a, lang) for line, a in zip(lines[:cap], shown, strict=True)),
                            *([more] if more else []),
                            *([translate(lang, "alert_msg_console", {"url": console_url})] if console_url else [])])
-        rows = "".join(
-            f"<li>{html.escape(line)}" + "".join(f"<br><small>→ {html.escape(s)}</small>" for s in next_steps(a, lang))
-            + "</li>" for line, a in zip(lines[:cap], shown, strict=True))
-        foot = f"<p>{html.escape(more)}</p>" if more else ""
-        link = (f'<p><a href="{html.escape(console_url)}">{html.escape(translate(lang, "alert_msg_console_link"))}</a></p>'
-                if console_url else "")
-        page = (f'<html><body><h2>{html.escape(subj)}</h2><ul>{rows}</ul>{foot}{link}</body></html>')
+        page = _mail_html(subj, shown, lang, tz, tz_label, more, console_url)
         return Rendered(subject=subj, text=plain, html=page, card=None, payload=None)
     payload = {"subject": subj, "truncated": rest, "alerts": [
         {"id": a.id, "rule": rule_title(a, lang), "severity": a.severity.value, "subject": a.subject_key,
