@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.13.0] - 2026-11-22
+
+### Changed — the alert rules page
+
+- One page for the rules: an event table, a traffic table and a table of detection and system checks. Each row shows
+  its full condition, what it leaves out, the threshold in words, an off / record only / notify control and its
+  recent activity. Search filters the rows shown.
+- Event and traffic rules are made and edited in one four-step form above the tables (what to watch, condition,
+  threshold, how to alert). Saving refuses when someone else changed the rule meanwhile.
+- Event conditions are picked from the event catalog by category, with search across categories and an action
+  filter; patterns and types outside the catalog are typed in a box and kept in their order. Severity and result
+  controls appear only where the catalog says they matter.
+- Traffic conditions show source, destination, ports and decisions first; the other fields sit under "More
+  conditions", which opens by itself when any of them holds a value.
+- A new rule can start from any of the 17 built-in event and traffic rules (named "… (copy)"). Each built-in rule
+  says in one sentence what it watches for, written from Illumio's documentation. A built-in rule that differs from
+  its default is tagged and can be restored to it; the restore is saved only with Save.
+- Detection and system rules keep their own forms. Old `/alerts/rules` links for event and traffic rules lead to the
+  new page; the scenario list keeps only the detection and system groups.
+
+### Fixed
+
+- The condition editor keeps every field and port as stored: ports without a protocol, with another protocol
+  number, protocol-only and port -1 now have a written form and read back unchanged (a bare port still means TCP).
+  Report filters use the same editor and benefit too.
+- The alert email had no layout since 6.0.0 (a heading and a plain list, so it read as plain text). Each alert is now
+  a card with its severity in words and colour, the time and caveats, and what to do next, in the report email's
+  colours. Telegram's subject line is bold.
+- The event catalog lists `system_task.inactive_ven_cleanup` and the two inactive-VEN-cleanup schedule events; the
+  lab PCE sent the first 50 times in a week and the picker could not offer it.
+- Readiness: when the draft recompute stops at 50,000 rows, the "Potentially Blocked" number says it is a floor where
+  it is read, not only under the table.
+
 ## [6.12.5] - 2026-11-17
 
 ### Fixed — follow-ups from the text review
