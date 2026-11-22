@@ -117,7 +117,7 @@ def test_service_pick_narrows_to_it(context, live_app):
     page.goto(f"{live_app.url}/investigate?alert={alert_id}")
     page.locator("[data-dim=service] .wb-dim-row", has_text="445").click()
     expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(1)
-    assert page.locator("[data-dim=service] .wb-dim-row[data-chosen=true]").count() == 1
+    expect(page.locator("[data-dim=service] .wb-dim-row[data-chosen=true]")).to_have_count(1)
 
 
 # ── the investigation page (UI redesign spec §4.3, §5.1) ────────────────────
