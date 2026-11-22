@@ -1,4 +1,4 @@
-"""Gate 2: no print() in the package (rescue.py is the one CLI surface allowed to)."""
+"""Gate 2: no print() in the package (rescue.py and crosscheck/__main__.py are the CLI surfaces allowed to)."""
 from __future__ import annotations
 
 import ast
@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 from tests.gates._scan import PKG_ROOT, Module, iter_modules
 
-EXEMPT = {"illumio_ops.rescue"}
+EXEMPT = {"illumio_ops.rescue", "illumio_ops.crosscheck.__main__"}
 
 
 def find_prints(modules: Iterable[Module]) -> list[str]:
