@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.15.0] - 2026-11-23
+
+### Changed
+
+- Rule schedules change the Draft only, unless "Provision when the time comes" is selected (off for new schedules).
+  A Draft-only schedule writes the rule's enabled flag to the Draft once when its time comes, never provisions, is not
+  held by someone else's pending Draft, and does not write over a manual change made in the PCE since. Its note is
+  written to and cleared from the Draft only. One Rule Set takes one mode: a schedule of the other mode is refused.
+  Existing schedules, and those brought over from 5.x, keep provisioning as before.
+
+### Added
+
+- Report "Detections and alerts": the period's detections by kind and host, a ranked list, the detection-category
+  alert history with delivery outcomes, and undelivered alerts. It reads only what this install stores.
+
 ## [6.14.2] - 2026-11-23
 
 ### Fixed
