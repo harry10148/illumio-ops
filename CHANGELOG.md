@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.15.1] - 2026-11-23
+
+### Fixed
+
+- The detections and lateral movement reports named a host the inventory does not hold (an unmanaged Workload)
+  "Removed host"; they name it as the flows and the workbench do.
+- The detections report's rule rows no longer carry the rule's id, and its severities are one column, so the delivery
+  columns fit the page.
+
 ## [6.15.0] - 2026-11-23
 
 ### Changed
