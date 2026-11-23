@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { BulkDeleted, Catalog, CatalogEntry, FlowCondition, ReportItem, ReportPage } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { EmptyState, ModeMark, PageHead, Tag } from "../../components/ui";
+import { EmptyState, PageHead, Tag } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import {
@@ -159,8 +159,8 @@ function tierEntries(catalog: Catalog, tier: string): CatalogEntry[] {
 }
 
 /** Templates in two parts — the common ones, then the ones by topic — each a grid of cards. A card names its kind
- * (assessment, traffic, policy, operations) in a small tag, says what basic mode means for it (§5), how many
- * schedules make it and how many copies are kept. */
+ * (assessment, traffic, policy, operations) in a small tag, notes when making it queries the PCE, and shows how
+ * many schedules make it and how many copies are kept. */
 function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
@@ -180,9 +180,8 @@ function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: 
                 <div className="hint">{word(TYPE_DESC_KEYS, e.report_type)}</div>
               </div>
               <div className="row">
-                {e.mode === "on_demand"
-                  ? <Tag tone="muted" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</Tag>
-                  : <ModeMark needs="basic" />}
+                {e.mode === "on_demand" &&
+                  <Tag tone="muted" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</Tag>}
                 <span className="hint" data-role="rpt-counts">
                   {t("rpt_card_counts", { schedules: String(e.schedules), copies: String(e.copies) })}
                 </span>

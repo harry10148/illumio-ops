@@ -18,11 +18,13 @@ from illumio_ops.domain.report import (
     ReportDocument,
     Section,
     TableBlock,
+    TextBlock,
 )
-from illumio_ops.domain.values import FocusKind, Language, Severity
+from illumio_ops.domain.values import FocusKind, IngestSource, Language, Severity
 from illumio_ops.services.analysis.anomaly_inputs import directory_servers
 from illumio_ops.services.analysis.context import LateralContext, load_lateral_context
 from illumio_ops.services.analysis.lateral_defaults import Initiator, lateral_defaults
+from illumio_ops.services.collect.mode import collects
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import (
     DECISION_KEYS,
@@ -97,6 +99,10 @@ class _Builder:
         self.inp, self.lang = inp, inp.lang
         self.lc: LateralContext = load_lateral_context(inp.ctx, now=inp.now)
         self.critical_set = bool(self.lc.settings.critical_assets)
+        # On-demand pulls build against a throwaway traffic store, but detection availability belongs to the
+        # install's configured collection mode, just as it does in run_detection().
+        install = inp.install or inp.ctx
+        self.detections_need_mode = not collects(install.settings.current(), IngestSource.TRAFFIC)
 
     def t(self, msg: str, /, **params: object) -> str:
         return tr(self.lang, msg, **params)
@@ -139,7 +145,8 @@ class _Builder:
               if self.critical_set else ()),
             *metric("pivots", "pivots_now", "rpt_lat_kpi_pivots"),
             Kpi(key="new_detections", label=self.t("rpt_lat_kpi_new_detections"), value=detections_now,
-                previous=detections_before, better="lower"),
+                previous=detections_before, better="lower",
+                note=self.t("lat_detections_need_mode") if self.detections_need_mode else None),
             *metric("cross_env", "cross_env_edges", "rpt_lat_kpi_cross_env"),
         )
 
@@ -258,8 +265,9 @@ class _Builder:
             total_rows=total, empty_text=self.t("rpt_lat_detections_none"),
             host_keys=self.keys(subject=(r["subject_key"] for r in rows)), host_section="connections",
             limit_note=self.t("rpt_limit_top", shown=len(rows), total=total) if total > len(rows) else None)
+        blocks = ((TextBlock(paragraphs=(self.t("lat_detections_need_mode"),)),) if self.detections_need_mode else ())
         return Section(id="detections", title=title, intro=self.t("rpt_lat_detections_intro"),
-                       blocks=(count_table, detail))
+                       blocks=(*blocks, count_table, detail))
 
     def cross_env_section(self, exposure: Mapping[str, Any] | None) -> Section | None:
         title = self.t("rpt_lat_sec_cross_env")

@@ -21,9 +21,9 @@ START, END = datetime(2026, 10, 20, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=U
 A, B, DB = "/orgs/1/workloads/a", "/orgs/1/workloads/b", "/orgs/1/workloads/db"
 
 
-def _inp(ctx, lang=Language.EN):
+def _inp(ctx, lang=Language.EN, *, install=None):
     return BuildInput(ctx=ctx, params=ReportParams(report_type=ReportType.LATERAL_POSTURE), start=START, end=END,
-                      lang=lang, tz=UTC, now=NOW, pce_label="pce")
+                      lang=lang, tz=UTC, now=NOW, pce_label="pce", install=install)
 
 
 def _hosts(ctx):
@@ -195,6 +195,27 @@ def test_detections_section_counts_and_lists(ctx):
     by_detector, detail = [b for b in sec.blocks if isinstance(b, TableBlock)]
     assert {r[0]: r[1] for r in by_detector.rows} == {"Fan-out": 1, "Authentication to a non-directory host": 1}
     assert detail.total_rows == 2 and detail.rows[0][1] == "Fan-out"  # high first
+
+
+def test_detection_mode_note_uses_install_settings_even_for_on_demand_context(ctx):
+    from illumio_ops.domain.report import TextBlock
+
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["collection"].update(mode="lightweight"))
+    throwaway = replace(ctx, ondemand=True)
+    doc = build_lateral_posture(_inp(throwaway, install=ctx))
+    need_mode = "Detections need the traffic of every collection cycle: switch to alert or full mode."
+    sec = _section(doc, "detections")
+    assert any(isinstance(block, TextBlock) and need_mode in block.paragraphs for block in sec.blocks)
+    assert next(k for k in doc.kpis if k.key == "new_detections").note == need_mode
+
+    ctx.settings.update(ctx.settings.current().revision,
+                        lambda d: d["collection"].update(mode="alert"))
+    _detection(ctx, "fanout", datetime(2026, 10, 21, tzinfo=UTC), severity="high")
+    alert_doc = build_lateral_posture(_inp(ctx))
+    alert_sec = _section(alert_doc, "detections")
+    assert not any(isinstance(block, TextBlock) and need_mode in block.paragraphs for block in alert_sec.blocks)
+    assert next(k for k in alert_doc.kpis if k.key == "new_detections").note is None
 
 
 def test_findings_only_lateral_kinds_max_five(ctx):

@@ -273,12 +273,13 @@ def test_templates_are_the_common_ones_then_the_rest(browser, live_app, width, c
     ctx.close()
 
 
-def test_traffic_card_not_marked_advanced(context, live_app):
+def test_traffic_card_explains_on_demand_without_mode_label(context, live_app):
     page = context.new_page()
     _reports(page, live_app.url)
+    cards = page.locator("[data-role=report-catalog] .rpt-card")
     card = page.locator("[data-report-type=traffic]")
-    expect(card).to_contain_text("Basic mode: on demand")
-    assert "Advanced mode" not in card.inner_text()
+    expect(card).to_contain_text("Queries the PCE when made; slower")
+    assert all("Basic mode" not in text for text in cards.all_text_contents())
 
 
 def test_recent_shows_conclusion(context, live_app):
