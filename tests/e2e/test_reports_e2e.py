@@ -252,17 +252,20 @@ def test_templates_are_the_common_ones_then_the_rest(browser, live_app, width, c
     assert [common.nth(i).get_attribute("data-report-type") for i in range(common.count())] == COMMON
     topic = page.locator("[data-tier=topic] .rpt-card")
     kinds = [topic.nth(i).get_attribute("data-report-type") for i in range(topic.count())]
-    # 16 cards: Rule Hit Count has none since it became a chapter of the policy usage report, and the weekly
-    # overview joined the common ones (stage 3b)
+    # Rule Hit Count has no card since it became a chapter of policy usage; the detections report is by topic.
     assert "rule_hit_count" not in kinds and "policy_usage" in kinds
-    assert not set(kinds) & set(COMMON) and len(kinds) + len(COMMON) == 16
+    assert "detections" in kinds
+    assert not set(kinds) & set(COMMON) and len(kinds) + len(COMMON) == 17
     cards = page.locator("[data-role=report-catalog] .rpt-card")
     tags = page.locator("[data-role=report-catalog] .rpt-card [data-role=rpt-group]")
-    assert tags.count() == cards.count() == 16
+    assert tags.count() == cards.count() == 17
+    detection_card = page.locator('[data-report-type="detections"]')
+    assert detection_card.locator("strong").inner_text() == "Detections and alerts"
+    assert "Stored detections" in detection_card.inner_text()
     assert set(tags.all_text_contents()) == {"Security assessment", "Traffic analysis", "Policy", "Operations and audit"}
     assert page.locator("[data-report-type=audit] [data-role=rpt-group]").inner_text() == "Operations and audit"
     # cards of one row share a top: the widest row of each part is as many columns as the width allows
-    for tier, n in (("common", 5), ("topic", 11)):
+    for tier, n in (("common", 5), ("topic", 12)):
         tops = page.evaluate(
             "(t) => [...document.querySelectorAll(`[data-tier=${t}] .rpt-card`)].map((c) => Math.round(c.getBoundingClientRect().top))",
             tier)

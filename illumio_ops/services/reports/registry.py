@@ -165,6 +165,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
     from illumio_ops.services.reports.app_summary import build_app_summary
     from illumio_ops.services.reports.audit import build_audit
     from illumio_ops.services.reports.custom import build_custom
+    from illumio_ops.services.reports.detections import build_detections
     from illumio_ops.services.reports.lateral_posture import build_lateral_posture
     from illumio_ops.services.reports.network_inventory import build_network_inventory
     from illumio_ops.services.reports.new_connections import build_new_connections
@@ -185,6 +186,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         # further back does not let its period start earlier.
         ReportType.WEEKLY_OVERVIEW: ReportSpec(ReportType.WEEKLY_OVERVIEW, "operations", False, build_weekly_overview,
                                                max_lookback=flow_days, reads_events=True, own_traffic=True),
+        ReportType.DETECTIONS: ReportSpec(ReportType.DETECTIONS, "lateral", False, build_detections),
         ReportType.LATERAL_POSTURE: ReportSpec(ReportType.LATERAL_POSTURE, "lateral", True, build_lateral_posture,
                                                ondemand_lead=baseline_lead, ondemand_prepare=_prepare_exposure),
         ReportType.NEW_CONNECTIONS: ReportSpec(ReportType.NEW_CONNECTIONS, "analysis", True, build_new_connections,

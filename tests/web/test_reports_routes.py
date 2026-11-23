@@ -50,7 +50,7 @@ def test_catalog_lists_built_types(client, ctx):
     data = get(client, "/api/reports/catalog").get_json()["data"]
     types = {e["report_type"]: e for e in data["entries"]}
     # rule_hit_count is a chapter of policy_usage since stage 3b: no card of its own
-    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness", "policy_usage", "policy_diff", "policy_resolver", "custom", "weekly_overview"}
+    assert set(types) == {"lateral_posture", "new_connections", "unmanaged_endpoints", "traffic", "security_risk", "network_inventory", "app_summary", "ven_status", "audit", "ransomware", "readiness", "policy_usage", "policy_diff", "policy_resolver", "custom", "weekly_overview", "detections"}
     assert all(e["available"] for e in types.values()) and data["smtp_enabled"] is False
 
 

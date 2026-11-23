@@ -11,7 +11,10 @@ longer built) and policy usage has three numbers more — rhc_hit, rhc_zero, rhc
 for hit, zero and no_record. The other numbers of policy usage are as they were.
 
 Stage 3b, Task 6: the weekly overview is a new type, with an entry of its own in each install. The sample with every
-setting got alerts for it (test_report_i18n._alerts_sample); no other type reads alerts, and no other entry changed."""
+setting got alerts for it (test_report_i18n._alerts_sample); no other type reads alerts, and no other entry changed.
+
+6.15.0 Task 2: the detections report records the two stored detections and detection-category alerts in the full
+sample; the bare sample has no stored detections or alerts."""
 import pytest
 
 from illumio_ops.domain.values import Language, ReportType
@@ -87,6 +90,10 @@ PINNED: dict[str, dict[str, Numbers]] = {
             "new_alerts": (4, 1), "vens_not_online": (1, None), "pb_connections": (1, None),
             "critical_high_alerts": (3, 0), "new_connections": (39, None), "provisions": (1, None),
         },
+        "detections": {
+            "new_detections": (2, None), "high_critical_detections": (1, None), "detection_alerts": (2, None),
+            "failed_deliveries": (0, None), "known_alerts": (0, None),
+        },
     },
     "bare": {
         "lateral_posture": {
@@ -147,6 +154,10 @@ PINNED: dict[str, dict[str, Numbers]] = {
         "weekly_overview": {
             "new_alerts": (0, None), "vens_not_online": (1, None), "pb_connections": (1, None),
             "critical_high_alerts": (0, None), "new_connections": (39, None), "provisions": (1, None),
+        },
+        "detections": {
+            "new_detections": (0, None), "high_critical_detections": (0, None), "detection_alerts": (0, None),
+            "failed_deliveries": (0, None), "known_alerts": (0, None),
         },
     },
 }

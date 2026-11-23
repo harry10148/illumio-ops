@@ -162,6 +162,15 @@ def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: d
     return rows, int(total)
 
 
+def period_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime, until: datetime,
+                  rule_types: Sequence[str] | None = None, detectors_in: Sequence[str] | None = None,
+                  detectors_not_in: Sequence[str] | None = None) -> list[sqlite3.Row]:
+    """Every alert in [since, until) matching the given rule and detector category filters."""
+    where, params = _where(pce_url=pce_url, org_id=org_id, since=since, until=until, rule_types=rule_types,
+                           detectors_in=detectors_in, detectors_not_in=detectors_not_in)
+    return conn.execute(f"SELECT * FROM alerts WHERE {where} ORDER BY fired_at, id", params).fetchall()
+
+
 def period_counts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime,
                   until: datetime | None = None) -> dict[str, int]:
     """Alerts fired since `since` (and before `until`, when given) per severity, and how many were marked as known

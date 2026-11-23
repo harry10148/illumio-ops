@@ -31554,7 +31554,8 @@
               "policy_diff",
               "policy_resolver",
               "custom",
-              "weekly_overview"
+              "weekly_overview",
+              "detections"
             ],
             "title": "ReportType",
             "type": "string"
@@ -32198,7 +32199,8 @@
               "policy_diff",
               "policy_resolver",
               "custom",
-              "weekly_overview"
+              "weekly_overview",
+              "detections"
             ],
             "title": "ReportType",
             "type": "string"
@@ -32934,7 +32936,8 @@
               "policy_diff",
               "policy_resolver",
               "custom",
-              "weekly_overview"
+              "weekly_overview",
+              "detections"
             ],
             "title": "ReportType",
             "type": "string"
@@ -33658,7 +33661,8 @@
               "policy_diff",
               "policy_resolver",
               "custom",
-              "weekly_overview"
+              "weekly_overview",
+              "detections"
             ],
             "title": "ReportType",
             "type": "string"
@@ -34578,7 +34582,8 @@
               "policy_diff",
               "policy_resolver",
               "custom",
-              "weekly_overview"
+              "weekly_overview",
+              "detections"
             ],
             "title": "ReportType",
             "type": "string"
@@ -35222,7 +35227,8 @@
               "policy_diff",
               "policy_resolver",
               "custom",
-              "weekly_overview"
+              "weekly_overview",
+              "detections"
             ],
             "title": "ReportType",
             "type": "string"
@@ -35531,7 +35537,8 @@
               "policy_diff",
               "policy_resolver",
               "custom",
-              "weekly_overview"
+              "weekly_overview",
+              "detections"
             ],
             "title": "ReportType",
             "type": "string"
@@ -36034,7 +36041,8 @@
               "policy_diff",
               "policy_resolver",
               "custom",
-              "weekly_overview"
+              "weekly_overview",
+              "detections"
             ],
             "title": "ReportType",
             "type": "string"
@@ -52622,6 +52630,7 @@
       "app_summary",
       "audit",
       "custom",
+      "detections",
       "lateral_posture",
       "network_inventory",
       "new_connections",

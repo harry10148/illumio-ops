@@ -29,6 +29,7 @@ CONCLUSION_KEYS: Mapping[ReportType, str] = {
     ReportType.POLICY_RESOLVER: "rpt_conclusion_policy_resolver",
     ReportType.CUSTOM: "rpt_conclusion_custom",
     ReportType.WEEKLY_OVERVIEW: "rpt_conclusion_weekly_overview",
+    ReportType.DETECTIONS: "rpt_conclusion_detections",
 }
 CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.LATERAL_POSTURE: ("assets_reachable", "pivots", "cross_env", "new_detections"),
@@ -47,6 +48,8 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.POLICY_RESOLVER: ("rules", "rulesets", "rows", "not_expanded", "no_address"),
     ReportType.CUSTOM: ("sections", "period"),
     ReportType.WEEKLY_OVERVIEW: ("new_alerts", "vens_not_online", "pb_connections", "provisions"),
+    ReportType.DETECTIONS: ("new_detections", "high_critical_detections", "detection_alerts", "failed_deliveries",
+                            "known_alerts"),
 }
 
 # The three numbers a report's first page leads with (stage 3a), in the order shown. The closing step (finish) moves
@@ -54,6 +57,7 @@ CONCLUSION_KPIS: Mapping[ReportType, tuple[str, ...]] = {
 # have no row of numbers on a first page.
 LEAD_KPIS: Mapping[ReportType, tuple[str, ...]] = {
     ReportType.WEEKLY_OVERVIEW: ("new_alerts", "vens_not_online", "pb_connections"),
+    ReportType.DETECTIONS: ("new_detections", "high_critical_detections", "detection_alerts"),
     ReportType.SECURITY_RISK: ("maturity", "enforced_hosts_pct", "pb_flows"),
     ReportType.LATERAL_POSTURE: ("assets_reachable", "pivots", "new_detections"),
     ReportType.NEW_CONNECTIONS: ("new", "admin", "unmanaged_source"),
@@ -103,6 +107,11 @@ CONCLUSIONS: Mapping[ReportType, tuple[tuple[tuple[str, ...], str], ...]] = {
         # no event at all in the period: no count of provisions (as the audit report gives none)
         (("new_alerts", "vens_not_online", "pb_connections"), "rpt_conclusion_weekly_overview_no_events"),
         (("new_alerts", "vens_not_online"), "rpt_conclusion_weekly_overview_alerts_vens"),
+    ),
+    ReportType.DETECTIONS: (
+        (("new_detections", "high_critical_detections", "detection_alerts", "failed_deliveries", "known_alerts"),
+         CONCLUSION_KEYS[ReportType.DETECTIONS]),
+        (("detection_alerts", "failed_deliveries", "known_alerts"), "rpt_conclusion_detections_lightweight"),
     ),
 }
 
