@@ -159,9 +159,17 @@ def build_detections(inp: BuildInput) -> ReportDocument:
     none_line = (TextBlock(paragraphs=(tr(lang, "rpt_det_no_kinds", kinds=tr(
         lang, "rpt_list_sep").join(detector_name(lang, kind) for kind in empty_kinds)),)) if empty_kinds else None)
 
+    # names as the workbench gives them: the inventory, else what the flows called the host (an unmanaged Workload
+    # has a name there), else words — the inventory alone called those "removed" (6.15.0 on .106)
+    from illumio_ops.services.hosts import display_names
+    named = display_names(ctx, {str(r["subject_key"]) for r in detection_rows} | set(host_kinds), lang=lang)
+
+    def shown(key: str) -> str:
+        return named.get(key) or host_name(lateral.hosts, key, lang)
+
     detection_table_rows = tuple(
         (severity_name(lang, str(row["severity"])), detector_name(lang, str(row["detector"])),
-         host_name(lateral.hosts, str(row["subject_key"]), lang), row["first_seen"], row["last_seen"], row["occurrences"],
+         shown(str(row["subject_key"])), row["first_seen"], row["last_seen"], row["occurrences"],
          tr(lang, "rpt_yes") if row["critical_asset"] else tr(lang, "rpt_no"),
          tr(lang, "rpt_yes") if _marked(row, marks) else tr(lang, "rpt_no"))
         for row in detection_rows)
@@ -187,7 +195,7 @@ def build_detections(inp: BuildInput) -> ReportDocument:
         columns=(Column(key="host", label=tr(lang, "rpt_col_host"), kind="host"),
                  Column(key="detections", label=tr(lang, "rpt_col_count"), kind="number"),
                  Column(key="kinds", label=tr(lang, "rpt_col_detector"))),
-        rows=tuple((host_name(lateral.hosts, key, lang), sum(kinds.values()), tr(lang, "rpt_list_sep").join(
+        rows=tuple((shown(key), sum(kinds.values()), tr(lang, "rpt_list_sep").join(
             f"{detector_name(lang, kind)}: {count}" for kind, count in
             sorted(kinds.items(), key=lambda item: (-item[1], item[0])))) for key, kinds in host_ranked),
         total_rows=len(host_kinds), empty_text=tr(lang, "rpt_det_hosts_none"),
@@ -196,17 +204,20 @@ def build_detections(inp: BuildInput) -> ReportDocument:
         host_keys=host_keys(host=(host_key({}, key) for key, _ in host_ranked)), host_section="connections")
 
     alert_rows = []
+    same_name = Counter(str(stats["name"]) for stats in rule_stats.values())
     for rule_id, stats in sorted(rule_stats.items(), key=lambda item: (str(item[1]["name"]).casefold(), item[0])):
         severity_counts = stats["severity"]
-        alert_rows.append((f"{stats['name']} ({rule_id})", stats["fired"],
-                           *(severity_counts.get(s.value, 0) for s in _SEVERITIES), stats["known"],
+        # a rule's id only tells apart two rules of the same name: otherwise it is noise beside the name
+        label = str(stats["name"]) if same_name[str(stats["name"])] == 1 else f"{stats['name']} (…{rule_id[-6:]})"
+        spread = tr(lang, "rpt_list_sep").join(f"{severity_name(lang, s.value)} {severity_counts[s.value]}"
+                                               for s in _SEVERITIES if severity_counts.get(s.value))
+        alert_rows.append((label, stats["fired"], spread or "—", stats["known"],
                            stats["sent"], stats["failed"], stats["not_notified"], stats["pending"]))
     history = TableBlock(
         title=tr(lang, "rpt_det_tbl_rules"),
         columns=(Column(key="rule", label=tr(lang, "rpt_det_col_rule")),
                  Column(key="fired", label=tr(lang, "rpt_det_col_fired"), kind="number"),
-                 *(Column(key=f"severity_{s.value}", label=severity_name(lang, s.value), kind="number")
-                   for s in _SEVERITIES),
+                 Column(key="severity", label=tr(lang, "rpt_col_severity")),
                  Column(key="known", label=tr(lang, "rpt_det_col_known"), kind="number"),
                  Column(key="sent", label=tr(lang, "rpt_det_col_sent"), kind="number"),
                  Column(key="failed", label=tr(lang, "rpt_det_col_failed"), kind="number"),

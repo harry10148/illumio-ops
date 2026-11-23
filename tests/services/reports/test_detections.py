@@ -106,7 +106,7 @@ def test_builder_reads_detections_alerts_known_and_delivery_errors(tmp_path):
     by_kind = _table(doc, "New detections by kind")
     fanout = next(row for row in by_kind.rows if row[0] == "Fan-out")
     assert fanout == ("Fan-out", 1, 1, 1, 1)
-    detail = _table(doc, "New detections, ranked by severity, critical asset and time")
+    detail = _table(doc, "New detections by severity")
     assert detail.rows[0][0] == "High" and detail.rows[0][2] == "app-01"
     assert detail.rows[0][-1] == "Yes" and detail.rows[1][-1] == "No"
     history = _table(doc, "Detection rules in the period")
@@ -129,7 +129,7 @@ def test_builder_with_no_data_lists_all_kinds(tmp_path):
     _host_inventory(ctx)
     doc = specs()[ReportType.DETECTIONS].build(_input(ctx))
     assert _table(doc, "New detections by kind").total_rows == 21
-    assert _table(doc, "New detections, ranked by severity, critical asset and time").rows == ()
+    assert _table(doc, "New detections by severity").rows == ()
     assert _table(doc, "Failed deliveries for detection-category alerts").rows == ()
     assert "No detections for these kinds:" in _text(doc)
 
@@ -151,7 +151,7 @@ def test_top_detection_limit_states_shown_and_total(tmp_path, monkeypatch):
     _detection(ctx, "fanout", f"fanout|{B}", B, START + timedelta(hours=2), severity="high")
     monkeypatch.setattr(detections, "DETECTION_ROWS", 1)
     detail = _table(specs()[ReportType.DETECTIONS].build(_input(ctx)),
-                    "New detections, ranked by severity, critical asset and time")
+                    "New detections by severity")
     assert len(detail.rows) == 1 and detail.total_rows == 2
     assert detail.limit_note == "Showing the top 1 of 2."
 
@@ -165,3 +165,30 @@ def test_scrubbed_delivery_error_in_zh_report(tmp_path):
            error="transport failed using 秘密-token")
     text = _text(specs()[ReportType.DETECTIONS].build(_input(ctx, Language.ZH_TW)))
     assert "秘密-token" not in text and "..." in text
+
+
+
+def test_rules_are_named_without_their_id_and_hosts_as_the_flows_named_them():
+    """6.15.0 on .106: rule rows read "name (32-hex id)", and an unmanaged Workload — absent from the inventory, named
+    in the flows — read "Removed host …id"."""
+    import tempfile
+    from pathlib import Path
+
+    from illumio_ops.domain.values import DataOrigin
+    from illumio_ops.store.flowdb.flows import upsert_flows
+    from tests.services.reports.test_findings import flow
+    ctx = configured_ctx(Path(tempfile.mkdtemp()), mode="full")
+    _host_inventory(ctx)
+    row = flow(src="fortigate-gw", dst="db-01", port=22)
+    object.__setattr__(row, "src_managed", False)
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [row], origin=DataOrigin.INGEST, now=NOW)
+        conn.commit()
+    _detection(ctx, "pivot_chain", "fp-u", "/orgs/1/workloads/fortigate-gw", START + timedelta(hours=2))
+    _alert(ctx, START + timedelta(hours=3), "fanout", status="sent")
+    doc = detections.build_detections(_input(ctx))
+    import re
+    names = [r[0] for r in _table(doc, "Detection rules in the period").rows]
+    assert "Fanout rule" in names and not any(re.search(r"[0-9a-f]{6}", n) for n in names)
+    hosts = [r[2] for r in _table(doc, "New detections by severity").rows]
+    assert hosts == ["fortigate-gw"]

@@ -266,8 +266,8 @@ def test_directory_section_marks_inferred_and_declared(ctx):
     rows = {r[0]: r for r in servers.rows}
     assert "fin-db-01" in rows and "Inferred" in rows["fin-db-01"][2]
     assert "10.0.9.10" in rows and "Declared" in rows["10.0.9.10"][2]
-    by_src = {r[0]: r for r in sources.rows}  # sources no longer in the inventory are named as removed
-    s1 = by_src["Removed workload …src-1"]
+    by_src = {r[0]: r for r in sources.rows}  # sources not in the inventory are named as the flows named them
+    s1 = by_src["s1"]
     assert s1[1] == 1 and s1[2] == 0 and "None last period" in s1[3]  # the previous period had none from it
     # each row's host key, row for row: a declared address opens the host page as ip:<address>
     assert dict(zip((r[0] for r in servers.rows), servers.host_keys["server"], strict=True))["10.0.9.10"] == "ip:10.0.9.10"

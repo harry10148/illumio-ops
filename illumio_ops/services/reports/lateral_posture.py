@@ -97,6 +97,7 @@ def _findings(focus: Mapping[str, Any] | None, hosts: Mapping[str, HostInfo], la
 class _Builder:
     def __init__(self, inp: BuildInput) -> None:
         self.inp, self.lang = inp, inp.lang
+        self._named: dict[str, str] = {}
         self.lc: LateralContext = load_lateral_context(inp.ctx, now=inp.now)
         self.critical_set = bool(self.lc.settings.critical_assets)
         # On-demand pulls build against a throwaway traffic store, but detection availability belongs to the
@@ -108,7 +109,16 @@ class _Builder:
         return tr(self.lang, msg, **params)
 
     def name(self, key: str) -> str:
-        return host_name(self.lc.hosts, key, self.lang)
+        host = self.lc.hosts.get(key)
+        if (host is not None and host.hostname) or key.startswith("ip:"):
+            return host_name(self.lc.hosts, key, self.lang)
+        # not in the inventory (an unmanaged Workload, say): what the flows called it, as the workbench says it —
+        # the inventory alone called it "removed" (6.15.0 on .106)
+        if key not in self._named:
+            from illumio_ops.services.hosts import display_names
+            self._named[key] = display_names(self.inp.ctx, {key}, lang=self.lang).get(key) or host_name(
+                self.lc.hosts, key, self.lang)
+        return self._named[key]
 
     def keys(self, **columns: Iterable[object]) -> dict[str, tuple[str | None, ...]]:
         """host_keys of a table's host columns, from what each row's cell was named from (a detection's subject may

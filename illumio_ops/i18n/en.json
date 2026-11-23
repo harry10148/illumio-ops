@@ -4011,7 +4011,7 @@
   "rpt_det_sec_failed": "Undelivered alerts",
   "rpt_det_sec_limits": "Data limits",
   "rpt_det_tbl_by_kind": "New detections by kind",
-  "rpt_det_tbl_list": "New detections, ranked by severity, critical asset and time",
+  "rpt_det_tbl_list": "New detections by severity",
   "rpt_det_tbl_hosts": "Top hosts and their detection kinds",
   "rpt_det_tbl_rules": "Detection rules in the period",
   "rpt_det_chart_days": "Detection-category alerts by day",
