@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.14.1] - 2026-11-23
+
+### Fixed
+
+- The investigation page's side column cut a host's "unmanaged Workload" or "IP address" tag to an ellipsis beside a
+  long name. The name gives way now and the tag is drawn whole.
+
 ## [6.14.0] - 2026-11-23
 
 ### Removed
