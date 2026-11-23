@@ -128,11 +128,13 @@ def test_workbench_marks_three_host_states(context, live_app):
     unmanaged = flow(src="unmanaged-dhcp-client-on-floor-3", dst="db", port=8443)  # long: the list must cut it
     object.__setattr__(unmanaged, "src_managed", False)
     address = flow(unmanaged_src=True, dst="db", port=9443)
-    for row in (unmanaged, address):
+    medium = flow(src="fortigate-gw", dst="db", port=7443)  # fits alone, not beside its tag
+    object.__setattr__(medium, "src_managed", False)
+    for row in (unmanaged, address, medium):
         object.__setattr__(row, "first_detected", END - timedelta(hours=2))
         object.__setattr__(row, "last_detected", END - timedelta(hours=1))
     with live_app.ctx.flows().connect() as conn:
-        upsert_flows(conn, [unmanaged, address], origin=DataOrigin.INGEST, now=END)
+        upsert_flows(conn, [unmanaged, address, medium], origin=DataOrigin.INGEST, now=END)
         conn.commit()
 
     page = context.new_page()
@@ -144,7 +146,7 @@ def test_workbench_marks_three_host_states(context, live_app):
     expect(detail).to_contain_text("address")
 
     source = page.locator("[data-dim=src_host]")
-    source.locator(".wb-dim-row", has_text="unmanaged").wait_for()
+    source.locator(".wb-dim-row", has_text="unmanaged-dhcp").wait_for()
     expect(source).to_contain_text("unmanaged Workload")
     expect(source).to_contain_text("address")
     for tag in ("unmanaged Workload", "address"):
@@ -159,6 +161,11 @@ def test_workbench_marks_three_host_states(context, live_app):
         "   const b = a.getBoundingClientRect(); if (r.left < b.left - 1 || r.right > b.right + 1) return true; }"
         " return false; }).length")
     assert cut == 0
+    # and the name is cut only when it alone is wider than the list (6.14.1 cut "Fortigate" to "For…" for the tag)
+    squeezed = source.locator(".wb-dim-name").evaluate_all(
+        "(els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1"
+        " && e.scrollWidth <= e.parentElement.getBoundingClientRect().width).map((e) => e.textContent)")
+    assert squeezed == []
     page.set_viewport_size({"width": 1280, "height": 900})
 
     page.click("role=tab[name=/Ranking|排名/]")

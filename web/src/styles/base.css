@@ -382,9 +382,10 @@ a.btn-primary, a.btn-quiet, a.btn-danger { text-decoration: none; }
 .wb-dim-row:hover:not(:disabled) { background: var(--fill); }
 .wb-dim-row[data-chosen="true"] { font-weight: 600; cursor: default; }
 .wb-dim-row:disabled:not([data-chosen="true"]) { cursor: default; }
-.wb-dim-label { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
-/* the name gives way, never the host's tag: a cut tag would hide whether it is managed (title holds the name) */
-.wb-dim-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.wb-dim-label { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-2); min-width: 0; }
+/* the host's tag goes to the next line when name and tag do not fit; the name is cut only when it alone does not
+   fit (title holds it), and the tag never: a cut tag would hide whether the host is managed */
+.wb-dim-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%; }
 .wb-dim-label .badge { flex: none; }
 .wb-dim-value, .wb-num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .wb-main { min-width: 0; }
