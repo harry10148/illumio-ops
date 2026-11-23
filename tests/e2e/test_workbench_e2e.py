@@ -125,7 +125,7 @@ def test_service_pick_narrows_to_it(context, live_app):
 
 def test_workbench_marks_three_host_states(context, live_app):
     alert_id = _seed(live_app)
-    unmanaged = flow(src="unmanaged", dst="db", port=8443)
+    unmanaged = flow(src="unmanaged-dhcp-client-on-floor-3", dst="db", port=8443)  # long: the list must cut it
     object.__setattr__(unmanaged, "src_managed", False)
     address = flow(unmanaged_src=True, dst="db", port=9443)
     for row in (unmanaged, address):
@@ -150,6 +150,16 @@ def test_workbench_marks_three_host_states(context, live_app):
     for tag in ("unmanaged Workload", "address"):
         item = source.locator(".wb-dim-item").filter(has_text=tag)
         expect(item.locator("[data-role=wb-quarantine]")).to_have_count(0)
+    # the tag is drawn whole: a narrow list cuts the name, never the tag (6.14.0 on .106 cut it to "…")
+    page.set_viewport_size({"width": 1440, "height": 900})  # the side column is narrow beside the results
+    cut = source.locator(".wb-dim-label .badge").evaluate_all(
+        "(els) => els.filter((e) => { const r = e.getBoundingClientRect(); if (r.width === 0) return true;"
+        " for (let a = e.parentElement; a && !a.matches('.wb-dim-item'); a = a.parentElement) {"
+        "   if (getComputedStyle(a).overflowX === 'visible') continue;"
+        "   const b = a.getBoundingClientRect(); if (r.left < b.left - 1 || r.right > b.right + 1) return true; }"
+        " return false; }).length")
+    assert cut == 0
+    page.set_viewport_size({"width": 1280, "height": 900})
 
     page.click("role=tab[name=/Ranking|排名/]")
     page.select_option("select[name=group_0]", "src_host")
