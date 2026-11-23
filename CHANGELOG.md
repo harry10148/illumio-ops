@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.14.2] - 2026-11-23
+
+### Fixed
+
+- 6.14.1 kept the host's tag whole by cutting short names (on .106 "Fortigate" read "For…"). The tag now moves to the
+  next line when the name and the tag do not fit side by side; a name is cut only when it alone is wider than the list.
+
 ## [6.14.1] - 2026-11-23
 
 ### Fixed
