@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.14.0] - 2026-11-23
+
+### Removed
+
+- VEN Overview no longer changes VEN enforcement modes: the dialog, its preview of what each host would block and the
+  `/api/fleet/enforcement/*` routes are gone. The traffic reporting rate increase stays, and the action history still
+  lists past enforcement changes with their modes before and after.
+
+### Changed
+
+- Enforcement modes are named, not paraphrased: Idle, Visibility Only, Selective, Full, in both languages, on every
+  page and report table. Sentences that explain what a mode does are unchanged.
+- Ports name their protocol everywhere they are shown (workbench, filter chips, host pages, quarantine, alert evidence,
+  predicted and lateral views): 443/TCP, not 443/6.
+- The investigation workbench and host pages tag an unmanaged Workload and an IP address; a managed Workload has no
+  tag.
+- Report cards no longer say "Basic mode". A report that queries the PCE when made says so.
+
+### Fixed
+
+- An unmanaged Workload was taken as managed because it has an href: its host page said it was no longer in the
+  inventory, reports called it removed, and the workbench offered to quarantine it. The inventory, then the flows'
+  managed flag, now decide.
+- The lateral movement report, where traffic is not collected every cycle, said only that no detections appeared; it
+  now says detections need alert or full mode.
+- A report filter on a port with any protocol printed it as TCP.
+- The write key's hint said it was used only for Rule Hit Count; quarantine, rule schedules and the traffic rate
+  increase use it too.
+- An unknown `/api` path answered 405 to a POST; it answers 404.
+
+### Added
+
+- `python -m illumio_ops.crosscheck`: checks events, event-rule alerts and report numbers against the PCE's own data
+  (read-only; the draft recompute the reports themselves use). Design: `docs/superpowers/specs/2026-11-20-v6-crosscheck-design.md`.
+
 ## [6.13.0] - 2026-11-22
 
 ### Changed — the alert rules page
