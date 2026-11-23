@@ -6,6 +6,7 @@ import { type ApiError, call } from "../../api/client";
 import type { AggRow, DenyProposal, DenySimulationView, FlowRow } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
+import { protocolWord } from "../../terms";
 import { Pulled } from "../workbench/Workbench";
 
 export interface Suggestion {
@@ -15,10 +16,6 @@ export interface Suggestion {
 }
 
 const SHOWN = 10;
-
-function protoName(p: number): string {
-  return p === 6 ? "TCP" : p === 17 ? "UDP" : String(p);
-}
 
 function csvCell(v: string | number): string {
   // A cell a spreadsheet would read as a formula (a hostname from the PCE starting with =, +, -, @) is kept as text.
@@ -31,7 +28,7 @@ function csvCell(v: string | number): string {
 function exportCsv(rows: FlowRow[]): void {
   const head = [t("lat_csv_src"), t("lat_csv_dst"), t("lat_csv_port"), t("lat_csv_proto"), t("lat_csv_decision"),
     t("lat_csv_connections"), t("lat_csv_first"), t("lat_csv_last")];
-  const lines = rows.map((r) => [r.src_hostname ?? r.src_ip, r.dst_hostname ?? r.dst_ip, r.port ?? "", protoName(r.proto),
+  const lines = rows.map((r) => [r.src_hostname ?? r.src_ip, r.dst_hostname ?? r.dst_ip, r.port ?? "", protocolWord(r.proto),
     r.policy_decision, r.num_connections, r.first_detected, r.last_detected].map(csvCell).join(","));
   const blob = new Blob([`﻿${[head.map(csvCell).join(","), ...lines].join("\n")}\n`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);

@@ -10,6 +10,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from illumio_ops.domain.protocols import service_label
+
 KEY = "Quarantine"
 LEVELS = ("Mild", "Moderate", "Severe")
 ALL_WORKLOADS = "all_workloads"
@@ -62,8 +64,9 @@ def _services(items: Sequence[Mapping[str, Any]] | None) -> list[str]:
             out.append(str(s["href"]))
         elif s.get("port") is not None or s.get("proto") is not None:
             port = s.get("port")
-            out.append(f"{port if port is not None else '*'}{'-' + str(s['to_port']) if s.get('to_port') else ''}"
-                       f"/{s.get('proto') if s.get('proto') is not None else '*'}")
+            proto = s.get("proto")
+            out.append(service_label(port, int(proto) if proto is not None else None,
+                                     int(s["to_port"]) if s.get("to_port") is not None else None))
     return out
 
 

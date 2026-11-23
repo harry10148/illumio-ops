@@ -11,7 +11,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { HostLink } from "../../components/HostLink";
 import { HostName, NeedsAdvanced, Panel, Purpose, SeverityTag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
-import { modeWord } from "../../terms";
+import { modeWord, portWord, serviceWord } from "../../terms";
 import { registerNav } from "../../shell/nav";
 import { SEVERITY_KEYS, word } from "../alerts/common";
 import type { Req } from "../workbench/conditions";
@@ -113,7 +113,7 @@ function HostTop({ title, req, dimension, hostLinks, onPulled }: {
           <tbody>
             {top.rows.map((r) => {
               const key = String(r.keys[0] ?? "");
-              const label = shownKey(key, r.display[0]);
+              const label = dimension === "service" ? serviceWord(key) : shownKey(key, r.display[0]);
               return (
                 <tr key={key}>
                   <td>{hostLinks && key ? <HostLink hostKey={key} name={label} section="connections" /> : label}</td>
@@ -326,7 +326,7 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
                 const status = rw.allow_status?.[k];
                 return (
                   <tr key={k}>
-                    <td>{s.name}</td><td className="nowrap">{k}</td>
+                    <td>{s.name}</td><td className="nowrap">{portWord(s.port, s.proto)}</td>
                     <td>{s.severity ? word(SEVERITY_KEYS, s.severity.toLowerCase()) : "—"}</td>
                     <td>{s.protection_state ?? "—"}{s.port_status ? ` · ${s.port_status}` : ""}</td>
                     <td className="wb-num">{s.weight ?? "—"}</td>

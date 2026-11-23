@@ -39,8 +39,11 @@ def test_from_alert_dimensions_ranking_events(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/alerts/{alert_id}")
+    page.wait_for_selector("[data-role=evidence]")
+    expect(page.locator("[data-role=evidence]")).to_contain_text("3389/TCP")
     page.click("[data-role=open-workbench]")
     page.wait_for_selector("[data-role=wb-detail]")
+    expect(page.locator("[data-role=wb-detail]")).to_contain_text("3389/TCP")
     assert page.locator("[data-chip=alert]").count() == 1
     assert page.locator("[data-role=wb-detail] tbody tr").count() == 4
 

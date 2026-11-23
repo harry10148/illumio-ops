@@ -113,7 +113,7 @@ def test_basic_mode_state(tmp_path):
 def test_port_range_and_protocol_only(ctx):
     rng = peer_precedent(ctx, _req(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST,
                                    ports=(PortProto(port=1400, to_port=1500, proto=6),)), [_row(A, X)], now=NOW)
-    assert rng.values == [2] and rng.ports == ["1400-1500/6"]
+    assert rng.values == [2] and rng.ports == ["1400-1500/TCP"]
     tcp = peer_precedent(ctx, _req(SegmentDimension.SRC_HOST, SegmentDimension.DST_HOST,
                                    ports=(PortProto(proto=6),)), [_row(A, X)], now=NOW)
     assert tcp.values == [2]

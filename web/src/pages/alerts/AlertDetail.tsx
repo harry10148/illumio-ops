@@ -7,6 +7,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { HostLink } from "../../components/HostLink";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
+import { portWord } from "../../terms";
 import { registerNav } from "../../shell/nav";
 import { AlertBody } from "./AlertBody";
 import { DELIVERY_TONES, deliveryText } from "./common";
@@ -27,9 +28,12 @@ function cell(row: Row, column: string, lang: string): string {
   if (v === null || v === undefined) {
     if (column === "src_hostname") return String(row.src_ip ?? "");
     if (column === "dst_hostname") return String(row.dst_ip ?? "");
+    if (column === "port") return portWord(null, typeof row.proto === "number" ? row.proto : null);
     return "";
   }
   if (column === "last_detected" || column === "timestamp") return formatTime(String(v), lang);
+  if (column === "port") return portWord(typeof v === "number" ? v : null,
+    typeof row.proto === "number" ? row.proto : null);
   return String(v);
 }
 

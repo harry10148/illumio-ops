@@ -7,6 +7,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { portWord } from "../../terms";
 import { DETECTOR_KEYS } from "../alerts/common";
 
 // The allowed-traffic anomaly detectors (spec §6.5.8), listed apart from the lateral-movement ones.
@@ -63,13 +64,8 @@ function label(keys: Record<string, string>, value: string): string {
   return key ? t(key) : value;
 }
 
-function proto(p: number | null): string {
-  if (p === null) return t("proto_any");
-  return p === 6 ? "TCP" : p === 17 ? "UDP" : String(p);
-}
-
 function portText(p: PortEntry): string {
-  return `${p.port}/${proto(p.proto)}`;
+  return portWord(p.port, p.proto);
 }
 
 function samePort(a: PortEntry, b: PortEntry): boolean {

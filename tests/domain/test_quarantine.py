@@ -57,7 +57,7 @@ def test_policy_refs_scope_and_allow_rule():
     refs = policy_refs([rs], HREFS)
     assert [(r.rule_type, r.side) for r in refs["Moderate"]] == [("scope", "scope")]
     [allow] = refs["Mild"]
-    assert (allow.rule_type, allow.side, allow.services) == ("allow", "consumer", ["53/17"])
+    assert (allow.rule_type, allow.side, allow.services) == ("allow", "consumer", ["53/UDP"])
 
 
 def test_level_states():

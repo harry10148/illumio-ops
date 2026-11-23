@@ -229,13 +229,13 @@ def filter_text(cond: FlowCondition | None, lang: Language) -> str | None:
         if side is not None:
             parts += _side_text(side, lang, key)
     if cond.ports:
-        parts.append(tr(lang, "rpt_filter_ports", ports=", ".join(port_text(p.port, p.proto or 6) for p in cond.ports)))
+        parts.append(tr(lang, "rpt_filter_ports", ports=", ".join(port_text(p.port, p.proto) for p in cond.ports)))
     for services, key in ((cond.services, "wb_cond_service"), (cond.exclude_services, "wb_cond_service_not")):
         if services:
             parts.append(tr(lang, "rpt_filter_services", name=tr(lang, key), n=len(services)))
     if cond.exclude_ports:
         parts.append(tr(lang, "rpt_filter_field", name=tr(lang, "wb_cond_port_not"),
-                        value=", ".join(port_text(p.port, p.proto or 6) for p in cond.exclude_ports)))
+                        value=", ".join(port_text(p.port, p.proto) for p in cond.exclude_ports)))
     if cond.decisions:
         parts.append(tr(lang, "rpt_filter_decisions",
                         decisions=", ".join(tr(lang, DECISION_IN_SENTENCE_KEYS[d.value]) for d in cond.decisions)))

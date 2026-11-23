@@ -14,13 +14,11 @@ from illumio_ops.i18n import translate
 from illumio_ops.pce.collections import get_all
 from illumio_ops.pce.policy_write import active_href
 from illumio_ops.services.context import AppContext
+from illumio_ops.services.reports.common import port_text
 from illumio_ops.store import rule_schedules as store
 
 DEADLINE_S = 60
 MAX_RULESETS = 20
-PROTO = {6: "TCP", 17: "UDP", 1: "ICMP"}
-
-
 class TargetHit(BaseModel):
     href: str
     is_ruleset: bool
@@ -53,11 +51,11 @@ def _service(s: dict[str, Any], names: dict[str, str]) -> str:
     if s.get("href"):
         return names.get(s["href"], "service")
     port, proto = s.get("port"), s.get("proto")
-    word = PROTO.get(int(proto), str(proto)) if proto is not None else ""
-    if port is None:
-        return word or "?"
+    if port is None and proto is None:
+        return "?"
     to = s.get("to_port")
-    return f"{port}{'-' + str(to) if to else ''}/{word}" if word else str(port)
+    return port_text(int(port) if port is not None else None,
+                     int(proto) if proto is not None else None, int(to) if to is not None else None)
 
 
 def rule_summary(rule: dict[str, Any], names: dict[str, str], lang: Language) -> str:

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from illumio_ops.domain.protocols import PROTOCOLS
 from illumio_ops.domain.report import (
     BarBlock,
     Cell,
@@ -28,7 +29,7 @@ from illumio_ops.services.flowsource import (
     traffic_volume,
 )
 from illumio_ops.services.reports import findings, flowsections
-from illumio_ops.services.reports.common import DECISION_KEYS, PROTOCOLS, port_text, tr
+from illumio_ops.services.reports.common import DECISION_KEYS, port_text, tr
 from illumio_ops.services.reports.generate import (
     caveats_in_order,
     coverage_text,

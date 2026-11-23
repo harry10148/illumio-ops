@@ -12,6 +12,8 @@ import ipaddress
 from collections.abc import Mapping
 from typing import Any
 
+from illumio_ops.domain.protocols import PROTOCOLS
+
 _ANY = "ANY"
 
 # 單一 rule 的 src×dst 上限。scoped ruleset 內「ams → ams」是常見寫法，兩側
@@ -22,9 +24,6 @@ _ANY = "ANY"
 _MAX_RULE_PAIRS = 100_000
 
 
-_PROTO_NAMES = {6: "TCP", 17: "UDP", 1: "ICMP", 58: "ICMPv6", 47: "GRE", 50: "ESP", -1: "ANY"}
-
-
 def _proto_name(proto: Any) -> str:
     # Illumio ingress_services proto numbers: 6=TCP, 17=UDP, 1=ICMP, 58=ICMPv6,
     # -1/None=ANY. Map known values; fall back to str(proto) for unknowns rather
@@ -32,7 +31,8 @@ def _proto_name(proto: Any) -> str:
     if proto is None:
         return "ANY"
     try:
-        return _PROTO_NAMES.get(int(proto), str(proto))
+        value = int(proto)
+        return "ANY" if value == -1 else PROTOCOLS.get(value, str(value))
     except (TypeError, ValueError):
         return str(proto)
 
@@ -461,7 +461,7 @@ def build_label_group_to_labels(groups: list[dict[str, Any]]) -> dict[str, list[
             return []
         seen.add(href)
         g = by_href.get(href, {})
-        labels = [l.get("href") for l in (g.get("labels") or []) if l.get("href")]
+        labels = [label.get("href") for label in (g.get("labels") or []) if label.get("href")]
         for sg in g.get("sub_groups") or []:
             sgh = sg.get("href")
             if sgh:

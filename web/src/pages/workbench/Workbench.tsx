@@ -9,6 +9,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { HostLink } from "../../components/HostLink";
 import { Purpose, Reason } from "../../components/ui";
 import { t, useLang } from "../../i18n";
+import { portWord, serviceWord } from "../../terms";
 import { registerNav } from "../../shell/nav";
 import { QuarantineDialog, type QuarantineHost } from "../quarantine/QuarantineDialog";
 import { Predicted } from "./Predicted";
@@ -142,7 +143,8 @@ function DimensionBox({ req, dim, open, onToggle, onPick, names, onQuarantine }:
           {top && top.rows.length === 0 && <p className="muted">{t("wb_dim_none")}</p>}
           {top && top.rows.map((row) => {
             const key = String(row.keys[0] ?? "");
-            const label = row.display[0] ?? names[key] ?? (key.startsWith("ip:") ? key.slice(3) : key || "—");
+            const label = dim.dimension === "service" ? serviceWord(key)
+              : row.display[0] ?? names[key] ?? (key.startsWith("ip:") ? key.slice(3) : key || "—");
             const pickable = dim.dimension !== "direction" && key !== "";
             const on = pickable && chosen(req, dim, key);
             return (
@@ -201,7 +203,7 @@ function Detail({ result, mode }: { result: SegmentResult; mode: Req["mode"] }) 
             <tr key={r.record_key}>
               <td className="nowrap">{formatTime(r.last_detected, lang)}</td>
               <td>{hostOf(r, "src")}</td><td>{hostOf(r, "dst")}</td>
-              <td className="nowrap">{r.port ?? "—"}/{r.proto}</td><td>{r.policy_decision}</td>
+              <td className="nowrap">{portWord(r.port, r.proto)}</td><td>{r.policy_decision}</td>
               <td>{r.num_connections.toLocaleString()}</td>
               <td>{[r.initiator_process, r.initiator_user].filter(Boolean).join(" · ") || "—"}</td>
               <td>{[r.service_process, r.service_user].filter(Boolean).join(" · ") || "—"}</td>
@@ -228,6 +230,7 @@ function Ranking({ result, heads, peer, dims }: {
   const showPeer = peer?.state === "ok";
   const shownKey = (r: AggRow, i: number) => {
     const k = r.keys[i];
+    if (dims[i] === "service") return serviceWord(String(k ?? ""));
     const s = r.display[i] ?? (typeof k === "string" && k.startsWith("ip:") ? k.slice(3) : k);
     return s === null || s === undefined || s === "" ? "—" : String(s);
   };

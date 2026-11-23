@@ -10,7 +10,7 @@ import { HostLink } from "../../components/HostLink";
 import { KpiStrip, NeedsAdvanced, PageHead, type Tone } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
-import { decisionWord } from "../../terms";
+import { decisionWord, portWord } from "../../terms";
 import { DETECTOR_KEYS, SEVERITY_KEYS, SEVERITY_TONES, word } from "../alerts/common";
 import { STATE_KEYS, STATE_TONES } from "../system/Lateral";
 import { QuarantineDialog } from "../quarantine/QuarantineDialog";
@@ -31,10 +31,6 @@ const GROUP_KEYS = ["app", "env"] as const;
 
 function endpoint(key: string): EndpointFilter {
   return key.startsWith("ip:") ? { ips: [key.slice(3)] } : { hrefs: [key] };
-}
-
-function protoName(p: number): string {
-  return p === 6 ? "TCP" : p === 17 ? "UDP" : String(p);
 }
 
 export default function LateralMovement() {
@@ -79,7 +75,7 @@ export default function LateralMovement() {
   }
 
   const name = (key: string): string => page.names[key] ?? (key.startsWith("ip:") ? key.slice(3) : key);
-  const portWord = ([port, proto]: Port): string => page.port_names[`${port}/${proto}`] ?? `${port}/${protoName(proto)}`;
+  const serviceWord = ([port, proto]: Port): string => page.port_names[`${port}/${proto}`] ?? portWord(port, proto);
   const ex = page.exposure;
   const offered = page.lightweight_days.includes(days) ? days : page.lightweight_days[page.lightweight_days.length - 1];
 
@@ -89,7 +85,7 @@ export default function LateralMovement() {
       const proposal: DenyProposal = { src: endpoint(cut.src), dst: endpoint(cut.dst),
         ports: ports.map(([port, proto]) => ({ port, proto })) };
       setSuggestion({ proposal, node: false, words: t("lat_rule_edge", { src: name(cut.src), dst: name(cut.dst),
-        ports: ports.map(portWord).join("、") }) });
+        ports: ports.map(serviceWord).join("、") }) });
     } else {
       setSuggestion({ proposal: { src: {}, dst: endpoint(cut.src) }, node: true,
         words: t("lat_rule_node", { host: name(cut.src), asset: name(asset) }) });
@@ -98,7 +94,7 @@ export default function LateralMovement() {
 
   function suggestEdge(src: string, dst: string, ports: Port[]) {
     setSuggestion({ proposal: { src: endpoint(src), dst: endpoint(dst), ports: ports.map(([port, proto]) => ({ port, proto })) },
-      node: false, words: t("lat_rule_edge", { src: name(src), dst: name(dst), ports: ports.map(portWord).join("、") }) });
+      node: false, words: t("lat_rule_edge", { src: name(src), dst: name(dst), ports: ports.map(serviceWord).join("、") }) });
   }
 
   return (
@@ -170,7 +166,7 @@ export default function LateralMovement() {
                   {ex.cross_env.map((x) => (
                     <tr key={`${x.src}>${x.dst}`}>
                       <td>{name(x.src)}</td><td>{name(x.dst)}</td><td className="nowrap">{x.src_env} → {x.dst_env}</td>
-                      <td>{(x.ports as Port[]).map(portWord).join("、")}</td><td>{x.state === "unknown" ? t("lat_state_unknown") : decisionWord(x.state)}</td>
+                      <td>{(x.ports as Port[]).map(serviceWord).join("、")}</td><td>{x.state === "unknown" ? t("lat_state_unknown") : decisionWord(x.state)}</td>
                       <td><button type="button" className="btn-quiet" data-role="sim-cross"
                         onClick={() => suggestEdge(x.src, x.dst, x.ports as Port[])}>{t("lat_simulate")}</button></td>
                     </tr>
@@ -197,7 +193,7 @@ export default function LateralMovement() {
               <ul className="plain-list">
                 {ex.footholds.map((f) => (
                   <li key={`${f.host}|${f.port}/${f.proto}`}>
-                    <HostLink hostKey={f.host} name={name(f.host)} section="connections" />　{f.name}（{f.port}/{protoName(f.proto)}）
+                    <HostLink hostKey={f.host} name={name(f.host)} section="connections" />　{f.name}（{portWord(f.port, f.proto)}）
                     {f.severity && <span className="badge">{word(SEVERITY_KEYS, f.severity.toLowerCase())}</span>}
                   </li>
                 ))}
@@ -327,7 +323,7 @@ function Assets({ ex, critical, preselect, name, onCut }: {
                           <li key={`${c.kind}|${c.src}|${c.dst ?? ""}`} className="lat-cut">
                             {c.kind === "edge" && c.dst
                               ? t("lat_cut_edge", { src: name(c.src), dst: name(c.dst), ports: (c.ports as Port[]).map(
-                                ([p, pr]) => `${p}/${protoName(pr)}`).join("、"), asset: name(asset.key),
+                                ([p, pr]) => portWord(p, pr)).join("、"), asset: name(asset.key),
                               before: String(c.before), after: String(c.after) })
                               : t("lat_cut_node", { host: name(c.src), asset: name(asset.key), before: String(c.before),
                                 after: String(c.after) })}

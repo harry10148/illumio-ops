@@ -156,7 +156,7 @@ def test_schedule_with_filter(context, live_app):
     editor.get_by_role("button", name="Save").click()
     row = page.locator("[data-role=schedule-list] tbody tr").first
     expect(row.locator("[data-role=schedule-filter]")).to_have_text(
-        "Destination: app=Finance; Source is not: 10.9.0.0/16; Port: 443/6")
+        "Destination: app=Finance; Source is not: 10.9.0.0/16; Port: 443/TCP")
     saved = live_app.ctx.settings.current().reports.schedules[0]
     assert saved.filter is not None and saved.filter.dst.labels[0].values == ("Finance",)
     assert [p.port for p in saved.filter.ports] == [443] and saved.filter.src_exclude.ips == ("10.9.0.0/16",)

@@ -345,7 +345,7 @@ class _Builder:
             host_keys=self.keys(source=(src for src, _ in top)), host_section="connections",
             limit_note=self.t("rpt_lat_dir_sources_top", n=DIRECTORY_SOURCES)
             if len(source_rows) == DIRECTORY_SOURCES else None)
-        intro = self.t("rpt_lat_directory_intro", ports=", ".join(port_text(p, q or 6) for p, q in ds.ports))
+        intro = self.t("rpt_lat_directory_intro", ports=", ".join(port_text(p, q) for p, q in ds.ports))
         return Section(id="directory", title=title, intro=intro, blocks=(server_table, det_table, source_table))
 
     def initiators_section(self) -> Section:

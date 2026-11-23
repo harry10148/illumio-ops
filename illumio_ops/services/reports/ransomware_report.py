@@ -147,7 +147,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                      Column(key="port", label=t("rpt_col_service")), Column(key="severity", label=t("rpt_col_severity")),
                      Column(key="sources", label=t("rpt_col_recent_sources"), kind="number")),
             host_keys=host_keys(host=(host_of(r) for r in items[:LIST_ROWS])), host_section="ransomware",
-            rows=tuple((name(r), r.get("name"), port_text(r.get("port"), int(r.get("proto") or 0)),
+            rows=tuple((name(r), r.get("name"), port_text(r.get("port"), int(r["proto"]) if r.get("proto") is not None else None),
                         severity_name(lang, str(r.get("severity") or "").lower()), r.get("recent_sources"))
                        for r in items[:LIST_ROWS]),
             total_rows=len(items), empty_text=t(empty),
@@ -239,7 +239,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                  Column(key="state", label=t("rpt_rw_col_state")),
                  Column(key="coverage", label=t("rpt_rw_col_coverage")),
                  Column(key="contribution", label=t("rpt_rw_col_contribution"))),
-        rows=tuple((name(h), s.get("name"), port_text(s.get("port"), int(s.get("proto") or 0)),
+        rows=tuple((name(h), s.get("name"), port_text(s.get("port"), int(s["proto"]) if s.get("proto") is not None else None),
                     severity_name(lang, str(s.get("severity") or "").lower()), s.get("weight"),
                     t(_state_key(s.get("protection_state"))),
                     pct(100 * s["coverage"]) if isinstance(s.get("coverage"), (int, float)) else "—",
@@ -273,7 +273,7 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
                     or t("rpt_rw_allow_none"))
             if state == "error":
                 text = t("rpt_rw_allow_error")
-            allow_rows.append((names[href], port_text(int(port), int(proto or 0)), text))
+            allow_rows.append((names[href], port_text(int(port), int(proto) if proto is not None else None), text))
             allow_keys.append(host_key({}, href))
     allow_table = TableBlock(
         title=t("rpt_rw_tbl_allow"),

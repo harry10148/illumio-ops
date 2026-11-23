@@ -18,6 +18,7 @@ from illumio_ops.services.analysis.context import (
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import AggRow
 from illumio_ops.services.flowsource_anomaly import peer_destinations
+from illumio_ops.services.reports.common import port_text
 from illumio_ops.services.workbench import (
     FlowRequest,
     PeerPrecedent,
@@ -38,8 +39,7 @@ def peer_precedent(ctx: AppContext, req: FlowRequest, rows: Sequence[AggRow], *,
                    now: datetime | None = None) -> PeerPrecedent:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     ports = list(req.condition.ports)
-    port_words = [("" if p.port is None else f"{p.port}" + (f"-{p.to_port}" if p.to_port is not None else ""))
-                  + ("" if p.proto is None else f"/{p.proto}") for p in ports]
+    port_words = [port_text(p.port, p.proto, p.to_port) for p in ports]
     dims = [g.dimension for g in req.group_by]
 
     def blank(state: PeerState) -> PeerPrecedent:

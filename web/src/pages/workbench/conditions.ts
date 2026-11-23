@@ -1,6 +1,7 @@
 // What a dimension value adds to the conditions, and the conditions as removable chips (spec §6.5.3).
 import type { AggRow, EndpointFilter, EventRequest, FlowCondition1, FlowRequest, SegmentDimension } from "../../api/generated";
 import { t } from "../../i18n";
+import { portWord } from "../../terms";
 
 export type Req = FlowRequest | EventRequest;
 
@@ -150,10 +151,10 @@ export function chips(req: Req, names: Record<string, string>): Chip[] {
   side("either_exclude", "wb_cond_either_not");
   const cond = (r: Req) => ({ ...((r as FlowRequest).condition ?? {}) });
   for (const p of c.ports ?? []) out.push({ id: `port:${p.port}/${p.proto}`, labelKey: "wb_cond_port",
-    value: `${p.port === -1 ? "—" : (p.port ?? "*")}${p.to_port ? `-${p.to_port}` : ""}/${p.proto ?? "*"}`,
+    value: portWord(p.port, p.proto, p.to_port),
     remove: (r) => ({ ...r, condition: { ...cond(r), ports: (cond(r).ports ?? []).filter((x) => x !== p) } }) as Req });
   for (const p of c.exclude_ports ?? []) out.push({ id: `xport:${p.port}/${p.proto}`, labelKey: "wb_cond_port_not",
-    value: `${p.port ?? "*"}/${p.proto ?? "*"}`,
+    value: portWord(p.port, p.proto, p.to_port),
     remove: (r) => ({ ...r, condition: { ...cond(r), exclude_ports: (cond(r).exclude_ports ?? []).filter((x) => x !== p) } }) as Req });
   for (const d of c.decisions ?? []) out.push({ id: `decision:${d}`, labelKey: "wb_cond_decision", value: d,
     remove: (r) => ({ ...r, condition: { ...cond(r), decisions: (cond(r).decisions ?? []).filter((x) => x !== d) } }) as Req });

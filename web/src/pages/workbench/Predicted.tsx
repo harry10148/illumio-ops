@@ -7,7 +7,7 @@ import { type ApiError, call } from "../../api/client";
 import type { ActorRef, PredictedView, RuleRef, ServiceRef } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
-import { decisionWord } from "../../terms";
+import { decisionWord, portWord } from "../../terms";
 import { word } from "../alerts/common";
 import type { Req } from "./conditions";
 
@@ -34,14 +34,9 @@ function actor(a: ActorRef): string {
   return a.exclusion ? t("wb_pred_except", { what: text }) : text;
 }
 
-function protoName(p: number): string {
-  return p === 6 ? "TCP" : p === 17 ? "UDP" : p === 1 ? "ICMP" : String(p);
-}
-
 function service(s: ServiceRef): string {
   if (s.name) return s.name;
-  const proto = s.proto === null ? "" : protoName(s.proto);
-  return `${s.port ?? "*"}${s.to_port ? `-${s.to_port}` : ""}${proto ? `/${proto}` : ""}`;
+  return portWord(s.port, s.proto, s.to_port);
 }
 
 export function ruleText(r: RuleRef): string {
@@ -113,7 +108,7 @@ export function Predicted({ req }: { req: Req }) {
                       <tr key={r.flow.record_key} data-draft={r.draft_decision}>
                         <td>{end(r.flow.src_hostname, r.flow.src_ip)}</td>
                         <td>{end(r.flow.dst_hostname, r.flow.dst_ip)}</td>
-                        <td className="nowrap">{r.flow.port ?? "—"}/{protoName(r.flow.proto)}</td>
+                        <td className="nowrap">{portWord(r.flow.port, r.flow.proto)}</td>
                         <td>{decided(r.flow.policy_decision)}</td>
                         <td>{decided(r.draft_decision)}</td>
                         <td className="pred-rules">

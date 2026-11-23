@@ -11,6 +11,7 @@ from urllib.parse import quote_plus
 
 from illumio_ops.domain.lateral import HostInfo
 from illumio_ops.domain.policy import ActorRef, RuleRef
+from illumio_ops.domain.protocols import service_label
 from illumio_ops.domain.report import HTML_ROW_CAP
 from illumio_ops.domain.tamper import TAMPER_PATTERN_KEYS
 from illumio_ops.domain.values import DetectorKind, Language, PortClass
@@ -45,7 +46,6 @@ PORT_CLASS_KEYS: Mapping[PortClass, str] = {
 }
 SEVERITY_KEYS = {"low": "severity_low", "medium": "severity_medium", "high": "severity_high",
                  "critical": "severity_critical"}
-PROTOCOLS = {6: "TCP", 17: "UDP", 1: "ICMP"}
 # The PCE's own values for a VEN's policy sync state and an event's outcome. A value outside these has no wording
 # here and is shown as the PCE sent it.
 SYNC_STATE_KEYS = {"applied": "rpt_sync_applied", "synced": "rpt_sync_applied", "syncing": "rpt_sync_syncing",
@@ -132,17 +132,16 @@ def mode_word(lang: Language, mode: str) -> str:
     return tr(lang, key) if key else mode
 
 
-def port_text(port: int | None, proto: int) -> str:
-    name = PROTOCOLS.get(proto, str(proto))
-    return name if port is None or port < 0 else f"{port}/{name}"
+def port_text(port: int | None, proto: int | None, to_port: int | None = None) -> str:
+    return service_label(port, proto, to_port)
 
 
 def ports_text(ports: Any) -> str:
-    """The exposure graph's port lists: [[port, proto], ...] or [{port, proto}, ...]."""
+    """Service lists as [[port, proto, to_port?], ...] or [{port, proto, to_port?}, ...]."""
     out = []
     for p in ports or ():
-        port, proto = (p.get("port"), p.get("proto")) if isinstance(p, Mapping) else (p[0], p[1])
-        out.append(port_text(port, int(proto or 0)))
+        port, proto, *rest = (p.get("port"), p.get("proto"), p.get("to_port")) if isinstance(p, Mapping) else p
+        out.append(port_text(port, int(proto) if proto is not None else None, rest[0] if rest else None))
     return ", ".join(out)
 
 
@@ -191,5 +190,5 @@ def rule_scope(r: RuleRef, any_text: str) -> str:
     """'consumers → providers：services' of a rule, as the policy usage report's tables say what a rule covers."""
     consumers = ", ".join(_actor(a) for a in r.consumers) or any_text
     providers = ", ".join(_actor(a) for a in r.providers) or any_text
-    services = ", ".join(s.name or port_text(s.port, s.proto or 0) for s in r.services) or any_text
+    services = ", ".join(s.name or port_text(s.port, s.proto) for s in r.services) or any_text
     return f"{consumers} → {providers}：{services}"
