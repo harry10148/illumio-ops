@@ -68,7 +68,7 @@ def _req(*dims, ports=MSSQL):
 
 
 def _row(*keys):
-    return AggRow(keys=list(keys), display=[None] * len(keys), value=1, bytes_known=None)
+    return AggRow(keys=list(keys), display=[None] * len(keys), managed=[None] * len(keys), value=1, bytes_known=None)
 
 
 def test_counts_other_members_with_same_destination_kind(ctx):

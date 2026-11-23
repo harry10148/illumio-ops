@@ -28,7 +28,11 @@ from illumio_ops.services.analysis.ransomware import HostRansomware
 from illumio_ops.services.analysis.tamper import HostTamper
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.flowsource import host_addresses, workload_at
+from illumio_ops.services.flowsource import (
+    host_addresses,
+    latest_host_managed,
+    workload_at,
+)
 from illumio_ops.services.reports.common import unnamed_host
 from illumio_ops.store.flowdb import analysis, capabilities, labels, workloads
 from illumio_ops.store.flowdb import flows as flows_store
@@ -76,6 +80,8 @@ class QuarantineEligibility(BaseModel):
 class RankedValue(BaseModel):
     value: str
     connections: int
+    managed: bool | None = None
+    key: str | None = None
 
 
 class HostUsual(BaseModel):
@@ -97,7 +103,7 @@ class HostDifference(BaseModel):
 
 class HostProfile(BaseModel):
     key: str
-    managed: bool          # a workload href (False: an address the inventory does not hold)
+    managed: bool          # inventory or latest flow says managed; unknown hrefs retain removed-workload wording
     in_inventory: bool
     name: str              # what to call it: hostname, name, an address seen in the flows, or words (never the href)
     named: bool = True     # False: the store knew no name or address (the page asks the host's own traffic)
@@ -139,9 +145,12 @@ def _usual(ctx: AppContext, key: str, at: datetime) -> tuple[HostUsual | None, U
     if first is None:
         return None, "no_data"
     covered = min(USUAL_DAYS, (at.date() - date.fromisoformat(first)).days)
-    names = display_names(ctx, {k for k, _ in tops["dst_key"]})
+    destination_keys = {k for k, _ in tops["dst_key"]}
+    names = display_names(ctx, destination_keys)
+    flags = latest_host_managed(ctx, {k for k in destination_keys if k.startswith("/orgs/")})
     usual = HostUsual(
-        top_destinations=[RankedValue(value=names.get(k, k), connections=n) for k, n in tops["dst_key"]],
+        top_destinations=[RankedValue(value=names.get(k, k), connections=n, managed=flags.get(k), key=k)
+                          for k, n in tops["dst_key"]],
         top_processes=[RankedValue(value=v, connections=n) for v, n in tops["initiator_process"]],
         top_accounts=[RankedValue(value=v, connections=n) for v, n in tops["initiator_user"]],
         days_covered=covered)
@@ -192,8 +201,12 @@ def display_names(ctx: AppContext, keys: Iterable[str], *, lang: Language | None
         with ctx.flows().connect() as conn:
             names = {w.href: n for w in workloads.all_workloads(conn) if w.href in hrefs and (n := w.hostname or w.name)}
         names |= host_addresses(ctx, hrefs - set(names))
+        managed = latest_host_managed(ctx, hrefs - set(names))
+    else:
+        managed = {}
     said = lang or ctx.settings.current().display.language
-    return {k: names.get(k) or (unnamed_host(k, said) or k if k in hrefs else k.removeprefix("ip:")) for k in keys}
+    return {k: names.get(k) or (unnamed_host(k, said, managed=managed.get(k)) or k
+                                if k in hrefs else k.removeprefix("ip:")) for k in keys}
 
 
 def _exposure(ctx: AppContext, key: str) -> HostExposureView | None:
@@ -232,6 +245,8 @@ def profile(ctx: AppContext, key: str, *, now: datetime | None = None) -> HostPr
             if wl is not None and wl.label_set is not None else {}
         cap = capabilities.all(conn).get("ransomware_risk")
         held = ransomware_store.source_updated(conn)
+    seen_managed = latest_host_managed(ctx, {href}).get(href)
+    managed = bool(wl.managed) if wl is not None else (seen_managed if seen_managed is not None else True)
     unsupported = cap is not None and cap.state == CapabilityState.UNSUPPORTED
     identity = None if wl is None else HostIdentity(
         hostname=wl.hostname, name=wl.name, enforcement_mode=wl.enforcement_mode, visibility_level=wl.visibility_level,
@@ -251,13 +266,13 @@ def profile(ctx: AppContext, key: str, *, now: datetime | None = None) -> HostPr
     if not name:
         name = display_names(ctx, {href})[href]
     return HostProfile(
-        key=key, managed=True, in_inventory=wl is not None, name=name, named=named, address=None, identity=identity,
+        key=key, managed=managed, in_inventory=wl is not None, name=name, named=named, address=None, identity=identity,
         labels=host_labels, exposure=_exposure(ctx, key), tamper=tamper.host_tamper(ctx, href, now=at),
         ransomware=ransomware.host_ransomware(ctx, href, now=at, explain_allows=False)
         if wl is not None and not unsupported else None,
         ransomware_unsupported=unsupported, ransomware_details=details, usual=usual,
         usual_state=usual_state, different=_different(ctx, key, name, at),
-        quarantine=_eligibility(key, name, managed=True, in_inventory=wl is not None,
+        quarantine=_eligibility(key, name, managed=managed, in_inventory=wl is not None,
                                 mode=wl.enforcement_mode if wl is not None else None))
 
 

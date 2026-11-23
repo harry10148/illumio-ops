@@ -53,10 +53,10 @@ from illumio_ops.services.reports.common import (
     DECISION_KEYS,
     host_key,
     host_keys,
-    host_name,
     mode_word,
     port_text,
     tr,
+    unnamed_host,
 )
 from illumio_ops.services.reports.hints import hint
 from illumio_ops.services.reports.registry import BuildInput
@@ -92,9 +92,10 @@ def narrowed(spec: FilterSpec, decisions: Sequence[PolicyDecision]) -> FilterSpe
     return spec.model_copy(update={"decisions": both}) if both else None
 
 
-def _key_text(inp: BuildInput, g: GroupBy, key: Any, display: str | None, names: dict[str, str]) -> str:
+def _key_text(inp: BuildInput, g: GroupBy, key: Any, display: str | None, names: dict[str, str],
+              managed: bool | None = None) -> str:
     if g.dimension in _HOSTS:
-        return display or names.get(str(key)) or host_name({}, str(key), inp.lang)
+        return display or names.get(str(key)) or unnamed_host(str(key), inp.lang, managed=managed) or str(key)
     if g.dimension in _LABELS:
         return str(key) if key not in (None, "") else tr(inp.lang, "rpt_no_label")
     if g.dimension is SegmentDimension.SERVICE:
@@ -178,7 +179,7 @@ def ranking(inp: BuildInput, *, title: str, group_by: Sequence[GroupBy], metric:
         rows_in = rows_in[:limit]
     names = _names(inp, rows_in, group_by)
     rows: tuple[tuple[Cell, ...], ...] = tuple(
-        (*(_key_text(inp, g, r.keys[i], r.display[i], names) for i, g in enumerate(group_by)), r.value)
+        (*(_key_text(inp, g, r.keys[i], r.display[i], names, r.managed[i]) for i, g in enumerate(group_by)), r.value)
         for r in rows_in)
     by_host = [i for i, g in enumerate(group_by) if g.dimension in _HOSTS]
     shown = tuple(c.model_copy(update={"kind": "host"}) if i in by_host else c for i, c in enumerate(columns))

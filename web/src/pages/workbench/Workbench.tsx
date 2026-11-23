@@ -32,6 +32,11 @@ const METRIC_KEYS: Record<string, string> = {
 const HOST_DIMS = new Set<string>(["src_host", "dst_host", "event_host"]);
 const HOST_KEY = /^(\/orgs\/\d+\/workloads\/|ip:)/;  // what the host profile takes (an event's VEN href is not)
 const WORKLOAD = /^\/orgs\/\d+\/workloads\//;  // only a managed workload can be quarantined
+function hostStateTag(key: string, managed: boolean | null | undefined) {
+  if (key.startsWith("ip:")) return <span className="badge">{t("host_tag_address")}</span>;
+  if (WORKLOAD.test(key) && managed === false) return <span className="badge">{t("host_tag_unmanaged")}</span>;
+  return null;
+}
 const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], ["wb_period_7d", 168], ["wb_period_30d", 720]];
 
 function lastHours(hours: number): { start: string; end: string } {
@@ -151,14 +156,14 @@ function DimensionBox({ req, dim, open, onToggle, onPick, names, onQuarantine }:
               <div key={key} className="wb-dim-item">
                 <button type="button" className="wb-dim-row" data-chosen={on} disabled={!pickable || on}
                   onClick={() => onPick(dim, row)} title={label}>
-                  <span className="wb-dim-label" title={label}>{label}</span>
+                  <span className="wb-dim-label" title={label}>{label} {HOST_DIMS.has(dim.dimension) && hostStateTag(key, row.managed[0])}</span>
                   <span className="wb-dim-value">{row.value.toLocaleString()}</span>
                 </button>
                 {HOST_DIMS.has(dim.dimension) && HOST_KEY.test(key) && (
                   <Link className="wb-dim-host" to={`/hosts?${new URLSearchParams({ key }).toString()}`}
                     aria-label={t("hosts_title")} title={t("hosts_title")}>↗</Link>
                 )}
-                {HOST_DIMS.has(dim.dimension) && WORKLOAD.test(key) && (
+                {HOST_DIMS.has(dim.dimension) && WORKLOAD.test(key) && row.managed[0] === true && (
                   <button type="button" className="wb-dim-host btn-quiet" data-role="wb-quarantine"
                     aria-label={t("q_title")} title={t("q_title")} onClick={() => onQuarantine({ key, name: label })}>⊘</button>
                 )}
@@ -202,7 +207,8 @@ function Detail({ result, mode }: { result: SegmentResult; mode: Req["mode"] }) 
           {(rows as FlowRow[]).map((r) => (
             <tr key={r.record_key}>
               <td className="nowrap">{formatTime(r.last_detected, lang)}</td>
-              <td>{hostOf(r, "src")}</td><td>{hostOf(r, "dst")}</td>
+              <td>{hostOf(r, "src")} {hostStateTag(r.src_key, r.src_managed)}</td>
+              <td>{hostOf(r, "dst")} {hostStateTag(r.dst_key, r.dst_managed)}</td>
               <td className="nowrap">{portWord(r.port, r.proto)}</td><td>{r.policy_decision}</td>
               <td>{r.num_connections.toLocaleString()}</td>
               <td>{[r.initiator_process, r.initiator_user].filter(Boolean).join(" · ") || "—"}</td>
@@ -237,7 +243,7 @@ function Ranking({ result, heads, peer, dims }: {
   const cell = (r: AggRow, i: number) => {
     const k = r.keys[i];
     return typeof k === "string" && HOST_DIMS.has(dims[i] ?? "") && HOST_KEY.test(k)
-      ? <HostLink hostKey={k} name={shownKey(r, i)} section="connections" /> : shownKey(r, i);
+      ? <><HostLink hostKey={k} name={shownKey(r, i)} section="connections" /> {hostStateTag(k, r.managed[i])}</> : shownKey(r, i);
   };
   return (
     <div className="table-wrap">

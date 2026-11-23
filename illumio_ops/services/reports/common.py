@@ -91,11 +91,13 @@ def host_url(base: str | None, key: str | None, section: str | None) -> str | No
     return f"{base.rstrip('/')}/hosts?key={query}" + (f"#{section}" if section else "")
 
 
-def unnamed_host(key: str, lang: Language) -> str | None:
+def unnamed_host(key: str, lang: Language, *, managed: bool | None = None) -> str | None:
     """Words for a workload href nothing names (its href means nothing to a reader): a workload not in the inventory
     has been removed; a Kubernetes or container workload is not one the inventory holds. None: not such an href."""
-    if "/workloads/" in key:
+    if "/workloads/" in key and managed is not False:
         return tr(lang, "rpt_host_removed", id=key.rsplit("/", 1)[-1][-6:])
+    if "/workloads/" in key and managed is False:
+        return tr(lang, "rpt_host_unmanaged", id=key.rsplit("/", 1)[-1][-6:])
     if "/kubernetes_workloads/" in key or "/container_workloads/" in key:
         return tr(lang, "rpt_host_container", id=key.rsplit("/", 1)[-1][-6:])
     return None
@@ -109,7 +111,7 @@ def host_name(hosts: Mapping[str, HostInfo], key: str, lang: Language) -> str:
         return host.hostname
     if key.startswith("ip:"):
         return key.removeprefix("ip:")
-    return (unnamed_host(key, lang) if host is None else None) or key
+    return (unnamed_host(key, lang, managed=host.managed if host else None) if host is None else None) or key
 
 
 def host_key(hosts: Mapping[str, Any], key: object) -> str | None:

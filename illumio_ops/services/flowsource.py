@@ -159,6 +159,7 @@ class FlowQuery(BaseModel):
 class AggRow(BaseModel):
     keys: list[str | int | None]       # one per grouping level
     display: list[str | None]          # what to show for each key (a host's name); None = the key itself
+    managed: list[bool | None]         # per level; None for non-host dimensions and event groups
     value: int
     bytes_known: int | None            # rows behind a bytes value that had byte data
 
@@ -453,6 +454,7 @@ def aggregate_flows(ctx: AppContext, seg: FlowSegment, *, now: datetime | None =
         raise StaleGeneration
     levels = len(seg.group_by)
     rows = [AggRow(keys=[r[f"k{i}"] for i in range(levels)], display=[r[f"d{i}"] for i in range(levels)],
+                   managed=[None if r[f"m{i}"] is None else bool(r[f"m{i}"]) for i in range(levels)],
                    value=r["value"] or 0, bytes_known=r["bytes_known"]) for r in found]
     gaps = merge_gaps(cov.gaps)
     return FlowAggregate(
@@ -1265,4 +1267,20 @@ def host_addresses(ctx: AppContext, hrefs: set[str]) -> dict[str, str]:
                                "SELECT src_hostname, src_ip FROM flows WHERE src_key = ? LIMIT 1", (h, h)).fetchone()
             if row:
                 out[h] = row[0] or row[1]
+    return out
+
+
+def latest_host_managed(ctx: AppContext, hrefs: set[str]) -> dict[str, bool]:
+    """The latest stored flow flag for each workload href. IP keys are addresses, not workloads."""
+    out: dict[str, bool] = {}
+    if not hrefs:
+        return out
+    with ctx.flows().connect() as conn:
+        for href in sorted(hrefs):
+            row = conn.execute(
+                "SELECT managed FROM (SELECT src_managed AS managed, last_detected, id FROM flows WHERE src_key = ? "
+                "UNION ALL SELECT dst_managed, last_detected, id FROM flows WHERE dst_key = ?) "
+                "ORDER BY last_detected DESC, id DESC LIMIT 1", (href, href)).fetchone()
+            if row is not None:
+                out[href] = bool(row[0])
     return out

@@ -73,6 +73,12 @@ function shownKey(key: string, display: string | null | undefined): string {
   return display ?? (key.startsWith("ip:") ? key.slice(3) : key || "—");
 }
 
+function hostStateTag(key: string, managed: boolean | null | undefined) {
+  if (key.startsWith("ip:")) return <span className="badge">{t("host_tag_address")}</span>;
+  if (key.startsWith("/orgs/") && managed === false) return <span className="badge">{t("host_tag_unmanaged")}</span>;
+  return null;
+}
+
 /** One single-level ranking about this host: the workbench's dimension top for the same conditions. */
 function HostTop({ title, req, dimension, hostLinks, onPulled }: {
   title: string; req: Req; dimension: SegmentDimension; hostLinks: boolean; onPulled: (p: PullInfo) => void;
@@ -116,7 +122,7 @@ function HostTop({ title, req, dimension, hostLinks, onPulled }: {
               const label = dimension === "service" ? serviceWord(key) : shownKey(key, r.display[0]);
               return (
                 <tr key={key}>
-                  <td>{hostLinks && key ? <HostLink hostKey={key} name={label} section="connections" /> : label}</td>
+                  <td>{hostLinks && key ? <HostLink hostKey={key} name={label} section="connections" /> : label} {hostStateTag(key, r.managed[0])}</td>
                   <td className="wb-num">{r.value.toLocaleString()}</td>
                 </tr>
               );
@@ -541,7 +547,7 @@ export function HostProfile() {
       )}
       {gapNotes.map((g) => <p key={g} className="notice" data-role="caveat">{g}</p>)}
       <div className="card stack host-section" id="status" data-section="identity">
-        {!profile.managed && <p className="notice">{t("hosts_unmanaged")}</p>}
+        {!profile.managed && <p className="notice">{t(profile.address ? "hosts_unmanaged" : "hosts_unmanaged_workload")}</p>}
         {profile.managed && !profile.in_inventory && <p className="notice">{t("hosts_not_in_inventory")}</p>}
         {id && (
           <dl className="host-facts">
@@ -669,7 +675,7 @@ function Usual({ profile }: { profile: Profile }) {
       <h3 className="side-h">{title}</h3>
       {rows.length === 0 ? <p className="muted">{t("hosts_usual_empty")}</p> : (
         <ol className="plain-list" data-role={role}>
-          {rows.map((r) => <li key={r.value}><HostName name={r.value} /> <span className="hint num">{r.connections.toLocaleString()}</span></li>)}
+          {rows.map((r) => <li key={r.key ?? r.value}><HostName name={r.value} /> {r.key && hostStateTag(r.key, r.managed)} <span className="hint num">{r.connections.toLocaleString()}</span></li>)}
         </ol>
       )}
     </div>

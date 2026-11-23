@@ -1,6 +1,7 @@
 """Host profile in a browser (P6b): who connects and the ports from the workbench, tamper investigation with a
 known cause, and an unmanaged address showing only its traffic."""
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode
 
 from playwright.sync_api import expect
 
@@ -66,6 +67,43 @@ def test_unmanaged_address_shows_traffic_only(context, live_app):
     expect(page.locator("[data-section=tamper]")).to_have_count(0)
     expect(page.locator("[data-section=events]")).to_have_count(0)
     expect(page.locator("[data-section=src_host]")).to_have_count(2)  # who connects, and mode switch by source
+
+
+def test_host_peer_list_marks_unmanaged_workload_and_address(context, live_app):
+    _seed(live_app)
+    unmanaged = flow(src="unmanaged", dst="db", port=8443)
+    object.__setattr__(unmanaged, "src_managed", False)
+    now = datetime.now(UTC)
+    object.__setattr__(unmanaged, "first_detected", now - timedelta(hours=2))
+    object.__setattr__(unmanaged, "last_detected", now - timedelta(hours=1))
+    with live_app.ctx.flows().connect() as conn:
+        upsert_flows(conn, [unmanaged], origin=DataOrigin.INGEST, now=now)
+        conn.commit()
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?key={DB}")
+    peers = page.locator("[data-section=src_host]").first
+    expect(peers).to_contain_text("unmanaged Workload")
+    expect(peers).to_contain_text("address")
+
+
+def test_unmanaged_workload_profile_is_not_deleted(context, live_app):
+    _seed(live_app)
+    href = "/orgs/1/workloads/unmanaged"
+    unmanaged = flow(src="unmanaged", dst="db", port=8443)
+    object.__setattr__(unmanaged, "src_managed", False)
+    now = datetime.now(UTC)
+    object.__setattr__(unmanaged, "first_detected", now - timedelta(hours=2))
+    object.__setattr__(unmanaged, "last_detected", now - timedelta(hours=1))
+    with live_app.ctx.flows().connect() as conn:
+        upsert_flows(conn, [unmanaged], origin=DataOrigin.INGEST, now=now)
+        conn.commit()
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/hosts?{urlencode({'key': href})}")
+    page.wait_for_selector("[data-role=host-profile]")
+    expect(page.locator("[data-section=identity]")).to_contain_text("unmanaged Workload")
+    expect(page.locator("[data-section=identity]")).not_to_contain_text("Removed workload")
 
 
 def test_unnamed_host_named_from_its_traffic(context, live_app):

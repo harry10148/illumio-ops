@@ -16,6 +16,7 @@ from illumio_ops.domain.values import (
 )
 from illumio_ops.services import hosts
 from illumio_ops.services.reports import flowsections
+from illumio_ops.services.reports.common import unnamed_host
 from illumio_ops.services.reports.registry import BuildInput, ReportParams
 from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.services.collect.conftest import configured_ctx
@@ -62,6 +63,7 @@ def test_workload_known_nowhere_said_in_words(ctx):
     assert got["/orgs/1/container_workloads/0f1e2d3c4b5a"] == "Container workload …3c4b5a"
     zh = hosts.display_names(ctx, {GONE}, lang=Language.ZH_TW)
     assert not zh[GONE].startswith("/orgs/")
+    assert unnamed_host(GONE, Language.EN, managed=False) == "Unmanaged Workload …a8f1eb"
 
 
 def test_report_ranking_never_shows_a_container_href(ctx):

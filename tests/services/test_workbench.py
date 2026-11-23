@@ -59,6 +59,28 @@ def test_dimension_top_ten(ctx):
     assert by_dst.rows[0].value == 12
 
 
+def test_host_rankings_keep_all_three_flow_states(ctx):
+    managed = flow(src="managed", dst="x", conns=100_000)
+    unmanaged = flow(src="unmanaged", dst="x", conns=100_000)
+    object.__setattr__(unmanaged, "src_managed", False)
+    address = flow(unmanaged_src=True, dst="x", conns=100_000)
+    for f in (managed, unmanaged, address):
+        object.__setattr__(f, "first_detected", END - timedelta(minutes=3))
+        object.__setattr__(f, "last_detected", END - timedelta(minutes=2))
+    with ctx.flows().connect() as conn:
+        conn.execute("DELETE FROM flows")
+        upsert_flows(conn, [managed, unmanaged, address], origin=DataOrigin.INGEST, now=NOW)
+    top = workbench.dimension(ctx, _flows(metric=SegmentMetric.CONNECTIONS), SegmentDimension.SRC_HOST, now=NOW)
+    states = {r.keys[0]: r.managed[0] for r in top.rows}
+    assert states.get("/orgs/1/workloads/managed") is True, states
+    assert states["/orgs/1/workloads/unmanaged"] is False
+    assert states[address.src_ip and f"ip:{address.src_ip}"] is False
+
+    ranking = workbench.run(ctx, _flows(metric=SegmentMetric.CONNECTIONS, view=SegmentView.RANKING,
+        group_by=(GroupBy(dimension=SegmentDimension.SRC_HOST),)), now=NOW).result.ranking
+    assert {r.keys[0]: r.managed[0] for r in ranking} == states
+
+
 def test_label_dimension_needs_key(ctx):
     with pytest.raises(ValidationError):
         workbench.dimension(ctx, _flows(), SegmentDimension.SRC_LABEL, now=NOW)

@@ -1,6 +1,6 @@
 """Investigation workbench in a browser (P6a): from an alert, the dimension panel adds conditions, two-level ranking,
 event mode, and the conditions survive a reload."""
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from playwright.sync_api import expect
 
@@ -121,6 +121,40 @@ def test_service_pick_narrows_to_it(context, live_app):
     page.locator("[data-dim=service] .wb-dim-row", has_text="445").click()
     expect(page.locator("[data-role=wb-detail] tbody tr")).to_have_count(1)
     expect(page.locator("[data-dim=service] .wb-dim-row[data-chosen=true]")).to_have_count(1)
+
+
+def test_workbench_marks_three_host_states(context, live_app):
+    alert_id = _seed(live_app)
+    unmanaged = flow(src="unmanaged", dst="db", port=8443)
+    object.__setattr__(unmanaged, "src_managed", False)
+    address = flow(unmanaged_src=True, dst="db", port=9443)
+    for row in (unmanaged, address):
+        object.__setattr__(row, "first_detected", END - timedelta(hours=2))
+        object.__setattr__(row, "last_detected", END - timedelta(hours=1))
+    with live_app.ctx.flows().connect() as conn:
+        upsert_flows(conn, [unmanaged, address], origin=DataOrigin.INGEST, now=END)
+        conn.commit()
+
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/investigate?alert={alert_id}")
+    detail = page.locator("[data-role=wb-detail]")
+    detail.wait_for()
+    expect(detail).to_contain_text("unmanaged Workload")
+    expect(detail).to_contain_text("address")
+
+    source = page.locator("[data-dim=src_host]")
+    source.locator(".wb-dim-row", has_text="unmanaged").wait_for()
+    expect(source).to_contain_text("unmanaged Workload")
+    expect(source).to_contain_text("address")
+    for tag in ("unmanaged Workload", "address"):
+        item = source.locator(".wb-dim-item").filter(has_text=tag)
+        expect(item.locator("[data-role=wb-quarantine]")).to_have_count(0)
+
+    page.click("role=tab[name=/Ranking|排名/]")
+    page.select_option("select[name=group_0]", "src_host")
+    expect(page.locator("[data-role=wb-ranking]")).to_contain_text("unmanaged Workload")
+    expect(page.locator("[data-role=wb-ranking]")).to_contain_text("address")
 
 
 # ── the investigation page (UI redesign spec §4.3, §5.1) ────────────────────

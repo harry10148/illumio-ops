@@ -7,11 +7,14 @@ from datetime import UTC, datetime
 import pytest
 import responses
 
+from illumio_ops.domain.values import DataOrigin
 from illumio_ops.services import quarantine
 from illumio_ops.store.flowdb import labels as label_store
 from illumio_ops.store.flowdb import workloads
+from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.domain.test_quarantine import LAB_SET
 from tests.services.collect.conftest import configured_ctx
+from tests.services.reports.test_findings import flow
 
 NOW = datetime(2026, 10, 31, 9, tzinfo=UTC)
 API = "https://pce.example.com:8443/api/v2"
@@ -61,6 +64,17 @@ def _policy(labels=LABELS, active=(LAB_SET,), draft=(LAB_SET,)):
 def _auth_user(call):
     import base64
     return base64.b64decode(call.request.headers["Authorization"].split()[1]).decode().split(":")[0]
+
+
+def test_quarantine_eligibility_rejects_unmanaged_workload_and_address(ctx):
+    href = "/orgs/1/workloads/unmanaged"
+    f = flow(src="unmanaged", dst="db")
+    object.__setattr__(f, "src_managed", False)
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [f], origin=DataOrigin.INGEST, now=NOW)
+    assert quarantine.eligibility(ctx, href).reason == "unmanaged"
+    assert quarantine.eligibility(ctx, "ip:203.0.113.44").reason == "unmanaged"
+    assert quarantine.eligibility(ctx, WL).ok
 
 
 # ── check ────────────────────────────────────────────────────────────────────

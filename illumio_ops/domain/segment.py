@@ -128,6 +128,7 @@ _FLOW_COLUMNS: dict[SegmentDimension, str] = {
 }
 # What a host key is shown as: any hostname the store has for it, else the key (an IP for unmanaged ends).
 _HOST_DISPLAY = {SegmentDimension.SRC_HOST: "MAX(f.src_hostname)", SegmentDimension.DST_HOST: "MAX(f.dst_hostname)"}
+_HOST_MANAGED = {SegmentDimension.SRC_HOST: "MAX(f.src_managed)", SegmentDimension.DST_HOST: "MAX(f.dst_managed)"}
 
 _METRICS: dict[SegmentMetric, str] = {
     SegmentMetric.FLOWS: "COUNT(*)",
@@ -155,7 +156,8 @@ def compile_flow_ranking(seg: FlowSegment, *, wide: bool = False) -> tuple[str, 
         else:
             column = _FLOW_COLUMNS[g.dimension]
         keys.append(column)
-        select += [f"{column} AS k{i}", f"{_HOST_DISPLAY.get(g.dimension, 'NULL')} AS d{i}"]
+        select += [f"{column} AS k{i}", f"{_HOST_DISPLAY.get(g.dimension, 'NULL')} AS d{i}",
+                   f"{_HOST_MANAGED.get(g.dimension, 'NULL')} AS m{i}"]
     where, where_params = to_sql(seg.filter, wide=wide)
     bytes_known = "COUNT(f.bytes_in)" if seg.metric is SegmentMetric.BYTES else "NULL"
     sql = (f"SELECT {', '.join(select)}, {_METRICS[seg.metric]} AS value, {bytes_known} AS bytes_known "

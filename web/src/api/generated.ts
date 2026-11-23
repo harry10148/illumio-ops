@@ -1524,6 +1524,8 @@ top_processes: RankedValue[]
  */
 export interface RankedValue {
 connections: number
+key?: (string | null)
+managed?: (boolean | null)
 value: string
 }
 /**
@@ -1834,6 +1836,7 @@ export interface AggRow {
 bytes_known: (number | null)
 display: (string | null)[]
 keys: (string | number | null)[]
+managed: (boolean | null)[]
 value: number
 }
 /**

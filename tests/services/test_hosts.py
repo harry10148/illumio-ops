@@ -4,12 +4,14 @@ from datetime import timedelta
 
 import pytest
 
-from illumio_ops.domain.values import TamperPattern
+from illumio_ops.domain.values import DataOrigin, TamperPattern
 from illumio_ops.services import hosts
 from illumio_ops.services.analysis import ransomware as ransomware_service
 from illumio_ops.store.flowdb import analysis
+from illumio_ops.store.flowdb.flows import upsert_flows
 from tests.services.analysis.test_tamper import HOST, _ctx
 from tests.services.collect.conftest import NOW
+from tests.services.reports.test_findings import flow
 
 
 @pytest.fixture
@@ -36,6 +38,17 @@ def test_unmanaged_address(ctx):
     p = hosts.profile(ctx, "ip:10.0.0.9", now=NOW)
     assert not p.managed and p.address == "10.0.0.9" and p.name == "10.0.0.9"
     assert p.identity is None and p.tamper is None and p.ransomware is None
+
+
+def test_unmanaged_workload_uses_latest_flow_flag(ctx):
+    href = "/orgs/1/workloads/unmanaged"
+    f = flow(src="unmanaged", dst="db")
+    object.__setattr__(f, "src_managed", False)
+    with ctx.flows().connect() as conn:
+        upsert_flows(conn, [f], origin=DataOrigin.INGEST, now=NOW)
+    p = hosts.profile(ctx, href, now=NOW)
+    assert not p.managed and not p.in_inventory
+    assert p.quarantine is not None and not p.quarantine.eligible and p.quarantine.reason == "unmanaged"
 
 
 def test_href_not_in_inventory(ctx):

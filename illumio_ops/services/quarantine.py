@@ -29,6 +29,7 @@ from illumio_ops.pce.policy import fetch_rule_sets
 from illumio_ops.services.analysis.deny_sim import DenySimulation, simulate_deny
 from illumio_ops.services.collect.guard import require_same_pce
 from illumio_ops.services.context import AppContext
+from illumio_ops.services.flowsource import latest_host_managed
 from illumio_ops.services.hosts import display_names, parse_key
 from illumio_ops.services.lateral_view import DenySimulationView
 from illumio_ops.services.ondemand import INTERACTIVE_PULL, pull_period
@@ -186,11 +187,14 @@ def _targets(ctx: AppContext, keys: Sequence[str], cfg: PceSettings | None = Non
         inventory = {w.href: w for w in workloads.all_workloads(conn)}
         sets = label_store.label_sets(conn, {w.label_set for w in inventory.values() if w.label_set is not None})
     names = display_names(ctx, [k for k, _, _ in parsed])
+    seen_managed = latest_host_managed(ctx, {href for _, href, _ in parsed if href is not None})
     out = []
     for key, href, _ in parsed:
         wl = inventory.get(href) if href else None
+        flow_managed = seen_managed.get(href) if href is not None else False
+        is_managed = bool(wl.managed) if wl is not None else flow_managed
         reason: Literal["unmanaged", "not_in_inventory"] | None = (
-            "unmanaged" if href is None else "not_in_inventory" if wl is None else None)
+            "unmanaged" if href is None or is_managed is False else "not_in_inventory" if wl is None else None)
         mode = wl.enforcement_mode if wl else None
         current = sets.get(wl.label_set, {}).get(KEY) if wl and wl.label_set is not None else None
         out.append(QuarantineTarget(key=key, name=names.get(key, key), ok=reason is None, reason=reason,
