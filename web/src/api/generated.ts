@@ -2383,6 +2383,8 @@ status: (number | null)
  * via the `definition` "ScheduleView".
  */
 export interface ScheduleView {
+draft_changed: boolean
+draft_live: ("enabled" | "disabled" | "unknown")
 href: string
 id: number
 is_ruleset: boolean
@@ -2398,6 +2400,7 @@ preview_key: string
 preview_params: {
 [k: string]: string
 }
+provision: boolean
 ruleset_name: string
 summary: string
 }
@@ -2434,6 +2437,7 @@ name: string
 org_id: string
 pce_url: string
 plan: (Weekly | Expiry)
+provision?: boolean
 ruleset_name: string
 summary: string
 }
@@ -2540,6 +2544,7 @@ pce_url?: string
  */
 export interface ScheduleEdit {
 plan: (Weekly | Expiry)
+provision: boolean
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema

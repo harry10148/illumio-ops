@@ -18,6 +18,7 @@ const DAY_KEYS: Record<Day, string> = {
 };
 const ACTION_KEYS: Record<string, string> = {
   enable: "rs_run_enable", disable: "rs_run_disable", expire: "rs_run_expire", skip_draft: "rs_run_skip_draft",
+  draft_enable: "rs_run_draft_enable", draft_disable: "rs_run_draft_disable", draft_expire: "rs_run_draft_expire",
   not_found: "rs_run_not_found", error: "rs_run_error", note: "rs_run_note", note_cleared: "rs_run_note_cleared",
 };
 const RESULT_KEYS: Record<string, string> = { ok: "rs_result_ok", failed: "rs_result_failed", skipped: "rs_result_skipped" };
@@ -32,15 +33,24 @@ function word(map: Record<string, string>, value: string): string {
   return key ? t(key) : value;
 }
 
+function runDetail(value: string): string {
+  return value === "rs_detail_draft_only" ? t(value) : value;
+}
+
 function daysText(days: string[]): string {
   return DAYS.filter((d) => days.includes(d)).map((d) => t(DAY_KEYS[d])).join("");
 }
 
 /** The sentence a plan reads as, from the same key and parameters the server gives (domain/rule_schedule.preview). */
-function previewText(key: string, params: Record<string, string>): string {
+function previewText(key: string, params: Record<string, string>, provision = true): string {
   const p = { ...params };
   if (p.days !== undefined) p.days = daysText(p.days.split(","));
   if (p.next_day !== undefined) p.next_day = p.next_day === "1" ? t("rs_next_day") : "";
+  if (!provision) {
+    if (key === "rs_preview_weekly_enable") return t("rs_preview_weekly_enable_draft", p);
+    if (key === "rs_preview_weekly_disable") return t("rs_preview_weekly_disable_draft", p);
+    return t("rs_preview_expiry_draft", p);
+  }
   return t(PREVIEW_KEYS[key] ?? "rs_preview_expiry", p);
 }
 
@@ -106,7 +116,7 @@ function localInput(iso: string): string {
 
 /** The plan being written: a new schedule starts from office hours in the browser's zone; an edit from its plan (a
  * weekly window keeps its zone, since its times are that zone's; an expiry is shown and saved in the browser's). */
-function usePlan(initial: Weekly | Expiry | null) {
+function usePlan(initial: Weekly | Expiry | null, provision: boolean) {
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const weekly = initial && "days" in initial ? initial : null;
   const [kind, setKind] = useState<"weekly" | "expiry">(initial && !weekly ? "expiry" : "weekly");
@@ -121,8 +131,8 @@ function usePlan(initial: Weekly | Expiry | null) {
     : { kind: "expiry", expire_at: expireAt ? new Date(expireAt).toISOString() : "", timezone: zone };
   const preview = kind === "weekly"
     ? previewText(action === "enable_in_window" ? "rs_preview_weekly_enable" : "rs_preview_weekly_disable",
-      { days: DAYS.filter((d) => days.includes(d)).join(","), start, end, next_day: start > end ? "1" : "0" })
-    : expireAt ? previewText("rs_preview_expiry", { at: expireAt.replace("T", " "), timezone: zone }) : "";
+      { days: DAYS.filter((d) => days.includes(d)).join(","), start, end, next_day: start > end ? "1" : "0" }, provision)
+    : expireAt ? previewText("rs_preview_expiry", { at: expireAt.replace("T", " "), timezone: zone }, provision) : "";
   const valid = kind === "weekly" ? days.length > 0 && start !== end : expireAt !== "";
   const fields = (
     <>
@@ -172,7 +182,8 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
   const [target, setTarget] = useState<TargetHit | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
-  const { plan, valid: planValid, fields } = usePlan(null);
+  const [provision, setProvision] = useState(false);
+  const { plan, valid: planValid, fields } = usePlan(null, provision);
 
   async function search(e: FormEvent) {
     e.preventDefault();
@@ -189,12 +200,15 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
   }
 
   const valid = target !== null && planValid;
+  // a pending draft holds a schedule that provisions (its whole rule set would go live): said beside the target
+  const held = provision && Boolean(target?.draft_pending);
 
   async function create() {
     if (!target) return;
     setBusy(true);
     const env = await call("rule_schedules.create", { href: target.href, plan, name: target.name,
-      ruleset_name: target.ruleset_name, summary: target.summary, pce_url: found?.pce_url ?? "", org_id: found?.org_id ?? "" });
+      ruleset_name: target.ruleset_name, summary: target.summary, pce_url: found?.pce_url ?? "", org_id: found?.org_id ?? "",
+      provision });
     setBusy(false);
     if (env.ok) {
       setTarget(null);
@@ -219,7 +233,8 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
       {hits && (hits.length === 0 ? <p className="muted">{t("rs_targets_none")}</p> : (
         <ul className="plain-list rs-targets" data-role="rs-targets">
           {hits.map((h) => {
-            const why = h.draft_pending ? t("rs_target_draft") : h.scheduled ? t("rs_target_scheduled") : null;
+            // a pending draft holds only a schedule that provisions: a draft-only one never takes it live
+            const why = h.draft_pending && provision ? t("rs_target_draft") : h.scheduled ? t("rs_target_scheduled") : null;
             return (
               <li key={h.href}>
                 <label className="check">
@@ -238,8 +253,11 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
       {target && (
         <>
           {fields}
+          <label className="check"><input type="checkbox" name="rs_provision" checked={provision}
+            onChange={(e) => setProvision(e.target.checked)} />{t("rs_provision_when")}</label>
+          <p className="hint">{t("rs_provision_hint")}</p>
           <div className="actions">
-            <button type="button" className="btn-primary" disabled={!valid || busy || !writeKey} onClick={() => void create()}>
+            <button type="button" className="btn-primary" disabled={!valid || busy || !writeKey || held} onClick={() => void create()}>
               {t("rs_create")}
             </button>
           </div>
@@ -256,13 +274,14 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
 
 /** 5.x edited a schedule in place: the new plan's note is written to the PCE first (as a new schedule's is). */
 function EditSchedule({ schedule, writeKey, onDone }: { schedule: ScheduleView; writeKey: boolean; onDone: (saved: boolean) => void }) {
-  const { plan, valid, fields } = usePlan(schedule.plan);
+  const [provision, setProvision] = useState(schedule.provision);
+  const { plan, valid, fields } = usePlan(schedule.plan, provision);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function save() {
     setBusy(true);
-    const env = await call("rule_schedules.update", { plan }, { schedule_id: String(schedule.id) });
+    const env = await call("rule_schedules.update", { plan, provision }, { schedule_id: String(schedule.id) });
     setBusy(false);
     if (env.ok) onDone(true);
     else setError(env.error);
@@ -275,6 +294,9 @@ function EditSchedule({ schedule, writeKey, onDone }: { schedule: ScheduleView; 
       <p className="hint">{schedule.summary}</p>
       {!writeKey && <p className="notice">{t("rs_no_write_key")}</p>}
       {fields}
+      <label className="check"><input type="checkbox" name="rs_provision" checked={provision}
+        onChange={(e) => setProvision(e.target.checked)} />{t("rs_provision_when")}</label>
+      <p className="hint">{t("rs_provision_hint")}</p>
       <div className="actions">
         <button type="button" className="btn-primary" disabled={!valid || busy || !writeKey} onClick={() => void save()}>
           {t("rs_edit_save")}
@@ -298,7 +320,7 @@ export function RuleSchedules() {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [deleted, setDeleted] = useState<DeleteResult | null>(null);
   const [editing, setEditing] = useState<ScheduleView | null>(null);
-  const [checked, setChecked] = useState<{ name: string; outcome: CheckResult["outcome"] } | null>(null);
+  const [checked, setChecked] = useState<{ name: string; outcome: CheckResult["outcome"]; draft: boolean } | null>(null);
   const [checking, setChecking] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -323,7 +345,7 @@ export function RuleSchedules() {
     const env = await call("rule_schedules.check", {}, { schedule_id: String(s.id) });
     setChecking(null);
     if (env.ok && env.data) {
-      setChecked({ name: s.name, outcome: env.data.outcome });
+      setChecked({ name: s.name, outcome: env.data.outcome, draft: !s.provision });
       setError(null);
     } else setError(env.error);
     void load();
@@ -356,12 +378,14 @@ export function RuleSchedules() {
       ]} />
       {checked && (
         <p className="notice" role="status" data-role="rs-checked">
-          {t(OUTCOME_KEYS[checked.outcome] ?? "rs_check_none", { name: checked.name })}
+          {t(checked.draft && checked.outcome === "switched" ? "rs_check_draft_changed" :
+            OUTCOME_KEYS[checked.outcome] ?? "rs_check_none", { name: checked.name })}
         </p>
       )}
       {deleted && (
         <p className="notice" data-role="rs-deleted">
-          {deleted.note_cleared ? t(deleted.provisioned ? "rs_deleted_ok" : "rs_deleted_note_draft")
+          {deleted.note_cleared ? t(deleted.provisioned ? "rs_deleted_ok" : deleted.detail === "draft_only"
+            ? "rs_deleted_note_draft_only" : "rs_deleted_note_draft")
             : t("rs_deleted_note_kept", { detail: deleted.detail ?? "—" })}
         </p>
       )}
@@ -376,10 +400,12 @@ export function RuleSchedules() {
               columns={[
                 { key: "target", label: t("rs_col_target"), render: (s) => (
                   <div><div>{s.is_ruleset ? t("rs_whole_ruleset", { name: s.name }) : `${s.name} · ${s.ruleset_name}`}</div>
-                    <div className="hint">{s.summary}</div></div>) },
+                    <div className="hint">{s.summary}</div>{s.draft_changed && <Tag tone="high">{t("rs_draft_changed")}</Tag>}</div>) },
+                { key: "mode", label: t("rs_col_mode"), render: (s) => <Tag tone={s.provision ? "ok" : "muted"}>
+                  {t(s.provision ? "rs_mode_provision" : "rs_mode_draft")}</Tag> },
                 { key: "type", label: t("rs_col_type"), render: (s) => <span className="nowrap">{weeklyOf(s) ? t("rs_type_weekly") : t("rs_type_expiry")}</span> },
                 { key: "time", label: t("rs_col_time"), render: (s) => (
-                  <div><div>{planText(s, lang)}</div><div className="hint">{previewText(s.preview_key, s.preview_params)}</div></div>) },
+                  <div><div>{planText(s, lang)}</div><div className="hint">{previewText(s.preview_key, s.preview_params, s.provision)}</div></div>) },
                 { key: "now", label: t("rs_col_now"), render: (s) => (
                   <span>
                     {s.paused ? <Tag tone="muted">{t("rs_paused")}</Tag> : <Tag tone={s.live === "enabled" ? "ok" : "muted"}>{word(LIVE_KEYS, s.live)}</Tag>}
@@ -390,7 +416,7 @@ export function RuleSchedules() {
                     <Tag tone={s.last_run.result === "failed" ? "crit" : s.last_run.result === "skipped" ? "high" : "ok"}>
                       {word(ACTION_KEYS, s.last_run.action)}
                     </Tag> <span className="num hint">{shortTime(s.last_run.at)}</span>
-                    {s.last_run.status !== null && <div className="hint">HTTP {s.last_run.status} {s.last_run.detail ?? ""}</div>}
+                    {s.last_run.status !== null && <div className="hint">HTTP {s.last_run.status} {s.last_run.detail ? runDetail(s.last_run.detail) : ""}</div>}
                   </div>) : <span className="hint">{t("rs_never_checked")}</span>) },
                 { key: "act", label: "", render: (s) => (
                   <div className="row nowrap">
@@ -417,7 +443,7 @@ export function RuleSchedules() {
                 { key: "name", label: t("rs_col_target"), render: (r) => r.name },
                 { key: "action", label: t("rs_col_action"), render: (r) => word(ACTION_KEYS, r.action) },
                 { key: "result", label: t("rs_col_result"), render: (r) => (
-                  <span>{word(RESULT_KEYS, r.result)}{r.status !== null ? ` · HTTP ${r.status}` : ""}{r.detail ? ` · ${r.detail}` : ""}</span>) },
+                  <span>{word(RESULT_KEYS, r.result)}{r.status !== null ? ` · HTTP ${r.status}` : ""}{r.detail ? ` · ${runDetail(r.detail)}` : ""}</span>) },
               ]}
             />
           </Panel>

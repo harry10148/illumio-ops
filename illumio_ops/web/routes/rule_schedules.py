@@ -42,10 +42,12 @@ class ScheduleCreate(BaseModel):
     summary: str = Field(max_length=1000)
     pce_url: str = Field(max_length=500)  # the PCE the target was found on (TargetSearch): another PCE is refused
     org_id: str = Field(max_length=50)
+    provision: bool = False
 
 
 class ScheduleEdit(BaseModel):
     plan: PlanField
+    provision: bool
 
 
 class RunList(BaseModel):
@@ -76,6 +78,8 @@ def _mapped(exc: Exception) -> ApiFailure:
         return ApiFailure(409, "draft_pending", "rs_err_draft_pending")
     if isinstance(exc, rs.AlreadyScheduled):
         return ApiFailure(409, "already_scheduled", "rs_err_already_scheduled")
+    if isinstance(exc, rs.ModeMixed):
+        return ApiFailure(409, "mode_mixed", "rs_err_mode_mixed", params={"name": exc.name})
     if isinstance(exc, rs.NotProvisioned):
         return ApiFailure(409, "not_provisioned", "rs_err_not_provisioned")
     if isinstance(exc, rs.SchedulePaused):
@@ -129,18 +133,20 @@ def list_runs() -> RunList:
 def create(body: ScheduleCreate) -> ScheduleView:
     try:
         return rs.create(get_ctx(), href=body.href, plan=body.plan, name=body.name, ruleset_name=body.ruleset_name,
-                         summary=body.summary, by=str(current_user.get_id()), pce=(body.pce_url, body.org_id))
+                         summary=body.summary, by=str(current_user.get_id()), pce=(body.pce_url, body.org_id),
+                         provision=body.provision)
     except (rs.NoWriteKey, PceNotConfigured, rs.DraftPending, rs.AlreadyScheduled, rs.NotProvisioned,
-            rs.PceRefused, rs.PceSwitched) as exc:
+            rs.PceRefused, rs.PceSwitched, rs.ModeMixed) as exc:
         raise _mapped(exc) from None
 
 
 @api_route(bp, OP_UPDATE)
 def update(body: ScheduleEdit, schedule_id: int) -> ScheduleView:
-    """5.x edited a schedule in place: the new plan's note is written and provisioned first; refused, nothing changes."""
+    """Write the new note using the selected schedule mode before saving the plan."""
     try:
-        return rs.update(get_ctx(), schedule_id, body.plan)
-    except (LookupError, rs.NoWriteKey, PceNotConfigured, rs.DraftPending, rs.PceRefused, rs.PceSwitched) as exc:
+        return rs.update(get_ctx(), schedule_id, body.plan, provision=body.provision)
+    except (LookupError, rs.NoWriteKey, PceNotConfigured, rs.DraftPending, rs.PceRefused, rs.PceSwitched,
+            rs.ModeMixed) as exc:
         raise _mapped(exc) from None
 
 

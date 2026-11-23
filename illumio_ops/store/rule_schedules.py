@@ -5,19 +5,21 @@ import sqlite3
 from datetime import datetime
 from typing import Literal
 
-Action = Literal["enable", "disable", "expire", "skip_draft", "not_found", "error", "note", "note_cleared"]
+Action = Literal["enable", "disable", "expire", "draft_enable", "draft_disable", "draft_expire", "skip_draft",
+                 "not_found", "error", "note", "note_cleared"]
 Result = Literal["ok", "failed", "skipped"]
 DETAIL_MAX = 300
 
 
 def create(conn: sqlite3.Connection, *, pce_url: str, org_id: str, href: str, is_ruleset: bool, name: str,
            ruleset_name: str, summary: str, plan_json: str, paused: bool, pce_status: str, by: str,
-           at: datetime) -> int:
+           at: datetime, provision: bool = False) -> int:
     cur = conn.execute(
         "INSERT INTO rule_schedules (pce_url, org_id, href, is_ruleset, name, ruleset_name, summary, plan_json, paused, "
-        "pce_status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "pce_status, created_by, created_at, updated_at, provision) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (pce_url, org_id, href, int(is_ruleset), name, ruleset_name, summary, plan_json, int(paused), pce_status, by,
-         at.isoformat(), at.isoformat()))
+         at.isoformat(), at.isoformat(), int(provision)))
     return int(cur.lastrowid or 0)
 
 
@@ -42,6 +44,16 @@ def update_plan(conn: sqlite3.Connection, schedule_id: int, plan_json: str, at: 
                  (plan_json, at.isoformat(), schedule_id))
 
 
+def update_schedule(conn: sqlite3.Connection, schedule_id: int, plan_json: str, provision: bool, at: datetime) -> None:
+    conn.execute("UPDATE rule_schedules SET plan_json = ?, last_want = CASE WHEN provision != ? THEN NULL "
+                 "ELSE last_want END, provision = ?, updated_at = ? WHERE id = ?",
+                 (plan_json, int(provision), int(provision), at.isoformat(), schedule_id))
+
+
+def set_last_want(conn: sqlite3.Connection, schedule_id: int, want: bool) -> None:
+    conn.execute("UPDATE rule_schedules SET last_want = ? WHERE id = ?", (int(want), schedule_id))
+
+
 def set_paused(conn: sqlite3.Connection, schedule_id: int, paused: bool, at: datetime) -> bool:
     return conn.execute("UPDATE rule_schedules SET paused = ?, updated_at = ? WHERE id = ?",
                         (int(paused), at.isoformat(), schedule_id)).rowcount > 0
@@ -50,6 +62,12 @@ def set_paused(conn: sqlite3.Connection, schedule_id: int, paused: bool, at: dat
 def set_checked(conn: sqlite3.Connection, schedule_id: int, *, pce_status: str, live: str, at: datetime) -> None:
     conn.execute("UPDATE rule_schedules SET pce_status = ?, live = ?, last_checked_at = ? WHERE id = ?",
                  (pce_status, live, at.isoformat(), schedule_id))
+
+
+def set_policy_state(conn: sqlite3.Connection, schedule_id: int, *, pce_status: str, live: str, draft_live: str,
+                     at: datetime) -> None:
+    conn.execute("UPDATE rule_schedules SET pce_status = ?, live = ?, draft_live = ?, last_checked_at = ? WHERE id = ?",
+                 (pce_status, live, draft_live, at.isoformat(), schedule_id))
 
 
 def delete(conn: sqlite3.Connection, schedule_id: int) -> bool:

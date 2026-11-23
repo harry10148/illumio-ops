@@ -28,6 +28,24 @@ def test_migrate_is_idempotent(tmp_path):
     assert migrate(conn) == v1
 
 
+def test_rule_schedule_mode_migration_keeps_existing_schedules_in_provision_mode(tmp_path, monkeypatch):
+    conn = connect(tmp_path / "legacy.sqlite")
+    migrations = db._migrations()
+    assert migrations[-1][0] == 21
+    monkeypatch.setattr(db, "_migrations", lambda package=None: migrations[:-1])
+    assert migrate(conn) == 20
+    conn.execute(
+        "INSERT INTO rule_schedules (pce_url, org_id, href, is_ruleset, name, ruleset_name, summary, plan_json, paused, "
+        "pce_status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("https://pce", "1", "/orgs/1/sec_policy/active/rule_sets/5", 1, "old", "old", "", "{}", 0,
+         "active", "admin", "2026-11-01T00:00:00+00:00", "2026-11-01T00:00:00+00:00"))
+    conn.commit()
+    monkeypatch.undo()
+    assert migrate(conn) == 21
+    row = conn.execute("SELECT provision, last_want, draft_live FROM rule_schedules").fetchone()
+    assert tuple(row) == (1, None, "unknown")
+
+
 def test_newer_db_version_is_refused(tmp_path):
     conn = connect(tmp_path / "app.sqlite")
     migrate(conn)

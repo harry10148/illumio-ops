@@ -47,7 +47,17 @@ def _add(ctx, href=RULE, plan=WINDOW, *, paused=False, pce_url=None):
     with ctx.db() as conn:
         sid = store.create(conn, pce_url=pce_url or pce.url, org_id=pce.org_id, href=href, is_ruleset=pw.is_ruleset(href),
                            name="r9", ruleset_name="Backups", summary="a → b: 445", plan_json=plan.model_dump_json(),
-                           paused=paused, pce_status="unknown", by="admin", at=NOW)
+                           paused=paused, pce_status="unknown", by="admin", at=NOW, provision=True)
+        conn.commit()
+    return sid
+
+
+def _add_mode(ctx, href=RULE, plan=WINDOW, *, provision=False, name="r9"):
+    pce = ctx.settings.current().pce
+    with ctx.db() as conn:
+        sid = store.create(conn, pce_url=pce.url, org_id=pce.org_id, href=href, is_ruleset=pw.is_ruleset(href),
+                           name=name, ruleset_name="Backups", summary="", plan_json=plan.model_dump_json(),
+                           paused=False, pce_status="unknown", by="admin", at=NOW, provision=provision)
         conn.commit()
     return sid
 
@@ -198,7 +208,7 @@ def test_stops_when_pce_changes_mid_tick(ctx, monkeypatch):
 def test_create_refuses_draft_pending(ctx):
     _pce(href=RS, enabled=True, draft="update")
     with pytest.raises(rs.DraftPending):
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A, provision=True)
 
 
 @responses.activate
@@ -212,17 +222,17 @@ def test_create_refuses_unprovisioned_target(ctx):
 def test_create_writes_note_and_provisions(ctx):
     _pce(href=RS, enabled=True)
     view = rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin",
-                     now=NOW, pce=PCE_A)
+                     now=NOW, pce=PCE_A, provision=True)
     assert view.id and _puts() == [{"description": "keep\n[📅 Recurring: Mon 08:00-18:00 (Asia/Taipei) Enable in window]"}]
     with pytest.raises(rs.AlreadyScheduled):
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A, provision=True)
 
 
 @responses.activate
 def test_create_pce_refusal_saves_nothing(ctx):
     _pce(href=RS, enabled=True, put=403)
     with pytest.raises(rs.PceRefused) as e:
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin", now=NOW, pce=PCE_A, provision=True)
     assert e.value.status == 403
     with ctx.db() as conn:
         assert store.list_for(conn, pce_url=ctx.settings.current().pce.url, org_id="1") == []
@@ -350,9 +360,9 @@ def test_concurrent_create_is_refused_cleanly(ctx):
     """P2: the target is claimed before the PCE is written, so a second create cannot change the note."""
     import sqlite3
     _pce(href=RS, enabled=True)
-    rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW, pce=PCE_A)
+    rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW, pce=PCE_A, provision=True)
     with pytest.raises(rs.AlreadyScheduled):
-        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW, pce=PCE_A)
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="a", now=NOW, pce=PCE_A, provision=True)
     assert sqlite3  # the IntegrityError of a race is answered as AlreadyScheduled (rs.create)
 
 
@@ -380,7 +390,7 @@ def test_create_refused_provision_puts_the_description_back(ctx):
     _pce(href=RS, enabled=True, provision=403)
     with pytest.raises(rs.PceRefused):
         rs.create(ctx, href=RS, plan=WINDOW, name="B", ruleset_name="B", summary="", by="a", now=NOW,
-                  pce=("https://pce.example.com:8443", "1"))
+                  pce=("https://pce.example.com:8443", "1"), provision=True)
     assert _puts()[-1] == _reverted(RS)
 
 
@@ -421,6 +431,19 @@ def test_skipped_now_clears_after_a_good_check(ctx):
     assert rs.schedules(ctx, now=NOW + timedelta(minutes=5))[0].skipped_now == 0
 
 
+def test_skipped_now_counts_only_provision_mode_schedules(ctx):
+    draft_sid = _add_mode(ctx, href=RULE, provision=False)
+    provision_sid = _add_mode(ctx, href=OTHER, provision=True)
+    cfg = ctx.settings.current().pce
+    with ctx.db() as conn:
+        for sid, href in ((draft_sid, RULE), (provision_sid, OTHER)):
+            store.add_run(conn, pce_url=cfg.url, org_id=cfg.org_id, schedule_id=sid, href=href, name="r9", at=NOW,
+                          action="skip_draft", result="skipped")
+            store.set_checked(conn, sid, pce_status="active", live="disabled", at=NOW)
+        conn.commit()
+    assert rs.schedules(ctx, now=NOW)[0].skipped_now == 1
+
+
 # ── lab 26.2 acceptance (2026-11-03) ────────────────────────────────────────
 
 @responses.activate
@@ -443,7 +466,7 @@ def test_update_changes_the_plan_and_rewrites_the_note(ctx):
     sid = _add(ctx, href=RS)
     _pce(href=RS, enabled=True)
     evening = Weekly(days=("tue",), start="18:00", end="23:00", timezone="Asia/Taipei", action="disable_in_window")
-    view = rs.update(ctx, sid, evening, now=NOW)
+    view = rs.update(ctx, sid, evening, provision=True, now=NOW)
     assert view.plan == evening and view.preview_key == "rs_preview_weekly_disable"
     assert _puts() == [{"description": "keep\n[📅 Recurring: Tue 18:00-23:00 (Asia/Taipei) Disable in window]"}]
     with ctx.db() as conn:
@@ -456,7 +479,7 @@ def test_update_refused_by_the_pce_keeps_the_old_plan(ctx):
     _pce(href=RS, enabled=True, put=403)
     evening = Weekly(days=("tue",), start="18:00", end="23:00", timezone="Asia/Taipei", action="disable_in_window")
     with pytest.raises(rs.PceRefused):
-        rs.update(ctx, sid, evening, now=NOW)
+        rs.update(ctx, sid, evening, provision=True, now=NOW)
     with ctx.db() as conn:
         assert rs.plan_of(store.get(conn, sid)["plan_json"]) == WINDOW
 
@@ -490,3 +513,103 @@ def test_check_now_needs_the_write_key_and_an_active_schedule(tmp_path):
     paused = _add(c, href=OTHER, paused=True)
     with pytest.raises(rs.SchedulePaused):
         rs.check_now(c, paused, now=NOW)
+
+
+@responses.activate
+def test_draft_only_writes_enabled_once_without_provision_even_with_pending_draft(ctx):
+    _add_mode(ctx)
+    _pce(enabled=False, draft="update", parent_draft="update")
+    result = rs.tick(ctx, now=NOW)
+    assert result.switched == 1 and _puts() == [{"enabled": True}]
+    assert rs.schedules(ctx, now=NOW)[1][0].draft_changed
+    assert not any(c.request.url.endswith("/sec_policy") and c.request.method == "POST" for c in responses.calls)
+    assert _runs(ctx) == [("draft_enable", "ok", None)]
+    with ctx.db() as conn:
+        [run] = store.runs(conn, pce_url=ctx.settings.current().pce.url, org_id="1", limit=1)
+    assert run["detail"] == "rs_detail_draft_only"
+
+
+@responses.activate
+def test_draft_only_does_not_overwrite_manual_change_after_its_last_write(ctx):
+    _add_mode(ctx)
+    _pce(enabled=False)
+    assert rs.tick(ctx, now=NOW).switched == 1
+    responses.reset()
+    _pce(enabled=False)  # an operator changed the draft back; desired is still true
+    result = rs.tick(ctx, now=NOW + timedelta(minutes=5))
+    assert result.switched == 0 and _puts() == []
+
+
+@responses.activate
+def test_draft_only_expiry_deletes_without_provision_and_says_draft_only(ctx):
+    sid = _add_mode(ctx, plan=Expiry(expire_at=NOW - timedelta(minutes=1), timezone="Asia/Taipei"))
+    _pce(enabled=True)
+    result = rs.tick(ctx, now=NOW)
+    with ctx.db() as conn:
+        assert store.get(conn, sid) is None
+    assert {"enabled": False} in _puts() and {"description": "keep"} in _puts()
+    assert not any(c.request.url.endswith("/sec_policy") and c.request.method == "POST" for c in responses.calls)
+    with ctx.db() as conn:
+        [run] = store.runs(conn, pce_url=ctx.settings.current().pce.url, org_id="1", limit=1)
+    assert result.switched == 1 and run["action"] == "draft_expire" and run["detail"] == "rs_detail_draft_only"
+
+
+@responses.activate
+def test_draft_only_create_and_delete_notes_do_not_provision(ctx):
+    _pce(href=RS, enabled=True, draft="update", parent_draft="update")
+    view = rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin",
+                     now=NOW, pce=PCE_A, provision=False)
+    assert view.provision is False
+    assert not any(c.request.url.endswith("/sec_policy") and c.request.method == "POST" for c in responses.calls)
+    responses.reset()
+    sid = view.id
+    responses.add(responses.GET, API + pw.draft_href(RS), json={"description": "keep [📅 Recurring: x]"})
+    responses.add(responses.PUT, API + pw.draft_href(RS), status=204)
+    out = rs.delete(ctx, sid, by="admin", now=NOW)
+    assert out.note_cleared and not out.provisioned
+    assert _puts() == [{"description": "keep"}]
+    assert not any(c.request.url.endswith("/sec_policy") and c.request.method == "POST" for c in responses.calls)
+
+
+@responses.activate
+def test_mixed_modes_refused_for_same_ruleset_but_allowed_for_another(ctx):
+    _add_mode(ctx, href=RULE, provision=False)
+    with pytest.raises(rs.ModeMixed, match="r9"):
+        rs.create(ctx, href=RS, plan=WINDOW, name="Backups", ruleset_name="Backups", summary="", by="admin",
+                  now=NOW, pce=PCE_A, provision=True)
+    _pce(href=OTHER, enabled=True)
+    view = rs.create(ctx, href=OTHER, plan=WINDOW, name="Other", ruleset_name="Other", summary="", by="admin",
+                     now=NOW, pce=PCE_A, provision=True)
+    assert view.provision is True
+
+
+@responses.activate
+def test_updating_mode_checks_for_other_schedule_conflict(ctx):
+    sid = _add_mode(ctx, href=RULE, provision=False)
+    _add_mode(ctx, href=RS, provision=False, name="whole set")
+    with pytest.raises(rs.ModeMixed, match="whole set"):
+        rs.update(ctx, sid, WINDOW, provision=True, now=NOW)
+
+
+@responses.activate
+def test_draft_only_plan_update_writes_note_without_provision(ctx):
+    sid = _add_mode(ctx, href=RS, provision=False)
+    responses.add(responses.GET, API + pw.draft_href(RS), json={"description": "keep"})
+    responses.add(responses.PUT, API + pw.draft_href(RS), status=204)
+    evening = Weekly(days=("tue",), start="18:00", end="23:00", timezone="Asia/Taipei", action="disable_in_window")
+    view = rs.update(ctx, sid, evening, provision=False, now=NOW)
+    assert view.plan == evening and not view.provision
+    assert _puts() == [{"description": "keep\n[📅 Recurring: Tue 18:00-23:00 (Asia/Taipei) Disable in window]"}]
+    assert not any(c.request.url.endswith("/sec_policy") and c.request.method == "POST" for c in responses.calls)
+
+
+@responses.activate
+def test_draft_only_leaves_a_draft_already_so_untouched(ctx):
+    """Writing the value the draft already has would still leave the rule pending provision (lab 26.2, 2026-11-03)."""
+    _add_mode(ctx)
+    _pce(enabled=True)  # desired is enabled, and the draft already is
+    result = rs.tick(ctx, now=NOW)
+    assert result.switched == 0 and _puts() == [] and _runs(ctx) == []
+    responses.reset()
+    _pce(enabled=True)
+    assert rs.tick(ctx, now=NOW + timedelta(minutes=5)).switched == 0 and _puts() == []

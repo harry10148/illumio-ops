@@ -37157,6 +37157,19 @@
           },
           "ScheduleView": {
             "properties": {
+              "draft_changed": {
+                "title": "Draft Changed",
+                "type": "boolean"
+              },
+              "draft_live": {
+                "enum": [
+                  "enabled",
+                  "disabled",
+                  "unknown"
+                ],
+                "title": "Draft Live",
+                "type": "string"
+              },
               "href": {
                 "title": "Href",
                 "type": "string"
@@ -37258,6 +37271,10 @@
                 "title": "Preview Params",
                 "type": "object"
               },
+              "provision": {
+                "title": "Provision",
+                "type": "boolean"
+              },
               "ruleset_name": {
                 "title": "Ruleset Name",
                 "type": "string"
@@ -37275,6 +37292,9 @@
               "ruleset_name",
               "summary",
               "plan",
+              "provision",
+              "draft_live",
+              "draft_changed",
               "paused",
               "pce_status",
               "live",
@@ -37504,6 +37524,11 @@
             ],
             "title": "Plan"
           },
+          "provision": {
+            "default": false,
+            "title": "Provision",
+            "type": "boolean"
+          },
           "ruleset_name": {
             "maxLength": 200,
             "title": "Ruleset Name",
@@ -37679,6 +37704,19 @@
           }
         },
         "properties": {
+          "draft_changed": {
+            "title": "Draft Changed",
+            "type": "boolean"
+          },
+          "draft_live": {
+            "enum": [
+              "enabled",
+              "disabled",
+              "unknown"
+            ],
+            "title": "Draft Live",
+            "type": "string"
+          },
           "href": {
             "title": "Href",
             "type": "string"
@@ -37780,6 +37818,10 @@
             "title": "Preview Params",
             "type": "object"
           },
+          "provision": {
+            "title": "Provision",
+            "type": "boolean"
+          },
           "ruleset_name": {
             "title": "Ruleset Name",
             "type": "string"
@@ -37797,6 +37839,9 @@
           "ruleset_name",
           "summary",
           "plan",
+          "provision",
+          "draft_live",
+          "draft_changed",
           "paused",
           "pce_status",
           "live",
@@ -38002,6 +38047,19 @@
           },
           "ScheduleView": {
             "properties": {
+              "draft_changed": {
+                "title": "Draft Changed",
+                "type": "boolean"
+              },
+              "draft_live": {
+                "enum": [
+                  "enabled",
+                  "disabled",
+                  "unknown"
+                ],
+                "title": "Draft Live",
+                "type": "string"
+              },
               "href": {
                 "title": "Href",
                 "type": "string"
@@ -38103,6 +38161,10 @@
                 "title": "Preview Params",
                 "type": "object"
               },
+              "provision": {
+                "title": "Provision",
+                "type": "boolean"
+              },
               "ruleset_name": {
                 "title": "Ruleset Name",
                 "type": "string"
@@ -38120,6 +38182,9 @@
               "ruleset_name",
               "summary",
               "plan",
+              "provision",
+              "draft_live",
+              "draft_changed",
               "paused",
               "pce_status",
               "live",
@@ -38370,6 +38435,19 @@
           }
         },
         "properties": {
+          "draft_changed": {
+            "title": "Draft Changed",
+            "type": "boolean"
+          },
+          "draft_live": {
+            "enum": [
+              "enabled",
+              "disabled",
+              "unknown"
+            ],
+            "title": "Draft Live",
+            "type": "string"
+          },
           "href": {
             "title": "Href",
             "type": "string"
@@ -38471,6 +38549,10 @@
             "title": "Preview Params",
             "type": "object"
           },
+          "provision": {
+            "title": "Provision",
+            "type": "boolean"
+          },
           "ruleset_name": {
             "title": "Ruleset Name",
             "type": "string"
@@ -38488,6 +38570,9 @@
           "ruleset_name",
           "summary",
           "plan",
+          "provision",
+          "draft_live",
+          "draft_changed",
           "paused",
           "pce_status",
           "live",
@@ -38661,6 +38746,19 @@
           }
         },
         "properties": {
+          "draft_changed": {
+            "title": "Draft Changed",
+            "type": "boolean"
+          },
+          "draft_live": {
+            "enum": [
+              "enabled",
+              "disabled",
+              "unknown"
+            ],
+            "title": "Draft Live",
+            "type": "string"
+          },
           "href": {
             "title": "Href",
             "type": "string"
@@ -38762,6 +38860,10 @@
             "title": "Preview Params",
             "type": "object"
           },
+          "provision": {
+            "title": "Provision",
+            "type": "boolean"
+          },
           "ruleset_name": {
             "title": "Ruleset Name",
             "type": "string"
@@ -38779,6 +38881,9 @@
           "ruleset_name",
           "summary",
           "plan",
+          "provision",
+          "draft_live",
+          "draft_changed",
           "paused",
           "pce_status",
           "live",
@@ -39205,10 +39310,15 @@
               }
             ],
             "title": "Plan"
+          },
+          "provision": {
+            "title": "Provision",
+            "type": "boolean"
           }
         },
         "required": [
-          "plan"
+          "plan",
+          "provision"
         ],
         "title": "ScheduleEdit",
         "type": "object"
@@ -39365,6 +39475,19 @@
           }
         },
         "properties": {
+          "draft_changed": {
+            "title": "Draft Changed",
+            "type": "boolean"
+          },
+          "draft_live": {
+            "enum": [
+              "enabled",
+              "disabled",
+              "unknown"
+            ],
+            "title": "Draft Live",
+            "type": "string"
+          },
           "href": {
             "title": "Href",
             "type": "string"
@@ -39466,6 +39589,10 @@
             "title": "Preview Params",
             "type": "object"
           },
+          "provision": {
+            "title": "Provision",
+            "type": "boolean"
+          },
           "ruleset_name": {
             "title": "Ruleset Name",
             "type": "string"
@@ -39483,6 +39610,9 @@
           "ruleset_name",
           "summary",
           "plan",
+          "provision",
+          "draft_live",
+          "draft_changed",
           "paused",
           "pce_status",
           "live",

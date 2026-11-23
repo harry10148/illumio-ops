@@ -47,12 +47,20 @@ def test_draft_target_disabled_in_picker_and_preview(context, live_app, monkeypa
     page.get_by_role("button", name="Search").click()
     radios = page.locator("[data-role=rs-targets] input[name=rs_target]")
     expect(radios).to_have_count(2)
-    assert radios.nth(1).is_disabled()
-    expect(page.locator("[data-role=rs-target-why]")).to_contain_text("draft is pending")
-    radios.nth(0).check()
+    # draft only (the default): a pending draft does not hold the target, and nothing is provisioned
+    assert not radios.nth(1).is_disabled()
+    radios.nth(1).check()
+    expect(page.locator("input[name=rs_provision]")).not_to_be_checked()
     page.fill("input[name=rs_start]", "18:00")
     page.fill("input[name=rs_end]", "09:00")
     page.locator("input[name=rs_action]").nth(1).check()
+    expect(page.locator("[data-role=rs-preview]")).to_contain_text("18:00 disable in Draft, the next day 09:00 enable in Draft")
+    # provisioning: the pending target is held and let go of, and the preview says provision
+    page.locator("input[name=rs_provision]").check()
+    expect(page.locator("[data-role=rs-target-why]")).to_contain_text("draft is pending")
+    expect(page.get_by_role("button", name="Create schedule")).to_be_disabled()
+    radios.nth(0).check()
+    expect(page.get_by_role("button", name="Create schedule")).to_be_enabled()
     expect(page.locator("[data-role=rs-preview]")).to_contain_text("disable and provision, the next day 09:00 enable")
 
 
@@ -96,7 +104,7 @@ def test_a_new_search_clears_the_earlier_pick(context, live_app, monkeypatch):
     expect(page.get_by_role("button", name="Create schedule")).to_have_count(0)
 
 
-def _scheduled(live_app):
+def _scheduled(live_app, *, provision=True):
     from datetime import UTC, datetime
 
     from illumio_ops.domain.rule_schedule import Weekly
@@ -106,7 +114,7 @@ def _scheduled(live_app):
     with live_app.ctx.db() as conn:
         sid = store.create(conn, pce_url=pce.url, org_id=pce.org_id, href=RS, is_ruleset=True, name="Backups",
                            ruleset_name="Backups", summary="2 rules", plan_json=plan.model_dump_json(), paused=False,
-                           pce_status="active", by="a", at=datetime.now(UTC))
+                           pce_status="active", by="a", at=datetime.now(UTC), provision=provision)
         conn.commit()
     return sid
 
@@ -129,7 +137,7 @@ def test_edit_prefills_the_plan_and_check_now_says_what_happened(context, live_a
     expect(edit.locator("input[name=rs_start]")).to_have_value("08:00")
     assert edit.locator("input[name=rs_day_mon]").is_checked() and not edit.locator("input[name=rs_day_tue]").is_checked()
     edit.locator("input[name=rs_day_tue]").check()
-    edit.get_by_role("button", name="Save and provision the note").click()
+    edit.get_by_role("button", name="Save schedule").click()
     expect(page.locator("[data-role=rs-new]")).to_have_count(1)  # back to the new-schedule pane
     assert sent["plan"].days == ("mon", "tue") and sent["plan"].timezone == "Asia/Taipei"
     page.locator("[data-role=rs-check]").click()
@@ -175,3 +183,23 @@ def test_rule_sets_are_browsed_from_rule_schedules(context, live_app, monkeypatc
     expect(panels).to_have_count(1)
     expect(panels).to_contain_text("Backups")
     assert asked == ["", "back"]
+
+
+def test_draft_mode_checkbox_and_mixed_mode_error(context, live_app, monkeypatch):
+    _write_key(live_app)
+    _targets(monkeypatch)
+    _scheduled(live_app, provision=False)
+    page = _open(context, live_app)
+    expect(page.locator("[data-role=rs-list]")).to_contain_text("Draft only")
+    page.fill("input[name=rs_q]", "back")
+    page.get_by_role("button", name="Search").click()
+    page.locator("[data-role=rs-targets] input[name=rs_target]").nth(0).check()
+    provision = page.locator("input[name=rs_provision]")
+    assert not provision.is_checked()
+    provision.check()
+
+    def mixed(*a, **kw):
+        raise rs.ModeMixed("Backups")
+    monkeypatch.setattr("illumio_ops.web.routes.rule_schedules.rs.create", mixed)
+    page.get_by_role("button", name="Create schedule").click()
+    expect(page.locator("[data-role=rs-error]")).to_contain_text("Backups")

@@ -112,7 +112,7 @@ def write(conn: sqlite3.Connection, converted: list[Converted], *, pce_url: str,
     for c in converted:
         store.create(conn, pce_url=pce_url, org_id=org_id, href=c.href, is_ruleset=c.is_ruleset, name=c.name,
                      ruleset_name=c.ruleset_name, summary=c.summary, plan_json=c.plan.model_dump_json(), paused=True,
-                     pce_status="unknown", by="migrated-5.x", at=now)
+                     pce_status="unknown", by="migrated-5.x", at=now, provision=True)
 
 
 def host_zone() -> str | None:

@@ -62,6 +62,14 @@ class AlreadyScheduled(Exception):
     """The target already has a schedule."""
 
 
+class ModeMixed(Exception):
+    """Another schedule for this rule set uses the other provision mode."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.name = name
+
+
 class PceRefused(Exception):
     def __init__(self, status: int | None, detail: str) -> None:
         super().__init__(f"HTTP {status}")
@@ -87,6 +95,9 @@ class ScheduleView(BaseModel):
     ruleset_name: str
     summary: str
     plan: PlanField
+    provision: bool
+    draft_live: Literal["enabled", "disabled", "unknown"]
+    draft_changed: bool
     paused: bool
     pce_status: Literal["active", "deleted", "unknown"]
     live: Literal["enabled", "disabled", "unknown"]
@@ -199,7 +210,7 @@ def _switch(client: PceClient, href: str, enabled: bool, before: bool) -> PceRes
     return p
 
 
-def _clear_note(client: PceClient, href: str, draft: PceResponse) -> PceResponse | None:
+def _clear_note(client: PceClient, href: str, draft: PceResponse, *, provision: bool = True) -> PceResponse | None:
     desc = str((draft.json() or {}).get("description") or "")
     clean = strip_notes(desc)
     if clean == desc:
@@ -207,6 +218,8 @@ def _clear_note(client: PceClient, href: str, draft: PceResponse) -> PceResponse
     r = pw.set_fields(client, href, {"description": clean})
     if r.status != 204:
         return r
+    if not provision:
+        return None
     try:
         p = pw.provision(client, pw.ruleset_of(href), PROVISION_NOTE)
     except pw.DependenciesPending:
@@ -230,7 +243,7 @@ def _check_one(ctx: AppContext, client: PceClient, row: sqlite3.Row, at: datetim
         _run(ctx, row, href=href, name=name, at=at, action="error", result="failed", status=draft.status,
              detail=_detail(draft))
         return "failed"
-    if pw.draft_pending(client, href):
+    if row["provision"] and pw.draft_pending(client, href):
         with ctx.db() as conn:
             last = store.last_run(conn, row["id"])
         if last is None or last["action"] != "skip_draft":  # once while it stays so, not every five minutes
@@ -253,7 +266,68 @@ def _check_one(ctx: AppContext, client: PceClient, row: sqlite3.Row, at: datetim
 def _apply(ctx: AppContext, client: PceClient, row: sqlite3.Row, plan: Plan, draft: PceResponse,
            want: bool | Literal["expired"], at: datetime) -> Outcome:
     href, name = row["href"], row["name"]
-    before = bool((draft.json() or {}).get("enabled"))  # no pending draft here: the draft is the active value
+    before = bool((draft.json() or {}).get("enabled"))
+    if not row["provision"]:
+        if want == "expired":
+            if before:
+                disabled = pw.set_fields(client, href, {"enabled": False})
+                if disabled.status != 204:
+                    _run(ctx, row, href=href, name=name, at=at, action="draft_expire", result="failed",
+                         status=disabled.status, detail=_detail(disabled))
+                    return "failed"
+            note = _clear_note(client, href, draft, provision=False)
+            if note is not None:
+                _run(ctx, row, href=href, name=name, at=at, action="draft_expire", result="failed",
+                     status=note.status, detail=_detail(note))
+                return "failed"
+            with ctx.db() as conn:
+                store.delete(conn, row["id"])
+                conn.commit()
+            _run(ctx, None, href=href, name=name, at=at, action="draft_expire", result="ok",
+                 pce=(row["pce_url"], row["org_id"]), detail="rs_detail_draft_only")
+            return "switched"
+        active = pw.get_active(client, href)
+        if active.status == 404:
+            with ctx.db() as conn:
+                store.set_policy_state(conn, row["id"], pce_status="unknown", live="unknown",
+                                       draft_live="enabled" if before else "disabled", at=at)
+                conn.commit()
+            return "skipped"
+        if active.status != 200:
+            _run(ctx, row, href=href, name=name, at=at, action="error", result="failed", status=active.status,
+                 detail=_detail(active))
+            return "failed"
+        live = bool((active.json() or {}).get("enabled"))
+        draft_live = "enabled" if before else "disabled"
+        draft_action: store.Action = "draft_enable" if want else "draft_disable"
+        with ctx.db() as conn:
+            store.set_policy_state(conn, row["id"], pce_status="active", live="enabled" if live else "disabled",
+                                   draft_live=draft_live, at=at)
+            conn.commit()
+        if row["last_want"] is not None and bool(row["last_want"]) == bool(want):
+            return "none"
+        if before == bool(want):
+            # Already so in the draft: writing the same value would still leave the rule pending provision (lab 26.2,
+            # 2026-11-03), a change nobody asked for. Remember it as written and leave the draft alone.
+            with ctx.db() as conn:
+                store.set_last_want(conn, row["id"], bool(want))
+                conn.commit()
+            return "none"
+        changed = pw.set_fields(client, href, {"enabled": bool(want)})
+        if changed.status != 204:
+            _run(ctx, row, href=href, name=name, at=at, action=draft_action, result="failed", status=changed.status,
+                 detail=_detail(changed))
+            return "failed"
+        with ctx.db() as conn:
+            store.set_last_want(conn, row["id"], bool(want))
+            store.set_policy_state(conn, row["id"], pce_status="active", live="enabled" if live else "disabled",
+                                   draft_live="enabled" if want else "disabled", at=at)
+            conn.commit()
+        _run(ctx, row, href=href, name=name, at=at, action=draft_action, result="ok",
+             detail="rs_detail_draft_only")
+        return "switched"
+
+    # Provision-mode schedules retain the historic active-policy behavior.
     if want == "expired":
         refused = _switch(client, href, False, before)
         if refused is not None:
@@ -343,7 +417,14 @@ def _view(conn: sqlite3.Connection, row: sqlite3.Row, at: datetime) -> ScheduleV
     key, params = preview(plan)
     return ScheduleView(
         id=row["id"], href=row["href"], is_ruleset=bool(row["is_ruleset"]), name=row["name"],
-        ruleset_name=row["ruleset_name"], summary=row["summary"], plan=plan, paused=bool(row["paused"]),
+        ruleset_name=row["ruleset_name"], summary=row["summary"], plan=plan, provision=bool(row["provision"]),
+        draft_live=row["draft_live"],
+        draft_changed=bool(not row["provision"] and row["last_want"] is not None
+                           and row["draft_live"] in ("enabled", "disabled")
+                           and row["live"] in ("enabled", "disabled")
+                           and row["draft_live"] != row["live"]
+                           and (row["draft_live"] == "enabled") == bool(row["last_want"])),
+        paused=bool(row["paused"]),
         pce_status=row["pce_status"], live=row["live"],
         last_checked_at=datetime.fromisoformat(row["last_checked_at"]) if row["last_checked_at"] else None,
         last_run=None if last is None else _run_view(last), next_change=None if row["paused"] else next_change(plan, at),
@@ -365,9 +446,10 @@ def schedules(ctx: AppContext, *, now: datetime | None = None) -> tuple[Schedule
     nexts = [v.next_change for v in views if v.next_change is not None]
     return ScheduleOverview(
         schedules=len(views),
-        switched_24h=sum(1 for r in recent if r["result"] == "ok" and r["action"] in ("enable", "disable", "expire")),
+        switched_24h=sum(1 for r in recent if r["result"] == "ok" and r["action"] in (
+            "enable", "disable", "expire", "draft_enable", "draft_disable", "draft_expire")),
         failed_24h=sum(1 for r in recent if r["result"] == "failed"),
-        skipped_now=sum(1 for v in views if v.last_run is not None and v.last_run.action == "skip_draft"
+        skipped_now=sum(1 for v in views if v.provision and v.last_run is not None and v.last_run.action == "skip_draft"
                         and (v.last_checked_at is None or v.last_checked_at <= v.last_run.at)),
         next_change=min(nexts, default=None), write_key=_has_key(ctx)), views
 
@@ -394,7 +476,7 @@ def _same(ctx: AppContext, cfg: PceSettings) -> bool:
     return _ident(ctx) == (cfg.url, cfg.org_id)
 
 
-def _write_note(client: PceClient, href: str, plan: Plan) -> None:
+def _write_note(client: PceClient, href: str, plan: Plan, *, provision: bool = True) -> None:
     """DraftPending (the description put back) when provisioning would take other unprovisioned objects live."""
     draft = pw.get_draft(client, href)
     if draft.status != 200:
@@ -403,6 +485,8 @@ def _write_note(client: PceClient, href: str, plan: Plan) -> None:
     r = pw.set_fields(client, href, {"description": with_note(desc, plan)})
     if r.status != 204:
         raise PceRefused(r.status, _detail(r))
+    if not provision:
+        return
     def put_back() -> None:
         back = pw.revert(client, pw.ruleset_of(href))
         if back.status != 204:
@@ -425,7 +509,7 @@ _CREATE = threading.Lock()  # one create at a time: the target is claimed before
 
 
 def create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: str, summary: str, by: str,
-           pce: tuple[str, str], now: datetime | None = None) -> ScheduleView:
+           pce: tuple[str, str], provision: bool = False, now: datetime | None = None) -> ScheduleView:
     """pce: the PCE (url, org) the target was found on — a target picked on another PCE is refused (PceSwitched).
     Raises NoWriteKey, AlreadyScheduled, NotProvisioned, DraftPending, PceRefused, PceSwitched (nothing saved then)."""
     if _ident(ctx) != tuple(pce):
@@ -433,13 +517,13 @@ def create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: s
     with _CREATE:
         try:
             return _create(ctx, href=href, plan=plan, name=name, ruleset_name=ruleset_name, summary=summary, by=by,
-                           now=now)
+                           provision=provision, now=now)
         except sqlite3.IntegrityError:
             raise AlreadyScheduled from None
 
 
 def _create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: str, summary: str, by: str,
-            now: datetime | None = None) -> ScheduleView:
+            provision: bool = False, now: datetime | None = None) -> ScheduleView:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     cfg = ctx.settings.current().pce
     if not (cfg.write_api_key and cfg.write_api_secret):
@@ -448,6 +532,9 @@ def _create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: 
     with ctx.db() as conn:
         if store.by_href(conn, pce_url=cfg.url, org_id=cfg.org_id, href=href) is not None:
             raise AlreadyScheduled
+        for other in store.list_for(conn, pce_url=cfg.url, org_id=cfg.org_id):
+            if pw.ruleset_of(other["href"]) == pw.ruleset_of(href) and bool(other["provision"]) != provision:
+                raise ModeMixed(other["name"])
     with ctx.pce_write_client(cfg) as client:
         try:
             active = pw.get_active(client, href)
@@ -455,42 +542,57 @@ def _create(ctx: AppContext, *, href: str, plan: Plan, name: str, ruleset_name: 
                 raise NotProvisioned
             if active.status != 200:
                 raise PceRefused(active.status, _detail(active))
-            if pw.draft_pending(client, href):
+            if provision and pw.draft_pending(client, href):
                 raise DraftPending
-            _write_note(client, href, plan)
+            _write_note(client, href, plan, provision=provision)
         except PCE_ERRORS as exc:
             raise PceRefused(getattr(exc, "status", None), f"{type(exc).__name__}: {exc}") from None
     live = "enabled" if (active.json() or {}).get("enabled") else "disabled"
     with ctx.db() as conn:
         sid = store.create(conn, pce_url=cfg.url, org_id=cfg.org_id, href=href, is_ruleset=pw.is_ruleset(href),
                            name=name, ruleset_name=ruleset_name, summary=summary, plan_json=plan.model_dump_json(),
-                           paused=False, pce_status="active", by=by, at=at)
+                           paused=False, pce_status="active", by=by, at=at, provision=provision)
         store.set_checked(conn, sid, pce_status="active", live=live, at=at)
         conn.commit()
         row = store.get(conn, sid)
     assert row is not None
-    _run(ctx, row, href=href, name=name, at=at, action="note", result="ok")
+    _run(ctx, row, href=href, name=name, at=at, action="note", result="ok",
+         detail=None if provision else "rs_detail_draft_only")
     with ctx.db() as conn:
         return _view(conn, row, at)
 
 
-def update(ctx: AppContext, schedule_id: int, plan: Plan, *, now: datetime | None = None) -> ScheduleView:
+def update(ctx: AppContext, schedule_id: int, plan: Plan, *, provision: bool = False,
+           now: datetime | None = None) -> ScheduleView:
+    """Edit a schedule under the same per-process mode lock used when claiming a new schedule."""
+    with _CREATE:
+        return _update(ctx, schedule_id, plan, provision=provision, now=now)
+
+
+def _update(ctx: AppContext, schedule_id: int, plan: Plan, *, provision: bool = False,
+            now: datetime | None = None) -> ScheduleView:
     at = (now or datetime.now(UTC)).astimezone(UTC)
     cfg = ctx.settings.current().pce
     row = _own(ctx, schedule_id, cfg)
+    if bool(row["provision"]) != provision:
+        with ctx.db() as conn:
+            for other in store.list_for(conn, pce_url=cfg.url, org_id=cfg.org_id):
+                if (other["id"] != schedule_id and pw.ruleset_of(other["href"]) == pw.ruleset_of(row["href"])
+                        and bool(other["provision"]) != provision):
+                    raise ModeMixed(other["name"])
     if not (cfg.write_api_key and cfg.write_api_secret):
         raise NoWriteKey
     if not _same(ctx, cfg):
         raise PceSwitched
     with ctx.pce_write_client(cfg) as client:
         try:
-            if pw.draft_pending(client, row["href"]):
+            if provision and pw.draft_pending(client, row["href"]):
                 raise DraftPending
-            _write_note(client, row["href"], plan)
+            _write_note(client, row["href"], plan, provision=provision)
         except PCE_ERRORS as exc:
             raise PceRefused(getattr(exc, "status", None), f"{type(exc).__name__}: {exc}") from None
     with ctx.db() as conn:
-        store.update_plan(conn, schedule_id, plan.model_dump_json(), at)
+        store.update_schedule(conn, schedule_id, plan.model_dump_json(), provision, at)
         conn.commit()
         fresh = store.get(conn, schedule_id)
         assert fresh is not None
@@ -557,11 +659,13 @@ def delete(ctx: AppContext, schedule_id: int, *, by: str, now: datetime | None =
                     out = DeleteResult(note_cleared=False, provisioned=False, status=draft.status,
                                        detail=_detail(draft))
                 else:
-                    pending = pw.draft_pending(client, row["href"])
+                    pending = bool(row["provision"] and pw.draft_pending(client, row["href"]))
                     desc = str((draft.json() or {}).get("description") or "")
                     r = pw.set_fields(client, row["href"], {"description": strip_notes(desc)})
                     if r.status != 204:
                         out = DeleteResult(note_cleared=False, provisioned=False, status=r.status, detail=_detail(r))
+                    elif not row["provision"]:
+                        out = DeleteResult(note_cleared=True, provisioned=False, status=None, detail="draft_only")
                     elif pending:  # someone's change waits in that draft: leave provisioning to them
                         out = DeleteResult(note_cleared=True, provisioned=False, status=None, detail="draft_pending")
                     else:

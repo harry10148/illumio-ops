@@ -14,7 +14,7 @@ RS = "/orgs/1/sec_policy/active/rule_sets/5"
 PLAN = {"kind": "weekly", "days": ["mon"], "start": "08:00", "end": "18:00", "timezone": "Asia/Taipei",
         "action": "enable_in_window"}
 BODY = {"href": RS, "plan": PLAN, "name": "Backups", "ruleset_name": "Backups", "summary": "", "pce_url": "",
-        "org_id": ""}
+        "org_id": "", "provision": False}
 
 
 def _add(ctx):
@@ -22,7 +22,8 @@ def _add(ctx):
     with ctx.db() as conn:
         sid = store.create(conn, pce_url=pce.url, org_id=pce.org_id, href=RS, is_ruleset=True, name="Backups",
                            ruleset_name="Backups", summary="", plan_json=rs.plan_of(json.dumps(PLAN))
-                           .model_dump_json(), paused=False, pce_status="active", by="a", at=datetime.now(UTC))
+                           .model_dump_json(), paused=False, pce_status="active", by="a", at=datetime.now(UTC),
+                           provision=True)
         conn.commit()
     return sid
 
@@ -53,6 +54,15 @@ def test_create_conflicts(client, monkeypatch, exc, status, code):
     login(client)
     r = post(client, "/api/rule-schedules", BODY)
     assert r.status_code == status and r.get_json()["error"]["code"] == code
+
+
+def test_create_mode_mixed_409_names_other_schedule(client, monkeypatch):
+    def boom(*a, **kw):
+        raise rs.ModeMixed("Backups")
+    monkeypatch.setattr(rs, "create", boom)
+    login(client)
+    error = post(client, "/api/rule-schedules", BODY).get_json()["error"]
+    assert error["code"] == "mode_mixed" and error["params"]["name"] == "Backups"
 
 
 def test_create_pce_refusal_502_carries_pce_answer(client, monkeypatch):
@@ -96,7 +106,7 @@ def test_edit_and_check_now_need_the_write_key(client, ctx):
     """5.x edited a schedule in place and checked on demand (parity 2026-11-06); both write to the PCE."""
     login(client)
     sid = _add(ctx)
-    r = client.put(f"/api/rule-schedules/{sid}", json={"plan": PLAN}, environ_overrides=LOCAL,
+    r = client.put(f"/api/rule-schedules/{sid}", json={"plan": PLAN, "provision": True}, environ_overrides=LOCAL,
                    headers={"X-CSRFToken": csrf(client)})
     assert r.status_code == 412 and r.get_json()["error"]["code"] == "no_write_key"
     r = post(client, f"/api/rule-schedules/{sid}/check", {})
@@ -121,10 +131,20 @@ def test_edit_answers_with_the_schedule(client, ctx, monkeypatch):
     sid = _add(ctx)
     view = rs.schedules(ctx)[1][0]
     seen = {}
-    monkeypatch.setattr(rs, "update", lambda c, i, plan, **kw: seen.update(id=i, plan=plan) or view)
-    r = client.put(f"/api/rule-schedules/{sid}", json={"plan": PLAN}, environ_overrides=LOCAL,
+    monkeypatch.setattr(rs, "update", lambda c, i, plan, **kw: seen.update(id=i, plan=plan, provision=kw["provision"]) or view)
+    r = client.put(f"/api/rule-schedules/{sid}", json={"plan": PLAN, "provision": True}, environ_overrides=LOCAL,
                    headers={"X-CSRFToken": csrf(client)})
-    assert r.status_code == 200 and seen["id"] == sid and seen["plan"].kind == "weekly"
+    assert r.status_code == 200 and seen["id"] == sid and seen["plan"].kind == "weekly" and seen["provision"]
+
+
+def test_edit_mode_mixed_is_409_and_names_other_schedule(client, ctx, monkeypatch):
+    login(client)
+    sid = _add(ctx)
+    monkeypatch.setattr(rs, "update", lambda *a, **kw: (_ for _ in ()).throw(rs.ModeMixed("Rule 9")))
+    r = client.put(f"/api/rule-schedules/{sid}", json={"plan": PLAN, "provision": False}, environ_overrides=LOCAL,
+                   headers={"X-CSRFToken": csrf(client)})
+    error = r.get_json()["error"]
+    assert r.status_code == 409 and error["code"] == "mode_mixed" and error["params"]["name"] == "Rule 9"
 
 
 def test_rulesets_browse_is_read_only_and_says_when_the_pce_fails(client, monkeypatch):
