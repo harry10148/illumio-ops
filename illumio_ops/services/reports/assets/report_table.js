@@ -214,8 +214,7 @@ function autoFitColumns(table) {
       naturalTotal = widths.reduce((a, b) => a + b, 0);
     }
   }
-  /* Still wider (stage 3a: a column named "Recording only (Visibility Only)" was as wide as its name on one line,
-     and four of them pushed the last columns past the edge): the headers wrap too, then the cells. Every column
+  /* Long column names can push the last columns past the edge. The headers wrap too, then the cells. Each column
      gives up width in proportion to what it can spare, down to a floor, in two steps:
        1. a text column TEXT_MIN (or its own width when narrower), any other column its widest cell on one line;
        2. every column the longest word of its cells (a number never wraps; a share keeps its number and a

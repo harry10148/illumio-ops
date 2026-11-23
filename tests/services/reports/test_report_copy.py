@@ -78,18 +78,18 @@ def test_no_page_keeps_its_own_word_for_a_decision_or_a_mode(lang):
     assert gone == []
 
 
-def test_a_mode_is_said_in_plain_words_with_the_pce_word_beside():
+def test_a_mode_is_its_name_in_both_languages():
     said = {(lang, mode): mode_word(lang, mode) for lang in Language
             for mode in ("idle", "visibility_only", "selective", "full")}
     assert said == {
-        (Language.EN, "idle"): "Not blocking (Idle)",
-        (Language.EN, "visibility_only"): "Recording only (Visibility Only)",
-        (Language.EN, "selective"): "Blocking only what a Deny Rule names (Selective)",
-        (Language.EN, "full"): "Blocking what no rule allows (Full)",
-        (Language.ZH_TW, "idle"): "不擋（Idle）",
-        (Language.ZH_TW, "visibility_only"): "只記錄、不擋（Visibility Only）",
-        (Language.ZH_TW, "selective"): "只擋 Deny Rule 指定的（Selective）",
-        (Language.ZH_TW, "full"): "擋下沒有規則允許的（Full）",
+        (Language.EN, "idle"): "Idle",
+        (Language.EN, "visibility_only"): "Visibility Only",
+        (Language.EN, "selective"): "Selective",
+        (Language.EN, "full"): "Full",
+        (Language.ZH_TW, "idle"): "Idle",
+        (Language.ZH_TW, "visibility_only"): "Visibility Only",
+        (Language.ZH_TW, "selective"): "Selective",
+        (Language.ZH_TW, "full"): "Full",
     }
     assert mode_word(Language.EN, "something_new") == "something_new"  # a mode this table does not know: as it is
 

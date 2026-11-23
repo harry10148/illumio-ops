@@ -186,12 +186,12 @@ def test_host_no_overflow_760(narrow_context, live_app):
     assert no_horizontal_overflow(page)
 
 
-def test_the_enforcement_mode_is_said_in_plain_words_with_the_pce_term_beside(context, live_app):
+def test_the_enforcement_mode_is_its_name(context, live_app):
     _seed(live_app)  # db is in Visibility Only
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/hosts?key={DB}")
-    expect(page.locator("[data-role=host-mode]")).to_have_text("Recording only (Visibility Only)")
+    expect(page.locator("[data-role=host-mode]")).to_have_text("Visibility Only")
 
 
 # ── the host page is where every host name leads (purpose-led UI spec §6.2, §6.3) ──
@@ -220,7 +220,7 @@ def test_the_host_page_says_what_it_comes_to_and_lists_the_alerts_about_this_hos
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/hosts?key={DB}")
     said = page.locator("[data-role=page-conclusion]")
-    expect(said).to_contain_text("db: Recording only (Visibility Only); VEN ")
+    expect(said).to_contain_text("db: Visibility Only; VEN ")
     expect(said).to_contain_text("2 alerts in the last 7 days; not quarantined.")
     listed = page.locator("#alerts [data-role=host-alert-list] li")
     expect(listed).to_have_count(2)

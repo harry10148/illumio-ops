@@ -127,8 +127,7 @@ def host_keys(**columns: Iterable[str | None]) -> dict[str, tuple[str | None, ..
 
 
 def mode_word(lang: Language, mode: str) -> str:
-    """An enforcement mode as "plain words (PCE term)", the console's own wording (web/src/terms.ts modeWord); a
-    mode this table does not know is shown as it is."""
+    """An enforcement mode name (web/src/terms.ts modeWord); a mode this table does not know is shown as it is."""
     key = MODE_KEYS.get(mode)
     return tr(lang, key) if key else mode
 

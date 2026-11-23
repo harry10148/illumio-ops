@@ -25,8 +25,10 @@ from illumio_ops.domain.values import Severity
 from illumio_ops.services.analysis.ransomware import host_ransomware
 from illumio_ops.services.reports import reads
 from illumio_ops.services.reports.common import (
+    MODE_KEYS,
     host_key,
     host_keys,
+    mode_word,
     port_text,
     rule_label,
     severity_name,
@@ -62,7 +64,6 @@ _TERMS = (("rpt_rw_col_pce_percent", "rpt_rw_term_pce_means", "rpt_rw_term_pce_u
 
 
 _SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-MODE_NAMES = {"full": "Full", "selective": "Selective", "visibility_only": "Visibility Only", "idle": "Idle"}
 NAMES_SHOWN = 5  # service names in a host's explanation; the rest are counted
 _EXPOSURE_KEYS = {"fully_protected": "rpt_rw_exposure_fully_protected"}
 
@@ -183,13 +184,13 @@ def build_ransomware(inp: BuildInput) -> ReportDocument:
         open_ = [s for s in h.get("services") or () if _open(s)]
         mode = str(h.get("enforcement_mode") or "")
         if mode in UNENFORCED_MODES:  # the vendor counts only Selective or Full hosts (user 2026-10-29)
-            return t("rpt_rw_explain_unenforced", pce=pct(h.get("pce_percent")), mode=MODE_NAMES.get(mode, mode))
-        if mode not in MODE_NAMES:  # review #6: no mode to judge by
+            return t("rpt_rw_explain_unenforced", pce=pct(h.get("pce_percent")), mode=mode_word(lang, mode))
+        if mode not in MODE_KEYS:  # review #6: no mode to judge by
             return t("rpt_rw_explain_mode_unknown", pce=pct(h.get("pce_percent")))
         if h.get("contradiction"):  # review #7: only Selective's gap is the Deny Rule coverage
             key = "rpt_rw_explain_contradiction" if mode == "selective" else "rpt_rw_explain_mismatch"
             return t(key, pce=pct(h.get("pce_percent")), computed=pct(h.get("computed_percent")),
-                     mode=MODE_NAMES[mode])
+                     mode=mode_word(lang, mode))
         if not open_:
             return t("rpt_rw_explain_protected")
         names = list(dict.fromkeys(str(s.get("name")) for s in open_))  # a service on TCP and UDP is named once

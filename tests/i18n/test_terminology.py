@@ -1,11 +1,9 @@
 """Traditional Chinese terminology (spec §6.2 用語, user 2026-10-29; purpose-led UI spec §5.6, user 2026-11-12): general
 prose is Chinese, and what the PCE console shows is written as the console shows it — it has no Chinese UI, so a
-customer reading "可能被擋" cannot find it there. Where a policy decision or an enforcement mode is a name (a table
-cell, a filter option, a state, a column, a number's name, a chapter or table title) it is said in plain words with the
-console's word in brackets after it, the term_decision_* and term_mode_* keys — except Potentially Blocked, which has
-one name everywhere, the console's own, with no paraphrase beside it (user 2026-11-14): the paraphrases it used to
-carry are banned as names. A sentence that explains what it means says so in other words. Inside a sentence the
-console's word stands alone.
+customer reading "可能被擋" cannot find it there. An enforcement mode name (a table cell, filter option, state, column,
+number's name, chapter or table title) is just the console's mode name in both languages. A sentence that explains what
+a mode does stays explanatory; inside it the console's mode name stands alone. Policy decision names still use plain
+words with the console's word in brackets, except Potentially Blocked, which has one name everywhere (user 2026-11-14).
 Each pattern is a spelling that must not appear in zh_TW, in a name or in a sentence; the comment names the one to use."""
 import json
 import re
@@ -71,6 +69,18 @@ def test_a_decision_name_is_plain_words_then_the_pce_word():
 
 
 EN = json.loads((Path(__file__).resolve().parents[2] / "illumio_ops" / "i18n" / "en.json").read_text())
+
+zh_explicit = {
+    "term_mode_idle": "Idle",
+    "term_mode_visibility_only": "Visibility Only",
+    "term_mode_selective": "Selective",
+    "term_mode_full": "Full",
+}
+
+
+def test_mode_names_are_explicitly_the_same_in_both_languages():
+    assert {key: ZH[key] for key in zh_explicit} == zh_explicit
+    assert {key: EN[key] for key in zh_explicit} == zh_explicit
 
 
 def test_potentially_blocked_is_written_one_way_in_both_languages():

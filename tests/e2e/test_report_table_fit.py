@@ -251,14 +251,15 @@ def test_the_lead_numbers_are_level_at_every_width(context, lang):
 
 @pytest.mark.parametrize("lang", [Language.EN, Language.ZH_TW])
 def test_the_longest_names_fit_the_page_and_the_paper(context, lang):
-    """The cells and column names that grew when a decision and a mode got plain words (stage 3a Task 5): a
-    readiness scores table (four share columns and the modes cell), a table whose columns are the four modes, and a
+    """Check the longest cells and column names in a readiness scores table (four share columns and the modes cell),
+    a table whose columns are the four modes, and a
     cell holding a decision's name. No table scrolls inside its panel (the headers and the cells wrap instead:
     report_table.js), nothing is cut, the page never scrolls sideways; on paper every table is inside the page."""
     def t(key, **params):
         return translate(lang, key, {k: str(v) for k, v in params.items()})
     modes = [t(k) for k in ("term_mode_full", "term_mode_selective", "term_mode_visibility_only", "term_mode_idle")]
-    cell = t("rpt_rdy_modes", full_word=modes[0], full=12, selective_word=modes[1], selective=3,
+    long_mode_text = "A deliberately long explanation used to keep the wrapping scenario in this cell."
+    cell = t("rpt_rdy_modes", full_word=long_mode_text, full=12, selective_word=modes[1], selective=3,
              visibility_word=modes[2], visibility=140, idle_word=modes[3], idle=7)
     assert lang is not Language.EN or len(cell) > 100
     scores = TableBlock(

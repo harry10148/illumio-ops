@@ -698,7 +698,7 @@ def test_the_side_panel_and_the_alerts_own_page_say_the_same(context, live_app):
     side = page.locator("[data-role=alert-side] [data-role=alert-body]")
     expect(side.locator("[data-role=alert-devices] li")).to_have_count(2)
     said = side.locator("[data-role=alert-devices]").inner_text()
-    assert "Source" in said and "Recording only (Visibility Only)" in said and "unmanaged address" in said
+    assert "Source" in said and "Visibility Only" in said and "unmanaged address" in said
     actions = set(side.locator("[data-role=alert-actions] a, [data-role=alert-actions] button").all_inner_texts())
     summary = side.locator("[data-role=alert-summary]").inner_text()
     page.goto(f"{live_app.url}/alerts/{a}")

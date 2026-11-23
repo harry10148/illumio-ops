@@ -17,8 +17,8 @@ const MODES = ["idle", "visibility_only", "selective", "full"] as const;
 const ONLINE = ["online", "lost_24h", "lost_48h", "long_offline", "unknown"] as const;
 // Literal maps: i18n keys are never built from data.
 const MODE_KEYS: Record<string, string> = {
-  full: "hosts_mode_full", selective: "hosts_mode_selective", visibility_only: "hosts_mode_visibility_only",
-  idle: "hosts_mode_idle",
+  full: "term_mode_full", selective: "term_mode_selective", visibility_only: "term_mode_visibility_only",
+  idle: "term_mode_idle",
 };
 const ONLINE_KEYS: Record<string, string> = {
   online: "fleet_online_online", lost_24h: "fleet_online_lost_24h", lost_48h: "fleet_online_lost_48h",

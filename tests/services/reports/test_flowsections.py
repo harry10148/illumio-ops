@@ -219,17 +219,17 @@ def test_a_hosts_mode_is_the_inventorys_current_one_never_the_flow_rows(sample):
     assert [c.label for c in hosts.columns] == ["Host", "Mode now", "Flows", "Connections", "Which end", "Note"]
     idle_note = "A VEN in Idle only records snapshots; it reports no decision."
     assert hosts.rows == (
-        ("db", "Blocking what no rule allows (Full)", 4, 19, "Both", ""),
+        ("db", "Full", 4, 19, "Both", ""),
         ("left-1", "Not in the inventory", 1, 10, "Source", ""),
-        ("idle-1", "Not blocking (Idle)", 2, 7, "Both", idle_note),
-        ("sel-1", "Blocking only what a Deny Rule names (Selective)", 1, 2, "Source", ""))  # no reason given for a host not in Idle now
+        ("idle-1", "Idle", 2, 7, "Both", idle_note),
+        ("sel-1", "Selective", 1, 2, "Source", ""))  # no reason given for a host not in Idle now
     assert hosts.host_keys == {"host": tuple(f"/orgs/1/workloads/{n}" for n in ("db", "left-1", "idle-1", "sel-1"))}
     words = " ".join(p for b in section.blocks if not hasattr(b, "rows") for p in b.paragraphs)
     assert "the inventory's current one" in words
     _, (zh,) = _monitor(sample, Language.ZH_TW)
     table = _tables(zh)["出現在裡面、有 VEN 的主機"]
     assert [c.label for c in table.columns][1] == "現在的模式"
-    assert table.rows[2][1:] == ("不擋（Idle）", 2, 7, "兩端", "Idle 的 VEN 只記快照，不回報判定。")
+    assert table.rows[2][1:] == ("Idle", 2, 7, "兩端", "Idle 的 VEN 只記快照，不回報判定。")
     assert table.rows[1][1] == "不在清冊" and table.rows[3][5] == ""
 
 
