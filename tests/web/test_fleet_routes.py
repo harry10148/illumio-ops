@@ -1,9 +1,5 @@
-"""VEN fleet API: signed in, CSRF on POST, the list filters checked, no write key a conflict, a PCE failure said, a
-label selection larger than a batch refused with its size, the batch bounded, the record read back."""
+"""VEN fleet API: authentication, filters, bounded rate requests and their write-key requirement."""
 import pytest
-
-from illumio_ops.pce.collections import PceCollectionIncomplete
-from illumio_ops.services import fleet_write
 
 from .conftest import LOCAL, login, post
 
@@ -31,45 +27,24 @@ def test_list_filter_checked(client):
 
 def test_no_write_key_is_a_conflict(client):
     login(client)
-    r = post(client, "/api/fleet/enforcement/apply", {"target": "full", "hosts": [{"key": WL, "from_mode": "idle"}]})
-    assert r.status_code == 409 and r.get_json()["error"]["code"] == "no_write_key"
     r = post(client, "/api/fleet/traffic-rate/apply", {"keys": [WL]})
     assert r.status_code == 409 and r.get_json()["error"]["code"] == "no_write_key"
 
 
-@pytest.mark.parametrize(("exc", "status", "code"), [
-    (PceCollectionIncomplete("/x", 0, "HTTP 503"), 502, "pce_failed"), (ValueError("bad"), 400, "invalid_input"),
-    (fleet_write.SelectionTooLarge(73), 400, "too_many")])
-def test_failures_mapped(client, monkeypatch, exc, status, code):
-    def boom(*a, **kw):
-        raise exc
-    monkeypatch.setattr(fleet_write, "preview", boom)
+def test_enforcement_preview_route_is_gone(client):
     login(client)
     r = post(client, "/api/fleet/enforcement/preview", {"target": "full", "keys": [WL]})
-    assert r.status_code == status and r.get_json()["error"]["code"] == code
-    if code == "too_many":
-        assert r.get_json()["error"]["params"] == {"n": "73", "max": "50"}
+    assert r.status_code == 404
 
 
-def test_hosts_or_labels_and_bounded(client):
+def test_wrong_method_on_a_registered_route_stays_405(client):
     login(client)
-    assert post(client, "/api/fleet/enforcement/preview", {"target": "full"}).status_code == 400
-    both = {"target": "full", "keys": [WL], "labels": [{"key": "env", "value": "Prod"}]}
-    assert post(client, "/api/fleet/enforcement/preview", both).status_code == 400
+    assert client.get("/api/fleet/traffic-rate/check", environ_overrides=LOCAL).status_code == 405
+
+
+def test_rate_batch_is_bounded(client):
+    login(client)
     assert post(client, "/api/fleet/traffic-rate/check", {"keys": [WL] * 51}).status_code == 400
-    assert post(client, "/api/fleet/enforcement/apply", {"target": "full", "hosts": []}).status_code == 400
-
-
-def test_label_preview_resolves_on_the_server(client, monkeypatch):
-    seen = {}
-    def preview(ctx, keys, target):
-        seen["keys"] = keys
-        raise ValueError("stop here")
-    monkeypatch.setattr(fleet_write, "select", lambda ctx, picks: seen.setdefault("picks", picks) and [WL])
-    monkeypatch.setattr(fleet_write, "preview", preview)
-    login(client)
-    post(client, "/api/fleet/enforcement/preview", {"target": "full", "labels": [{"key": "env", "value": "Prod"}]})
-    assert seen["keys"] == [WL] and seen["picks"][0].value == "Prod"
 
 
 # ── finding a host on the VEN overview (2026-11-12: it is the one way in to hosts) ──

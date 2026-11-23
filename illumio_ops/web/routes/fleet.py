@@ -1,10 +1,9 @@
-"""VEN fleet: the inventory counted and listed (read-only), enforcement progression and the traffic update rate
-increase (write key only), and what was done."""
+"""VEN fleet inventory and traffic update rate actions."""
 from __future__ import annotations
 
 from flask import Blueprint, request
 from flask_login import current_user
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, Field, ValidationError
 
 from illumio_ops.pce.client import (
     PceBudgetExhausted,
@@ -16,11 +15,8 @@ from illumio_ops.services import fleet, fleet_write
 from illumio_ops.services.collect.guard import BindingMismatch
 from illumio_ops.services.fleet import FleetFilter, FleetHostList, FleetOverview
 from illumio_ops.services.fleet_write import (
-    EnforcementHost,
-    EnforcementPreview,
     FleetAction,
     FleetOutcome,
-    LabelPick,
     RateCheck,
 )
 from illumio_ops.services.ondemand import OnDemandFailed
@@ -35,33 +31,12 @@ class FleetKeys(BaseModel):
     keys: list[Key] = Field(min_length=1, max_length=fleet_write.MAX_BATCH)
 
 
-class EnforcementPreviewRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=20)
-    keys: list[Key] = Field(default_factory=list, max_length=fleet_write.MAX_BATCH)
-    labels: list[LabelPick] = Field(default_factory=list, max_length=8)  # every one of them (resolved here only)
-
-    @model_validator(mode="after")
-    def _one(self) -> EnforcementPreviewRequest:
-        if bool(self.keys) == bool(self.labels):
-            raise ValueError("choose hosts or labels")
-        return self
-
-
-class EnforcementApplyRequest(BaseModel):
-    target: str = Field(min_length=1, max_length=20)
-    hosts: list[EnforcementHost] = Field(min_length=1, max_length=fleet_write.MAX_BATCH)
-
-
 class FleetHistory(BaseModel):
     actions: list[FleetAction]
 
 
 OP_OVERVIEW = operation("fleet.overview", "GET", "/api/fleet/overview", None, FleetOverview)
 OP_HOSTS = operation("fleet.hosts", "GET", "/api/fleet/hosts", None, FleetHostList)
-OP_PREVIEW = operation("fleet.enforcement_preview", "POST", "/api/fleet/enforcement/preview",
-                       EnforcementPreviewRequest, EnforcementPreview)
-OP_APPLY = operation("fleet.enforcement_apply", "POST", "/api/fleet/enforcement/apply", EnforcementApplyRequest,
-                     FleetOutcome)
 OP_RATE_CHECK = operation("fleet.rate_check", "POST", "/api/fleet/traffic-rate/check", FleetKeys, RateCheck)
 OP_RATE_APPLY = operation("fleet.rate_apply", "POST", "/api/fleet/traffic-rate/apply", FleetKeys, FleetOutcome)
 OP_HISTORY = operation("fleet.history", "GET", "/api/fleet/actions", None, FleetHistory)
@@ -79,9 +54,6 @@ def _mapped(exc: Exception) -> ApiFailure:
         return ApiFailure(409, "pce_not_configured", "q_err_pce_not_configured")
     if isinstance(exc, PCE_FAILURES):
         return ApiFailure(502, "pce_failed", "fleet_err_pce", params={"error": str(exc)[:300]})
-    if isinstance(exc, fleet_write.SelectionTooLarge):
-        return ApiFailure(400, "too_many", "fleet_err_too_many",
-                          params={"n": str(exc.n), "max": str(fleet_write.MAX_BATCH)})
     return ApiFailure(400, "invalid_input", "err_invalid_input", field="keys")  # ValueError: input never echoed
 
 
@@ -109,24 +81,6 @@ def hosts() -> FleetHostList:
         return fleet.host_list(get_ctx(), f)
     except BindingMismatch:
         raise ApiFailure(409, "pce_switched", "wb_pce_switched") from None
-
-
-@api_route(bp, OP_PREVIEW)
-def enforcement_preview(body: EnforcementPreviewRequest) -> EnforcementPreview:
-    ctx = get_ctx()
-    try:
-        keys = body.keys or fleet_write.select(ctx, body.labels)
-        return fleet_write.preview(ctx, keys, body.target)
-    except HANDLED as exc:
-        raise _mapped(exc) from None
-
-
-@api_route(bp, OP_APPLY)
-def enforcement_apply(body: EnforcementApplyRequest) -> FleetOutcome:
-    try:
-        return fleet_write.apply(get_ctx(), body.hosts, body.target, by=str(current_user.get_id()))
-    except HANDLED as exc:
-        raise _mapped(exc) from None
 
 
 @api_route(bp, OP_RATE_CHECK)

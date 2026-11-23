@@ -81,8 +81,7 @@ def test_potentially_blocked_is_written_one_way_in_both_languages():
         assert sorted(k for k, v in lang.items() if any(m != "Potentially Blocked" for m in other_case.findall(_words(v)))) == []
         assert sorted(k for k, v in lang.items() if re.search(r"Potentially Blocked ?[（(](?!Deny Rule|Override Deny)", v)) == []
         assert sorted(k for k, v in lang.items() if re.search(r"[（(]Potentially Blocked[）)]", v)) == []
-        assert {lang[k] for k in ("term_decision_potentially_blocked", "decision_potentially_blocked", "rpt_sec_sec_pb",
-                                  "fleet_col_would_block")} == {"Potentially Blocked"}
+        assert {lang[k] for k in ("term_decision_potentially_blocked", "decision_potentially_blocked", "rpt_sec_sec_pb")} == {"Potentially Blocked"}
     assert not [k for k, v in EN.items() if re.search(r"blocked once enforcement starts\)|enforcement would block:", v)]
 
 

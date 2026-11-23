@@ -12,7 +12,8 @@ from flask_limiter.util import get_remote_address
 from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 from loguru import logger
-from werkzeug.exceptions import HTTPException, NotFound
+from werkzeug.exceptions import HTTPException, MethodNotAllowed, NotFound
+from werkzeug.routing import Map, Rule
 from werkzeug.wrappers import Response as WerkzeugResponse
 
 from illumio_ops.services.context import AppContext
@@ -143,12 +144,19 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
     app.register_blueprint(shell.bp)
     app.register_blueprint(rule_schedules.bp)
 
+    api_paths = {rule.rule for rule in app.url_map.iter_rules() if op_id_for_endpoint(rule.endpoint) is not None}
+    api_path_adapter = Map([Rule(path) for path in api_paths]).bind("localhost")
+
     # 8. The single-page app: hashed assets, anything else that is a file, else index.html
     @app.get("/")
     @app.get("/<path:path>")
     def spa(path: str = "") -> Response:
-        if path.startswith("api/"):
-            raise NotFound()
+        if path == "api" or path.startswith("api/"):
+            try:
+                api_path_adapter.match(f"/{path}")
+            except NotFound:
+                raise NotFound() from None
+            raise MethodNotAllowed()
         if path and (static_root / path).is_file():
             return send_from_directory(static_root, path, max_age=31536000 if path.startswith("assets/") else 0)
         return send_from_directory(static_root, "index.html", max_age=0)
@@ -176,6 +184,10 @@ def create_app(ctx: AppContext, *, use_https: bool, static_dir: Path | None = No
             if exc.code == 404:
                 return api_error(404, "not_found", "err_not_found")
             if exc.code == 405:
+                try:
+                    api_path_adapter.match(request.path)
+                except NotFound:
+                    return api_error(404, "not_found", "err_not_found")
                 return api_error(405, "method_not_allowed", "err_method_not_allowed")
             return api_error(exc.code or 500, "http_error", "err_http_error", params={"status": str(exc.code)})
         ref = uuid.uuid4().hex[:8]

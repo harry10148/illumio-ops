@@ -12,14 +12,14 @@ export type PolicyDecision = ("allowed" | "potentially_blocked" | "blocked" | "u
 export type Severity = ("low" | "medium" | "high" | "critical")
 /**
  * The lateral-movement detectors of spec §6.5.1 and the allowed-traffic anomaly detectors of §6.5.8.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DetectorKind".
  */
 export type DetectorKind = ("fanout" | "new_admin_connection" | "pivot_chain" | "blocked_surge" | "non_admin_group" | "cross_env" | "account_fanout" | "unexpected_initiator" | "peer_deviation" | "volume_surge" | "account_new_source" | "suspicious_tool" | "new_process" | "auth_to_non_dc" | "new_dc_client" | "directory_surge" | "direction_reversal" | "new_pair_port" | "quiet_host_wakes" | "data_staging" | "off_hours")
 /**
  * An event rule fires on the matches of one evaluation (immediate) or on a count within its window.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ThresholdType".
  */
@@ -27,7 +27,7 @@ export type ThresholdType = ("immediate" | "count")
 /**
  * What a system rule watches: the PCE itself, and this product's own collection (5.x's watchdog and
  * data-loss meta-alerts).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SystemCheck".
  */
@@ -76,14 +76,14 @@ export type TamperPattern = ("regular_cycle" | "burst" | "sporadic" | "too_few")
 export type CapabilityState = ("supported" | "unsupported" | "unknown")
 /**
  * An unprotected high-risk service by its recent traffic (spec §6.5.6).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RansomwareTrafficClass".
  */
 export type RansomwareTrafficClass = ("priority" | "safe_to_block" | "suspicious" | "protected" | "unknown")
 /**
  * What a signal-type tamper event did, from its kernel functions (spec §6.6 F4).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "TamperAction".
  */
@@ -91,14 +91,14 @@ export type TamperAction = ("add_rule" | "delete_rule" | "add_chain" | "delete_c
 /**
  * An exposure-graph edge by the reported decision of its newest observation (blocked edges are
  * not in the graph).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "EdgeState".
  */
 export type EdgeState = ("allowed" | "potentially_blocked" | "unknown")
 /**
  * What a detector run can say besides its detections: "no detection" is only ever OK.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DetectorState".
  */
@@ -110,7 +110,7 @@ export type DetectorState = ("ok" | "disabled" | "accumulating" | "no_data" | "c
 export type ReportFormat = ("html" | "xlsx" | "json" | "csv")
 /**
  * Report types (spec §6.5 報表, §6.5.5); 5b and 5c add the 5.x types.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportType".
  */
@@ -122,7 +122,7 @@ export type ReportType = ("lateral_posture" | "new_connections" | "unmanaged_end
 export type ReportStatus = ("queued" | "running" | "done" | "failed")
 /**
  * Rule Hit Count: the PCE report template and the VENs' firewall_settings scopes (spec §6.5 RHC).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RhcState".
  */
@@ -130,14 +130,14 @@ export type RhcState = ("enabled" | "partial" | "disabled" | "unsupported" | "un
 /**
  * What data collection reads (spec §6.4): everything; events plus short-lived traffic for
  * alerts; or no traffic at all (lightweight, the new-install default: flow reports query the PCE on demand).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "CollectionMode".
  */
 export type CollectionMode = ("full" | "alert" | "lightweight")
 /**
  * How a SIEM destination's lines look (spec §6.5 SIEM 轉送).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SiemFormat".
  */
@@ -145,7 +145,7 @@ export type SiemFormat = ("cef" | "json" | "syslog_cef" | "syslog_json" | "cef_p
 /**
  * What a destination receives: PCE audit events, this product's detections and alerts, and (optional) the first
  * time each connection appears in the baseline period. Never traffic records (spec §4.1 goal 4).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SiemSource".
  */
@@ -168,7 +168,7 @@ export type CollectionMode1 = ("full" | "alert" | "lightweight")
 /**
  * The three kinds of management port (spec §6.5.8): remote execution and control, directory and
  * authentication, and databases. Each detector reads the classes it is about.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "PortClass".
  */
@@ -226,7 +226,7 @@ name: string
 /**
  * What a flow condition editor offers (alert rules, the reports filter): the inventory's labels and the PCE
  * objects the last inventory read.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ConditionChoices".
  */
@@ -257,7 +257,7 @@ window_minutes: number
 /**
  * A flow filter without its time window: what an alert rule (and later a saved report section) stores.
  * within() gives the FilterSpec for a window; every field, default and check is FilterSpec's.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "FlowCondition".
  */
@@ -360,7 +360,7 @@ window_minutes: number
 /**
  * severity None: each alert takes its detection's severity (precursor weighting included). exclude: a detection
  * whose source matches, or whose every target does, does not alert (it stays on the lateral page).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "LateralRule".
  */
@@ -444,7 +444,7 @@ rule: (EventRule | TrafficRule | BandwidthRule | VolumeRule | SystemRule | Later
 }
 /**
  * A rule holding alerts back now: the latest moment one of its subjects is let through again.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RuleHold".
  */
@@ -758,7 +758,7 @@ id: number
 }
 /**
  * Who the quarantine button would act on: only a managed workload the inventory holds (spec §4.4).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "QuarantineEligibility".
  */
@@ -827,7 +827,7 @@ timeline: TimelineEntry[]
 }
 /**
  * The period's alerts per severity and how many were marked as known, before the page's filters.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "AlertCounts".
  */
@@ -1078,7 +1078,7 @@ title: string
 }
 /**
  * An analysis segment without its period.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "CustomSegment".
  */
@@ -1130,140 +1130,6 @@ name: string
  */
 export interface SectionRequest {
 request: (FlowRequest | EventRequest)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "EnforcementHost".
- */
-export interface EnforcementHost {
-from_mode: string
-key: string
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "EnforcementApplyRequest".
- */
-export interface EnforcementApplyRequest {
-/**
- * @minItems 1
- * @maxItems 50
- */
-hosts: [EnforcementHost, ...(EnforcementHost)[]]
-target: string
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "FleetResult".
- */
-export interface FleetResult {
-detail: (string | null)
-key: string
-name: (string | null)
-previous: (string | null)
-status: ("ok" | "failed" | "skipped" | "unknown")
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "FleetOutcome".
- */
-export interface FleetOutcome {
-action: ("enforcement" | "traffic_rate")
-batch_id: string
-results: FleetResult[]
-target: (string | null)
-until: (string | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "LabelPick".
- */
-export interface LabelPick {
-key: string
-value: string
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "EnforcementPreviewRequest".
- */
-export interface EnforcementPreviewRequest {
-/**
- * @maxItems 50
- */
-keys?: string[]
-/**
- * @maxItems 8
- */
-labels?: []|[LabelPick]|[LabelPick, LabelPick]|[LabelPick, LabelPick, LabelPick]|[LabelPick, LabelPick, LabelPick, LabelPick]|[LabelPick, LabelPick, LabelPick, LabelPick, LabelPick]|[LabelPick, LabelPick, LabelPick, LabelPick, LabelPick, LabelPick]|[LabelPick, LabelPick, LabelPick, LabelPick, LabelPick, LabelPick, LabelPick]|[LabelPick, LabelPick, LabelPick, LabelPick, LabelPick, LabelPick, LabelPick, LabelPick]
-target: string
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "FleetTarget".
- */
-export interface FleetTarget {
-current: (string | null)
-key: string
-name: (string | null)
-ok: boolean
-online: (("online" | "lost_24h" | "lost_48h" | "long_offline" | "unknown") | null)
-reason: (("unmanaged" | "not_in_inventory" | "same_mode" | "not_forward" | "mode_changed") | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "HostBlocks".
- */
-export interface HostBlocks {
-inbound: number
-key: string
-top_sources: RankedSource[]
-would_block: (number | null)
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "RankedSource".
- */
-export interface RankedSource {
-connections: number
-key: string
-name: string
-}
-/**
- * What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing
- * silent).
- * 
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "PullInfo".
- */
-export interface PullInfo {
-archive_days?: number
-archive_first?: (string | null)
-archive_last?: (string | null)
-capped: boolean
-end: string
-missing_days?: string[]
-read_at: string
-rows: number
-source?: ("pce" | "archive")
-start: string
-truncated_windows: number
-unread_from: (string | null)
-unreadable?: number
-}
-/**
- * This interface was referenced by `ContractRoot`'s JSON-Schema
- * via the `definition` "EnforcementPreview".
- */
-export interface EnforcementPreview {
-basis: ("connections" | "none" | "deny_rules")
-blocks: HostBlocks[]
-gaps: number
-pulled: (PullInfo | null)
-target: string
-targets: FleetTarget[]
-truncated: boolean
-window_end: string
-window_start: string
-write_key: boolean
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
@@ -1370,6 +1236,40 @@ keys: [string, ...(string)[]]
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FleetResult".
+ */
+export interface FleetResult {
+detail: (string | null)
+key: string
+name: (string | null)
+previous: (string | null)
+status: ("ok" | "failed" | "skipped" | "unknown")
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FleetOutcome".
+ */
+export interface FleetOutcome {
+action: ("enforcement" | "traffic_rate")
+batch_id: string
+results: FleetResult[]
+target: (string | null)
+until: (string | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "FleetTarget".
+ */
+export interface FleetTarget {
+current: (string | null)
+key: string
+name: (string | null)
+ok: boolean
+online: (("online" | "lost_24h" | "lost_48h" | "long_offline" | "unknown") | null)
+reason: (("unmanaged" | "not_in_inventory") | null)
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RateCheck".
  */
 export interface RateCheck {
@@ -1424,7 +1324,7 @@ stale: boolean
 }
 /**
  * An operator's "known cause" for a host's or a pattern's tampering (spec §6.5.4 step 5).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "Annotation".
  */
@@ -1608,7 +1508,7 @@ summary: string
 /**
  * What the host usually does (spec §5.1): its top destinations, initiating processes and accounts by connections
  * over the last USUAL_DAYS of daily rollups.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "HostUsual".
  */
@@ -1747,7 +1647,7 @@ unknown_edges: number
 }
 /**
  * A host with an unprotected, listening high-risk service (spec §6.5.6): a place to land.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "Foothold".
  */
@@ -1796,10 +1696,32 @@ subject_name: string
 title_key: string
 }
 /**
+ * What was read for this answer, from the PCE or from the archive: said on the page (anti-goal: nothing
+ * silent).
+ *
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "PullInfo".
+ */
+export interface PullInfo {
+archive_days?: number
+archive_first?: (string | null)
+archive_last?: (string | null)
+capped: boolean
+end: string
+missing_days?: string[]
+read_at: string
+rows: number
+source?: ("pce" | "archive")
+start: string
+truncated_windows: number
+unread_from: (string | null)
+unreadable?: number
+}
+/**
  * The attack surface at the top of the detection page (UI redesign spec §4.2), each with the last stored day
  * before the result's own day for comparison (None: no such day). A number that cannot be computed is None with
  * its reason, never 0.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SurfaceNumbers".
  */
@@ -1879,7 +1801,7 @@ with_user: number
 /**
  * Who initiates management-port connections (spec §6.5.7), for the kept traffic of the observation period.
  * state: lightweight keeps no traffic and collection_off collects none: the rankings need stored traffic.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "LateralInitiators".
  */
@@ -1946,7 +1868,7 @@ window: [unknown, unknown]
 /**
  * How many of the matching connections carry each optional field (spec §6.5.7: process and user
  * are on few flows, bytes on fewer).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "FieldCoverage".
  */
@@ -2136,7 +2058,7 @@ state: ("active" | "disabled" | "draft_only" | "none")
 /**
  * One place a level is referred to. Actors and services are hrefs ("all_workloads" for every workload,
  * "<port>/<proto>" for a port written into the rule); the service names them.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "QuarantineRuleRef".
  */
@@ -2187,7 +2109,7 @@ keys: [string, ...(string)[]]
 /**
  * A built-in report run on a schedule: its type and parameters, not its output (spec §6.3). The page edits
  * these; the server assigns the id (ReportSchedule).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "ReportScheduleFields".
  */
@@ -2631,7 +2553,7 @@ write_key: boolean
 /**
  * The page's copy of a destination: a masked token is not a token, so what is saved or sent is validated as
  * SiemDestination after the saved token is merged back in.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SiemDestinationInput".
  */
@@ -2672,7 +2594,7 @@ ok: boolean
 /**
  * One DLQ line in full: the line exactly as it was formatted for the destination (the source row may be gone,
  * and the line is what a resend sends).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DlqDetail".
  */
@@ -2719,7 +2641,7 @@ total: number
 /**
  * ids: those lines; none: every line of destination_id (or of every destination) — with older_than_days, those
  * moved to the DLQ more than that many days ago (purge only).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DlqAction".
  */
@@ -3241,7 +3163,7 @@ value: string
 /**
  * Lateral-movement analysis (spec §6.5.1): which ports count as management, which hosts matter,
  * and the detectors' thresholds.
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "LateralSettings".
  */
@@ -3658,7 +3580,7 @@ timestamp: string
 }
 /**
  * The ranking's peer-precedent column (services/workbench_peer.py).
- * 
+ *
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "PeerPrecedent".
  */
@@ -3696,7 +3618,7 @@ pulled: (PullInfo | null)
 result: SegmentResult
 }
 
-export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.pack_rules" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.mark_seen" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.enforcement_apply" | "fleet.enforcement_preview" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.initiators" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.current" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
+export type OpId = "alert_rules.condition_choices" | "alert_rules.create" | "alert_rules.delete" | "alert_rules.evaluate_now" | "alert_rules.event_catalog" | "alert_rules.list" | "alert_rules.pack" | "alert_rules.pack_rules" | "alert_rules.preview" | "alert_rules.reset_state" | "alert_rules.retention" | "alert_rules.test" | "alert_rules.test_candidates" | "alert_rules.update" | "alerts.evidence" | "alerts.explain" | "alerts.get" | "alerts.list" | "alerts.mark_known" | "alerts.mark_seen" | "alerts.note_add" | "auth.csrf" | "auth.login" | "auth.logout" | "auth.me" | "auth.password" | "auth.username" | "custom_reports.add_section" | "custom_reports.delete" | "custom_reports.list" | "custom_reports.remove_section" | "custom_reports.rename" | "custom_reports.section_request" | "fleet.history" | "fleet.hosts" | "fleet.overview" | "fleet.rate_apply" | "fleet.rate_check" | "home.focus" | "hosts.profile" | "hosts.ransomware_allows" | "hosts.search" | "hosts.tamper_note_add" | "hosts.tamper_note_remove" | "i18n.dictionary" | "lateral.compute" | "lateral.initiators" | "lateral.simulate" | "lateral.view" | "quarantine.apply" | "quarantine.current" | "quarantine.history" | "quarantine.preview" | "quarantine.remove" | "report_schedules.create" | "report_schedules.delete" | "report_schedules.list" | "report_schedules.run_now" | "report_schedules.update" | "reports.bulk_delete" | "reports.catalog" | "reports.delete" | "reports.generate" | "reports.get" | "reports.list" | "rhc.enable" | "rhc.status" | "rule_schedules.check" | "rule_schedules.create" | "rule_schedules.delete" | "rule_schedules.list" | "rule_schedules.pause" | "rule_schedules.resume" | "rule_schedules.rulesets" | "rule_schedules.runs" | "rule_schedules.targets" | "rule_schedules.update" | "shell.status" | "siem.destination.test" | "siem.dlq.get" | "siem.dlq.list" | "siem.dlq.purge" | "siem.dlq.resend" | "siem.settings.get" | "siem.settings.update" | "siem.status" | "system.channels.get" | "system.channels.test" | "system.channels.test_all" | "system.channels.update" | "system.collection.backfill" | "system.collection.clear" | "system.collection.data" | "system.collection.get" | "system.collection.retention_run" | "system.collection.status" | "system.collection.update" | "system.display.get" | "system.display.update" | "system.jobs.list" | "system.lateral.get" | "system.lateral.known" | "system.lateral.known_delete" | "system.lateral.update" | "system.logs.query" | "system.pce.get" | "system.pce.latest" | "system.pce.probe" | "system.pce.update" | "system.reports.get" | "system.reports.update" | "system.security.get" | "system.security.update" | "system.tls.csr" | "system.tls.import" | "system.tls.renew" | "system.tls.status" | "system.tls.update" | "workbench.dimension" | "workbench.from_alert" | "workbench.meta" | "workbench.predicted" | "workbench.run";
 
 export interface Requests {
   "alert_rules.condition_choices": undefined;
@@ -3732,8 +3654,6 @@ export interface Requests {
   "custom_reports.remove_section": Empty;
   "custom_reports.rename": CustomRename;
   "custom_reports.section_request": undefined;
-  "fleet.enforcement_apply": EnforcementApplyRequest;
-  "fleet.enforcement_preview": EnforcementPreviewRequest;
   "fleet.history": undefined;
   "fleet.hosts": undefined;
   "fleet.overview": undefined;
@@ -3860,8 +3780,6 @@ export interface Responses {
   "custom_reports.remove_section": CustomReport;
   "custom_reports.rename": CustomReport;
   "custom_reports.section_request": SectionRequest;
-  "fleet.enforcement_apply": FleetOutcome;
-  "fleet.enforcement_preview": EnforcementPreview;
   "fleet.history": FleetHistory;
   "fleet.hosts": FleetHostList;
   "fleet.overview": FleetOverview;
@@ -3988,8 +3906,6 @@ export const OPERATIONS = {
   "custom_reports.remove_section": { method: "POST", path: "/api/custom-reports/<int:report_id>/sections/<int:index>/remove" },
   "custom_reports.rename": { method: "POST", path: "/api/custom-reports/<int:report_id>/rename" },
   "custom_reports.section_request": { method: "GET", path: "/api/custom-reports/<int:report_id>/sections/<int:index>/request" },
-  "fleet.enforcement_apply": { method: "POST", path: "/api/fleet/enforcement/apply" },
-  "fleet.enforcement_preview": { method: "POST", path: "/api/fleet/enforcement/preview" },
   "fleet.history": { method: "GET", path: "/api/fleet/actions" },
   "fleet.hosts": { method: "GET", path: "/api/fleet/hosts" },
   "fleet.overview": { method: "GET", path: "/api/fleet/overview" },

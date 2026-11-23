@@ -1,15 +1,9 @@
-// VEN fleet (spec §6.5 「VEN 總覽」「VEN enforcement 推進」「心跳加速」, deferred to v6.1 and built now): the managed
-// hosts the inventory holds, counted and listed; the chosen ones moved forward to a target mode, or asked to report
-// traffic faster, through the write key after a preview; and what was done.
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+// VEN fleet overview, filters, traffic reporting rate and action history.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
-import type {
-  EnforcementPreview, EnforcementPreviewRequest, FleetAction, FleetHost, FleetHostList, FleetOutcome, FleetOverview, FleetTarget, HostHit,
-  LabelPick,
-  RateCheck, Tally,
-} from "../../api/generated";
+import type { FleetAction, FleetHost, FleetHostList, FleetOutcome, FleetOverview, FleetTarget, HostHit, RateCheck, Tally } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { HostLink } from "../../components/HostLink";
 import { DataTable, Disclosure, KpiStrip, PageHead, Panel, Segmented, Tag } from "../../components/ui";
@@ -17,11 +11,9 @@ import { t, useLang } from "../../i18n";
 import { modeWord as plainMode } from "../../terms";
 import { registerNav } from "../../shell/nav";
 import { word } from "../alerts/common";
-import { Pulled } from "../workbench/Workbench";
 
 const MAX = 50;
 const MODES = ["idle", "visibility_only", "selective", "full"] as const;
-const TARGETS = ["visibility_only", "selective", "full"] as const;
 const ONLINE = ["online", "lost_24h", "lost_48h", "long_offline", "unknown"] as const;
 // Literal maps: i18n keys are never built from data.
 const MODE_KEYS: Record<string, string> = {
@@ -38,14 +30,14 @@ const PROBLEM_KEYS: Record<string, string> = {
 };
 const REASON_KEYS: Record<string, string> = {
   unmanaged: "fleet_reason_unmanaged", not_in_inventory: "fleet_reason_not_in_inventory",
-  same_mode: "fleet_reason_same_mode", not_forward: "fleet_reason_not_forward", mode_changed: "fleet_reason_mode_changed",
 };
 const STATUS_KEYS: Record<string, string> = {
   ok: "fleet_status_ok", failed: "fleet_status_failed", skipped: "fleet_status_skipped",
   unknown: "fleet_status_unknown", refused: "fleet_status_refused", pending: "fleet_status_pending",
 };
 const DETAIL_KEYS: Record<string, string> = {
-  ...REASON_KEYS, pce_changed: "fleet_detail_pce_changed", no_write_key: "fleet_detail_no_write_key",
+  ...REASON_KEYS, same_mode: "fleet_reason_same_mode", not_forward: "fleet_reason_not_forward",
+  mode_changed: "fleet_reason_mode_changed", pce_changed: "fleet_detail_pce_changed", no_write_key: "fleet_detail_no_write_key",
 };
 const ACTION_KEYS: Record<string, string> = {
   enforcement: "fleet_action_enforcement", traffic_rate: "fleet_action_traffic_rate",
@@ -82,9 +74,6 @@ function TallyTable({ title, rows, wordOf, role }: {
 function Outcome({ outcome, lang }: { outcome: FleetOutcome; lang: string }) {
   return (
     <div className="stack" data-role="fleet-outcome">
-      {outcome.action === "enforcement" && outcome.results.some((r) => r.status === "ok") && (
-        <p className="hint">{t("fleet_enf_heartbeat")}</p>
-      )}
       {outcome.until && <p className="hint" data-role="fleet-rate-until">{t("fleet_rate_until", { at: formatTime(outcome.until, lang) })}</p>}
       <div className="table-wrap">
         <table className="table">
@@ -120,164 +109,6 @@ function TargetsTable({ targets }: { targets: FleetTarget[] }) {
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function Blocks({ prev }: { prev: EnforcementPreview }) {
-  if (prev.basis === "none") return <p className="hint" data-role="fleet-blocks-none">{t("fleet_blocks_none")}</p>;
-  if (prev.basis === "deny_rules") return <p className="notice" data-role="fleet-blocks-selective">{t("fleet_blocks_selective")}</p>;
-  const names = new Map(prev.targets.map((x) => [x.key, hostName(x.name, x.key)]));
-  return (
-    <div className="stack" data-role="fleet-blocks">
-      <h3>{t("fleet_blocks_title")}</h3>
-      <p className="hint">{t("fleet_blocks_rule")}</p>
-      {prev.pulled && <Pulled info={prev.pulled} />}
-      {prev.gaps > 0 && <p className="notice">{t("wb_gaps", { n: String(prev.gaps) })}</p>}
-      {prev.truncated && <p className="notice">{t("fleet_truncated")}</p>}
-      <div className="table-wrap">
-        <table className="table">
-          <thead><tr><th>{t("fleet_col_host")}</th><th data-kind="num">{t("fleet_col_inbound")}</th>
-            <th data-kind="num">{t("fleet_col_would_block")}</th><th>{t("fleet_col_top_sources")}</th></tr></thead>
-          <tbody>
-            {prev.blocks.map((b) => (
-              <tr key={b.key} data-host={b.key}>
-                <td>{names.get(b.key) ?? b.key}</td>
-                <td data-kind="num">{b.inbound.toLocaleString()}</td>
-                <td data-kind="num" data-role="fleet-would-block">{b.would_block === null ? "—" : b.would_block.toLocaleString()}</td>
-                <td>{b.top_sources.map((s) => `${s.name}（${s.connections.toLocaleString()}）`).join("、") || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function EnforcementDialog({ chosen, envKey, onClose, onDone }: {
-  chosen: FleetHost[]; envKey: string; onClose: () => void; onDone: () => void;
-}) {
-  const lang = useLang();
-  const [target, setTarget] = useState<string>("full");
-  const [by, setBy] = useState<"hosts" | "labels">(chosen.length ? "hosts" : "labels");
-  const [picks, setPicks] = useState<LabelPick[]>([{ key: envKey, value: "" }]);
-  const [asked, setAsked] = useState<string | null>(chosen.length ? "hosts" : null);
-  const [prev, setPrev] = useState<EnforcementPreview | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [ack, setAck] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [outcome, setOutcome] = useState<FleetOutcome | null>(null);
-  const keys = JSON.stringify(chosen.map((h) => h.key));
-
-  useEffect(() => {
-    if (asked === null) return;
-    let live = true;  // a slower answer for the target left behind must not replace this one
-    setPrev(null);
-    setError(null);
-    setAck(false);
-    const query = asked === "hosts"
-      ? { target, keys: JSON.parse(keys) as string[] }
-      : { target, labels: JSON.parse(asked) as NonNullable<EnforcementPreviewRequest["labels"]> };
-    void call("fleet.enforcement_preview", query).then((env) => {
-      if (!live) return;
-      if (env.ok && env.data) setPrev(env.data);
-      else setError(env.error);
-    });
-    return () => { live = false; };
-  }, [asked, keys, target]);
-
-  function find(e: FormEvent) {
-    e.preventDefault();
-    const usable = picks.filter((p) => p.key.trim() && p.value.trim()).map((p) => ({ key: p.key.trim(), value: p.value.trim() }));
-    if (usable.length) setAsked(JSON.stringify(usable));
-  }
-
-  async function apply() {
-    if (!prev) return;
-    setBusy(true);
-    setError(null);
-    const hosts = prev.targets.filter((x) => x.ok && x.current).map((x) => ({ key: x.key, from_mode: x.current as string }));
-    const env = await call("fleet.enforcement_apply", { target: prev.target, hosts: nonEmpty(hosts) });
-    setBusy(false);
-    if (env.ok && env.data) {
-      setOutcome(env.data);
-      onDone();
-    } else {
-      setError(env.error);
-    }
-  }
-
-  const usable = prev?.targets.filter((x) => x.ok) ?? [];
-  const canApply = !!prev && prev.target === target && prev.write_key && usable.length > 0 && ack && !busy && !outcome;
-  return (
-    <div className="card stack" data-role="fleet-enforce" role="dialog" aria-label={t("fleet_enf_title")}>
-      <div className="row">
-        <h2>{t("fleet_enf_title")}</h2>
-        <button type="button" className="btn-quiet" onClick={onClose}>{t("q_close")}</button>
-      </div>
-      <p className="hint">{t("fleet_enf_intro")}</p>
-      {prev && !prev.write_key && <p className="notice" data-role="fleet-no-write-key">{t("fleet_no_write_key")}</p>}
-      <div className="row">
-        <label>
-          {t("fleet_enf_target")}
-          <select name="target" value={target} disabled={!!outcome} onChange={(e) => setTarget(e.target.value)}>
-            {TARGETS.map((m) => <option key={m} value={m}>{modeWord(m)}</option>)}
-          </select>
-        </label>
-        <label className="row">
-          <input type="radio" name="by" checked={by === "hosts"} disabled={!chosen.length || !!outcome}
-                 onChange={() => { setBy("hosts"); setAsked("hosts"); }} />
-          {t("fleet_enf_by_hosts", { n: String(chosen.length) })}
-        </label>
-        <label className="row">
-          <input type="radio" name="by" checked={by === "labels"} disabled={!!outcome} onChange={() => setBy("labels")} />
-          {t("fleet_enf_by_labels")}
-        </label>
-      </div>
-      {by === "labels" && !outcome && (
-        <form className="stack" onSubmit={find} data-role="fleet-labels">
-          <p className="hint">{t("fleet_enf_labels_hint", { max: String(MAX) })}</p>
-          {picks.map((p, i) => (
-            <div className="row" key={i}>
-              <input aria-label={t("fleet_enf_label_key")} placeholder={t("fleet_enf_label_key")} value={p.key}
-                     onChange={(e) => setPicks(picks.map((x, j) => (j === i ? { ...x, key: e.target.value } : x)))} />
-              <input aria-label={t("fleet_enf_label_value")} placeholder={t("fleet_enf_label_value")} value={p.value}
-                     name={`label-value-${i}`}
-                     onChange={(e) => setPicks(picks.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
-            </div>
-          ))}
-          <div className="row">
-            <button type="button" className="btn-quiet" disabled={picks.length >= 8}
-                    onClick={() => setPicks([...picks, { key: "", value: "" }])}>{t("fleet_enf_add_label")}</button>
-            <button type="submit" className="btn-quiet" data-role="fleet-find">{t("fleet_enf_find")}</button>
-          </div>
-        </form>
-      )}
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
-      {asked !== null && !prev && !error && <p className="muted">{t("loading")}</p>}
-      {prev && (
-        <>
-          <TargetsTable targets={prev.targets} />
-          {prev.targets.length === 0 && <p className="hint">{t("fleet_enf_no_match")}</p>}
-          {usable.length > 0 && <Blocks prev={prev} />}
-          {!outcome && usable.length > 0 && (
-            <label className="row" data-role="fleet-ack">
-              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-              {/* what the preview showed is what is confirmed: the connections Full blocks, Selective's Deny Rules, or nothing */}
-              {prev.basis === "connections" ? t("fleet_enf_confirm", { n: String(usable.length), mode: modeWord(prev.target) })
-                : prev.basis === "deny_rules" ? t("fleet_enf_confirm_deny_rules", { n: String(usable.length), mode: modeWord(prev.target) })
-                : t("fleet_enf_confirm_none", { n: String(usable.length), mode: modeWord(prev.target) })}
-            </label>
-          )}
-          {!outcome && (
-            <button type="button" className="btn-primary" disabled={!canApply} onClick={() => void apply()} data-role="fleet-apply">
-              {busy ? t("fleet_applying") : t("fleet_enf_apply", { n: String(usable.length), mode: modeWord(prev.target) })}
-            </button>
-          )}
-        </>
-      )}
-      {outcome && <Outcome outcome={outcome} lang={lang} />}
     </div>
   );
 }
@@ -377,7 +208,7 @@ function Fleet() {
   // a searched address the inventory does not hold: offered as the unmanaged address it then is
   const [loose, setLoose] = useState<HostHit[]>([]);
   const [chosen, setChosen] = useState<Map<string, FleetHost>>(new Map());
-  const [open, setOpen] = useState<"enforce" | "rate" | null>(null);
+  const [open, setOpen] = useState<"rate" | null>(null);
 
   const load = useCallback(async () => {
     const [o, h] = await Promise.all([call("fleet.overview"), call("fleet.history")]);
@@ -487,13 +318,8 @@ function Fleet() {
           <span data-role="fleet-chosen">{t("fleet_chosen", { n: String(chosen.size), max: String(MAX) })}</span>
           <button type="button" className="btn-quiet" onClick={chooseShown}>{t("fleet_choose_shown")}</button>
           <button type="button" className="btn-quiet" disabled={!chosen.size} onClick={() => setChosen(new Map())}>{t("fleet_clear")}</button>
-          <button type="button" className="btn-primary" data-role="fleet-open-enforce" onClick={() => setOpen("enforce")}>{t("fleet_btn_enforce")}</button>
           <button type="button" className="btn-quiet" data-role="fleet-open-rate" disabled={!chosen.size} onClick={() => setOpen("rate")}>{t("fleet_btn_rate")}</button>
         </div>
-        {open === "enforce" && (
-          <EnforcementDialog key={JSON.stringify([...chosen.keys()])} chosen={picked} envKey={o?.env_key ?? "env"}
-                             onClose={() => setOpen(null)} onDone={refresh} />
-        )}
         {open === "rate" && picked.length > 0 && (
           <RateDialog key={JSON.stringify([...chosen.keys()])} chosen={picked} onClose={() => setOpen(null)} onDone={refresh} />
         )}

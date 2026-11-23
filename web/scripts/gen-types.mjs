@@ -62,6 +62,8 @@ let types = await compile(root, "ContractRoot", {
   format: false,
 });
 types = types.replace(/export interface ContractRoot \{\s*\}\n?/, "");
+// Keep empty JSDoc lines readable without emitting trailing whitespace (git diff --check).
+types = types.replace(/^[ \t]*\* [ \t]*$/gm, " *");
 
 const q = (s) => JSON.stringify(s);
 const lines = [

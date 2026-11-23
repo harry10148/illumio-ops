@@ -1,10 +1,10 @@
-"""VEN fleet in a browser: the counts and the filtered list from the inventory, a chosen host moved to Full only after
-the preview (what Full would block) and the confirmation, the traffic update rate increased, and both on record."""
+"""VEN fleet filters, traffic update rate, and legacy enforcement history in a browser."""
 from datetime import UTC, datetime, timedelta
 
 from playwright.sync_api import expect
 
 from illumio_ops.domain.values import DataOrigin
+from illumio_ops.store import fleet_actions as action_store
 from illumio_ops.store.flowdb import labels as label_store
 from illumio_ops.store.flowdb import workloads
 from illumio_ops.store.flowdb.db import db_time
@@ -44,7 +44,7 @@ def _setup(live_app, fake_pce):
     fake_pce.set(f"{ORG}/workloads/set_flow_reporting_frequency", 204)
 
 
-def test_overview_filter_progress_and_rate(context, live_app, fake_pce):
+def test_overview_filter_and_rate(context, live_app, fake_pce):
     _setup(live_app, fake_pce)
     page = context.new_page()
     sign_in(page, live_app.url)
@@ -56,37 +56,45 @@ def test_overview_filter_progress_and_rate(context, live_app, fake_pce):
     fleet.locator("select[name=env]").select_option("Prod")
     expect(fleet.locator("[data-role=fleet-list] tbody tr")).to_have_count(1)
     fleet.locator("[data-role=fleet-list] tbody tr input[type=checkbox]").check()
-
-    fleet.locator("[data-role=fleet-open-enforce]").click()
-    dialog = page.locator("[data-role=fleet-enforce]")
-    expect(dialog.locator("[data-role=fleet-would-block]")).to_have_text("4")
-    # the sentence to confirm names what the preview showed: Full's connections, Selective's Deny Rules
-    ack = dialog.locator("[data-role=fleet-ack]")
-    expect(ack).to_contain_text("the Potentially Blocked connections")
-    dialog.locator("select[name=target]").select_option("selective")
-    expect(dialog.locator("[data-role=fleet-blocks-selective]")).to_be_visible()
-    expect(ack).to_contain_text("checked in the PCE the Deny Rules that apply to these hosts")
-    expect(ack).not_to_contain_text("Potentially Blocked")
-    dialog.locator("select[name=target]").select_option("full")
-    expect(dialog.locator("[data-role=fleet-would-block]")).to_have_text("4")
-    expect(ack).to_contain_text("the Potentially Blocked connections")
-    apply = dialog.locator("[data-role=fleet-apply]")
-    expect(apply).to_be_disabled()  # not before the confirmation
-    assert f"/api/v2{DB}" not in fake_pce.calls  # nothing read or written before confirming
-    dialog.locator("[data-role=fleet-ack] input").check()
-    apply.click()
-    expect(dialog.locator("[data-role=fleet-outcome] tr[data-status=ok]")).to_have_count(1)
-    assert fake_pce.calls.count(f"/api/v2{DB}") == 2  # read right before the write, then written
-    assert f"/api/v2{WEB}" not in fake_pce.calls  # not chosen: never touched
-    dialog.locator("button.btn-quiet").first.click()  # close
+    expect(fleet.locator("[data-role=fleet-open-enforce]")).to_have_count(0)
 
     fleet.locator("[data-role=fleet-open-rate]").click()
     rate = page.locator("[data-role=fleet-rate]")
     rate.locator("[data-role=fleet-rate-apply]").click()
     expect(rate.locator("[data-role=fleet-rate-until]")).to_have_count(1)
     assert f"{ORG}/workloads/set_flow_reporting_frequency" in fake_pce.calls
-    expect(fleet.locator("[data-role=fleet-history] tbody tr")).to_have_count(2)
-    expect(fleet.locator("[data-role=fleet-history] [data-result=ok]")).to_have_count(2)
+    expect(fleet.locator("[data-role=fleet-history] tbody tr")).to_have_count(1)
+    expect(fleet.locator("[data-role=fleet-history] [data-result=ok]")).to_have_count(1)
+
+
+def test_removed_enforcement_surface_keeps_legacy_history(context, live_app, fake_pce):
+    _setup(live_app, fake_pce)
+    ctx = live_app.ctx
+    pce = ctx.settings.current().pce
+    with ctx.db() as conn:
+        action_store.add(conn, pce_url=pce.url, org_id=pce.org_id, batch_id="old-enforcement", at=datetime.now(UTC),
+                         by="admin", action="enforcement", workload_href=DB, hostname="db",
+                         previous_mode="visibility_only", target_mode="full", result="ok", detail=None)
+
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(f"{live_app.url}/fleet")
+    fleet = page.locator("[data-role=fleet]")
+    expect(fleet.locator("[data-role=fleet-open-enforce]")).to_have_count(0)
+    status = page.evaluate("""async () => {
+      const csrf = await fetch('/api/auth/csrf').then((response) => response.json());
+      const response = await fetch('/api/fleet/enforcement/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf.data.csrf_token },
+        body: JSON.stringify({ target: 'full', keys: ['/orgs/1/workloads/db'] }),
+      });
+      return response.status;
+    }""")
+    assert status == 404
+    history = fleet.locator("[data-role=fleet-history]")
+    row = history.locator("tbody tr")
+    expect(row).to_have_count(1)
+    expect(row.locator("td").nth(3)).to_contain_text("Enforcement mode：Visibility Only → Full")
 
 
 def test_a_slow_answer_to_an_earlier_filter_does_not_replace_the_newer_list(context, live_app, fake_pce):

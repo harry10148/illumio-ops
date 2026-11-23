@@ -88,12 +88,6 @@ def walk(page, base_url: str, paths=PATHS) -> dict[str, list[str]]:
     return found
 
 
-def _fleet_enforce(page):
-    page.locator("[data-role=fleet-list] tbody input[type=checkbox]").first.check()
-    page.click("[data-role=fleet-open-enforce]")
-    page.wait_for_selector("[data-role=fleet-enforce]")
-
-
 def _fleet_rate(page):
     page.locator("[data-role=fleet-list] tbody input[type=checkbox]").first.check()
     page.click("[data-role=fleet-open-rate]")
@@ -122,7 +116,7 @@ def _schedule_editor(page):
 
 # what a page shows only after something is pressed: opened, never submitted. (The new rule schedule pane, the
 # channel forms and the rule editor are on their pages as they load, so the walk already covers them.)
-STATES = (("/fleet", _fleet_enforce), ("/fleet", _fleet_rate), (f"/hosts?key={fleet_e2e.DB}", _quarantine),
+STATES = (("/fleet", _fleet_rate), (f"/hosts?key={fleet_e2e.DB}", _quarantine),
           ("/reports", _generate), ("/reports?tab=schedules", _schedule_editor), ("/investigate", _save_section))
 
 
