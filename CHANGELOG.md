@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.15.2] - 2026-11-24
+
+### Fixed
+
+- Reports: the settings to make a report opened inside its card and spread onto the next one. They open in a panel as
+  wide as the page after the card's row; the optional filter is folded until it holds something.
+- Reports: a produced report is titled by its kind, with when it was made under it; the conclusion follows in small
+  print. The status label no longer wraps.
+
 ## [6.15.1] - 2026-11-23
 
 ### Fixed
