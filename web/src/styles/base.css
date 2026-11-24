@@ -518,11 +518,14 @@ input[type=date] { justify-self: start; width: 11em; max-width: 100%; }
 .rpt-card strong { font-family: var(--font-ui); font-weight: 600; }
 /* every template card keeps room for three lines of description, so the cards of a row start and end level */
 .rpt-card > div:first-child > .hint { min-height: 3lh; }
-.rpt-card[data-open="true"] { outline: 2px solid var(--ink); outline-offset: -1px; }
+/* --ink exists only under [data-tone]; the open card is marked in the accent colour */
+.rpt-card[data-open="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 /* the settings to make a report: a row of their own, as wide as the grid, after the clicked card's row */
 .rpt-generate { grid-column: 1 / -1; padding: var(--space-5) var(--space-6); }
 .rpt-generate-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-4); }
-.rpt-generate-head h3 { margin: 0; }
+.rpt-generate { border-top: 2px solid var(--accent); }
+/* the panel title is a title, not the eyebrow that .card h3 gives every other card heading */
+.rpt-generate-head h3 { margin: 0; font-size: var(--fs-lead); letter-spacing: normal; text-transform: none; color: var(--text-1); }
 .rpt-row-title strong { font-family: var(--font-ui); font-weight: 600; }
 
 /* Lateral movement: the three initiator rankings side by side, one column when narrow. A long account or process

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.15.3] - 2026-11-24
+
+### Fixed
+
+- Reports: the card whose settings are open was meant to be outlined, but the outline named a colour that is not set
+  there, so nothing was drawn. It is marked in the accent colour, and the settings panel carries the same colour on top.
+- Reports: the settings panel's title was set as a small capitalised label; it is set as a title.
+
 ## [6.15.2] - 2026-11-24
 
 ### Fixed

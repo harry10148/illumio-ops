@@ -413,6 +413,17 @@ def test_generate_settings_open_in_a_full_width_panel_after_the_cards_row(contex
         return {full: Math.abs(r.width - g.width) < 2, below: row.every((b) => r.top >= b.bottom),
                 page: document.documentElement.scrollWidth <= document.documentElement.clientWidth}; }""")
     assert geo == {"full": True, "below": True, "page": True}
+    # the clicked card is marked in the accent colour, the others are not; the panel title reads as a title
+    look = panel.evaluate("""(p) => {
+        const probe = document.createElement('i'); probe.style.color = 'var(--accent)'; document.body.append(probe);
+        const accent = getComputedStyle(probe).color; probe.remove();
+        const mark = (e) => { const s = getComputedStyle(e);
+          return (s.outlineStyle !== 'none' && s.outlineColor === accent) || s.boxShadow.includes(accent); };
+        const others = [...document.querySelectorAll('.rpt-card:not([data-open=true])')];
+        const h = getComputedStyle(p.querySelector('h3'));
+        return {open: mark(document.querySelector('[data-report-type=traffic]')), others: others.some(mark),
+                size: parseFloat(h.fontSize) >= 17, upper: h.textTransform}; }""")
+    assert look == {"open": True, "others": False, "size": True, "upper": "none"}
     # the optional filter is folded; period, language and formats come first
     assert not panel.locator("[data-role=report-filter] details").first.evaluate("(d) => d.open")
     expect(panel.locator("select[name=lookback_days]")).to_be_visible()
