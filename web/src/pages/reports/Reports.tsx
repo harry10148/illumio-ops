@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
@@ -168,51 +168,90 @@ function CatalogView({ catalog, onGenerated }: { catalog: Catalog; onGenerated: 
       {TIERS.filter((tier) => catalog.entries.some((e) => e.tier === tier)).map((tier) => (
         <section key={tier} className="rpt-tier" data-tier={tier}>
           <h2>{word(TIER_KEYS, tier)}</h2>
-          <div className="rpt-grid">
-          {tierEntries(catalog, tier).map((e) => (
-            <div key={e.report_type} className="card stack rpt-card" data-report-type={e.report_type}
-                 data-available={String(e.available)}>
-              <div>
-                <div className="rpt-card-head">
-                  <strong>{word(TYPE_KEYS, e.report_type)}</strong>
-                  <span data-role="rpt-group"><Tag tone="muted">{word(UI_GROUP_KEYS, e.ui_group)}</Tag></span>
-                </div>
-                <div className="hint">{word(TYPE_DESC_KEYS, e.report_type)}</div>
-              </div>
-              <div className="row">
-                {e.mode === "on_demand" &&
-                  <Tag tone="muted" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</Tag>}
-                <span className="hint" data-role="rpt-counts">
-                  {t("rpt_card_counts", { schedules: String(e.schedules), copies: String(e.copies) })}
-                </span>
-              </div>
-              {!e.available && e.reason_key && (
-                <div className="notice" data-role="unavailable">
-                  {t(e.reason_key)}{" "}
-                  <Link to="/system/collection">{t("gui_reports_collection_link")}</Link>
-                </div>
-              )}
-              {e.report_type !== "custom" && (
-                <div className="row">
-                  <button type="button" className="btn-quiet" disabled={!e.available}
-                    onClick={() => setOpen(open === e.report_type ? null : e.report_type)}>
-                    {t("gui_reports_generate_open")}
-                  </button>
-                  <Link to="/reports?tab=schedules" className="btn-text">{t("rpt_schedule_link")}</Link>
-                </div>
-              )}
-              {e.report_type === "custom" && (
-                <CustomReports generate={(customId, done) => (
-                  <GenerateForm entry={e} catalog={catalog} customId={customId} onDone={() => { done(); onGenerated(); }} />
-                )} />
-              )}
-              {open === e.report_type && e.report_type !== "custom" && (
-                <GenerateForm entry={e} catalog={catalog} onDone={() => { setOpen(null); onGenerated(); }} />
-              )}
-            </div>
-          ))}
-          </div>
+          <TierGrid entries={tierEntries(catalog, tier)} catalog={catalog} open={open} setOpen={setOpen}
+                    onGenerated={onGenerated} />
         </section>
+      ))}
+    </div>
+  );
+}
+
+/** One tier's cards. The settings to make a report open in a panel as wide as the page, after the last card of the
+ * clicked card's row: inside a 260px card the filter's fields pushed past it onto the next card (6.15.1 on .106). */
+function TierGrid({ entries, catalog, open, setOpen, onGenerated }: {
+  entries: CatalogEntry[]; catalog: Catalog; open: string | null; setOpen: (v: string | null) => void;
+  onGenerated: () => void;
+}) {
+  const grid = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState(1);
+  useEffect(() => {
+    const el = grid.current;
+    if (!el) return;
+    const measure = () => setCols(Math.max(1, getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const openIndex = entries.findIndex((e) => e.report_type === open);
+  const openEntry = openIndex >= 0 ? entries[openIndex] : undefined;
+  const after = openIndex < 0 ? -1 : Math.min(entries.length - 1, Math.floor(openIndex / cols) * cols + cols - 1);
+  useEffect(() => {
+    if (openEntry) panel.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [openEntry]);
+  return (
+    <div className="rpt-grid" ref={grid}>
+      {entries.map((e, i) => (
+        <Fragment key={e.report_type}>
+          <div className="card stack rpt-card" data-report-type={e.report_type} data-available={String(e.available)}
+               data-open={open === e.report_type ? "true" : undefined}>
+            <div>
+              <div className="rpt-card-head">
+                <strong>{word(TYPE_KEYS, e.report_type)}</strong>
+                <span data-role="rpt-group"><Tag tone="muted">{word(UI_GROUP_KEYS, e.ui_group)}</Tag></span>
+              </div>
+              <div className="hint">{word(TYPE_DESC_KEYS, e.report_type)}</div>
+            </div>
+            <div className="row">
+              {e.mode === "on_demand" &&
+                <Tag tone="muted" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</Tag>}
+              <span className="hint" data-role="rpt-counts">
+                {t("rpt_card_counts", { schedules: String(e.schedules), copies: String(e.copies) })}
+              </span>
+            </div>
+            {!e.available && e.reason_key && (
+              <div className="notice" data-role="unavailable">
+                {t(e.reason_key)}{" "}
+                <Link to="/system/collection">{t("gui_reports_collection_link")}</Link>
+              </div>
+            )}
+            {e.report_type !== "custom" && (
+              <div className="row">
+                <button type="button" className="btn-quiet" disabled={!e.available} aria-expanded={open === e.report_type}
+                  onClick={() => setOpen(open === e.report_type ? null : e.report_type)}>
+                  {t("gui_reports_generate_open")}
+                </button>
+                <Link to="/reports?tab=schedules" className="btn-text">{t("rpt_schedule_link")}</Link>
+              </div>
+            )}
+            {e.report_type === "custom" && (
+              <CustomReports generate={(customId, done) => (
+                <GenerateForm entry={e} catalog={catalog} customId={customId} onDone={() => { done(); onGenerated(); }} />
+              )} />
+            )}
+          </div>
+          {i === after && openEntry && openEntry.report_type !== "custom" && (
+            <div className="card stack rpt-generate" data-role="generate-panel" data-for={openEntry.report_type} ref={panel}>
+              <div className="rpt-generate-head">
+                <h3>{t("gui_reports_generate_title", { name: word(TYPE_KEYS, openEntry.report_type) })}</h3>
+                <button type="button" className="btn-text" onClick={() => setOpen(null)}>{t("q_close")}</button>
+              </div>
+              <GenerateForm key={openEntry.report_type} entry={openEntry} catalog={catalog}
+                            onDone={() => { setOpen(null); onGenerated(); }} />
+            </div>
+          )}
+        </Fragment>
       ))}
     </div>
   );
@@ -314,16 +353,22 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                     onChange={(e) => toggle(r.id, e.target.checked)} />
                 </td>
                 <td>
-                  <div data-role="report-conclusion">{r.conclusion || `${word(TYPE_KEYS, r.report_type)}${r.custom_name ? `：${r.custom_name}` : ""}`}</div>
-                  <div className="hint">{word(TYPE_KEYS, r.report_type)}{r.custom_name ? `：${r.custom_name}` : ""} · {r.pce_label}</div>
+                  <div className="rpt-row-title" data-role="report-title">
+                    <strong>{word(TYPE_KEYS, r.report_type)}{r.custom_name ? `：${r.custom_name}` : ""}</strong>
+                    {r.trigger === "schedule" && r.schedule_name && <span className="hint"> · {r.schedule_name}</span>}
+                  </div>
+                  <div className="hint" data-role="report-made">
+                    {t("gui_reports_made_at", { at: formatTime(r.created_at, lang) })} · {r.pce_label}
+                  </div>
+                  {r.conclusion && <div className="hint" data-role="report-conclusion">{r.conclusion}</div>}
                 </td>
                 <td className="nowrap">{periodText(r.period_start, r.period_end, lang)}</td>
                 <td>
-                  {r.trigger === "schedule" ? (r.schedule_name ?? t("gui_reports_schedule_deleted")) : t("gui_reports_trigger_manual")}
-                  <div className="hint">{formatTime(r.created_at, lang)}</div>
+                  {r.trigger === "schedule" ? (r.schedule_name ? t("gui_reports_trigger_schedule")
+                    : t("gui_reports_schedule_deleted")) : t("gui_reports_trigger_manual")}
                 </td>
                 <td>
-                  <span className="badge" data-tone={STATUS_TONES[r.status]}>{word(STATUS_KEYS, r.status)}</span>
+                  <span className="badge nowrap" data-tone={STATUS_TONES[r.status]}>{word(STATUS_KEYS, r.status)}</span>
                   {r.error_key && <div className="hint">{t(r.error_key)}</div>}
                   {r.error_detail && <div className="hint">{r.error_detail}</div>}
                 </td>

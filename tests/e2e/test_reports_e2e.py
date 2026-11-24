@@ -21,7 +21,7 @@ def test_generate_wait_download(context, live_app):
     _reports(page, live_app.url)
     entry = page.locator("[data-report-type=unmanaged_endpoints]")
     entry.get_by_role("button", name="Generate…").click()
-    form = entry.locator("[data-role=generate-form]")
+    form = page.locator("[data-role=generate-form]")
     form.locator("select[name=lookback_days]").select_option("14")
     form.locator("select[name=lang]").select_option("zh_TW")
     form.get_by_role("button", name="Generate", exact=True).click()
@@ -99,7 +99,7 @@ def test_app_summary_needs_an_app(context, live_app):
     _reports(page, live_app.url)
     entry = page.locator("[data-report-type=app_summary]")
     entry.get_by_role("button", name="Generate…").click()
-    form = entry.locator("[data-role=generate-form]")
+    form = page.locator("[data-role=generate-form]")
     go = form.get_by_role("button", name="Generate", exact=True)
     expect(go).to_be_disabled()  # no app chosen yet
     form.locator("select[name=filter_app]").select_option("Finance")
@@ -121,7 +121,8 @@ def test_the_report_filter_starts_from_the_loaded_labels_and_holds_back_a_bad_co
     _reports(page, live_app.url)
     entry = page.locator("[data-report-type=traffic]")
     entry.get_by_role("button", name="Generate…").click()
-    form = entry.locator("[data-role=generate-form]")
+    form = page.locator("[data-role=generate-form]")
+    form.locator("[data-role=report-filter] summary").first.click()  # the filter is folded until it holds something
     dst = form.locator("[data-side=dst]")
     expect(dst.locator("select[name=dst_label_key]")).not_to_have_value("")
     dst.locator("select[name=dst_label_key]").select_option("app")
@@ -144,6 +145,7 @@ def test_schedule_with_filter(context, live_app):
     editor = page.locator("[data-role=schedule-editor]")
     editor.locator("input[name=name]").fill("Finance traffic")
     editor.locator("select[name=report_type]").select_option("traffic")
+    editor.locator("[data-role=report-filter] summary").first.click()  # folded until it holds something
     dst = editor.locator("[data-side=dst]")
     dst.locator("select[name=dst_label_key]").select_option("app")
     dst.locator("select[name=dst_label_value]").select_option("Finance")
@@ -220,7 +222,7 @@ def test_audit_in_lightweight_mode(context, live_app):
     expect(entry).to_have_attribute("data-available", "true")
     expect(page.locator("[data-report-type=traffic]")).to_have_attribute("data-available", "true")
     entry.get_by_role("button", name="Generate…").click()
-    entry.locator("[data-role=generate-form]").get_by_role("button", name="Generate", exact=True).click()
+    page.locator("[data-role=generate-form]").get_by_role("button", name="Generate", exact=True).click()
     row = page.locator("[data-role=report-list] tbody tr").first
     expect(row).to_have_attribute("data-status", "queued")
     generate.run_queued(live_app.ctx)
@@ -392,3 +394,44 @@ def test_a_host_named_in_a_report_leads_to_its_page(context, live_app):
     expect(report.locator("h1")).to_have_text("db")
     assert report.url == f"{live_app.url}/hosts?key=%2Forgs%2F1%2Fworkloads%2Fdb#status"
     expect(report.locator("#status")).to_be_in_viewport()
+
+
+def test_generate_settings_open_in_a_full_width_panel_after_the_cards_row(context, live_app):
+    """6.15.1 on .106: the settings opened inside a 260px card and the filter's fields spread onto the next card."""
+    page = context.new_page()
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _reports(page, live_app.url)
+    card = page.locator("[data-report-type=traffic]")
+    card.get_by_role("button", name="Generate…").click()
+    panel = page.locator("[data-role=generate-panel][data-for=traffic]")
+    expect(panel).to_be_visible()
+    expect(card).to_have_attribute("data-open", "true")
+    geo = panel.evaluate("""(p) => { const g = p.closest('.rpt-grid').getBoundingClientRect(), r = p.getBoundingClientRect();
+        const c = document.querySelector('[data-report-type=traffic]').getBoundingClientRect();
+        const row = [...p.closest('.rpt-grid').querySelectorAll('.rpt-card')].map((e) => e.getBoundingClientRect())
+          .filter((b) => Math.abs(b.top - c.top) < 2);
+        return {full: Math.abs(r.width - g.width) < 2, below: row.every((b) => r.top >= b.bottom),
+                page: document.documentElement.scrollWidth <= document.documentElement.clientWidth}; }""")
+    assert geo == {"full": True, "below": True, "page": True}
+    # the optional filter is folded; period, language and formats come first
+    assert not panel.locator("[data-role=report-filter] details").first.evaluate("(d) => d.open")
+    expect(panel.locator("select[name=lookback_days]")).to_be_visible()
+    panel.get_by_role("button", name="Close").click()
+    expect(panel).to_have_count(0)
+
+
+def test_a_produced_report_is_titled_by_its_kind_and_when_it_was_made(context, live_app):
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.values import ReportType
+    from illumio_ops.services.reports.registry import ReportParams
+    generate.enqueue(live_app.ctx, ReportParams(report_type=ReportType.UNMANAGED_ENDPOINTS), trigger="manual",
+                     schedule_id=None, now=datetime.now(UTC))
+    generate.run_queued(live_app.ctx)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    row = page.locator("[data-role=report-list] tbody tr").first
+    expect(row.locator("[data-role=report-title]")).to_have_text("Unmanaged endpoints")
+    expect(row.locator("[data-role=report-made]")).to_contain_text("Made ")
+    expect(row.locator("[data-role=report-conclusion]")).to_contain_text("Unmanaged addresses:")
+    assert row.locator(".badge").evaluate("(b) => b.getBoundingClientRect().height < 2 * parseFloat(getComputedStyle(b).lineHeight) + 8")

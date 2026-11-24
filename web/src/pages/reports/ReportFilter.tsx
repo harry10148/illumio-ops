@@ -93,7 +93,9 @@ export function ReportFilter({ value, onChange, requireApp, onValid }: {
           {apps?.truncated && <span className="hint">{t("gui_reports_filter_truncated")}</span>}
         </label>
       )}
-      <details open={!requireApp || !empty({ ...cond, dst: null })}>
+      {/* folded until it holds something: the form opens on period, language and formats, and the filter is
+          optional (6.15.1 on .106: always open, it filled the screen) */}
+      <details open={!empty(requireApp ? { ...cond, dst: null } : cond)}>
         <summary>{t(requireApp ? "gui_reports_filter_more" : "gui_reports_filter_conditions")}</summary>
         {/* mounted once the choices are in (its label pickers start from them), and remounted when the app is picked
             above, so its address and port fields show what the filter holds */}
