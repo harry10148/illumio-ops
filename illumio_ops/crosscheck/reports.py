@@ -324,8 +324,56 @@ def _unmanaged(run: Run, r: Report, leftovers: list[str]) -> Recomputed:
         raise CannotCheck("the PCE answered with records longer than two days: it keeps traffic this old by the "
                          "week, which the daily rollups did not hold")
     primaries = [p for p, _ in kpis.pair(flows)]
-    return Recomputed(kpis.unmanaged_values(primaries, first_day, last_day),
-                      f"{f.describe(frozenset())}; UTC days {first_day} to {last_day}")
+    note = f"{f.describe(frozenset())}; UTC days {first_day} to {last_day}"
+    why = _unmanaged_why(run, primaries, first_day, last_day)
+    return Recomputed(kpis.unmanaged_values(primaries, first_day, last_day), f"{note}{'; ' + why if why else ''}")
+
+
+_ROLLUP_ADDRESSES = ("SELECT substr(src_key, 4) FROM flow_rollup_daily WHERE day >= ? AND day <= ? "
+                     "AND src_key LIKE 'ip:%' AND dst_key NOT LIKE 'ip:%' UNION "
+                     "SELECT substr(dst_key, 4) FROM flow_rollup_daily WHERE day >= ? AND day <= ? "
+                     "AND dst_key LIKE 'ip:%' AND src_key NOT LIKE 'ip:%'")
+EXAMPLES = 3
+
+
+def _unmanaged_why(run: Run, primaries: Sequence[kpis.Flow], first_day: str, last_day: str) -> str:
+    """Where the store's addresses and the PCE's answer part, and how: the PCE names the workloads of old traffic as
+    they are today, so a workload deleted or paired since moves an address in or out. Says nothing when they agree
+    or the store cannot be read; it explains a difference, it never turns one into agreement."""
+    try:
+        conn = open_ro(run.paths.flows_db)
+    except Exception:  # noqa: BLE001 - the note is an aid; the comparison stands without it
+        return ""
+    try:
+        days = (first_day, last_day, first_day, last_day)
+        store = {str(r[0]) for r in conn.execute(_ROLLUP_ADDRESSES, days)}
+        answer = kpis.unmanaged_addresses(primaries, first_day, last_day)
+        only_store, only_pce = sorted(store - answer), sorted(answer - store)
+        if not only_store and not only_pce:
+            return ""
+        in_range = [p for p in primaries if first_day <= p.last.strftime("%Y-%m-%d") <= last_day]
+        named = {ip for p in in_range for ip, href in ((p.src_ip, p.src_href), (p.dst_ip, p.dst_href)) if href}
+        bare = {ip for p in in_range if p.src_href is None and p.dst_href is None for ip in (p.src_ip, p.dst_ip)}
+        kinds: dict[str, list[str]] = {}
+        for ip in only_store:
+            kind = ("a workload in the PCE's answer today" if ip in named else
+                    "no workload at either end in the PCE's answer today" if ip in bare else
+                    "not in the PCE's answer")
+            kinds.setdefault(f"only in the store, {kind}", []).append(ip)
+        for ip in only_pce:
+            had = conn.execute("SELECT 1 FROM flows WHERE is_primary = 1 AND last_detected >= ? AND last_detected < ? "
+                               "AND ((src_ip = ? AND src_key NOT LIKE 'ip:%') OR (dst_ip = ? AND dst_key NOT LIKE "
+                               "'ip:%')) LIMIT 1", (f"{first_day}T00:00:00", f"{last_day}T24", ip, ip)).fetchone()
+            kind = "the store recorded a workload there" if had else "not in the store's rollups"
+            kinds.setdefault(f"only in the PCE's answer, {kind}", []).append(ip)
+    except Exception:  # noqa: BLE001 - an older or partial store: no note
+        return ""
+    finally:
+        conn.close()
+    parts = [f"{len(ips)} {kind} (e.g. {', '.join(ips[:EXAMPLES])})" for kind, ips in kinds.items()]
+    return ("the store's rollups and the PCE's answer part on " + "; ".join(parts) +
+            ". The PCE names the workloads of old traffic as they are now: a workload deleted, re-paired or created "
+            "since the traffic moves its peers in or out")
 
 
 def _get_list(client: PceClient, path: str, *, org_scoped: bool) -> list[dict[str, Any]]:

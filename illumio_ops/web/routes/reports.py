@@ -94,7 +94,7 @@ def generate(body: ReportParams) -> ReportItem:
 
 @api_route(bp, OP_DELETE)
 def delete_report(report_id: int) -> Empty:
-    outcome = retention.remove_report(get_ctx(), report_id)
+    outcome = retention.remove_report(get_ctx(), report_id, by=str(current_user.get_id()))
     if outcome == "missing":
         raise ApiFailure(404, "not_found", "err_not_found")
     if outcome == "running":
@@ -107,7 +107,7 @@ def bulk_delete(body: BulkDelete) -> BulkDeleted:
     ctx = get_ctx()
     out: dict[str, list[int]] = {"removed": [], "running": [], "missing": []}
     for rid in dict.fromkeys(body.ids):
-        out[retention.remove_report(ctx, rid)].append(rid)
+        out[retention.remove_report(ctx, rid, by=str(current_user.get_id()))].append(rid)
     return BulkDeleted(**out)
 
 

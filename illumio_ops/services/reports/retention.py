@@ -5,6 +5,8 @@ import shutil
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
+from loguru import logger
+
 from illumio_ops.domain.values import ReportStatus
 from illumio_ops.services.context import AppContext
 from illumio_ops.store import reports as store
@@ -27,10 +29,13 @@ def run_report_retention(ctx: AppContext, *, now: datetime | None = None) -> int
             ids += store.ids_beyond_keep(conn, s.id, s.keep)
         gone = store.delete(conn, sorted(set(ids)))
     _remove_files(ctx, gone)
+    if gone:  # a removal leaves no row behind: the log is the only trace of what went and why
+        logger.info("reports: retention removed {} report(s) older than {} days or beyond their schedule's keep: {}",
+                    len(gone), settings.retention_days, ", ".join(f"#{i}" for i in gone))
     return len(gone)
 
 
-def remove_report(ctx: AppContext, report_id: int) -> Literal["removed", "running", "missing"]:
+def remove_report(ctx: AppContext, report_id: int, *, by: str) -> Literal["removed", "running", "missing"]:
     with ctx.db() as conn:
         row = store.get(conn, report_id)
         if row is None:
@@ -38,4 +43,5 @@ def remove_report(ctx: AppContext, report_id: int) -> Literal["removed", "runnin
         if row.status is ReportStatus.RUNNING or not store.delete(conn, [report_id]):
             return "running"  # claimed by the reports job between the read and the delete
     _remove_files(ctx, [report_id])
+    logger.info("reports: #{} ({}) removed by {}", report_id, row.report_type, by)
     return "removed"

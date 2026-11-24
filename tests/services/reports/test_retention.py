@@ -39,9 +39,9 @@ def test_remove_report_refuses_running(tmp_path):
     ctx = configured_ctx(tmp_path)
     running = _add(ctx, NOW, ReportStatus.RUNNING)
     done = _add(ctx, NOW)
-    assert retention.remove_report(ctx, running) == "running"
-    assert retention.remove_report(ctx, done) == "removed" and not (ctx.paths.reports_dir / str(done)).exists()
-    assert retention.remove_report(ctx, 12345) == "missing"
+    assert retention.remove_report(ctx, running, by="t") == "running"
+    assert retention.remove_report(ctx, done, by="t") == "removed" and not (ctx.paths.reports_dir / str(done)).exists()
+    assert retention.remove_report(ctx, 12345, by="t") == "missing"
 
 
 def test_remove_only_clears_files_of_rows_it_deleted(tmp_path, monkeypatch):
@@ -55,7 +55,7 @@ def test_remove_only_clears_files_of_rows_it_deleted(tmp_path, monkeypatch):
         store.claim_next(conn, at=NOW)  # the reports job claims it between the read and the delete
         return row
     monkeypatch.setattr(store, "get", get_then_claimed)
-    assert retention.remove_report(ctx, rid) == "running"
+    assert retention.remove_report(ctx, rid, by="t") == "running"
     assert (ctx.paths.reports_dir / str(rid)).exists()
 
 
@@ -65,3 +65,23 @@ def test_claim_is_atomic_and_skips_deleted(tmp_path):
     with ctx.db() as conn:
         assert store.delete(conn, [rid]) == [rid]
         assert store.claim_next(conn, at=NOW) is None
+
+
+def test_every_removal_is_logged_with_who_or_why(tmp_path):
+    """6.15.3 on .106: every report made before 2026-11-23 had gone, and nothing said who or what removed them."""
+    from loguru import logger
+    ctx = configured_ctx(tmp_path)
+    old = _add(ctx, NOW - timedelta(days=91))
+    mine = _add(ctx, NOW)
+    lines: list[str] = []
+    sink = logger.add(lambda m: lines.append(m.record["message"]), level="INFO")
+    try:
+        retention.run_report_retention(ctx, now=NOW)
+        retention.remove_report(ctx, mine, by="illumio")
+        retention.remove_report(ctx, 12345, by="illumio")  # nothing removed: nothing said
+    finally:
+        logger.remove(sink)
+    assert [line for line in lines if "report" in line] == [
+        f"reports: retention removed 1 report(s) older than 90 days or beyond their schedule's keep: #{old}",
+        f"reports: #{mine} (lateral_posture) removed by illumio",
+    ]

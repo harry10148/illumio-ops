@@ -307,6 +307,31 @@ def test_traffic_and_unmanaged_against_the_reports(tmp_path):
     assert all(q["deleted"] for q in pce.queries.values())
 
 
+def test_unmanaged_differences_are_explained_not_excused(tmp_path):
+    """6.15.2 on .106: the tool counted 9 fewer addresses. The PCE names old traffic's workloads as they are now, so a
+    workload deleted since leaves its peers with no workload at either end; the note says so, the status stays."""
+    from illumio_ops.store.flowdb.db import FlowDb
+    t = datetime(2026, 11, 18, 3, tzinfo=UTC)
+    records = [rec("8.8.8.8", "10.0.0.9", dst_wl="9", first=t),           # both agree
+               rec("10.0.0.7", "1.1.1.7", first=t),                  # workload deleted since: neither end named
+               rec("10.0.0.9", "192.168.1.5", src_wl="9", first=t)]      # the store saw a workload at .5 then
+    run = _run(tmp_path, FakePce(records))
+    conn = FlowDb(run.paths.flows_db).connect()
+    row = ("INSERT INTO flow_rollup_daily (day, src_key, dst_key, port, proto, policy_decision, initiator_user, "
+           "initiator_process, connections, flow_records, bytes_in, bytes_out, bytes_known_records) "
+           "VALUES ('2026-11-18', ?, ?, 443, 6, 'allowed', '', '', 1, 1, 0, 0, 0)")
+    conn.execute(row, ("ip:8.8.8.8", WL + "9"))
+    conn.execute(row, (WL + "7", "ip:1.1.1.7"))
+    conn.commit()
+    conn.close()
+    _reports(run, ("unmanaged_endpoints", {"total": 2, "private": 0, "admin_sources": 0, "public": 2}, None))
+    f = _by(reports.check(run), None, "unmanaged_endpoints #1: public")[0]
+    assert f.status == "inconsistent"
+    assert "1 only in the store, no workload at either end in the PCE's answer today (e.g. 1.1.1.7)" in f.detail
+    assert "1 only in the PCE's answer, not in the store's rollups (e.g. 192.168.1.5)" in f.detail
+    assert "names the workloads of old traffic as they are now" in f.detail
+
+
 def test_every_kpi_of_a_report_is_listed_and_missing_types_are_said(tmp_path):
     run = _run(tmp_path, FakePce())
     _reports(run, ("lateral_posture", {"pivots": 3}, None))

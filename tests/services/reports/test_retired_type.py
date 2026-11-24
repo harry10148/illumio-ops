@@ -115,7 +115,7 @@ def test_its_old_reports_are_listed_read_opened_and_deleted(old):
     assert item is not None and item.files == [name] and item.conclusion == "Provisioned enabled rules: 4."
     path = views.report_file(ctx, first, name)
     assert path is not None and path.read_text(encoding="utf-8") == "<html>old</html>"
-    assert retention.remove_report(ctx, first) == "removed"
+    assert retention.remove_report(ctx, first, by="t") == "removed"
     assert not (ctx.paths.reports_dir / str(first)).exists() and views.get_report(ctx, first) is None
 
 

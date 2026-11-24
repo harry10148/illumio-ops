@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.15.4] - 2026-11-24
+
+### Added
+
+- Reports: removing a report writes a line to the log saying which report and who removed it, and the daily
+  retention says which reports it removed and why. Before, a removed report left no trace at all.
+- Cross-check tool: when the unmanaged endpoints numbers differ, the finding says which addresses part and how. The
+  PCE names the workloads of old traffic as they are now, so a workload deleted, re-paired or created since moves
+  its peers in or out. The finding stays inconsistent.
+
 ## [6.15.3] - 2026-11-24
 
 ### Fixed

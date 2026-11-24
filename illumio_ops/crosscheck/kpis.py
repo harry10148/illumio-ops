@@ -265,7 +265,7 @@ def _is_public(ip: str) -> bool:
         return False
 
 
-def unmanaged_values(primaries: Sequence[Flow], first_day: str, last_day: str) -> dict[str, int | None]:
+def unmanaged_addresses(primaries: Sequence[Flow], first_day: str, last_day: str) -> set[str]:
     """Addresses without a workload that talk with a workload, over the primary records last seen on the UTC days
     first_day..last_day (the daily rollups' days)."""
     found: set[str] = set()
@@ -277,6 +277,11 @@ def unmanaged_values(primaries: Sequence[Flow], first_day: str, last_day: str) -
             found.add(f.src_ip)
         elif f.dst_href is None and f.src_href is not None:
             found.add(f.dst_ip)
+    return found
+
+
+def unmanaged_values(primaries: Sequence[Flow], first_day: str, last_day: str) -> dict[str, int | None]:
+    found = unmanaged_addresses(primaries, first_day, last_day)
     public = sum(1 for ip in found if _is_public(ip))
     return {"total": len(found), "private": len(found) - public, "public": public}
 
