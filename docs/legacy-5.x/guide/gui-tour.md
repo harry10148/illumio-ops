@@ -44,8 +44,7 @@ Web GUI 是單頁式應用（SPA）。登入後畫面分成**五個區**——�
 報表、系統——底下共 **23 條路由**，以 URL 的 hash 表示（例如
 `#/investigate/traffic`）。區的導覽在**畫面左側**（224px 一欄；v3.1，
 2026-09-05 起），目前所在的區會展開它的子項；≤1000px 時導覽收成頂列。
-設計依據 `docs/superpowers/specs/2026-09-04-ui-redesign-v3-1-workbench-design.md`
-（取代 v3 spec 的 §1／§2／§3／§5／§8）。切區不重新整頁：hash 一變，router 就 lazy-mount
+切區不重新整頁：hash 一變，router 就 lazy-mount
 對應的區模組，只有被造訪過的區才會被下載。內容全部由前端 ES module 向約
 85 條 JSON API（`/api/...`）取資料，精確端點清單見
 [rest-api.md](../reference/rest-api.md)。

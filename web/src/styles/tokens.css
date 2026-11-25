@@ -1,5 +1,5 @@
 /* ============================================================================
-   tokens — the light security console (docs/superpowers/specs/2026-11-03-v6-ui-redesign-design.md §7).
+   tokens — the light security console.
 
    · Light only: no theme switch, no dark values (spec §2 non-goal).
    · Colour carries severity and state only, and never alone (a word goes with it).

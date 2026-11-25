@@ -38,4 +38,3 @@ verified_against:
 
 ## 其他
 
-- `docs/superpowers/`：設計文件（specs）與實作計畫（plans），是開發過程的紀錄，不是使用手冊。

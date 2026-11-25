@@ -289,4 +289,4 @@ PY
 `≥`）是可證明的下界、真值只會更高，`—` 是算不出來、不是零。三者不可混為一談——尤其
 不要把下界或算不出來當成點值拿去比大小或算平均，`mod11_bandwidth` 的統計量已示範怎麼
 把這個區分帶到聚合層。門檻怎麼重設見 `scripts/bandwidth_basis_diff.py`
-（§6.3）；設計全文見 `docs/superpowers/specs/2026-08-23-bandwidth-basis-design.md`。
+（§6.3）。

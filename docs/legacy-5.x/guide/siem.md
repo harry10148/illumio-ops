@@ -61,7 +61,7 @@ SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)�
 
 #### `cef_pce` 與 PCE 直送的已知差異
 
-格式契約與真機證據見 `docs/superpowers/specs/2026-09-11-cef-pce-native-format-design.md`。用 event href（ops 的 `cs1`＝PCE 的 `cs1`）對帳時，只有下列欄位允許不同：
+用 event href（ops 的 `cs1`＝PCE 的 `cs1`）對帳時，只有下列欄位允許不同：
 
 - **Header 版本欄**：ops 送 `GET /api/v2/product_version` 的結果，取不到時為 `unknown`。
 - **`rt`（audit）**：PCE 送 `Sep 11 2026 09:00:08.882 +0000`，ops 不送 ` +0000`——Graylog 的 CEF input 遇到帶時區的 `rt` 會整行丟棄（實測），值同為 UTC。

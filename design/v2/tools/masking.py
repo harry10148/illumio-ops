@@ -1,9 +1,7 @@
 """遞迴遮罩快照裡的機密。
 
 語意式 key 判定（2026-08-03 使用者裁決，取代舊版「子字串即遮」regex——
-舊規則把 c-h-e-c-k 這種普通字誤判成含 "hec" 而整批非機密欄位被打光，
-詳見 docs/superpowers/plans/2026-08-03-ui-redesign-v2-phase1-mockup.md
-Global Constraints）：
+舊規則把 c-h-e-c-k 這種普通字誤判成含 "hec" 而整批非機密欄位被打光）：
 
 - key 依非英數字元「以及 camelCase 邊界」切成 token（小寫），完整字 token
   命中即遮：password/passwd/secret/token/credential/credentials/hec。

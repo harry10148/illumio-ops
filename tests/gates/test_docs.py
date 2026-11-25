@@ -10,8 +10,7 @@ from scripts.gen_api_reference import OUT, render
 from tests.gates._scan import REPO_ROOT
 
 DOCS = REPO_ROOT / "docs"
-# docs/superpowers holds dated working papers (plans, specs); they are records, not the manual.
-PAGES = sorted([p for p in DOCS.rglob("*.md") if "superpowers" not in p.relative_to(DOCS).parts]
+PAGES = sorted(list(DOCS.rglob("*.md"))
                + [REPO_ROOT / "README.md", REPO_ROOT / "README_zh.md"])
 CURRENT = [p for p in PAGES if "legacy-5.x" not in p.parts]
 _LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")

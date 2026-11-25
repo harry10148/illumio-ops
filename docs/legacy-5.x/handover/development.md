@@ -126,11 +126,11 @@ ruff check --fix .    # 自動修正
 **這四件套本身不在 CI 硬閘門內**——`ci.yml` 只跑 `scripts/check_doc_links.py`（掃 repo 根目錄 README/Status/Task 與整個 `docs/` 下所有連結，範圍比 `docs_check.py --links` 更廣，且不受 `--exclude` 限制）。`docs_check.py` 是提交文件變更前的手動／半自動稽核工具，例如：
 
 ```bash
-python scripts/docs_check.py --frontmatter --exclude 'superpowers/**'
+python scripts/docs_check.py --frontmatter
 python scripts/check_doc_links.py
 ```
 
-`docs/superpowers/` 底下的計畫文件本來就沒有 frontmatter，因此檢查 frontmatter 時要排除它；連結正確性交給 repo-root 視野的 `check_doc_links.py` 把關。
+連結正確性交給 repo-root 視野的 `check_doc_links.py` 把關。
 
 ---
 
