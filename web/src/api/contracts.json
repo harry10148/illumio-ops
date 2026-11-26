@@ -925,7 +925,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -2220,7 +2221,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -3515,7 +3517,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -4907,7 +4910,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -6211,7 +6215,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -7390,7 +7395,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -8505,7 +8511,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -9850,7 +9857,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -11152,7 +11160,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -12453,7 +12462,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -13748,7 +13758,8 @@
               "data_loss",
               "job_failing",
               "disk_low",
-              "siem_backlog"
+              "siem_backlog",
+              "report_failing"
             ],
             "title": "SystemCheck",
             "type": "string"
@@ -31504,6 +31515,15 @@
                 "title": "Name",
                 "type": "string"
               },
+              "period": {
+                "default": "days",
+                "enum": [
+                  "days",
+                  "previous_month"
+                ],
+                "title": "Period",
+                "type": "string"
+              },
               "recipients": {
                 "items": {
                   "type": "string"
@@ -32136,6 +32156,15 @@
                 "maxLength": 80,
                 "minLength": 1,
                 "title": "Name",
+                "type": "string"
+              },
+              "period": {
+                "default": "days",
+                "enum": [
+                  "days",
+                  "previous_month"
+                ],
+                "title": "Period",
                 "type": "string"
               },
               "recipients": {
@@ -32875,6 +32904,15 @@
                 "title": "Name",
                 "type": "string"
               },
+              "period": {
+                "default": "days",
+                "enum": [
+                  "days",
+                  "previous_month"
+                ],
+                "title": "Period",
+                "type": "string"
+              },
               "recipients": {
                 "items": {
                   "type": "string"
@@ -33598,6 +33636,15 @@
                 "maxLength": 80,
                 "minLength": 1,
                 "title": "Name",
+                "type": "string"
+              },
+              "period": {
+                "default": "days",
+                "enum": [
+                  "days",
+                  "previous_month"
+                ],
+                "title": "Period",
                 "type": "string"
               },
               "recipients": {
@@ -34532,6 +34579,15 @@
                 "title": "Name",
                 "type": "string"
               },
+              "period": {
+                "default": "days",
+                "enum": [
+                  "days",
+                  "previous_month"
+                ],
+                "title": "Period",
+                "type": "string"
+              },
               "recipients": {
                 "items": {
                   "type": "string"
@@ -35166,6 +35222,15 @@
                 "title": "Name",
                 "type": "string"
               },
+              "period": {
+                "default": "days",
+                "enum": [
+                  "days",
+                  "previous_month"
+                ],
+                "title": "Period",
+                "type": "string"
+              },
               "recipients": {
                 "items": {
                   "type": "string"
@@ -35422,6 +35487,30 @@
               "group": {
                 "title": "Group",
                 "type": "string"
+              },
+              "last_days": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Days"
+              },
+              "last_seconds": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Last Seconds"
               },
               "latest_day": {
                 "format": "date",
@@ -52713,6 +52802,7 @@
       "disk_low",
       "job_failing",
       "pce_health",
+      "report_failing",
       "siem_backlog"
     ],
     "TamperAction": [

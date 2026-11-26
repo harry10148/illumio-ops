@@ -33,8 +33,8 @@ def _language(live_app, language: str) -> None:
 
 
 def test_the_numbers_this_file_counts_on():
-    """The scenario list has 21 detectors and 6 system checks."""
-    assert GROUPS == {"detector": 21, "system": 6}
+    """The scenario list has 21 detectors and 7 system checks."""
+    assert GROUPS == {"detector": 21, "system": 7}
 
 
 @pytest.mark.parametrize("language", ["en", "zh_TW"])
@@ -228,7 +228,7 @@ def test_a_row_says_what_fires_it_then_its_conditions(browser, live_app, languag
         " n ? n.innerText.trim() : null, n ? getComputedStyle(n).fontSize : null,"
         " getComputedStyle(e.querySelector('[data-role=scenario-desc]')).fontSize,"
         " n ? n.previousElementSibling.dataset.role : null]; })")
-    assert len(rows) == 21 + 6
+    assert len(rows) == 21 + 7
     for scenario, desc, notes, notes_size, desc_size, before in rows:
         group, name = scenario.split(":")
         key = {"detector": "scn_det_", "system": "scn_sys_"}[group] + name

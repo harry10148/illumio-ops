@@ -51,6 +51,7 @@ SYSTEM_GUIDE_KEYS: Mapping[SystemCheck, str] = {
     SystemCheck.JOB_FAILING: "guide_sys_job_failing",
     SystemCheck.DISK_LOW: "guide_sys_disk_low",
     SystemCheck.SIEM_BACKLOG: "guide_sys_siem_backlog",
+    SystemCheck.REPORT_FAILING: "guide_sys_report_failing",
 }
 DETECTOR_GUIDE_KEYS: Mapping[DetectorKind, str] = {
     DetectorKind.FANOUT: "guide_det_fanout",

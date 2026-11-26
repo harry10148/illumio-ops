@@ -8,6 +8,7 @@ after a PCE switch — only sets the watermark to now: history (and the initial 
 """
 from __future__ import annotations
 
+import dataclasses
 import functools
 import json
 import threading
@@ -24,6 +25,7 @@ from illumio_ops.domain.alerting import (
     EventFact,
     IncrementFacts,
     IncrementTopFact,
+    ReportFact,
     Trigger,
     evaluate_bandwidth_rule,
     evaluate_event_rule,
@@ -62,7 +64,12 @@ from illumio_ops.domain.values import (
 )
 from illumio_ops.services.alerts import known
 from illumio_ops.services.alerts.channels import enabled_channels
-from illumio_ops.services.alerts.system import max_gap_id, system_facts
+from illumio_ops.services.alerts.system import (
+    mark_reports_checked,
+    max_gap_id,
+    report_facts,
+    system_facts,
+)
 from illumio_ops.services.analysis.tamper import list_annotations
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.eventsource import (
@@ -469,14 +476,27 @@ def evaluate_system(ctx: AppContext, *, now: datetime | None = None,
         _set_watermark(ctx, s, SOURCE_SYSTEM, str(max_gap_id(ctx)))
         mark = str(max_gap_id(ctx))
     rules = [r for r in _rules(s, SystemRule) if checks is None or r.check in checks]
+    # The schedules' reports that are over are looked at once each (a flag on the report, not a watermark on its
+    # id: SQLite hands a deleted newest report's id to the next one), whether or not a rule watches them: a rule
+    # turned on later speaks of the reports made after that, not of every failure before it.
+    reports: tuple[ReportFact, ...] = ()
+    looked_at: list[int] = []
+    if checks is None or SystemCheck.REPORT_FAILING in checks:
+        reports, looked_at = report_facts(ctx)
+        if not any(r.check is SystemCheck.REPORT_FAILING for r in rules):
+            mark_reports_checked(ctx, looked_at)
+            looked_at = []
     if not rules:
         return run
     # Only the run that evaluates data loss moves the gap watermark (a probe-only run must not skip gaps).
     watches_gaps = checks is None or SystemCheck.DATA_LOSS in checks
     facts, newest = system_facts(ctx, since_gap_id=int(mark), now=at)
+    facts = dataclasses.replace(facts, reports=reports)
     rec = _Recorder(ctx, s, at)
     for rule in rules:
         rec.record(rule, evaluate_system_rule(rule, facts, now=at))
         run.evaluated += 1
     rec.commit(SOURCE_SYSTEM, str(newest) if watches_gaps else None)
+    if looked_at:  # after the alerts are recorded: a stop in between says a report twice, never not at all
+        mark_reports_checked(ctx, looked_at)
     return run.model_copy(update={"fired": rec.fired, "suppressed": rec.suppressed})

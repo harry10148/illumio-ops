@@ -8,14 +8,17 @@ from illumio_ops.domain.alerting import (
     GapFact,
     JobFact,
     ProbeFact,
+    ReportFact,
     SiemFact,
     SourceFact,
     SystemFacts,
 )
+from illumio_ops.domain.values import ReportStatus
 from illumio_ops.services import pce_health
 from illumio_ops.services.collect.status import collection_status
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.siem.status import siem_status
+from illumio_ops.store import reports as report_store
 from illumio_ops.store.flowdb import ingest_state
 from illumio_ops.store.job_health import list_health
 
@@ -64,6 +67,35 @@ def _siem_facts(ctx: AppContext) -> tuple[SiemFact, ...]:
                             warn=ctx.settings.current().siem.backlog_warn_rows, dlq_full=d.dlq >= d.dlq_max,
                             failing=bool(failing), error=failing[0].last_error if failing else None))
     return tuple(out)
+
+
+_MAIL_PROBLEMS = {"failed": "mail_failed", "skipped_no_smtp": "mail_no_smtp", "interrupted": "mail_interrupted"}
+
+
+def report_facts(ctx: AppContext) -> tuple[tuple[ReportFact, ...], list[int]]:
+    """(the schedules' reports that went wrong among those not looked at yet, the ids of all of those looked at:
+    the caller marks them once its alerts are recorded). A report is looked at once, when it is over: made or
+    failed, and its email sent or not."""
+    names = {s.id: s.name for s in ctx.settings.current().reports.schedules}
+    with ctx.db() as conn:
+        rows = report_store.unchecked_schedule_reports(conn)
+    out = []
+    for r in rows:
+        sid = r.schedule_id or ""
+        if r.status is ReportStatus.FAILED:
+            problem, key, detail = "not_made", r.error_key or "", r.error_detail or ""
+        elif r.email_status in _MAIL_PROBLEMS:
+            problem, key, detail = _MAIL_PROBLEMS[r.email_status], "", r.email_detail or ""
+        else:
+            continue
+        out.append(ReportFact(report_id=r.id, schedule_id=sid, schedule=names.get(sid, sid),
+                              report_type=r.report_type, problem=problem, error_key=key, detail=detail))
+    return tuple(out), [r.id for r in rows]
+
+
+def mark_reports_checked(ctx: AppContext, report_ids: list[int]) -> None:
+    with ctx.db() as conn:
+        report_store.mark_checked(conn, report_ids)
 
 
 def max_gap_id(ctx: AppContext) -> int:

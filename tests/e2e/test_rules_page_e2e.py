@@ -22,7 +22,7 @@ def _add_rules(live_app, rules: list[dict]) -> None:
 
 def test_each_rule_appears_once_in_the_table_for_its_kind(context, live_app):
     rules = _settings_rules(live_app)
-    assert len(rules) == 35 and all(rule["pack_key"] for rule in rules)
+    assert len(rules) == 36 and all(rule["pack_key"] for rule in rules)
     extra = [rule | {"id": uuid.uuid4().hex} for rule in OTHER_SHAPES]
     _add_rules(live_app, extra)
 

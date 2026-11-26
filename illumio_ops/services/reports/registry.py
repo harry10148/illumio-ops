@@ -16,6 +16,11 @@ from illumio_ops.services.context import AppContext
 from illumio_ops.settings.schema import Settings
 
 Group = Literal["lateral", "inventory", "analysis", "assessment", "policy", "operations", "custom"]
+# The queue has two lanes, each making one report at a time (6.16.0): "pce" for the types that ask the PCE to
+# recompute the draft a day at a time (policy usage always, readiness when its period passes the row limit: 24
+# minutes for a month on the lab), "local" for the rest — so a report that takes seconds is not held up behind
+# one that takes half an hour.
+Lane = Literal["local", "pce"]
 
 
 class ReportFailed(Exception):
@@ -114,6 +119,7 @@ class ReportSpec:
     # needs_traffic type fails whole). The generator hands such a builder the install's context beside an archive
     # store (BuildInput.install), and the catalog lists the type as one that pulls on demand.
     own_traffic: bool = False
+    lane: Lane = "local"
 
 
 REGISTRY: dict[ReportType, ReportSpec] = {}
@@ -211,7 +217,7 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         # recompute, so a month at most. Its chapter of the provisioned rules' hits is the PCE's own Rule Hit Count
         # report (rule_hit_count.py); the report is made with or without it.
         ReportType.POLICY_USAGE: ReportSpec(ReportType.POLICY_USAGE, "policy", False, build_policy_usage,
-                                            max_lookback=lambda settings: POLICY_USAGE_MAX_DAYS),
+                                            max_lookback=lambda settings: POLICY_USAGE_MAX_DAYS, lane="pce"),
         # Draft against active, read when the report runs; the period bounds the events used for attribution.
         ReportType.POLICY_DIFF: ReportSpec(ReportType.POLICY_DIFF, "policy", False, build_policy_diff,
                                            max_lookback=lambda settings: POLICY_DIFF_MAX_DAYS),
@@ -223,8 +229,11 @@ def _builtin() -> dict[ReportType, ReportSpec]:
         ReportType.CUSTOM: ReportSpec(ReportType.CUSTOM, "custom", True, build_custom, max_lookback=flow_days,
                                       retention=flow_retention,
                                       needs_traffic_for=lambda ctx, p: custom_needs_traffic(ctx, p.custom_id)),
+        # Its draft recompute is one query for most periods; one past the row limit is read a day at a time,
+        # which takes as long as the policy usage report: the same lane.
         ReportType.READINESS: ReportSpec(ReportType.READINESS, "assessment", True, build_readiness,
-                                         max_lookback=flow_days, accepts_filter=True, retention=flow_retention),
+                                         max_lookback=flow_days, accepts_filter=True, retention=flow_retention,
+                                         lane="pce"),
     }
 
 

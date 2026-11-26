@@ -24,7 +24,7 @@ def test_queue_order_and_claim(tmp_path):
         store.finish(conn, a, status=ReportStatus.DONE, at=T, files=["x.html"], kpis=[{"key": "k", "value": 1}])
         row = store.get(conn, a)
         assert row.status is ReportStatus.DONE and row.files == ["x.html"] and row.params == {"lookback_days": 7}
-        assert store.requeue_running(conn) == 1 and store.get(conn, b).status is ReportStatus.QUEUED
+        assert store.recover(conn, at=T, error_key="x") == (1, 0, 0) and store.get(conn, b).status is ReportStatus.QUEUED
 
 
 def test_failed_at_insert_is_finished(tmp_path):

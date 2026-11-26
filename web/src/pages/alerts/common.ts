@@ -45,11 +45,12 @@ export const DETECTOR_KEYS: Record<string, string> = {
   quiet_host_wakes: "detector_name_quiet_host_wakes", data_staging: "detector_name_data_staging",
   off_hours: "detector_name_off_hours",
 };
-export const CHECKS: SystemCheck[] = ["pce_health", "collection_failing", "data_loss", "job_failing", "disk_low", "siem_backlog"];
+export const CHECKS: SystemCheck[] = ["pce_health", "collection_failing", "data_loss", "job_failing", "disk_low", "siem_backlog",
+  "report_failing"];
 export const CHECK_KEYS: Record<string, string> = {
   pce_health: "rule_system_pce_health", collection_failing: "rule_system_collection_failing",
   data_loss: "rule_system_data_loss", job_failing: "rule_system_job_failing", disk_low: "rule_system_disk_low",
-  siem_backlog: "rule_system_siem_backlog",
+  siem_backlog: "rule_system_siem_backlog", report_failing: "rule_system_report_failing",
 };
 export const STATUS_KEYS: Record<string, string> = {
   ok: "rule_status_ok", no_data: "rule_status_no_data", incomplete: "rule_status_incomplete",

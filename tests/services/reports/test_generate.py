@@ -122,7 +122,7 @@ def test_running_rows_requeued_after_restart(ctx, monkeypatch):
     with ctx.db() as conn:
         store.claim_next(conn, at=NOW)
     assert _row(ctx, rid).status is ReportStatus.RUNNING
-    assert generate.recover_running(ctx) == 1
+    assert generate.recover(ctx, now=NOW) == (1, 0, 0)
     assert generate.run_queued(ctx, now=NOW) == rid and _row(ctx, rid).status is ReportStatus.DONE
 
 

@@ -31,7 +31,7 @@ export type ThresholdType = ("immediate" | "count")
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "SystemCheck".
  */
-export type SystemCheck = ("pce_health" | "collection_failing" | "data_loss" | "job_failing" | "disk_low" | "siem_backlog")
+export type SystemCheck = ("pce_health" | "collection_failing" | "data_loss" | "job_failing" | "disk_low" | "siem_backlog" | "report_failing")
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "RuleAction".
@@ -2134,6 +2134,7 @@ lang: (Language | null)
 lookback_days: number
 minute: number
 name: string
+period?: ("days" | "previous_month")
 /**
  * @maxItems 50
  */
@@ -2171,6 +2172,7 @@ lang: (Language | null)
 lookback_days: number
 minute: number
 name: string
+period?: ("days" | "previous_month")
 /**
  * @maxItems 50
  */
@@ -2269,6 +2271,8 @@ copies: number
 earliest_day: (string | null)
 formats: ReportFormat[]
 group: string
+last_days?: (number | null)
+last_seconds?: (number | null)
 latest_day: string
 max_lookback: (number | null)
 mode: ("basic" | "on_demand")
@@ -4259,6 +4263,7 @@ export const VALUES = {
     "disk_low",
     "job_failing",
     "pce_health",
+    "report_failing",
     "siem_backlog"
   ],
   "TamperAction": [

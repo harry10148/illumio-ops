@@ -41,7 +41,7 @@ from illumio_ops.domain.values import (
     SiemTransport,
 )
 
-SCHEMA_VERSION: Literal[15] = 15
+SCHEMA_VERSION: Literal[16] = 16
 _UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
 
 
@@ -497,6 +497,9 @@ class ReportScheduleFields(StrictModel):
     keep: int = Field(ge=1, le=365)  # newest reports of this schedule kept
     filter: FlowCondition | None = None  # flow reports: e.g. one application
     custom_id: int | None = None  # the custom report it makes (report_type custom only)
+    # What each run covers: the last lookback_days whole days, or the calendar month before the one it is due in
+    # (a monthly schedule only; lookback_days is then not read). Spec 2026-11-27 §5.
+    period: Literal["days", "previous_month"] = "days"
 
     @field_validator("recipients")
     @classmethod
@@ -512,6 +515,8 @@ class ReportScheduleFields(StrictModel):
             raise ValueError("day_of_week is set for a weekly schedule and only for one")
         if (self.frequency == "monthly") != (self.day_of_month is not None):
             raise ValueError("day_of_month is set for a monthly schedule and only for one")
+        if self.period == "previous_month" and self.frequency != "monthly":
+            raise ValueError("the previous month is a monthly schedule's period")
         if len(set(self.formats)) != len(self.formats):
             raise ValueError("each format once")
         return self
@@ -639,7 +644,7 @@ class SiemSettings(StrictModel):
 
 
 class Settings(StrictModel):
-    schema_version: Literal[15]
+    schema_version: Literal[16]
     revision: int = Field(ge=0)
     pce: PceSettings
     web: WebSettings

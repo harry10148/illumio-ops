@@ -260,6 +260,17 @@ def _v14_to_v15(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _v15_to_v16(data: dict[str, Any]) -> dict[str, Any]:
+    # The check on the schedules' reports joins the pack like the other system checks (6.16.0): it says nothing
+    # while no schedule's report goes wrong, and starts from the reports made after the upgrade.
+    alerts = data.get("alerts")
+    if isinstance(alerts, dict) and isinstance(alerts.get("rules"), list):
+        have = {r.get("pack_key") for r in alerts["rules"] if isinstance(r, dict)}
+        if "rule_system_report_failing" not in have:
+            alerts["rules"].append(system_rule("rule_system_report_failing").model_dump(mode="json"))
+    return data
+
+
 # source version -> function producing source version + 1
 UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
@@ -276,6 +287,7 @@ UPGRADES: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     12: _v12_to_v13,
     13: _v13_to_v14,
     14: _v14_to_v15,
+    15: _v15_to_v16,
 }
 
 

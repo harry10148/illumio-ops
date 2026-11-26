@@ -221,6 +221,8 @@ def test_previous_from_the_last_report(ctx):
                                   error_key=None, pce_target=generate.pce_target(ctx.settings.current().pce))
         report_store.finish(conn, rid, status=ReportStatus.DONE, at=START, files=[],
                             kpis=[{"key": "managed", "label": "x", "value": 7, "previous": None}])
+    assert _kpi(_build(ctx, ReportType.VEN_STATUS))["managed"].previous is None  # read from the numbers kept apart
+    generate.recover(ctx, now=START)  # which a start fills in from the reports made before they were kept
     assert _kpi(_build(ctx, ReportType.VEN_STATUS))["managed"].previous == 7
 
 

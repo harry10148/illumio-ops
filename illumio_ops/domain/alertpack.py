@@ -58,6 +58,7 @@ _SYSTEM: tuple[tuple[str, SystemCheck, Severity], ...] = (
     ("rule_system_job_failing", SystemCheck.JOB_FAILING, Severity.HIGH),
     ("rule_system_disk_low", SystemCheck.DISK_LOW, Severity.MEDIUM),
     ("rule_system_siem_backlog", SystemCheck.SIEM_BACKLOG, Severity.MEDIUM),
+    ("rule_system_report_failing", SystemCheck.REPORT_FAILING, Severity.MEDIUM),
 )
 # Lateral rules leave out detections with a source, or only targets, outside the estate: internet scans of a firewall's
 # public address and connections out are not lateral movement (user 2026-10-31; the lateral page still shows them).

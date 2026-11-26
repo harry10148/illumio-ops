@@ -3,7 +3,7 @@ whole and guarded by its revision) and the report settings (GUI address for emai
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from flask import Blueprint
@@ -12,7 +12,13 @@ from pydantic import BaseModel, Field
 from illumio_ops.domain.values import ReportStatus, ReportType
 from illumio_ops.services import custom_reports
 from illumio_ops.services.reports import schedules
-from illumio_ops.services.reports.generate import REFUSAL_FIELDS, availability, refusal
+from illumio_ops.services.reports.generate import (
+    LONGEST_MONTH,
+    REFUSAL_FIELDS,
+    availability,
+    reach,
+    refusal,
+)
 from illumio_ops.services.reports.views import ReportItem, get_report
 from illumio_ops.settings.schema import ReportSchedule, ReportScheduleFields
 from illumio_ops.web.auth import get_ctx
@@ -83,8 +89,25 @@ def _view() -> SchedulesView:
 
 def _check(fields: ReportScheduleFields) -> None:
     """The same refusal a manual request gets, at save time (a schedule that could never run is not saved)."""
-    params = schedules.params_of(ReportSchedule(**fields.model_dump(), id="0" * 32))
-    reason = refusal(get_ctx().settings.current(), params)
+    ctx = get_ctx()
+    settings = ctx.settings.current()
+    tz = settings.display.zone()
+    now = datetime.now(UTC)
+    params = schedules.params_of(ReportSchedule(**fields.model_dump(), id="0" * 32), due=now, tz=tz)
+    if fields.period == "previous_month":
+        # The furthest back a run of this schedule reaches: made on its day of the month, for the longest month
+        # before it. A type that cannot reach that far is refused here, not every month when it runs (a policy
+        # usage schedule on the 15th would start 45 days back, past the 31 it can read).
+        today = now.astimezone(tz).date()
+        first = today - timedelta(days=(fields.day_of_month or 1) - 1 + LONGEST_MONTH)
+        params = params.model_copy(update={"period_from": first,
+                                           "period_to": first + timedelta(days=LONGEST_MONTH - 1)})
+        reason = refusal(settings, params, now=now, reached=reach(ctx, now))
+        if reason in ("rpt_err_lookback_beyond_retention", "rpt_err_before_archive"):
+            raise ApiFailure(400, "invalid_input", "rpt_err_month_out_of_reach", field="schedule.day_of_month",
+                             params={"day": str(fields.day_of_month or 1)})
+    else:
+        reason = refusal(settings, params)
     if reason is None and params.report_type is ReportType.CUSTOM and custom_reports.get(get_ctx(), params.custom_id or 0) is None:
         reason = "rpt_err_custom_missing"
     if reason:

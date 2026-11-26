@@ -23,6 +23,7 @@ const JOB_LABEL_KEYS: Record<string, string> = {
   alerts_retention: "job_name_alerts_retention",
   alerts_dispatch: "job_name_alerts_dispatch",
   reports_run: "job_name_reports_run",
+  reports_run_pce: "job_name_reports_run_pce",
   reports_retention: "job_name_reports_retention",
   siem_dispatch: "job_name_siem_dispatch",
   rule_schedules_tick: "job_name_rule_schedules_tick",

@@ -23,6 +23,7 @@ import { Schedules } from "./Schedules";
 import { ReportSettings } from "../system/ReportSettings";
 
 const POLL_MS = 5000;
+const LONG_SECONDS = 120;  // the last report of a type took at least this long: the generate panel says how long
 type Tab = "templates" | "schedules" | "produced";
 
 function GenerateForm({ entry, catalog, onDone, customId }: {
@@ -103,6 +104,12 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
           </label>
         ))}
       </div>
+      {/* a report that took minutes the last time says so before it is asked for again */}
+      {entry.last_seconds != null && entry.last_days != null && entry.last_seconds >= LONG_SECONDS && (
+        <p className="hint" data-role="last-took">
+          {t("gui_reports_last_took", { days: String(entry.last_days), minutes: String(Math.round(entry.last_seconds / 60)) })}
+        </p>
+      )}
       <div className="row">
         <label>
           <input type="checkbox" name="email" checked={email} disabled={!catalog.smtp_enabled}

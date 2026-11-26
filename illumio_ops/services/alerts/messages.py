@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from typing import Any
 
+from illumio_ops.domain.alerting import REPORT_PROBLEM_KEYS
 from illumio_ops.domain.guidance import guide_keys
 from illumio_ops.domain.tamper import TAMPER_ACTION_KEYS, TAMPER_PATTERN_KEYS
 from illumio_ops.domain.values import (
@@ -142,6 +143,17 @@ def pce_health_reading(v: AlertView, lang: Language) -> str | None:
     return " ".join(parts)
 
 
+def report_reading(v: AlertView, lang: Language) -> str | None:
+    """What went wrong with a schedule's report: not made (the report's own reason), or made and not emailed."""
+    p = v.params
+    key = REPORT_PROBLEM_KEYS.get(str(p.get("problem") or ""))
+    if v.message_key != "alert_system_report_failing" or key is None:
+        return None
+    reason = translate(lang, str(p["error_key"])) if p.get("error_key") else ""
+    detail = str(p.get("detail") or "")
+    return translate(lang, key, {"reason": " ".join(x for x in (reason, detail) if x) or "?"})
+
+
 def summary(v: AlertView, lang: Language) -> str:
     """The alert's one sentence: its message with the facts and parameters filled in (and a tampering alert's
     reading after it)."""
@@ -153,7 +165,7 @@ def summary(v: AlertView, lang: Language) -> str:
     if v.message_key == "alert_system_pce_health" and isinstance(v.params.get("failures"), list):
         values["failures"] = ", ".join(translate(lang, PROBE_NAME_KEYS[f]) if f in PROBE_NAME_KEYS else str(f)
                                        for f in v.params["failures"])
-    reading = tamper_reading(v, lang) or pce_health_reading(v, lang)
+    reading = tamper_reading(v, lang) or pce_health_reading(v, lang) or report_reading(v, lang)
     text = translate(lang, v.message_key, values)
     return f"{text} {reading}" if reading else text
 

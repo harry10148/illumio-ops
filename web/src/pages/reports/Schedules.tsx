@@ -15,11 +15,13 @@ const FREQUENCY_KEYS: Record<string, string> = {
   daily: "gui_reports_freq_daily", weekly: "gui_reports_freq_weekly", monthly: "gui_reports_freq_monthly",
 };
 
+const MONTH = "previous_month";  // the period choice that is not a number of days
+
 function blank(type: string): ReportScheduleFields {
   return {
     name: "", enabled: true, report_type: type as ReportScheduleFields["report_type"], lookback_days: 7,
     frequency: "weekly", day_of_week: 0, day_of_month: null, hour: 8, minute: 0, formats: ["html", "xlsx"],
-    email: false, recipients: [], lang: null, keep: 30, filter: null,
+    email: false, recipients: [], lang: null, keep: 30, filter: null, period: "days",
   };
 }
 
@@ -59,6 +61,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   const freq = (f: ReportScheduleFields["frequency"]) => set({
     frequency: f, day_of_week: f === "weekly" ? (s.day_of_week ?? 0) : null,
     day_of_month: f === "monthly" ? (s.day_of_month ?? 1) : null,
+    period: f === "monthly" ? s.period : "days",  // the previous month is a monthly schedule's period
   });
   const toggleFormat = (f: ReportScheduleFields["formats"][number], on: boolean) =>
     // An empty list is sent as is: the server refuses it and names the field.
@@ -105,8 +108,11 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       )}
       <label>
         {t("gui_reports_lookback")}
-        <select name="lookback_days" value={String(s.lookback_days)} onChange={(e) => set({ lookback_days: Number(e.target.value) })}>
+        <select name="lookback_days" value={s.period === "previous_month" ? MONTH : String(s.lookback_days)}
+          onChange={(e) => set(e.target.value === MONTH ? { period: "previous_month" }
+            : { period: "days", lookback_days: Number(e.target.value) })}>
           {lookbackChoices(entry?.max_lookback).map((d) => <option key={d} value={d}>{t("gui_reports_days", { n: d })}</option>)}
+          {s.frequency === "monthly" && <option value={MONTH}>{t("gui_reports_period_previous_month")}</option>}
         </select>
       </label>
       <label>
@@ -264,7 +270,9 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
                   <tr key={s.id} data-schedule-id={s.id}>
                     <td>{s.name}</td>
                     <td>
-                      {word(TYPE_KEYS, s.report_type)}<div className="hint">{t("gui_reports_days", { n: String(s.lookback_days) })}</div>
+                      {word(TYPE_KEYS, s.report_type)}
+                      <div className="hint">{s.period === "previous_month" ? t("gui_reports_period_previous_month")
+                        : t("gui_reports_days", { n: String(s.lookback_days) })}</div>
                       <FilterSummary value={s.filter} />
                     </td>
                     <td>{when(s)}{s.email && <div className="hint">{t("gui_reports_email")}</div>}</td>

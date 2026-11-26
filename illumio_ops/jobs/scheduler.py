@@ -36,7 +36,8 @@ from illumio_ops.services.collect.reset import finish_pending_switch
 from illumio_ops.services.collect.retention import run_retention
 from illumio_ops.services.collect.traffic import run_traffic_cycle
 from illumio_ops.services.context import AppContext
-from illumio_ops.services.reports.generate import recover_running, run_queued
+from illumio_ops.services.reports.generate import recover as recover_reports
+from illumio_ops.services.reports.generate import run_queued
 from illumio_ops.services.reports.retention import run_report_retention
 from illumio_ops.services.reports.schedules import tick_schedules
 from illumio_ops.services.rule_schedules import tick as rule_schedule_tick
@@ -87,6 +88,7 @@ def job_intervals(settings: Settings) -> dict[str, int]:
         "alerts_retention": DAILY_SECONDS,
         "alerts_dispatch": ALERTS_DISPATCH_SECONDS,
         "reports_run": REPORTS_RUN_SECONDS,
+        "reports_run_pce": REPORTS_RUN_SECONDS,
         "reports_retention": DAILY_SECONDS,
         "siem_dispatch": settings.siem.tick_seconds,
         "rule_schedules_tick": RULE_SCHEDULES_SECONDS,
@@ -202,15 +204,15 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
     def alerts_dispatch() -> None:
         run_dispatch(ctx)
 
-    recovered = False
-
+    # Two lanes, one report at a time each (services/reports/registry.py Lane). What a stopped service left
+    # running is put right in build_scheduler, before either lane starts: a lane doing it would queue the other
+    # lane's report in the making again.
     def reports_run() -> None:
-        nonlocal recovered
-        if not recovered:  # reports left running by a stopped service start again
-            recover_running(ctx)
-            recovered = True
         tick_schedules(ctx)
-        run_queued(ctx)
+        run_queued(ctx, lane="local")
+
+    def reports_run_pce() -> None:
+        run_queued(ctx, lane="pce")
 
     def reports_retention() -> None:
         run_report_retention(ctx)
@@ -223,12 +225,14 @@ def _collector_jobs(ctx: AppContext) -> dict[str, Callable[[], None]]:
             "collect_backfill": backfill, "collect_archive": archive, "collect_retention": retention,
             "flows_checkpoint": checkpoint, "analysis_hourly": hourly_analysis, "alerts_system": alerts_system,
             "alerts_retention": alerts_retention, "alerts_dispatch": alerts_dispatch,
-            "reports_run": reports_run, "reports_retention": reports_retention, "siem_dispatch": siem_dispatch}
+            "reports_run": reports_run, "reports_run_pce": reports_run_pce, "reports_retention": reports_retention,
+            "siem_dispatch": siem_dispatch}
 
 
 def build_scheduler(ctx: AppContext) -> BackgroundScheduler:
     sched = BackgroundScheduler(timezone=UTC, job_defaults={"coalesce": True, "max_instances": 1})
     intervals = job_intervals(ctx.settings.current())
+    recover_reports(ctx)  # once per start, before the report jobs exist
     # coalesce/max_instances are passed per job: job_defaults only apply once the
     # scheduler starts, and a job must never pile up behind a slow previous run.
     sched.add_job(instrument("pce_probe", _probe_job(ctx), ctx), "interval", id="pce_probe",

@@ -446,3 +446,84 @@ def test_a_produced_report_is_titled_by_its_kind_and_when_it_was_made(context, l
     expect(row.locator("[data-role=report-made]")).to_contain_text("Made ")
     expect(row.locator("[data-role=report-conclusion]")).to_contain_text("Unmanaged addresses:")
     assert row.locator(".badge").evaluate("(b) => b.getBoundingClientRect().height < 2 * parseFloat(getComputedStyle(b).lineHeight) + 8")
+
+
+# ── 6.16.0: calendar months, how long the last one took, what a restart left ──
+
+def test_a_monthly_schedule_can_cover_the_previous_whole_month(context, live_app):
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.store import reports as store
+    page = context.new_page()
+    _reports(page, live_app.url)
+    page.get_by_role("tab", name="Schedules").click()
+    page.get_by_role("button", name="Add a schedule").click()
+    editor = page.locator("[data-role=schedule-editor]")
+    period = editor.locator("select[name=lookback_days]")
+    expect(period.locator("option[value=previous_month]")).to_have_count(0)  # a weekly schedule: days only
+    editor.locator("input[name=name]").fill("Monthly audit")
+    editor.locator("select[name=report_type]").select_option("audit")
+    editor.locator("select[name=frequency]").select_option("monthly")
+    period.select_option("previous_month")
+    editor.locator("select[name=frequency]").select_option("weekly")  # no longer monthly: back to a number of days
+    expect(period).not_to_have_value("previous_month")
+    editor.locator("select[name=frequency]").select_option("monthly")
+    period.select_option("previous_month")
+    editor.get_by_role("button", name="Save").click()
+    row = page.locator("[data-role=schedule-list] tbody tr").first
+    expect(row).to_contain_text("The previous whole month")
+    (saved,) = live_app.ctx.settings.current().reports.schedules
+    assert (saved.period, saved.frequency) == ("previous_month", "monthly")
+    row.get_by_role("button", name="Run now").click()
+    page.wait_for_url("**/reports?id=*")
+    with live_app.ctx.db() as conn:
+        made = store.list_reports(conn, limit=1, offset=0)[0][0]
+    tz = live_app.ctx.settings.current().display.zone()
+    first, after = made.period_start.astimezone(tz), made.period_end.astimezone(tz)
+    last_month = (datetime.now(UTC).astimezone(tz).date().replace(day=1) - timedelta(days=1)).replace(day=1)
+    assert first.date() == last_month and (first.day, after.day) == (1, 1) and (after - first).days in (28, 29, 30, 31)
+    assert made.error_key is None
+
+
+def test_the_generate_panel_says_how_long_the_last_one_took(context, live_app):
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.domain.values import ReportStatus
+    from illumio_ops.store import reports as store
+    now = datetime.now(UTC)
+    with live_app.ctx.db() as conn:
+        for kind, seconds in (("policy_usage", 1449), ("traffic", 29)):
+            rid = store.insert(conn, report_type=kind, params_json="{}", status=ReportStatus.QUEUED, trigger="manual",
+                               schedule_id=None, pce_label="p", period_start=now - timedelta(days=30), period_end=now,
+                               created_at=now)
+            conn.execute("UPDATE reports SET status = 'done', started_at = ?, finished_at = ? WHERE id = ?",
+                         ((now - timedelta(seconds=seconds)).isoformat(), now.isoformat(), rid))
+        conn.commit()
+    page = context.new_page()
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _reports(page, live_app.url)
+    page.locator("[data-report-type=policy_usage]").get_by_role("button", name="Generate…").click()
+    said = page.locator("[data-role=generate-panel][data-for=policy_usage] [data-role=last-took]")
+    expect(said).to_have_text("The last one (30 days) took 24 minutes to make.")
+    page.locator("[data-report-type=traffic]").get_by_role("button", name="Generate…").click()
+    panel = page.locator("[data-role=generate-panel][data-for=traffic]")
+    expect(panel).to_be_visible()
+    expect(panel.locator("[data-role=last-took]")).to_have_count(0)  # seconds: nothing worth saying
+
+
+def test_an_email_a_restart_interrupted_says_so_and_the_page_stops_waiting(context, live_app):
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.values import ReportType
+    from illumio_ops.services.reports.registry import ReportParams
+    from illumio_ops.store import reports as store
+    ctx = live_app.ctx
+    rid = generate.enqueue(ctx, ReportParams(report_type=ReportType.UNMANAGED_ENDPOINTS), trigger="manual",
+                           schedule_id=None, now=datetime.now(UTC))
+    generate.run_queued(ctx)
+    with ctx.db() as conn:
+        store.set_email(conn, rid, status="sending", detail=None)
+    generate.recover(ctx)
+    page = context.new_page()
+    _reports(page, live_app.url)
+    expect(page.locator("[data-role=report-list]")).to_contain_text("Not known: the service stopped while sending")

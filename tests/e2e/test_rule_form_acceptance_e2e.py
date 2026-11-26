@@ -118,7 +118,7 @@ def test_every_built_in_rule_opens_and_saves_unchanged(context, live_app):
     before = _rules(live_app)
     pack = {rule.id: rule.model_dump(mode="json") for rule in best_practice_rules(notify_new_defaults=True)}
     assert before == pack
-    assert len(before) == 35 and all(r["pack_key"] for r in before.values())
+    assert len(before) == 36 and all(r["pack_key"] for r in before.values())
     page = context.new_page()
     sign_in(page, live_app.url)
     revision = live_app.ctx.settings.current().revision

@@ -30,6 +30,7 @@ const DETECTOR_DESC: Record<DetectorKind, string> = {
 const CHECK_DESC: Record<SystemCheck, string> = {
   pce_health: "scn_sys_pce_health", collection_failing: "scn_sys_collection_failing", data_loss: "scn_sys_data_loss",
   job_failing: "scn_sys_job_failing", disk_low: "scn_sys_disk_low", siem_backlog: "scn_sys_siem_backlog",
+  report_failing: "scn_sys_report_failing",
 };
 
 const DETECTOR_NOTES: Partial<Record<DetectorKind, string>> = {

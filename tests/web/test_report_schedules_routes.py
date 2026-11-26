@@ -138,3 +138,20 @@ def test_a_rule_hit_count_schedule_in_the_file_is_listed_run_and_removed(client,
     assert as_usage.get_json()["data"]["items"][0]["schedule"]["report_type"] == "policy_usage"
     rev = as_usage.get_json()["data"]["revision"]
     assert delete(client, f"/api/report-schedules/{sid}", {"revision": rev}).get_json()["data"]["items"] == []
+
+
+def test_a_previous_month_schedule_is_checked_for_the_day_it_runs_on(client):
+    """Codex review 2026-11-27: checked as if run on the 1st, a policy usage schedule on the 15th was saved and then
+    refused every month (its month starts 45 days back; the report reads 31)."""
+    login(client)
+    monthly = SCHEDULE | {"report_type": "policy_usage", "frequency": "monthly", "day_of_week": None,
+                          "period": "previous_month"}
+    r = _create(client, monthly | {"day_of_month": 15, "name": "mid-month"})
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and (err["field"], err["message_key"], err["params"]) == (
+        "schedule.day_of_month", "rpt_err_month_out_of_reach", {"day": "15"})
+    r = _create(client, monthly | {"day_of_month": 1, "name": "on the 1st"})
+    assert r.status_code == 200
+    # a type that reads further back takes any day of the month
+    r = _create(client, monthly | {"report_type": "audit", "day_of_month": 28, "name": "audit"})
+    assert r.status_code == 200, r.get_json()

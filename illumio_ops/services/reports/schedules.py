@@ -44,9 +44,20 @@ def due_time(s: ReportSchedule, *, after: datetime, tz: tzinfo | None) -> dateti
     raise RuntimeError("no run time within 400 days")  # unreachable for a valid schedule
 
 
-def params_of(s: ReportSchedule) -> ReportParams:
+def previous_month(due: datetime, tz: tzinfo | None) -> tuple[date, date]:
+    """The first and last day of the calendar month before the one `due` falls in, in the display zone."""
+    last = due.astimezone(tz).date().replace(day=1) - timedelta(days=1)
+    return last.replace(day=1), last
+
+
+def params_of(s: ReportSchedule, *, due: datetime, tz: tzinfo | None) -> ReportParams:
+    """The report a run of the schedule makes. `due`: the time the run was due (not when it is made: a run due at
+    23:59 is picked up after midnight, and a run made up after downtime is the one that was due), which decides the
+    month of a previous-month schedule."""
+    first, last = previous_month(due, tz) if s.period == "previous_month" else (None, None)
     return ReportParams(report_type=s.report_type, lookback_days=s.lookback_days, lang=s.lang, formats=s.formats,
-                        email=s.email, recipients=s.recipients, filter=s.filter, custom_id=s.custom_id)
+                        email=s.email, recipients=s.recipients, filter=s.filter, custom_id=s.custom_id,
+                        period_from=first, period_to=last)
 
 
 def tick_schedules(ctx: AppContext, *, now: datetime | None = None) -> list[int]:
@@ -75,7 +86,7 @@ def tick_schedules(ctx: AppContext, *, now: datetime | None = None) -> list[int]
         logger.info("report schedule {} ({}) is due", s.name, s.id)
         with ctx.db() as conn:
             store.set_schedule_last_due(conn, s.id, latest)
-        out.append(enqueue(ctx, params_of(s), trigger="schedule", schedule_id=s.id, now=at))
+        out.append(enqueue(ctx, params_of(s, due=latest, tz=tz), trigger="schedule", schedule_id=s.id, now=at))
     return out
 
 
@@ -85,7 +96,8 @@ def run_now(ctx: AppContext, schedule_id: str, *, now: datetime | None = None) -
     found = next((s for s in ctx.settings.current().reports.schedules if s.id == schedule_id), None)
     if found is None:
         return None
-    return enqueue(ctx, params_of(found), trigger="schedule", schedule_id=found.id, now=at)
+    tz = ctx.settings.current().display.zone()
+    return enqueue(ctx, params_of(found, due=at, tz=tz), trigger="schedule", schedule_id=found.id, now=at)
 
 
 @dataclass(frozen=True)

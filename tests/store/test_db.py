@@ -31,8 +31,8 @@ def test_migrate_is_idempotent(tmp_path):
 def test_rule_schedule_mode_migration_keeps_existing_schedules_in_provision_mode(tmp_path, monkeypatch):
     conn = connect(tmp_path / "legacy.sqlite")
     migrations = db._migrations()
-    assert migrations[-1][0] == 21
-    monkeypatch.setattr(db, "_migrations", lambda package=None: migrations[:-1])
+    assert migrations[-1][0] == 22
+    monkeypatch.setattr(db, "_migrations", lambda package=None: migrations[:20])  # up to the one before it
     assert migrate(conn) == 20
     conn.execute(
         "INSERT INTO rule_schedules (pce_url, org_id, href, is_ruleset, name, ruleset_name, summary, plan_json, paused, "
@@ -41,7 +41,7 @@ def test_rule_schedule_mode_migration_keeps_existing_schedules_in_provision_mode
          "active", "admin", "2026-11-01T00:00:00+00:00", "2026-11-01T00:00:00+00:00"))
     conn.commit()
     monkeypatch.undo()
-    assert migrate(conn) == 21
+    assert migrate(conn) == 22
     row = conn.execute("SELECT provision, last_want, draft_live FROM rule_schedules").fetchone()
     assert tuple(row) == (1, None, "unknown")
 

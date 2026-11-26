@@ -321,3 +321,16 @@ def test_the_verdict_and_what_it_rests_on_are_two_tables(ctx):
     assert [c.key for c in verdict.columns] == ["app", "score", "grade", "explain", "advice"]
     assert basis.columns[0].key == "app" and basis.columns[-1].key == "modes" and len(basis.columns) >= 4
     assert [r[0] for r in verdict.rows] == [r[0] for r in basis.rows]
+
+
+def test_a_period_read_in_pieces_says_so_and_only_then(ctx, monkeypatch):
+    monkeypatch.setattr(readiness_report, "predicted_summary", lambda ctx, spec, **kw: summary(queries=31))
+    _write(ctx, [flow(src_app="Web", dst_app="DB", port=5432)])
+    doc = _build(ctx)
+    said = [p for b in next(s for s in doc.sections if s.id == "predicted").blocks
+            if hasattr(b, "paragraphs") for p in b.paragraphs]
+    assert any("31 queries" in p and "50,000" in p for p in said)
+    assert next(k for k in doc.kpis if k.key == "predicted_blocked").note is None  # the number is whole
+    monkeypatch.setattr(readiness_report, "predicted_summary", lambda ctx, spec, **kw: summary())
+    doc = _build(ctx)
+    assert not [b for b in next(s for s in doc.sections if s.id == "predicted").blocks if hasattr(b, "paragraphs")]

@@ -49,8 +49,9 @@ from illumio_ops.services.reports.visibility import visibility_sections
 
 APP = "app"
 PREDICTED_ROWS = 50
-# Rows the draft recompute asks the PCE for: its answer is held whole while it is read (about 4 KB a row in
-# memory), so 50,000 keeps a report within its half-gigabyte budget; more is disclosed as capped.
+# Rows the draft recompute asks the PCE for in one query: its answer is held whole while it is read (about 4 KB a
+# row in memory), so 50,000 keeps a report within its half-gigabyte budget. A period past it is read a UTC day at a
+# time and added (predicted_summary); what still comes back at the limit is disclosed as capped.
 PREDICTED_MAX_RESULTS = 50_000
 _FACTOR_KEYS = {"policy": "rpt_rdy_factor_policy", "ringfence": "rpt_rdy_factor_ringfence",
                 "enforcement": "rpt_rdy_factor_enforcement", "staged": "rpt_rdy_factor_staged",
@@ -230,7 +231,9 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
             limit_note=" ".join(x for x in (
                 t("rpt_limit_top_n", n=PREDICTED_ROWS) if len(groups) > PREDICTED_ROWS else "",
                 t("rpt_rdy_predicted_capped", n=f"{PREDICTED_MAX_RESULTS:,}") if predicted.capped else "") if x)
-                or None), *(undetermined if predicted.undetermined_flows else ()))
+                or None), *(undetermined if predicted.undetermined_flows else ()),
+            *((TextBlock(paragraphs=(t("rpt_rdy_predicted_split", n=f"{PREDICTED_MAX_RESULTS:,}",
+                                      queries=predicted.queries),)),) if predicted.queries > 1 else ()))
 
     closest = sorted((x for x in scored if x[1].score is not None),
                      key=lambda x: (-(x[1].score or 0), name(x[0])))[:NEXT_APPS]

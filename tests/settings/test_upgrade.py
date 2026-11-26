@@ -1,6 +1,7 @@
 """Settings files written by an older v6 load through an in-memory version upgrade."""
 import json
 import os
+from datetime import UTC, datetime
 
 import pytest
 
@@ -33,7 +34,7 @@ def test_v1_file_loads_as_v2_in_memory(tmp_path):
     p = _v1(tmp_path)
     before, mtime = p.read_bytes(), os.stat(p).st_mtime_ns
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION == 15
+    assert s.schema_version == SCHEMA_VERSION == 16
     assert s.collection.traffic_interval_seconds == 600
     assert s.collection.retention.baseline_days == 30
     assert p.read_bytes() == before and os.stat(p).st_mtime_ns == mtime
@@ -113,7 +114,7 @@ def test_v3_file_upgrades_to_v4_with_pack(tmp_path):
     p.write_text(json.dumps(d))
     p.chmod(0o600)
     s = SettingsStore(p).load()
-    assert s.schema_version == SCHEMA_VERSION and len(s.alerts.rules) == 35 and all(r.notify for r in s.alerts.rules)
+    assert s.schema_version == SCHEMA_VERSION and len(s.alerts.rules) == 36 and all(r.notify for r in s.alerts.rules)
     assert not s.alerts.channels.smtp.enabled
 
 
@@ -135,7 +136,7 @@ def _v4_dict():
 
 def test_v4_file_upgrades_to_v5_keeping_values():
     s = validate_settings(upgrade(_v4_dict()))
-    assert s.schema_version == SCHEMA_VERSION == 15
+    assert s.schema_version == SCHEMA_VERSION == 16
     lat = s.lateral
     assert lat.detectors.fanout_targets == 12
     assert lat.extra_admin_ports[0].category == "remote" and lat.removed_admin_ports[0].port == 23
@@ -153,7 +154,7 @@ def test_v4_upgrade_adds_anomaly_rules_record_only():
     added = [r for r in s.alerts.rules if r.pack_key.startswith("rule_anomaly")]
     assert len(s.alerts.rules) == kept + 9 and len(added) == 9 and not any(r.notify for r in added)
     again = validate_settings(upgrade(_v4_dict()))  # already has them: nothing is added twice
-    assert len(again.alerts.rules) == 35
+    assert len(again.alerts.rules) == 36
 
 
 def test_v4_at_the_old_rule_limit_still_loads_after_the_anomaly_rules_join():
@@ -183,7 +184,7 @@ def test_v5_file_upgrades_to_v6_with_reports():
     d["schema_version"] = 5
     del d["reports"]
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 15
+    assert s.schema_version == SCHEMA_VERSION == 16
     assert s.reports.retention_days == 90
 
 
@@ -194,7 +195,7 @@ def test_v6_file_upgrades_to_v7_with_rule_thresholds():
     del d["reports"]["rule_thresholds"]
     d["reports"]["retention_days"] = 30
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 15
+    assert s.schema_version == SCHEMA_VERSION == 16
     assert s.reports.retention_days == 30 and s.reports.rule_thresholds.unmanaged_connection == 50
 
 
@@ -205,7 +206,7 @@ def test_upgrade_keeps_mode(mode):
     d["schema_version"] = 7
     d["collection"]["mode"] = mode
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 15 and s.collection.mode.value == mode
+    assert s.schema_version == SCHEMA_VERSION == 16 and s.collection.mode.value == mode
 
 
 def test_events_only_becomes_lightweight():
@@ -259,7 +260,7 @@ def test_v12_settings_gain_batch2_detector_defaults():
         d["lateral"]["detectors"].pop(key, None)
     d["lateral"]["detectors"]["volume_min_connections"] = 4321
     s = validate_settings(upgrade(d))
-    assert s.schema_version == SCHEMA_VERSION == 15
+    assert s.schema_version == SCHEMA_VERSION == 16
     assert {k: getattr(s.lateral.detectors, k) for k in BATCH2_DETECTORS} == BATCH2_DETECTORS
     assert s.lateral.detectors.volume_min_connections == 4321
 
@@ -345,7 +346,8 @@ def test_the_upgraded_schedule_is_one_the_policy_usage_report_takes():
     from illumio_ops.services.reports.generate import refusal
     from illumio_ops.services.reports.schedules import params_of
     s = validate_settings(_v13(_schedule("a"), _schedule("b", lookback_days=7)))
-    assert [refusal(s, params_of(x)) for x in s.reports.schedules] == [None, None]
+    due = datetime(2026, 11, 20, tzinfo=UTC)
+    assert [refusal(s, params_of(x, due=due, tz=UTC)) for x in s.reports.schedules] == [None, None]
 
 
 def test_a_schedule_the_same_as_another_after_the_change_is_kept_once():
@@ -541,8 +543,8 @@ def _v14_with_heartbeat(**changed):
 def test_the_built_in_heartbeat_rule_fires_on_each_occurrence_after_the_upgrade():
     """Lab, 2026-11-15: the PCE sends one event for a VEN that stops answering; "3 in 30 minutes" never fired."""
     s = validate_settings(upgrade(_v14_with_heartbeat()))
-    assert s.schema_version == SCHEMA_VERSION == 15
-    hb, login = s.alerts.rules
+    assert s.schema_version == SCHEMA_VERSION == 16
+    hb, login = s.alerts.rules[:2]  # then the system check 6.16.0 adds
     assert (hb.threshold.value, hb.threshold_count, hb.window_minutes) == ("immediate", 1, 10)
     assert (hb.cooldown_minutes, hb.throttle.count, hb.throttle.period_minutes, hb.enabled) == (60, 1, 30, True)
     assert (login.threshold.value, login.threshold_count, login.window_minutes) == ("count", 5, 10)  # another rule: as it was

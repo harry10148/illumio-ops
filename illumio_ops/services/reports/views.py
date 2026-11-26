@@ -42,6 +42,10 @@ class CatalogEntry(BaseModel):
     mode: Literal["basic", "on_demand"]  # on_demand: reads traffic, pulled from the PCE where none is kept (§5)
     schedules: int  # schedules that make this type
     copies: int  # finished reports of this type kept
+    # The newest finished report of this type still kept: the days it covered and the seconds it took to make
+    # (None: none kept). The page says it before a report that takes minutes is asked for.
+    last_days: int | None = None
+    last_seconds: int | None = None
 
 
 class Catalog(BaseModel):
@@ -92,6 +96,8 @@ def catalog(ctx: AppContext) -> Catalog:
     settings = ctx.settings.current()
     with ctx.db() as conn:
         copies = store.done_counts(conn)
+        took = {t: (round((p_end - p_start).total_seconds() / 86400), round((done - begun).total_seconds()))
+                for t, (p_start, p_end, begun, done) in store.last_durations(conn).items()}
     scheduled: dict[str, int] = {}
     for sch in settings.reports.schedules:
         scheduled[sch.report_type.value] = scheduled.get(sch.report_type.value, 0) + 1
@@ -117,7 +123,9 @@ def catalog(ctx: AppContext) -> Catalog:
                                          formats=list(s.formats), ui_group=UI_GROUPS.get(s.group, "traffic"),  # type: ignore[arg-type]
                                          tier="common" if t in COMMON else "topic",
                                          mode="on_demand" if s.needs_traffic or s.own_traffic else "basic",
-                                         schedules=scheduled.get(t.value, 0), copies=copies.get(t.value, 0))
+                                         schedules=scheduled.get(t.value, 0), copies=copies.get(t.value, 0),
+                                         last_days=took.get(t.value, (None, None))[0],
+                                         last_seconds=took.get(t.value, (None, None))[1])
                             for t, s in specs().items()],
                    smtp_enabled=settings.alerts.channels.smtp.enabled,
                    gui_external_url_set=bool(settings.reports.gui_external_url))

@@ -54,6 +54,7 @@ class SystemCheck(StrEnum):
     JOB_FAILING = "job_failing"
     DISK_LOW = "disk_low"
     SIEM_BACKLOG = "siem_backlog"  # a SIEM destination far behind, failing, or its DLQ full (P7)
+    REPORT_FAILING = "report_failing"  # a schedule's report was not made, or made and not emailed (6.16.0)
 
 
 class DeliveryStatus(StrEnum):

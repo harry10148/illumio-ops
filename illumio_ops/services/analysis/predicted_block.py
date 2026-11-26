@@ -30,7 +30,7 @@ from illumio_ops.domain.policy import DraftView, RuleRef, index_rules, parse_dra
 from illumio_ops.domain.values import KNOWN_DRAFT_POLICY_DECISIONS, CapabilityState
 from illumio_ops.pce.async_query import PceQueryError, run_traffic_query
 from illumio_ops.pce.policy import fetch_policy_names, fetch_rule_sets
-from illumio_ops.services.collect.windows import asked_end
+from illumio_ops.services.collect.windows import asked_end, day_end
 from illumio_ops.services.context import AppContext
 from illumio_ops.services.flowsource import FlowRow, pair_row
 from illumio_ops.store.flowdb import capabilities, ip_lists, policy_objects
@@ -86,7 +86,11 @@ def draft_records(raws: list[dict[str, Any]]) -> tuple[list[FlowRecord], dict[st
     return records, views
 
 
-def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_seconds: int) -> _Recompute:
+def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_seconds: int,
+               own_from: datetime | None = None) -> _Recompute:
+    """own_from: only the connections first seen at or after it (one window of a period read in pieces: a record a
+    day long comes back from both halves of a split day, and one over midnight from both days — it belongs to the
+    window holding its first sighting, as in rule_usage)."""
     at = datetime.now(UTC)
     fdb = ctx.flows()
     gen = fdb.generation  # noted before the settings it goes with: an answer from a switched-away PCE is dropped
@@ -122,6 +126,9 @@ def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_
         # A connection both VENs reported is one row with both ends' attributes, filtered as such (P3 final
         # review #13); its draft evidence is both ends' rules.
         for primary, partner in group_pairs(records):
+            first = primary.first_detected if partner is None else min(primary.first_detected, partner.first_detected)
+            if own_from is not None and first < own_from:
+                continue
             flow = pair_row(primary, partner)
             if not matches(residual, flow.model_dump(), ip_lists=nets, label_groups=groups, services=ports):
                 continue
@@ -167,41 +174,93 @@ class PredictedSummary(BaseModel):
     blocked_flows: int
     blocked_connections: int
     undetermined_flows: int  # the PCE gave no draft decision: zero blocked is then not a confirmed answer
-    capped: bool
+    capped: bool  # still incomplete: a window at the row limit that could not be split further (see truncated)
     computed_at: datetime
     unsupported: bool
     missing_rules: list[str]
+    queries: int = 1  # recomputes asked of the PCE: one for the whole period, more when it was read in pieces
+    truncated: list[tuple[datetime, datetime]] = []  # the pieces that still came back at the row limit
+
+
+MAX_SPLITS = 3  # a UTC day at the row limit is halved this many times (three hours a piece), as rule_usage
+
+
+class _Tally:
+    def __init__(self) -> None:
+        self.counts: dict[tuple[str | None, str], list[int]] = {}
+        self.flows = self.connections = self.undetermined = self.queries = 0
+        self.rules: dict[str, RuleRef] = {}
+        self.truncated: list[tuple[datetime, datetime]] = []
+
+    def add(self, rc: _Recompute, app_key: str) -> None:
+        for row in rc.rows:
+            if not row.flow.dst_managed:  # what enforcement would block is traffic into managed hosts
+                continue
+            if row.draft_decision not in DECIDED:
+                self.undetermined += 1
+                continue
+            if not row.draft_decision.startswith("blocked"):
+                continue
+            self.flows += 1
+            self.connections += row.flow.num_connections
+            for href in row.blocking_rules or ["?"]:
+                c = self.counts.setdefault((row.flow.dst_labels.get(app_key), href), [0, 0])
+                c[0] += 1
+                c[1] += row.flow.num_connections
+        self.rules.update(rc.rules)
+
+
+def _walk(ctx: AppContext, spec: FilterSpec, a: datetime, b: datetime, depth: int, tally: _Tally, *,
+          own_from: datetime | None, app_key: str, max_results: int, deadline_seconds: int, gen: int) -> None:
+    rc = _recompute(ctx, spec.model_copy(update={"start": a, "end": b}), max_results=max_results,
+                    deadline_seconds=deadline_seconds, own_from=own_from)
+    if rc.gen != gen:
+        raise StaleGeneration
+    tally.queries += 1
+    if rc.capped and depth < MAX_SPLITS:
+        del rc  # not held while the halves are read
+        mid = a + (b - a) / 2
+        _walk(ctx, spec, a, mid, depth + 1, tally, own_from=own_from, app_key=app_key, max_results=max_results,
+              deadline_seconds=deadline_seconds, gen=gen)
+        _walk(ctx, spec, mid, b, depth + 1, tally, own_from=mid, app_key=app_key, max_results=max_results,
+              deadline_seconds=deadline_seconds, gen=gen)
+        return
+    if rc.capped:
+        tally.truncated.append((a, b))
+    tally.add(rc, app_key)
 
 
 def predicted_summary(ctx: AppContext, spec: FilterSpec, *, app_key: str = "app", max_results: int = 200_000,
                       deadline_seconds: int = 900) -> PredictedSummary:
+    """One recompute for the whole period; when the PCE stops at `max_results` (its answer is then a part, and
+    which part is the PCE's choice) the period is read again a UTC day at a time, a day at the limit halved up to
+    MAX_SPLITS times, and the pieces added — each connection once, in the piece holding its first sighting. What
+    still comes back at the limit is kept and named in `truncated`. `deadline_seconds` is each recompute's own."""
+    tally = _Tally()
     rc = _recompute(ctx, spec, max_results=max_results, deadline_seconds=deadline_seconds)
-    counts: dict[tuple[str | None, str], list[int]] = {}
-    flows = connections = 0
-    undetermined = 0
-    for row in rc.rows:
-        if not row.flow.dst_managed:  # what enforcement would block is traffic into managed hosts
-            continue
-        if row.draft_decision not in DECIDED:
-            undetermined += 1
-            continue
-        if not row.draft_decision.startswith("blocked"):
-            continue
-        flows += 1
-        connections += row.flow.num_connections
-        for href in row.blocking_rules or ["?"]:
-            c = counts.setdefault((row.flow.dst_labels.get(app_key), href), [0, 0])
-            c[0] += 1
-            c[1] += row.flow.num_connections
-    if ctx.flows().generation != rc.gen:
+    at, gen, unsupported = rc.at, rc.gen, rc.unsupported
+    tally.queries = 1
+    if rc.capped:
+        del rc  # not held while the days are read
+        cur = spec.start
+        while cur < spec.end:
+            nxt = min(day_end(cur), spec.end)  # a UTC day (collect/windows.py): its records are that day's alone
+            _walk(ctx, spec, cur, nxt, 0, tally, own_from=None if cur == spec.start else cur, app_key=app_key,
+                  max_results=max_results, deadline_seconds=deadline_seconds, gen=gen)
+            cur = nxt
+    else:
+        tally.add(rc, app_key)
+    if ctx.flows().generation != gen:
         raise StaleGeneration
-    named = {h for _, h in counts if h != "?"}
-    groups = sorted((PredictedGroup(dst_app=app, rule_href=h, flows=f, connections=n) for (app, h), (f, n) in counts.items()),
+    named = {h for _, h in tally.counts if h != "?"}
+    groups = sorted((PredictedGroup(dst_app=app, rule_href=h, flows=f, connections=n)
+                     for (app, h), (f, n) in tally.counts.items()),
                     key=lambda g: (-g.connections, g.dst_app or "", g.rule_href))
-    return PredictedSummary(groups=groups, rules={h: rc.rules[h] for h in sorted(named) if h in rc.rules},
-                            blocked_flows=flows, blocked_connections=connections, undetermined_flows=undetermined,
-                            capped=rc.capped,
-                            computed_at=rc.at, unsupported=rc.unsupported, missing_rules=sorted(named - rc.rules.keys()))
+    return PredictedSummary(groups=groups, rules={h: tally.rules[h] for h in sorted(named) if h in tally.rules},
+                            blocked_flows=tally.flows, blocked_connections=tally.connections,
+                            undetermined_flows=tally.undetermined, capped=bool(tally.truncated),
+                            computed_at=at, unsupported=unsupported, missing_rules=sorted(named - tally.rules.keys()),
+                            queries=tally.queries, truncated=tally.truncated)
 
 
 def _union(hrefs: Iterable[str]) -> list[str]:

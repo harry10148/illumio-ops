@@ -11,6 +11,7 @@ import os
 import shutil
 import traceback
 from collections.abc import Mapping, Sequence
+from contextvars import ContextVar
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -46,6 +47,7 @@ from illumio_ops.services.reports.finish import finish
 from illumio_ops.services.reports.registry import (
     RETIRED,
     BuildInput,
+    Lane,
     ReportFailed,
     ReportParams,
     ReportSpec,
@@ -61,6 +63,11 @@ from illumio_ops.store import reports as store
 from illumio_ops.store.flowdb.db import StaleGeneration
 
 ERROR_DETAIL_MAX = 500
+# Set while a report is built, by the three places that find part of its period missing (time not collected, a pull
+# that stopped short, days the archive lacks): its numbers are then not kept as a period to compare with
+# (history.with_stored_previous). A report is built in one thread, start to end.
+_PART_MISSING: ContextVar[bool] = ContextVar("report_part_missing", default=False)
+SHORTEST_MONTH, LONGEST_MONTH = 28, 31
 MAX_GAP_LINES = 10
 GAP_REASON_KEYS = {"before_retention": "rpt_gap_reason_before_retention",
                    "not_yet_collected": "rpt_gap_reason_not_yet_collected",
@@ -126,7 +133,11 @@ def earliest_start(settings: Settings, spec: ReportSpec, now: datetime,
         return min(base, reached["flows"]) if "flows" in reached else base
     if spec.max_lookback is not None:
         tz = settings.display.zone()
-        return _midnight(now.astimezone(tz).date() - timedelta(days=spec.max_lookback(settings)), tz)
+        back = spec.max_lookback(settings)
+        # A limit of about a month admits the longest calendar month: a monthly schedule of the previous month
+        # (ReportSchedule.period), run on the 1st, starts 31 days back and is not refused for a day.
+        back = LONGEST_MONTH if SHORTEST_MONTH <= back < LONGEST_MONTH else back
+        return _midnight(now.astimezone(tz).date() - timedelta(days=back), tz)
     return None
 
 
@@ -138,10 +149,29 @@ def first_day(start: datetime | None, tz: tzinfo | None) -> date | None:
     return d if _midnight(d, tz) >= start else d + timedelta(days=1)
 
 
+def whole_month(start: datetime, end: datetime, tz: tzinfo | None) -> bool:
+    """[start, end) is one calendar month in the display zone: from a first day's 00:00 to the next first day's."""
+    a, b = start.astimezone(tz), end.astimezone(tz)
+    first = a.date().replace(day=1)
+    following = (first + timedelta(days=32)).replace(day=1)
+    return start == _midnight(first, tz) and end == _midnight(following, tz) and b.date() == following
+
+
 def previous_period(start: datetime, end: datetime, tz: tzinfo | None) -> tuple[datetime, datetime]:
-    """The same number of calendar days just before [start, end)."""
-    days = (end.astimezone(tz).date() - start.astimezone(tz).date()).days
-    return _midnight(start.astimezone(tz).date() - timedelta(days=days), tz), start
+    """The period a report compares with: the same number of calendar days just before [start, end) — or, for one
+    whole calendar month, the whole month before it (October is compared with September's 30 days, not with the 31
+    days before October)."""
+    first = start.astimezone(tz).date()
+    if whole_month(start, end, tz):
+        return _midnight((first - timedelta(days=1)).replace(day=1), tz), start
+    days = (end.astimezone(tz).date() - first).days
+    return _midnight(first - timedelta(days=days), tz), start
+
+
+def comparable(prev_start: datetime, prev_end: datetime, start: datetime, end: datetime, tz: tzinfo | None) -> bool:
+    """Whether [prev_start, prev_end) is the previous period of [start, end): exactly the one previous_period
+    chooses (the same number of days just before; for a whole calendar month, the month before)."""
+    return (prev_start, prev_end) == previous_period(start, end, tz)
 
 
 def pce_target(pce: PceSettings) -> str:
@@ -199,6 +229,8 @@ def ondemand_lines(res: OnDemandResult, start: datetime, end: datetime, lang: La
         return translate(lang, key, {k: str(v) for k, v in params.items()})
 
     lines = [tr("rpt_quality_ondemand")]
+    if res.earliest is None or res.earliest > start + timedelta(days=1) or res.truncated or res.unread_from is not None:
+        _PART_MISSING.set(True)
     if res.earliest is None:
         lines.append(tr("rpt_quality_ondemand_none"))
     elif res.earliest > start + timedelta(days=1):
@@ -368,9 +400,19 @@ def enqueue(ctx: AppContext, params: ReportParams, *, trigger: str, schedule_id:
                             period_end=end, created_at=now, error_key=reason, pce_target=pce_target(settings.pce))
 
 
-def recover_running(ctx: AppContext) -> int:
+def recover(ctx: AppContext, *, now: datetime | None = None) -> tuple[int, int, int]:
+    """Once, when the service starts and before any report job runs (never from a job: the other lane's report in
+    the making would be queued again and made twice): what the stopped service left half done is put right
+    (store.recover), and the key numbers of the reports kept are recorded where they are not yet (history)."""
+    from illumio_ops.services.reports import history
+    at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.db() as conn:
-        return store.requeue_running(conn)
+        out = store.recover(conn, at=at, error_key="rpt_err_interrupted")
+    if any(out):
+        logger.info("reports: after the restart {} queued again, {} failed (interrupted twice), {} email(s) marked "
+                    "interrupted", *out)
+    history.record_kept(ctx, now=at)
+    return out
 
 
 def _file_name(doc: ReportDocument, report_id: int, fmt: ReportFormat, tz: tzinfo | None) -> str:
@@ -416,14 +458,26 @@ def _write(out_dir: Path, doc: ReportDocument, report_id: int, formats: tuple[Re
     return names
 
 
-def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
-    """Make the oldest queued report; None when nothing is queued. Never raises for a report's own failure."""
+def lane_types(lane: Lane) -> set[str]:
+    return {t.value for t, s in specs().items() if s.lane == lane}
+
+
+def run_queued(ctx: AppContext, *, now: datetime | None = None, lane: Lane | None = None) -> int | None:
+    """Make the oldest queued report; None when nothing is queued. Never raises for a report's own failure.
+    `lane`: only that lane's types (registry.Lane) — "local" also takes every type without a builder, so a report
+    queued before an upgrade still gets its failure; None: any type (one caller making everything, as the tests)."""
     at = (now or datetime.now(UTC)).astimezone(UTC)
     with ctx.db() as conn:
-        row = store.claim_next(conn, at=at)
+        if lane is None:
+            row = store.claim_next(conn, at=at)
+        elif lane == "local":
+            row = store.claim_next(conn, at=at, skip=lane_types("pce"))
+        else:
+            row = store.claim_next(conn, at=at, only=lane_types(lane))
     if row is None:
         return None
     out_dir = ctx.paths.reports_dir / str(row.id)
+    from illumio_ops.services.reports import history  # it imports this module
     fdb = ctx.flows()
     generation = fdb.generation  # noted before the settings it goes with: a switch in between fails the report
     settings = ctx.settings.current()
@@ -440,14 +494,17 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
         reason = availability(ctx).get(params.report_type)
         if reason:
             raise _Fail(reason)
+        _PART_MISSING.set(False)
         doc = _build(ctx, spec, BuildInput(ctx=ctx, params=params, start=row.period_start, end=row.period_end,
                                            lang=params.lang or settings.display.language, tz=tz, now=at,
                                            pce_label=row.pce_label))
+        complete = not _PART_MISSING.get()
         if fdb.generation != generation:
             raise _Fail("rpt_err_pce_switched")
         if _counts_traffic(ctx, spec, params):  # a period of days that are not UTC days counts its edge days whole
             doc = doc.model_copy(update={"data_quality": (
                 *doc.data_quality, *utc_days_note(row.period_start, row.period_end, doc.lang))})
+        doc = history.with_stored_previous(ctx, doc, row, params, tz=tz)
         # gui_base before finish: finish says in the data notes when the hosts a table names cannot be links
         doc = finish(doc.model_copy(update={"gui_base": settings.reports.gui_external_url.rstrip("/") or None}))
         doc = doc.model_copy(update={"gui_link": gui_link(settings.reports.gui_external_url, row.id),
@@ -468,10 +525,13 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None) -> int | None:
                          error_key=key, error_detail=detail)
         return row.id
     with ctx.db() as conn:
+        # "sending" with "done", in one change: the list says so while the email is going out, and nothing reads a
+        # finished report to be emailed as one that is over
         store.finish(conn, row.id, status=ReportStatus.DONE, at=datetime.now(UTC), files=files, kpis=kpis,
-                     conclusion=doc.conclusion)
-        if params.email:  # the list says so while the email is going out
-            store.set_email(conn, row.id, status="sending", detail=None)
+                     conclusion=doc.conclusion, email_status="sending" if params.email else None)
+        store.record_kpis(conn, report_type=row.report_type, pce_target=row.pce_target,
+                          match_json=history.match_key(row.params), period_start=row.period_start,
+                          period_end=row.period_end, kpis=kpis, at=datetime.now(UTC), complete=complete)
     if params.email:
         deliver(ctx, row.id, doc, params, [out_dir / f for f in files], tz=tz)
     return row.id
@@ -495,6 +555,7 @@ def gap_caveats(gaps: Sequence[tuple[datetime, datetime, str]], lang: Language) 
     merged stretches."""
     if not gaps:
         return ()
+    _PART_MISSING.set(True)
     seconds, upto, stretches = 0.0, None, 0
     for a, b, _ in sorted(gaps, key=lambda g: g[0]):
         if upto is None or a > upto:  # starts after the stretch so far: a new one
@@ -524,6 +585,8 @@ def archive_caveat(res: archive_read.ArchiveResult, lang: Language) -> tuple[str
     """One sentence when some days of the period are in no archive file (a day lacking for flows and for events is
     one day); nothing when the archive supplied them all."""
     days = {day for missing in res.missing_days.values() for day in missing}
+    if days or res.unreadable or res.unread_from is not None:
+        _PART_MISSING.set(True)
     return (translate(lang, "rpt_caveat_archive_missing", {"n": str(len(days))}),) if days else ()
 
 

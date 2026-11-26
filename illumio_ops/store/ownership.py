@@ -21,6 +21,7 @@ TABLE_OWNERS: dict[str, str] = {
     "channel_state": "illumio_ops.store.alerts",
     "reports": "illumio_ops.store.reports",
     "report_schedule_state": "illumio_ops.store.reports",
+    "report_kpi_history": "illumio_ops.store.reports",
     "quarantine_actions": "illumio_ops.store.quarantine_actions",
     "custom_reports": "illumio_ops.store.custom_reports",
     "rule_schedules": "illumio_ops.store.rule_schedules",

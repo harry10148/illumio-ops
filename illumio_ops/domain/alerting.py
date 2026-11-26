@@ -72,6 +72,7 @@ SYSTEM_MESSAGE_KEYS: Mapping[SystemCheck, str] = {
     SystemCheck.PCE_HEALTH: "alert_system_pce_health", SystemCheck.COLLECTION_FAILING: "alert_system_collection_failing",
     SystemCheck.DATA_LOSS: "alert_system_data_loss", SystemCheck.JOB_FAILING: "alert_system_job_failing",
     SystemCheck.DISK_LOW: "alert_system_disk_low", SystemCheck.SIEM_BACKLOG: "alert_system_siem_backlog",
+    SystemCheck.REPORT_FAILING: "alert_system_report_failing",
 }
 
 
@@ -252,6 +253,25 @@ class SiemFact:
     error: str | None
 
 
+# What went wrong with a schedule's report -> the sentence saying so (services.alerts.messages.report_reading).
+REPORT_PROBLEM_KEYS: Mapping[str, str] = {
+    "not_made": "alert_report_not_made", "mail_failed": "alert_report_mail_failed",
+    "mail_no_smtp": "alert_report_mail_no_smtp", "mail_interrupted": "alert_report_mail_interrupted",
+}
+
+
+@dataclass(frozen=True)
+class ReportFact:
+    """One report of a schedule that is over and did not reach its reader (spec 2026-11-27 §1)."""
+    report_id: int
+    schedule_id: str
+    schedule: str       # its name; the id when the schedule was deleted since
+    report_type: str
+    problem: str        # a REPORT_PROBLEM_KEYS key
+    error_key: str = ""  # not_made: the report's own reason (an i18n key)
+    detail: str = ""     # the report's error detail, or what the mail server said
+
+
 @dataclass(frozen=True)
 class SystemFacts:
     probe: ProbeFact | None
@@ -261,6 +281,7 @@ class SystemFacts:
     disk_free_bytes: int | None = None
     disk_warn_bytes: int | None = None
     siem: tuple[SiemFact, ...] = ()
+    reports: tuple[ReportFact, ...] = ()  # the schedules' reports not looked at yet that went wrong
 
 
 # ── events ───────────────────────────────────────────────────────────────────
@@ -489,4 +510,10 @@ def evaluate_system(rule: SystemRule, facts: SystemFacts, *, now: datetime) -> l
                         {"destination": f.destination, "pending": f.pending, "warn": f.warn,
                          "dlq_full": f.dlq_full, "error": f.error or ""})
                 for f in facts.siem if f.dlq_full or f.pending > f.warn]
+    if check is SystemCheck.REPORT_FAILING:
+        return [_system(rule, f"{check.value}:{r.schedule_id}", now,
+                        {"schedule": r.schedule, "schedule_id": r.schedule_id, "report_id": r.report_id,
+                         "report_type": r.report_type, "problem": r.problem, "error_key": r.error_key,
+                         "detail": r.detail})
+                for r in facts.reports]
     return []

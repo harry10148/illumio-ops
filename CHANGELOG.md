@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.16.0] - 2026-11-27
+
+### Added
+
+- Alerts: a new built-in system rule, "Scheduled report not delivered". A schedule's report that was not made, or was
+  made and not emailed (the send failed, the SMTP channel is off, or the service stopped while sending), raises one
+  alert when it is over. Before, this showed only on the Reports page. An upgrade adds the rule and starts from the
+  reports made after it; a report asked for by hand is not alerted on.
+- Reports: the key numbers of every finished report are kept apart from the report. "Compared with the previous
+  period" no longer disappears when the earlier report is deleted or aged out. Where a report cannot compute the
+  previous period itself (its data is no longer kept) and the numbers were recorded then, they are used, and the
+  data notes say so.
+- Reports: a monthly schedule can cover the previous whole calendar month instead of a number of days. A report of a
+  whole month is compared with the month before it. A weekly schedule with 7 days already covers the 7 whole days
+  up to yesterday.
+- Reports: the settings panel says how long the last report of that kind took, when it took two minutes or more.
+
+### Changed
+
+- Reports: the queue has two lanes. The policy usage and readiness reports, which ask the PCE to recompute the
+  draft (24 minutes for a month of policy usage on the lab), are made in their own lane; every other report is no
+  longer held up behind them. There is one more background job, "Reports (PCE recompute)".
+- Readiness report: a period whose draft recompute passed the PCE's 50,000 rows gave a part of the answer, marked as
+  capped. It is now read a UTC day at a time and added, each connection once; the report says how many queries that
+  took. Such a report takes about a minute a day of its period.
+
+### Fixed
+
+- Reports: a service restart while a report's email was going out left it at "Sending…" for good, and the page kept
+  polling. It is now marked as interrupted: whether the email went out is not known.
+- Reports: a report left unfinished by a stopped service is started again once; the second time it is failed instead
+  of being started at every restart.
+- Tests: two tests used fixed October dates and began to fail on 2026-11-25, when those days passed the default
+  retention. They no longer depend on the day they run.
+
 ## [6.15.4] - 2026-11-24
 
 ### Added
