@@ -16,9 +16,17 @@ from tests.services.reports.test_findings import flow
 START, END = datetime(2026, 10, 21, tzinfo=UTC), datetime(2026, 10, 27, tzinfo=UTC)
 
 
+def _full_and_kept(d):
+    """Full collection that keeps the fixed October days these tests read, whenever they run: past the default 35
+    days the workbench pulled the period from the PCE instead, and with none set every run answered 409 (from
+    2026-11-25)."""
+    d["collection"].update(mode="full")
+    d["collection"]["retention"].update(flow_days=3650, rollup_days=3650)
+
+
 def _seed(live_app):
     ctx = live_app.ctx
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="full"))
+    ctx.settings.update(ctx.settings.current().revision, _full_and_kept)
     with ctx.flows().connect() as conn:
         upsert_flows(conn, [flow(src="adm", dst="db", port=3389), flow(src="adm", dst="db", port=3389),
                             flow(src="bak", dst="db", port=445), flow(src="bak", dst="web", port=443)],
@@ -245,7 +253,7 @@ def test_a_pick_keeps_the_label_group_a_side_holds(context, live_app):
     from illumio_ops.domain.filter import EndpointFilter
     from illumio_ops.store.flowdb import policy_objects
     ctx = live_app.ctx
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="full"))
+    ctx.settings.update(ctx.settings.current().revision, _full_and_kept)
     group = "/orgs/1/sec_policy/active/label_groups/dev"
     with ctx.flows().connect() as conn:
         upsert_flows(conn, [flow(src="adm", dst="db", port=3389), flow(src="bak", dst="web", port=443)],

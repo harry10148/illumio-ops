@@ -11,7 +11,12 @@ REQ = {"mode": "flows", "start": "2026-10-21T00:00:00Z", "end": "2026-10-27T00:0
 
 
 def _seed(ctx):
-    ctx.settings.update(ctx.settings.current().revision, lambda d: d["collection"].update(mode="full"))
+    def keep(d):
+        # The flows and REQ are fixed days: the store keeps them whenever the test runs (past the default 35 days
+        # the period was pulled from the PCE instead, and with none set the run answered 409 — from 2026-11-25).
+        d["collection"].update(mode="full")
+        d["collection"]["retention"].update(flow_days=3650, rollup_days=3650)
+    ctx.settings.update(ctx.settings.current().revision, keep)
     with ctx.flows().connect() as conn:
         upsert_flows(conn, [flow(src="a", dst="db"), flow(src="b", dst="db")], origin=DataOrigin.INGEST,
                      now=datetime(2026, 10, 27, tzinfo=UTC))

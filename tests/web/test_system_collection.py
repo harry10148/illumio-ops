@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime, timedelta
 
 from illumio_ops.services.collect import backfill
 
@@ -51,7 +52,10 @@ def test_backfill_conflict_returns_409(client):
     login(client)
     backfill.BACKFILL_LOCK.acquire()
     try:
-        r = _send(client, "POST", "/api/system/collection/backfill", {"start": "2026-10-20", "end": "2026-10-21"})
+        # days the retention keeps whenever the test runs (fixed October days were refused from 2026-11-25)
+        today = datetime.now(UTC).date()
+        r = _send(client, "POST", "/api/system/collection/backfill",
+                  {"start": (today - timedelta(days=3)).isoformat(), "end": (today - timedelta(days=2)).isoformat()})
     finally:
         backfill.BACKFILL_LOCK.release()
     assert r.status_code == 409 and r.get_json()["error"]["code"] == "backfill_running"
