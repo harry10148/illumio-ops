@@ -38,12 +38,13 @@ def match_key(params: Mapping[str, Any]) -> str:
 
 def _previous(ctx: AppContext, *, report_type: str, target: str, params: Mapping[str, Any], start: datetime,
               end: datetime, tz: tzinfo | None, whole_only: bool = False) -> store.KpiRecord | None:
-    """whole_only: only numbers of a report known to have read its whole period."""
+    """Never the numbers of a report known to have read a part of its period. whole_only: nor those of a report
+    of which that is not known (one made before it was recorded)."""
     with ctx.db() as conn:
         found = store.kpis_ending_at(conn, report_type=report_type, pce_target=target, match_json=match_key(params),
                                      period_end=start)
     return next((r for r in found if comparable(r.period_start, r.period_end, start, end, tz)
-                 and (r.complete or not whole_only)), None)
+                 and r.complete is not False and (r.complete or not whole_only)), None)
 
 
 def previous_values(inp: BuildInput) -> dict[str, float | int | None] | None:

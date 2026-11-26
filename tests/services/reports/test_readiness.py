@@ -124,6 +124,8 @@ def test_predicted_capped_disclosed(ctx, monkeypatch):
     # the number itself says it is a floor (crosscheck 2026-11-20), and an undetermined note is kept beside it
     kpi = next(k for k in doc.kpis if k.key == "predicted_blocked")
     assert kpi.value == 7 and kpi.note and "50,000" in kpi.note
+    from illumio_ops.services.reports import generate
+    assert generate._PART_MISSING.get() is True  # a floor is not kept as the next period's "previous"
 
 
 def test_predicted_capped_and_undetermined_both_on_the_kpi(ctx, monkeypatch):

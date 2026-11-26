@@ -480,7 +480,7 @@ def evaluate_system(ctx: AppContext, *, now: datetime | None = None,
     # id: SQLite hands a deleted newest report's id to the next one), whether or not a rule watches them: a rule
     # turned on later speaks of the reports made after that, not of every failure before it.
     reports: tuple[ReportFact, ...] = ()
-    looked_at: list[int] = []
+    looked_at: list[tuple[int, datetime]] = []
     if checks is None or SystemCheck.REPORT_FAILING in checks:
         reports, looked_at = report_facts(ctx)
         if not any(r.check is SystemCheck.REPORT_FAILING for r in rules):

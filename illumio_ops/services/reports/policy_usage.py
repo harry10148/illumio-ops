@@ -25,6 +25,7 @@ from illumio_ops.pce.collections import PceCollectionIncomplete
 from illumio_ops.services.analysis.rule_usage import RuleUsage, rule_usage
 from illumio_ops.services.collect.traffic import PCE_FAILURES
 from illumio_ops.services.reports.common import port_text, rule_id, rule_scope, tr
+from illumio_ops.services.reports.generate import part_missing
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.render_html import fmt_time
 from illumio_ops.services.reports.rule_hit_count import rhc_chapter
@@ -153,6 +154,7 @@ def build_policy_usage(inp: BuildInput) -> ReportDocument:
     quality = [t("rpt_pu_quality_source")]
     if usage and usage.truncated:
         quality.append(t("rpt_pu_quality_truncated", n=len(usage.truncated)))
+        part_missing()  # counts of a part of the traffic: not the next period's "previous"
     if usage and usage.undetermined_connections:
         quality.append(t("rpt_pu_quality_undetermined", n=f"{usage.undetermined_connections:,}"))
     quality.extend(hits_chapter.data_quality)

@@ -95,3 +95,24 @@ def test_a_day_at_the_limit_is_halved_and_what_still_caps_is_named(tmp_path, fak
     s = predicted_summary(configured_ctx(tmp_path), spec, max_results=50_000)
     assert s.capped is True and s.truncated == [(d1, d1 + timedelta(hours=3))]  # a day halved three times
     assert s.queries == len(asked) == 8 and s.blocked_connections == 2  # 1 whole + 1 day + 2 + 2 + 2
+
+
+def test_a_sighting_exactly_at_a_split_is_counted_in_one_piece(tmp_path, fake, monkeypatch):  # noqa: F811
+    """Codex review 2026-11-27: the PCE's end is inclusive, so a record first seen exactly at noon comes back from
+    both halves of a split day."""
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.domain.filter import FilterSpec
+    d1 = datetime(2026, 10, 20, tzinfo=UTC)
+    noon = d1 + timedelta(hours=12)
+    spec = FilterSpec(start=d1, end=d1 + timedelta(days=1))
+    at_noon = _flow(1, noon, noon + timedelta(minutes=1), conns=4)
+    morning = _flow(2, d1 + timedelta(hours=1), d1 + timedelta(hours=2), conns=1)
+
+    def answer(a, b):
+        if b - a > timedelta(hours=12):
+            return [morning], True  # the whole day: at the limit
+        return ([morning, at_noon] if a == d1 else [at_noon]), False  # each half gives back the noon record
+    _pieces(monkeypatch, answer)
+    s = predicted_summary(configured_ctx(tmp_path), spec, max_results=50_000)
+    assert (s.blocked_flows, s.blocked_connections, s.truncated) == (2, 5, [])

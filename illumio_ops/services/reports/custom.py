@@ -36,7 +36,7 @@ from illumio_ops.services.reports.common import (
     port_text,
     tr,
 )
-from illumio_ops.services.reports.generate import coverage_text
+from illumio_ops.services.reports.generate import coverage_text, part_missing
 from illumio_ops.services.reports.registry import BuildInput, ReportFailed
 from illumio_ops.services.reports.render_html import fmt_time
 from illumio_ops.services.reports.visibility import visibility_sections
@@ -58,6 +58,8 @@ def _link(inp: BuildInput, sec: CustomSection) -> str | None:
 def _gaps(inp: BuildInput, cov: Coverage | None) -> tuple[TextBlock, ...]:
     """Where this section's data has holes (not collected, failed, cut): said beside the table, never an empty
     table that reads as "nothing happened"."""
+    if cov is not None and (cov.gaps or cov.truncated):
+        part_missing()  # a section over a part of the period: its numbers are not kept to compare with
     if cov is None or not (cov.gaps or cov.truncated):
         return ()
     lines = [tr(inp.lang, "rpt_cust_gaps", n=len(cov.gaps), start=fmt_time(cov.gaps[0][0].isoformat(), inp.tz),

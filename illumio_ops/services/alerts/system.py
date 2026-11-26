@@ -72,10 +72,10 @@ def _siem_facts(ctx: AppContext) -> tuple[SiemFact, ...]:
 _MAIL_PROBLEMS = {"failed": "mail_failed", "skipped_no_smtp": "mail_no_smtp", "interrupted": "mail_interrupted"}
 
 
-def report_facts(ctx: AppContext) -> tuple[tuple[ReportFact, ...], list[int]]:
-    """(the schedules' reports that went wrong among those not looked at yet, the ids of all of those looked at:
-    the caller marks them once its alerts are recorded). A report is looked at once, when it is over: made or
-    failed, and its email sent or not."""
+def report_facts(ctx: AppContext) -> tuple[tuple[ReportFact, ...], list[tuple[int, datetime]]]:
+    """(the schedules' reports that went wrong among those not looked at yet, all of those looked at — each by id
+    and creation time: the caller marks them once its alerts are recorded). A report is looked at once, when it is
+    over: made or failed, and its email sent or not."""
     names = {s.id: s.name for s in ctx.settings.current().reports.schedules}
     with ctx.db() as conn:
         rows = report_store.unchecked_schedule_reports(conn)
@@ -90,12 +90,12 @@ def report_facts(ctx: AppContext) -> tuple[tuple[ReportFact, ...], list[int]]:
             continue
         out.append(ReportFact(report_id=r.id, schedule_id=sid, schedule=names.get(sid, sid),
                               report_type=r.report_type, problem=problem, error_key=key, detail=detail))
-    return tuple(out), [r.id for r in rows]
+    return tuple(out), [(r.id, r.created_at) for r in rows]
 
 
-def mark_reports_checked(ctx: AppContext, report_ids: list[int]) -> None:
+def mark_reports_checked(ctx: AppContext, looked_at: list[tuple[int, datetime]]) -> None:
     with ctx.db() as conn:
-        report_store.mark_checked(conn, report_ids)
+        report_store.mark_checked(conn, looked_at)
 
 
 def max_gap_id(ctx: AppContext) -> int:

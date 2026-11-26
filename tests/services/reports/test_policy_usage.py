@@ -145,6 +145,17 @@ def test_unsupported_lists_no_rule_as_unused(ctx, monkeypatch):
     assert not any("not used" in f.title for f in doc.findings)
 
 
+def test_a_truncated_answer_is_not_kept_to_compare_with(ctx, monkeypatch):
+    from illumio_ops.services.reports import generate
+    generate._PART_MISSING.set(False)
+    monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage())
+    _build(ctx)
+    assert generate._PART_MISSING.get() is False
+    monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage(truncated=[(START, END)]))
+    _build(ctx)
+    assert generate._PART_MISSING.get() is True
+
+
 def test_truncated_unused_hedged_everywhere(ctx, monkeypatch):
     """Review #8: the KPI and the finding say "in the traffic read" too."""
     monkeypatch.setattr(policy_usage, "rule_usage", lambda ctx, **kw: usage(truncated=[(START, END)]))

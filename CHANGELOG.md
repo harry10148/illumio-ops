@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.16.1] - 2026-11-27
+
+### Fixed
+
+Found by a second review of 6.16.0, before any of it was relied on.
+
+- Reports: an error while a report's email was being put together, or while its key numbers were being kept, left
+  the report at "Sending…" until the next restart. The first is recorded as a failed send; the second no longer
+  stops the email.
+- Reports: numbers known to be of a part of a period are never the next report's "previous period": a policy usage
+  answer with truncated windows, a readiness answer still at the PCE's row limit, a weekly overview whose events or
+  alerts were not all collected, a custom report over a gap.
+- Readiness report: a connection first seen exactly where a busy day is split was counted in both pieces.
+- Alerts: the check on the schedules' reports could mark a report it had not read, when the report it read was
+  deleted and a new one was given its id within the same evaluation.
+
 ## [6.16.0] - 2026-11-27
 
 ### Added

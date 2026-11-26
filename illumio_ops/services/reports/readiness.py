@@ -42,7 +42,11 @@ from illumio_ops.services.flowsource import (
 )
 from illumio_ops.services.reports import flowsections
 from illumio_ops.services.reports.common import mode_word, port_text, rule_label, tr
-from illumio_ops.services.reports.generate import caveats_in_order, coverage_text
+from illumio_ops.services.reports.generate import (
+    caveats_in_order,
+    coverage_text,
+    part_missing,
+)
 from illumio_ops.services.reports.history import previous_values
 from illumio_ops.services.reports.registry import BuildInput
 from illumio_ops.services.reports.visibility import visibility_sections
@@ -136,6 +140,7 @@ def build_readiness(inp: BuildInput) -> ReportDocument:
     if predicted is not None and not predicted.unsupported:
         if predicted.capped:
             predicted_notes.append(t("rpt_rdy_predicted_capped", n=f"{PREDICTED_MAX_RESULTS:,}"))
+            part_missing()  # a floor, not a count: not the next period's "previous"
         if predicted.undetermined_flows:
             predicted_notes.append(t("rpt_rdy_predicted_undetermined", n=f"{predicted.undetermined_flows:,}"))
     notes = {"overall": None if rated else no_data,

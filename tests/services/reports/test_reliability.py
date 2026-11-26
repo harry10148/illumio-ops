@@ -278,3 +278,79 @@ def test_the_previous_month_is_a_monthly_schedules_period():
     with pytest.raises(ValidationError):
         sched(period="previous_month")  # daily
     assert sched().period == "days"  # a schedule saved before the field existed
+
+
+def test_an_email_that_breaks_while_sending_is_recorded_failed_not_left_sending(ctx, monkeypatch):
+    """Left at "sending", the report would wait for the next restart and the check on the schedules' reports for
+    an email that is not going out."""
+    _register(monkeypatch, FakeBuilder())
+
+    def broken(*a, **kw):
+        raise OSError("report file vanished")
+    monkeypatch.setattr(generate, "deliver", broken)
+    rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL, email=True), trigger="schedule", schedule_id="s1",
+                           now=NOW)
+    assert generate.run_queued(ctx, now=NOW) == rid  # the job does not fail for it
+    row = _row(ctx, rid)
+    assert (row.status, row.email_status) == (ReportStatus.DONE, "failed") and "report file vanished" in row.email_detail
+    with ctx.db() as conn:
+        assert [r.id for r in store.unchecked_schedule_reports(conn)] == [rid]
+
+
+def test_a_builder_can_say_its_answer_is_a_part(ctx, monkeypatch):
+    """A PCE answer that stopped at its row limit (policy usage, readiness): a floor is not kept to compare with."""
+    def floor(inp: BuildInput) -> ReportDocument:
+        generate.part_missing()
+        return _valued(10)(inp)
+    reg = {t: ReportSpec(report_type=t, group="lateral", needs_traffic=False, build=floor) for t in ReportType}
+    monkeypatch.setattr(registry, "REGISTRY", reg)
+    _queue(ctx, period_from=date(2026, 10, 13), period_to=date(2026, 10, 19))
+    generate.run_queued(ctx, now=NOW)
+    b = _make(ctx, monkeypatch, 100, date(2026, 10, 20), date(2026, 10, 26))
+    assert {k["key"]: k["previous"] for k in _row(ctx, b).kpis}["k"] is None
+
+
+# ── second review round (Codex, 2026-11-27) ──────────────────────────────────
+
+def test_marking_a_report_looked_at_does_not_mark_one_that_took_its_id_since(ctx):
+    with ctx.db() as conn:
+        old = store.insert(conn, report_type="audit", params_json="{}", status=ReportStatus.FAILED, trigger="schedule",
+                           schedule_id="s1", pce_label="p", period_start=NOW, period_end=NOW, created_at=NOW)
+        looked_at = [(r.id, r.created_at) for r in store.unchecked_schedule_reports(conn)]
+        store.delete(conn, [old])
+        new = store.insert(conn, report_type="audit", params_json="{}", status=ReportStatus.FAILED,
+                           trigger="schedule", schedule_id="s1", pce_label="p", period_start=NOW, period_end=NOW,
+                           created_at=NOW + timedelta(seconds=30))
+        assert new == old  # SQLite gave the deleted report's id to the next one
+        store.mark_checked(conn, looked_at)
+        assert [r.id for r in store.unchecked_schedule_reports(conn)] == [new]
+        store.mark_checked(conn, [(new, NOW + timedelta(seconds=30))])
+        assert store.unchecked_schedule_reports(conn) == []
+
+
+def test_key_numbers_that_cannot_be_kept_do_not_stop_the_email(ctx, monkeypatch):
+    _register(monkeypatch, FakeBuilder())
+    sent = []
+    monkeypatch.setattr(generate, "deliver", lambda c, rid, *a, **kw: sent.append(rid))
+
+    def locked(conn, **kw):
+        raise RuntimeError("database is locked")
+    monkeypatch.setattr(store, "record_kpis", locked)
+    rid = generate.enqueue(ctx, ReportParams(report_type=LATERAL, email=True), trigger="schedule", schedule_id="s1",
+                           now=NOW)
+    assert generate.run_queued(ctx, now=NOW) == rid and sent == [rid]
+    assert _row(ctx, rid).status is ReportStatus.DONE
+
+
+def test_a_report_of_a_state_does_not_compare_with_a_number_known_to_be_a_part(ctx):
+    target = generate.pce_target(ctx.settings.current().pce)
+    inp = BuildInput(ctx=ctx, params=ReportParams(report_type=ReportType.READINESS),
+                     start=datetime(2026, 10, 20, tzinfo=UTC), end=datetime(2026, 10, 27, tzinfo=UTC), lang=Language.EN,
+                     tz=UTC, now=NOW, pce_label="p")
+    for complete, expected in ((False, None), (None, {"predicted_blocked": 100}), (True, {"predicted_blocked": 100})):
+        with ctx.db() as conn:
+            store.record_kpis(conn, report_type="readiness", pce_target=target,
+                              match_json=history.match_key(inp.params.model_dump(mode="json")),
+                              period_start=datetime(2026, 10, 13, tzinfo=UTC), period_end=inp.start,
+                              kpis=[{"key": "predicted_blocked", "value": 100}], at=NOW, complete=complete)
+        assert history.previous_values(inp) == expected, complete

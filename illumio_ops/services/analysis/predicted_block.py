@@ -87,10 +87,11 @@ def draft_records(raws: list[dict[str, Any]]) -> tuple[list[FlowRecord], dict[st
 
 
 def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_seconds: int,
-               own_from: datetime | None = None) -> _Recompute:
-    """own_from: only the connections first seen at or after it (one window of a period read in pieces: a record a
-    day long comes back from both halves of a split day, and one over midnight from both days — it belongs to the
-    window holding its first sighting, as in rule_usage)."""
+               own_from: datetime | None = None, own_until: datetime | None = None) -> _Recompute:
+    """own_from / own_until: only the connections first seen at or after the one and before the other (one window
+    of a period read in pieces: a record a day long comes back from both halves of a split day, one over midnight
+    from both days, and the PCE's end is inclusive, so a sighting exactly at a split comes back from both sides —
+    a connection belongs to the one piece holding its first sighting)."""
     at = datetime.now(UTC)
     fdb = ctx.flows()
     gen = fdb.generation  # noted before the settings it goes with: an answer from a switched-away PCE is dropped
@@ -127,7 +128,7 @@ def _recompute(ctx: AppContext, spec: FilterSpec, *, max_results: int, deadline_
         # review #13); its draft evidence is both ends' rules.
         for primary, partner in group_pairs(records):
             first = primary.first_detected if partner is None else min(primary.first_detected, partner.first_detected)
-            if own_from is not None and first < own_from:
+            if (own_from is not None and first < own_from) or (own_until is not None and first >= own_until):
                 continue
             flow = pair_row(primary, partner)
             if not matches(residual, flow.model_dump(), ip_lists=nets, label_groups=groups, services=ports):
@@ -211,19 +212,20 @@ class _Tally:
 
 
 def _walk(ctx: AppContext, spec: FilterSpec, a: datetime, b: datetime, depth: int, tally: _Tally, *,
-          own_from: datetime | None, app_key: str, max_results: int, deadline_seconds: int, gen: int) -> None:
+          own_from: datetime | None, own_until: datetime | None = None, app_key: str, max_results: int,
+          deadline_seconds: int, gen: int) -> None:
     rc = _recompute(ctx, spec.model_copy(update={"start": a, "end": b}), max_results=max_results,
-                    deadline_seconds=deadline_seconds, own_from=own_from)
+                    deadline_seconds=deadline_seconds, own_from=own_from, own_until=own_until)
     if rc.gen != gen:
         raise StaleGeneration
     tally.queries += 1
     if rc.capped and depth < MAX_SPLITS:
         del rc  # not held while the halves are read
         mid = a + (b - a) / 2
-        _walk(ctx, spec, a, mid, depth + 1, tally, own_from=own_from, app_key=app_key, max_results=max_results,
-              deadline_seconds=deadline_seconds, gen=gen)
-        _walk(ctx, spec, mid, b, depth + 1, tally, own_from=mid, app_key=app_key, max_results=max_results,
-              deadline_seconds=deadline_seconds, gen=gen)
+        _walk(ctx, spec, a, mid, depth + 1, tally, own_from=own_from, own_until=mid, app_key=app_key,
+              max_results=max_results, deadline_seconds=deadline_seconds, gen=gen)
+        _walk(ctx, spec, mid, b, depth + 1, tally, own_from=mid, own_until=own_until, app_key=app_key,
+              max_results=max_results, deadline_seconds=deadline_seconds, gen=gen)
         return
     if rc.capped:
         tally.truncated.append((a, b))
@@ -235,7 +237,9 @@ def predicted_summary(ctx: AppContext, spec: FilterSpec, *, app_key: str = "app"
     """One recompute for the whole period; when the PCE stops at `max_results` (its answer is then a part, and
     which part is the PCE's choice) the period is read again a UTC day at a time, a day at the limit halved up to
     MAX_SPLITS times, and the pieces added — each connection once, in the piece holding its first sighting. What
-    still comes back at the limit is kept and named in `truncated`. `deadline_seconds` is each recompute's own."""
+    still comes back at the limit is kept and named in `truncated`. `deadline_seconds` is each recompute's own.
+    A connection whose two ends' records fall in different pieces (seen by one VEN just before a split and by the
+    other just after) is counted once per end: the pieces are paired apart, as in rule_usage."""
     tally = _Tally()
     rc = _recompute(ctx, spec, max_results=max_results, deadline_seconds=deadline_seconds)
     at, gen, unsupported = rc.at, rc.gen, rc.unsupported

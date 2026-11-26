@@ -75,6 +75,7 @@ from illumio_ops.services.reports.generate import (
     coverage_text,
     keeps_traffic,
     ondemand_lines,
+    part_missing,
     previous_period,
     traffic_covered,
 )
@@ -461,6 +462,8 @@ def build_weekly_overview(inp: BuildInput) -> ReportDocument:
         Kpi(key="provisions", label=t("rpt_aud_kpi_provisions"), value=provisions, previous=provisions_before,
             better="neutral", note=None if provisions is not None else t("rpt_aud_no_events")))
 
+    if events.coverage.gaps or partial:  # events not all collected, or alerts recorded for a part of the period
+        part_missing()  # the counts are of a part: not kept as the next period's "previous"
     latest = max((w.fetched_at for w in fleet.hosts), default=None)
     quality = (
         *traffic_notes,

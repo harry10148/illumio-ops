@@ -78,6 +78,13 @@ GAP_REASON_KEYS = {"before_retention": "rpt_gap_reason_before_retention",
 _Fail = ReportFailed
 
 
+def part_missing() -> None:
+    """A builder's word that the report in the making did not read its whole period (a PCE answer that stopped at
+    its row limit): its numbers are not kept as a period to compare with. The gaps, pulls and archive days this
+    module finds itself are marked where they are found."""
+    _PART_MISSING.set(True)
+
+
 def pce_label(pce: PceSettings) -> str:
     host = urlsplit(pce.url).hostname or pce.url
     return f"{host} (org {pce.org_id})" if pce.org_id else host
@@ -529,11 +536,22 @@ def run_queued(ctx: AppContext, *, now: datetime | None = None, lane: Lane | Non
         # finished report to be emailed as one that is over
         store.finish(conn, row.id, status=ReportStatus.DONE, at=datetime.now(UTC), files=files, kpis=kpis,
                      conclusion=doc.conclusion, email_status="sending" if params.email else None)
-        store.record_kpis(conn, report_type=row.report_type, pce_target=row.pce_target,
-                          match_json=history.match_key(row.params), period_start=row.period_start,
-                          period_end=row.period_end, kpis=kpis, at=datetime.now(UTC), complete=complete)
+    try:
+        with ctx.db() as conn:
+            store.record_kpis(conn, report_type=row.report_type, pce_target=row.pce_target,
+                              match_json=history.match_key(row.params), period_start=row.period_start,
+                              period_end=row.period_end, kpis=kpis, at=datetime.now(UTC), complete=complete)
+    except Exception:  # noqa: BLE001 - the report is made: its numbers not being kept must not stop its email
+        logger.error("report {}: its key numbers were not kept: {}", row.id, traceback.format_exc())
     if params.email:
-        deliver(ctx, row.id, doc, params, [out_dir / f for f in files], tz=tz)
+        try:
+            deliver(ctx, row.id, doc, params, [out_dir / f for f in files], tz=tz)
+        except Exception as exc:  # noqa: BLE001 - the report is made: a send that breaks is recorded on it, not raised
+            # Left at "sending" it would stay so until the next restart, and the check on the schedules' reports
+            # waits for an email that is going out.
+            logger.error("report {}: emailing it failed: {}", row.id, traceback.format_exc())
+            with ctx.db() as conn:
+                store.set_email(conn, row.id, status="failed", detail=f"{type(exc).__name__}: {exc}"[:ERROR_DETAIL_MAX])
     return row.id
 
 

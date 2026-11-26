@@ -259,8 +259,11 @@ def unchecked_schedule_reports(conn: sqlite3.Connection) -> list[ReportRow]:
         "AND COALESCE(email_status, '') != 'sending' ORDER BY id")]
 
 
-def mark_checked(conn: sqlite3.Connection, report_ids: list[int]) -> None:
-    conn.executemany("UPDATE reports SET alert_checked = 1 WHERE id = ?", [(i,) for i in report_ids])
+def mark_checked(conn: sqlite3.Connection, looked_at: list[tuple[int, datetime]]) -> None:
+    """looked_at: (id, created_at) of the reports read. The creation time is part of the match: a report deleted
+    since may have given its id to a new one, which has not been looked at."""
+    conn.executemany("UPDATE reports SET alert_checked = 1 WHERE id = ? AND created_at = ?",
+                     [(i, _t(at)) for i, at in looked_at])
     conn.commit()
 
 
