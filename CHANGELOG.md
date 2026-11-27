@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.16.2] - 2026-11-27
+
+### Fixed
+
+Found by a UI evaluation of 6.16.1 (two of them reproduced on a running console).
+
+- Reports › Schedules: editing one schedule and then clicking another one's "Edit" kept the first schedule's fields
+  in the form; saving then wrote them over the second schedule. The editor now opens for the schedule it is given,
+  and while it is open the list's run, edit, delete and on/off controls are disabled.
+- Notification channels: an email recipient list could not be typed. Enter, comma and space were removed as they
+  were typed, so a second address ran into the first. The box keeps what is typed and is split into addresses
+  when saving or testing. SIEM: a space could not be typed inside a CA path; host and path are trimmed when saving or testing.
+- Critical severities and failures were shown in neutral grey: the lateral movement and attention lists' "Critical",
+  failed reports and schedules, a failed alert delivery, and a failing or full SIEM forward. They now use the
+  critical colour, and a medium detection the medium colour, as everywhere else. A new gate fails the build when a
+  page uses a colour name the stylesheet does not define.
+- English product words inside section titles, KPI labels, table headers and navigation groups were shown in
+  capitals ("POTENTIALLY BLOCKED", "FULL", "DRAFT"). Labels keep the case they are written in; their size is
+  unchanged.
+- Raw values on screen: an alert's evidence showed `potentially_blocked`, VEN overview `applied`/`syncing`, a host's
+  ransomware table `unprotected`; they use the words the reports already use. A schedule's error no longer ends
+  with the internal field name (`schedule.day_of_month`): it is shown next to that field, and an error about a
+  field the form does not show stays at the bottom, so none is lost.
+- Deleting one report, schedule, custom report, known detection or tamper note now asks to confirm first, as
+  deleting several reports already did.
+- Tests: the narrow-width overflow check measured the page, which never scrolls sideways; it now also measures the
+  content area, where overflow happens.
+
 ## [6.16.1] - 2026-11-27
 
 ### Fixed

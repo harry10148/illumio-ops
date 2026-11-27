@@ -382,7 +382,8 @@ function Fleet() {
           <TallyTable title={t("fleet_tally_os")} role="fleet-os" rows={o.systems} wordOf={(v) => v ?? t("fleet_not_reported")} />
           <TallyTable title={t("fleet_tally_online")} role="fleet-online"
                       rows={ONLINE.map((s) => ({ value: s, hosts: o.online[s] ?? 0 }))} wordOf={(v) => word(ONLINE_KEYS, v ?? "")} />
-          <TallyTable title={t("fleet_tally_sync")} role="fleet-sync" rows={o.sync_states} wordOf={(v) => v ?? t("fleet_not_reported")} />
+          <TallyTable title={t("fleet_tally_sync")} role="fleet-sync" rows={o.sync_states}
+                      wordOf={(v) => (v ? word(SYNC_KEYS, v) : t("fleet_not_reported"))} />
         </div>
       )}
       <Panel title={t("fleet_history_title")} role="fleet-history"><History actions={actions} lang={lang} /></Panel>

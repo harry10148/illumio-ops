@@ -68,12 +68,16 @@ def narrow_context(browser):
 
 
 def no_horizontal_overflow(page) -> bool:
-    return bool(page.evaluate("""(() => {
+    """Neither the page nor the content area scrolls sideways. The content area (main.content, base.css .content
+    overflow: auto) is where overflow happens: the document itself never scrolls."""
+    r = page.evaluate("""(() => {
       const doc = document.documentElement;
       const content = document.querySelector('main.content');
-      return doc.scrollWidth <= doc.clientWidth + 1
-        && (!content || content.scrollWidth <= content.clientWidth + 1);
-    })()"""))
+      return {found: !!content, doc: doc.scrollWidth <= doc.clientWidth + 1,
+              content: !!content && content.scrollWidth <= content.clientWidth + 1};
+    })()""")
+    assert r["found"], "main.content not found: the overflow check would only see the document"
+    return bool(r["doc"] and r["content"])
 
 
 def sign_in(page, base_url: str) -> None:

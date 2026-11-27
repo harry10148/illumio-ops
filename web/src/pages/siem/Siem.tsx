@@ -37,6 +37,11 @@ const STATE_TONES: Record<SiemSourceStatus["state"], Tone> = {
   baseline_building: "info", off: "info",
 };
 const TRANSPORTS: SiemDestinationInput["transport"][] = ["udp", "tcp", "tls", "hec"];
+
+/** What is sent for a destination: host and CA path without surrounding spaces (kept while typing). */
+function trimmed(d: SiemDestinationInput): SiemDestinationInput {
+  return { ...d, host: d.host.trim(), verify_tls: typeof d.verify_tls === "string" ? d.verify_tls.trim() || true : d.verify_tls };
+}
 const TRANSPORT_KEYS: Record<SiemDestinationInput["transport"], string> = {
   udp: "siem_transport_udp", tcp: "siem_transport_tcp", tls: "siem_transport_tls", hec: "siem_transport_hec",
 };
@@ -137,7 +142,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
   async function test() {
     setBusy(true);
     setResult(null);
-    const env = await call("siem.destination.test", { destination: d });
+    const env = await call("siem.destination.test", { destination: trimmed(d) });
     setBusy(false);
     setResult(env.ok && env.data ? env.data : (env.error as ApiError));
   }
@@ -287,9 +292,7 @@ export function Siem() {
   async function save(e: FormEvent | null, confirmUnverified = false) {
     e?.preventDefault();
     if (!view || !siem) return;
-    const normalized = { ...siem, destinations: siem.destinations.map((d) => ({
-      ...d, host: d.host.trim(), verify_tls: typeof d.verify_tls === "string" ? d.verify_tls.trim() || true : d.verify_tls,
-    })) };
+    const normalized = { ...siem, destinations: siem.destinations.map(trimmed) };
     const env = await call("siem.settings.update", { revision: view.revision, siem: normalized, confirm_tls_unverified: confirmUnverified });
     if (env.ok && env.data) { setView(env.data); setSiem(env.data.siem); setError(null); setSaved(true); loadStatus(); }
     else { setError(env.error); setSaved(false); }

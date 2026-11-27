@@ -1,4 +1,5 @@
 """Reports in a browser (P5a Tasks 8–9): generate, wait, download, land on a linked report, schedule and run."""
+import json
 from pathlib import Path
 
 import pytest
@@ -86,7 +87,7 @@ def test_editing_a_schedule_cannot_switch_the_editor_target(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.goto(live_app.url + "/reports?tab=schedules")
-    page.wait_for_selector("[data-role=schedule-list]")
+    page.wait_for_selector("[data-role=schedules]")
     for name in ("Schedule A", "Schedule B"):
         page.get_by_role("button", name="Add a schedule").click()
         editor = page.locator("[data-role=schedule-editor]")
@@ -96,13 +97,18 @@ def test_editing_a_schedule_cannot_switch_the_editor_target(context, live_app):
         expect(page.locator(f"[data-role=schedule-list] tr:has-text('{name}')")).to_be_visible()
     row_a = page.locator("[data-role=schedule-list] tr:has-text('Schedule A')")
     row_b = page.locator("[data-role=schedule-list] tr:has-text('Schedule B')")
-    row_a.get_by_role("button", name="Edit").click()
+    row_b.get_by_role("button", name="Delete").click()  # a pending confirmation...
+    expect(row_b.locator("[data-role=schedule-delete-confirm]")).to_be_visible()
+    row_a.get_by_role("button", name="Edit").click()  # ...is dropped when the editor opens
+    expect(page.locator("[data-role=schedule-delete-confirm]")).to_have_count(0)
     editor = page.locator("[data-role=schedule-editor]")
     expect(editor.locator("input[name=name]")).to_have_value("Schedule A")
     expect(row_b.get_by_role("button", name="Edit")).to_be_disabled()
+    editor.locator("input[name=name]").fill("Schedule A2")
     editor.get_by_role("button", name="Save").click()
+    expect(editor).to_have_count(0)  # saved: the editor closes only on success
     schedules = live_app.ctx.settings.current().reports.schedules
-    assert {s.name for s in schedules} == {"Schedule A", "Schedule B"}
+    assert {s.name for s in schedules} == {"Schedule A2", "Schedule B"}
 
 
 def test_report_single_delete_requires_confirmation(context, live_app):
@@ -119,6 +125,39 @@ def test_report_single_delete_requires_confirmation(context, live_app):
     row.locator("[data-role=report-delete-confirm]").click()
     expect(page.locator(f"[data-report-id='{ids[0]}']")).to_have_count(0)
     assert len(requests) == 1
+
+
+def test_schedule_errors_are_never_dropped(context, live_app):
+    """6.16.2: an error naming a field the editor shows goes next to that field; any other error (no field, or one
+    with no place on the form, such as a rejected recipient) stays at the bottom, so it is never lost."""
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(live_app.url + "/reports?tab=schedules")
+    page.wait_for_selector("[data-role=schedules]")
+    page.get_by_role("button", name="Add a schedule").click()
+    editor = page.locator("[data-role=schedule-editor]")
+    editor.locator("input[name=name]").fill("Error check")
+    answer = {"field": "schedule.recipients.0"}
+
+    def refuse(route):
+        if route.request.method != "POST":
+            route.continue_()
+            return
+        route.fulfill(status=400, content_type="application/json", body=json.dumps({
+            "ok": False, "data": None, "error": {"code": "invalid_input", "message_key": "err_invalid_input",
+                                                  "params": {}, "field": answer["field"]}}))
+
+    page.route("**/api/report-schedules", refuse)
+    editor.get_by_role("button", name="Save").click()
+    expect(editor.locator(".form-error")).to_have_text("Some fields are not valid.")
+    answer["field"] = "schedule.lookback_days"
+    editor.get_by_role("button", name="Save").click()
+    expect(editor.locator('.field-error[data-field="schedule.lookback_days"]')).to_have_text("Some fields are not valid.")
+    expect(editor.locator(".form-error")).to_have_count(0)
+    answer["field"] = "schedule.name"
+    editor.get_by_role("button", name="Save").click()
+    expect(editor.locator('.field-error[data-field="schedule.name"]')).to_have_text("Some fields are not valid.")
+    expect(editor.locator(".form-error")).to_have_count(0)
 
 
 def test_schedule_single_delete_requires_confirmation(context, live_app):

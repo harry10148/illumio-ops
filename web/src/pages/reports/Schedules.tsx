@@ -39,6 +39,9 @@ function when(s: ReportScheduleFields): string {
   return t("gui_reports_when_daily", { time });
 }
 
+/** Server fields that are shown by another field's control: their errors go there. */
+const ERROR_SLOTS: Record<string, string> = { period: "lookback_days", hour: "time", minute: "time", email: "formats" };
+
 function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   initial: ReportScheduleFields; catalog: Catalog; smtp: boolean; error: ApiError | null;
   onSave: (s: ReportScheduleFields) => void; onCancel: () => void;
@@ -53,7 +56,19 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   const [filterValid, setFilterValid] = useState(true);
   const entry = catalog.entries.find((c) => c.report_type === s.report_type);
   const [customs, setCustoms] = useState<CustomReport[] | null>(null);
-  const fieldError = (name: string) => error?.field === `schedule.${name}`
+  // An error that names a field this form is showing goes next to that field. Any other error (none named, or one
+  // with no place here, such as a recipient the server rejected: schedule.recipients.0) stays at the bottom, so no
+  // error is ever dropped.
+  const placed: Record<string, boolean> = {
+    name: true, report_type: true, custom_id: s.report_type === "custom", lookback_days: true, frequency: true,
+    day_of_week: s.frequency === "weekly", day_of_month: s.frequency === "monthly", time: true, lang: true,
+    formats: true, recipients: s.email, filter: Boolean(entry?.accepts_filter), keep: true,
+  };
+  const errorField = error?.field?.startsWith("schedule.")
+    ? (error.field.slice("schedule.".length).split(".")[0] ?? null) : null;
+  const slot = errorField === null ? null : ERROR_SLOTS[errorField] ?? errorField;
+  const inline = slot !== null && placed[slot] === true;
+  const fieldError = (name: string) => error && inline && slot === name
     ? <span className="field-error" data-field={error.field}>{t(error.message_key, error.params)}</span> : null;
   useEffect(() => {
     if (s.report_type !== "custom" || customs) return;
@@ -74,6 +89,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
         {t("gui_reports_sched_name")}
         <input name="name" value={s.name} maxLength={80} onChange={(e) => set({ name: e.target.value })} />
       </label>
+      {fieldError("name")}
       <label>
         {t("gui_reports_col_report")}
         <select name="report_type" value={s.report_type}
@@ -126,12 +142,14 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           {Object.keys(FREQUENCY_KEYS).map((f) => <option key={f} value={f}>{word(FREQUENCY_KEYS, f)}</option>)}
         </select>
       </label>
+      {fieldError("frequency")}
       {s.frequency === "weekly" && (
         <label>
           {t("gui_reports_day_of_week")}
           <select name="day_of_week" value={String(s.day_of_week ?? 0)} onChange={(e) => set({ day_of_week: Number(e.target.value) })}>
             {WEEKDAY_KEYS.map((k, i) => <option key={k} value={i}>{t(k)}</option>)}
           </select>
+          {fieldError("day_of_week")}
         </label>
       )}
       {s.frequency === "monthly" && (
@@ -149,6 +167,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           onChange={(e) => { const [h, m] = e.target.value.split(":"); set({ hour: Number(h), minute: Number(m) }); }} />
         <span className="hint">{t("gui_reports_time_hint")}</span>
       </label>
+      {fieldError("time")}
       <label>
         {t("gui_reports_language")}
         <select name="lang" value={s.lang ?? ""} onChange={(e) => set({ lang: e.target.value === "" ? null : (e.target.value as "en" | "zh_TW") })}>
@@ -157,6 +176,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           <option value="en">{t("gui_reports_language_en")}</option>
         </select>
       </label>
+      {fieldError("lang")}
       <div className="row span-all">
         {(entry?.formats ?? ["html", "xlsx"]).map((f) => (
           <label key={f}><input type="checkbox" name={f} checked={s.formats.includes(f)}
@@ -173,6 +193,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           {t("gui_reports_recipients")}
           <input name="recipients" value={recipients} placeholder={t("gui_reports_recipients_hint")}
             onChange={(e) => setRecipients(e.target.value)} />
+          {fieldError("recipients")}
         </label>
       )}
       {entry?.accepts_filter && (
@@ -183,10 +204,11 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
         {t("gui_reports_keep")}
         <input name="keep" type="number" min={1} max={365} value={s.keep} onChange={(e) => set({ keep: Number(e.target.value) })} />
       </label>
+      {fieldError("keep")}
       <label>
         <input type="checkbox" name="enabled" checked={s.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> {t("gui_reports_enabled")}
       </label>
-      {error && !error.field && <p className="form-error span-all">{t(error.message_key, error.params)}</p>}
+      {error && !inline && <p className="form-error span-all">{t(error.message_key, error.params)}</p>}
       <div className="actions span-all">
         <button type="button" className="btn-primary" disabled={!filterValid}
           onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? filter : null,
@@ -253,7 +275,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
     <div className="stack" data-role="schedules">
       {!editing && (
         <div className="actions">
-          <button type="button" className="btn-primary" onClick={() => setEditing({ id: null, fields: blank(first) })}>
+          <button type="button" className="btn-primary" onClick={() => { setDeleting(null); setEditing({ id: null, fields: blank(first) }); }}>
             {t("gui_reports_sched_add")}
           </button>
         </div>
@@ -300,11 +322,12 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
                       onChange={() => toggle(item)} /></td>
                     <td className="nowrap">
                       {deleting === s.id ? <>
-                        <button type="button" className="btn-danger" data-role="schedule-delete-confirm" onClick={() => void remove(s.id)}>{t("btn_confirm")}</button>
+                        <button type="button" className="btn-danger" data-role="schedule-delete-confirm" disabled={editing !== null}
+                          onClick={() => void remove(s.id)}>{t("btn_confirm")}</button>
                         <button type="button" className="btn-quiet" onClick={() => setDeleting(null)}>{t("btn_cancel")}</button>
                       </> : <>
                         <button type="button" className="btn-quiet" disabled={editing !== null} onClick={() => void runNow(s.id)}>{t("gui_reports_run_now")}</button>
-                        <button type="button" className="btn-quiet" disabled={editing !== null} onClick={() => { const { id, ...fields } = s; setEditing({ id, fields }); }}>{t("btn_edit")}</button>
+                        <button type="button" className="btn-quiet" disabled={editing !== null} onClick={() => { const { id, ...fields } = s; setDeleting(null); setEditing({ id, fields }); }}>{t("btn_edit")}</button>
                         <button type="button" className="btn-danger" disabled={editing !== null} onClick={() => setDeleting(s.id)}>{t("gui_reports_delete")}</button>
                       </>}
                     </td>

@@ -84,14 +84,11 @@ def test_notification_recipients_keep_newlines_until_save(context, live_app):
     box = form.locator("textarea[name=smtp_recipients]")
     box.fill("a@example.com")
     box.press("Enter")
-    box.type("b@example.com")
+    box.press_sequentially("b@example.com")
     expect(box).to_have_value("a@example.com\nb@example.com")
-    requests = []
-    page.on("request", lambda request: requests.append(request) if request.method == "PUT"
-            and request.url.endswith("/api/system/channels") else None)
-    form.get_by_role("button", name="Save").click()
-    expect.poll(lambda: len(requests)).to_be(1)
-    assert requests[0].post_data_json["channels"]["smtp"]["recipients"] == ["a@example.com", "b@example.com"]
+    with page.expect_request(lambda r: r.method == "PUT" and r.url.endswith("/api/system/channels")) as sent:
+        form.get_by_role("button", name="Save").click()
+    assert sent.value.post_data_json["channels"]["smtp"]["recipients"] == ["a@example.com", "b@example.com"]
 
 
 def test_rule_create_traffic_with_condition(context, live_app):
@@ -266,6 +263,8 @@ def test_lateral_alert_marked_known_then_removed(context, live_app):
     expect(known).to_contain_text("Nightly backup host")
     expect(known).to_contain_text("every detection of this kind about /orgs/1/workloads/w1")
     known.get_by_role("button", name="Remove").click()
+    expect(known).to_contain_text("Nightly backup host")  # 6.16.2: a removal asks first
+    known.locator("[data-role=known-delete-confirm]").click()
     expect(known).to_contain_text("No detection is marked known.")
 
 
