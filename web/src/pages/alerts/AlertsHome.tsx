@@ -1,6 +1,6 @@
 // The home page: alerts first (UI redesign spec §4.1, sample 01) — the period's counts, the list filtered by kind,
 // and the selected alert beside it with its timeline, what the vendor's tools cannot show, and what to do next.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
@@ -83,6 +83,7 @@ export function AlertsHome() {
   const severity = params.get("severity") ?? "";
   const page = Math.max(1, Number(params.get("page") ?? 1) || 1);
   const selectedId = params.get("alert");
+  const scrollDetailOnSelection = useRef(false);
   const updateView = (changes: Record<string, string | null>) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
@@ -93,6 +94,24 @@ export function AlertsHome() {
       return next;
     });
   };
+  const scrollDetailIntoView = useCallback(() => {
+    const pane = document.querySelector<HTMLElement>("[data-role=alert-detail-pane]");
+    const content = pane?.closest<HTMLElement>("main.content");
+    if (!pane || !content) return;
+    if (pane.getBoundingClientRect().top > content.getBoundingClientRect().bottom) {
+      pane.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    }
+  }, []);
+  const selectAlert = (id: string) => {
+    if (selectedId === id) scrollDetailIntoView();
+    else scrollDetailOnSelection.current = true;
+    updateView({ alert: id });
+  };
+  useEffect(() => {
+    if (!scrollDetailOnSelection.current) return;
+    scrollDetailOnSelection.current = false;
+    scrollDetailIntoView();
+  }, [selectedId, scrollDetailIntoView]);
   // "New" is measured against when this page was opened BEFORE this visit. Opening it marks everything seen for the
   // next visit and answers that earlier time, which is kept for as long as the page stays open: changing the page,
   // the period or the filter must not age the alerts being looked at.
@@ -194,7 +213,7 @@ export function AlertsHome() {
                 rows={data.items}
                 rowKey={(a) => String(a.id)}
                 selected={data.items.find((a) => a.group_ids.includes(Number(selectedId)))?.id.toString() ?? null}
-                onRowClick={(a) => updateView({ alert: String(a.id) })}
+                onRowClick={(a) => selectAlert(String(a.id))}
                 empty={onlyNew ? t("alerts_none_new") : t("alerts_none")}
                 columns={[
                   { key: "time", label: t("alerts_col_time"), kind: "time", render: (a) => (
@@ -219,7 +238,7 @@ export function AlertsHome() {
                         {a.group_members.map((member) => <button key={member.id} type="button" className="btn-text"
                           data-member-id={member.id}
                           aria-current={selectedId === String(member.id) ? "true" : undefined}
-                          onClick={(e) => { e.stopPropagation(); updateView({ alert: String(member.id) }); }}>
+                          onClick={(e) => { e.stopPropagation(); selectAlert(String(member.id)); }}>
                           <time dateTime={member.fired_at} title={formatTime(member.fired_at, lang)}>{shortTime(member.fired_at)}</time>
                           {" · "}{member.summary}
                         </button>)}
@@ -240,7 +259,7 @@ export function AlertsHome() {
             )}
           </div>
           {selectedId !== null && Number.isInteger(Number(selectedId)) && (
-              <DetailPane label={t("alert_detail_title")}>
+              <DetailPane label={t("alert_detail_title")} dataRole="alert-detail-pane">
               <Side key={Number(selectedId)} id={Number(selectedId)} />
             </DetailPane>
           )}

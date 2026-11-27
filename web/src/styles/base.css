@@ -71,6 +71,9 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .content { overflow: auto; padding: var(--space-7) var(--space-8); min-width: 0; }
 /* a page is a column of blocks that keep one distance; no page has to remember it */
 .page { max-width: 1400px; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); align-content: start; }
+.page > * { min-width: 0; }
+.page h1, .page h2, .page h3, .page .hint { overflow-wrap: break-word; }
+.page-head > * { min-width: 0; }
 .page > h1, .page > .console-head, .page > .kpi-strip, .page > .subnav { margin-bottom: 0; }
 .subnav { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-6); padding-bottom: var(--space-4);
           border-bottom: 1px solid var(--line); }
@@ -155,7 +158,7 @@ p.badge, div.badge { display: block; padding: var(--space-2) var(--space-4); lin
 .detail-close { position: absolute; top: var(--space-3); right: var(--space-3); height: auto; padding: 0 var(--space-4); }
 .btn-danger { height: var(--ctl-h); padding: 0 var(--space-5); border: 1px solid var(--tone-crit-fg); border-radius: var(--radius-m);
               background: transparent; color: var(--tone-crit-fg); }
-@media (max-width: 1100px) { .split { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .split { grid-template-columns: minmax(0, 1fr); } }
 
 /* ── cards and forms ─────────────────────────────────────────────────── */
 .card {
@@ -250,7 +253,7 @@ button[aria-busy="true"]:disabled { cursor: progress; }
   .probe-row { grid-template-columns: 1fr; gap: var(--space-2); }
 }
 
-.table-wrap { overflow-x: auto; padding: 0; }
+.table-wrap { overflow-x: auto; padding: 0; min-width: 0; }
 .table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
 .table th, .table td { text-align: left; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
 .table th { font-size: var(--fs-micro); letter-spacing: .08em; color: var(--text-2); font-weight: 600;
@@ -267,7 +270,8 @@ button[aria-busy="true"]:disabled { cursor: progress; }
 .status-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); }
 .status-name { min-width: 10rem; color: var(--text-1); font-weight: 600; }
 
-.stack { display: grid; gap: var(--space-7); align-content: start; }
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-7); align-content: start; min-width: 0; }
+.stack > * { min-width: 0; }
 .stack > h1 { margin-bottom: 0; }
 .span-all { grid-column: 1 / -1; margin: 0; }
 /* a checkbox is drawn here, not by the browser: a 16px box on the text's line, ink when ticked */
@@ -352,9 +356,9 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-co
 .host-section { scroll-margin-top: var(--space-6); }
 .host-section:empty { display: none; }
 .host-section[data-arrived] { box-shadow: -4px 0 0 var(--accent); transition: box-shadow .2s; }
-/* a host's name is one thing: it moves to the next line whole, and breaks inside only when it is longer than
-   the room it has (seen on the test box: a name broken mid-word beside its arrow) */
-[data-role=host-link] { display: inline-block; max-width: 100%; overflow-wrap: anywhere; vertical-align: top; }
+/* HostName supplies break opportunities at punctuation; only an overlong segment breaks within itself. */
+[data-role=host-link] { display: inline-block; max-width: 100%; overflow-wrap: break-word; vertical-align: top; }
+.table td > .badge { white-space: nowrap; }
 /* the hosts an alert is about: a name to open, and what the inventory says of it */
 .device-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .device-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-5); padding: var(--space-4) var(--space-5);

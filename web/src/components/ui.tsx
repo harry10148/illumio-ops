@@ -82,7 +82,10 @@ const ADDRESS = /^(ip:)?(\d{1,3}(\.\d{1,3}){3}|[0-9a-f:]*:[0-9a-f:]+)(\/\d+)?$/i
 
 /** A host by name in the reading face; an address in monospace (a value to copy). */
 export function HostName({ name }: { name: string }) {
-  return ADDRESS.test(name.trim()) ? <span className="mono" data-role="address">{name}</span> : <>{name}</>;
+  if (ADDRESS.test(name.trim())) return <span className="mono" data-role="address">{name}</span>;
+  return <>{name.split(/([.-])/).map((part, index) => (
+    <span key={index}>{part}{(part === "." || part === "-") && <wbr />}</span>
+  ))}</>;
 }
 
 export type Tone = "crit" | "high" | "med" | "low" | "ok" | "warn" | "info" | "neutral" | "accum" | "adv" | "muted";
@@ -223,9 +226,11 @@ export function DataTable<R>({ columns, rows, rowKey, empty, onRowClick, selecte
 }
 
 /** The detail beside a list: on the right on a wide screen, under the list on a narrow one. */
-export function DetailPane({ label, onClose, children }: { label: string; onClose?: () => void; children: ReactNode }) {
+export function DetailPane({ label, onClose, children, dataRole }: {
+  label: string; onClose?: () => void; children: ReactNode; dataRole?: string;
+}) {
   return (
-    <aside className="detail-pane" aria-label={label}>
+    <aside className="detail-pane" aria-label={label} data-role={dataRole}>
       {onClose && (
         <button type="button" className="btn-quiet detail-close" onClick={onClose} aria-label={t("action_close")}>×</button>
       )}

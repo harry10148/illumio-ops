@@ -372,7 +372,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                   {r.conclusion && <div className="hint" data-role="report-conclusion">{r.conclusion}</div>}
                 </td>
                 <td className="nowrap">{periodText(r.period_start, r.period_end, lang)}</td>
-                <td>
+                <td className="nowrap">
                   {r.trigger === "schedule" ? (r.schedule_name ? t("gui_reports_trigger_schedule")
                     : t("gui_reports_schedule_deleted")) : t("gui_reports_trigger_manual")}
                 </td>
