@@ -80,7 +80,8 @@ def test_alert_note_persists(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)
     page.click("nav >> text=Alerts")
-    page.locator(f"[data-alert-id='{a}']").click()
+    # the list's entry, not the side pane that also carries the id once the alert is selected
+    page.locator(f"[data-role=alert-list] [data-alert-id='{a}']").click()
     page.locator("[data-role=open-detail]").click()
     notes = page.locator("[data-role=notes]")
     notes.locator("textarea[name=note]").fill("Checked: the backup job filled the disk.")
