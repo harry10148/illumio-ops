@@ -74,12 +74,25 @@ function Side({ id }: { id: number }) {
 export function AlertsHome() {
   const lang = useLang();
   const basic = useBasicMode();
-  const [days, setDays] = useState("7");
-  const [cat, setCat] = useState<Category>("");
-  const [onlyNew, setOnlyNew] = useState(false);
   // ?device=<key>: only the alerts about one host (the host page's "and N more" leads here)
   const [params, setParams] = useSearchParams();
   const device = params.get("device");
+  const days = PERIODS.includes(params.get("days") ?? "7") ? params.get("days") ?? "7" : "7";
+  const cat = (params.get("category") ?? "") as Category;
+  const onlyNew = params.get("only_new") === "true";
+  const severity = params.get("severity") ?? "";
+  const page = Math.max(1, Number(params.get("page") ?? 1) || 1);
+  const selectedId = params.get("alert");
+  const updateView = (changes: Record<string, string | null>) => {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      for (const [key, value] of Object.entries(changes)) {
+        if (value === null || value === "") next.delete(key);
+        else next.set(key, value);
+      }
+      return next;
+    });
+  };
   // "New" is measured against when this page was opened BEFORE this visit. Opening it marks everything seen for the
   // next visit and answers that earlier time, which is kept for as long as the page stays open: changing the page,
   // the period or the filter must not age the alerts being looked at.
@@ -93,25 +106,33 @@ export function AlertsHome() {
       notifyShellStatus();
     });
   }, []);
-  const [page, setPage] = useState(1);
   const [data, setData] = useState<AlertListData | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
 
   useEffect(() => {
     if (seenBefore === null) return;
     const query: Record<string, string> = { days, page: String(page), new_after: seenBefore };
     if (cat) query.category = cat;
     if (onlyNew) query.only_new = "true";
+    if (severity) query.severity = severity;
     if (device) query.device = device;
+    else query.group = "true";
     void call("alerts.list", undefined, undefined, query).then((env) => {
       if (env.ok && env.data) {
         setData(env.data);
         setError(null);
-        setSelected((s) => (s !== null && env.data!.items.some((i) => i.id === s) ? s : env.data!.items[0]?.id ?? null));
       } else setError(env.error);
     });
-  }, [days, cat, onlyNew, page, seenBefore, device]);
+  }, [days, cat, onlyNew, severity, page, seenBefore, device]);
+
+  useEffect(() => {
+    if (!data) return;
+    const chosen = selectedId === null ? null : Number(selectedId);
+    if (chosen !== null && data.items.some((item) => item.group_ids.includes(chosen))) return;
+    const first = data.items[0]?.id;
+    if (String(first ?? "") !== selectedId) updateView({ alert: first === undefined ? null : String(first) });
+  }, [data, selectedId]);
 
   const c = data?.counts;
   const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
@@ -121,7 +142,7 @@ export function AlertsHome() {
       <PageHead title={t("nav_alerts")} purpose={t("purpose_alerts")}>
         <label className="inline-label">
           {t("alerts_period")}
-          <select name="days" value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }}>
+          <select name="days" value={days} onChange={(e) => updateView({ days: e.target.value, page: "1" })}>
             {PERIODS.map((d) => <option key={d} value={d}>{t("alerts_period_days", { n: d })}</option>)}
           </select>
         </label>
@@ -141,18 +162,19 @@ export function AlertsHome() {
         { key: "medium", label: t("severity_medium"), value: c ? c.medium : null, tone: "med" },
         { key: "low", label: t("severity_low"), value: c ? c.low : null },
         { key: "grouped", label: t("alerts_kpi_grouped"), value: c ? c.grouped : null },
-      ]} />
+      ]} selectedKey={severity || null} selectableKeys={["critical", "high", "medium", "low"]}
+        onSelect={(key) => updateView({ severity: severity === key ? null : key, page: "1" })} />
       {device && (
         <p className="row" data-role="alert-device-filter">
           <span>{t("alerts_device_filter", { name: data?.device_name ?? device.replace(/^ip:/, "") })}</span>
-          <button type="button" className="btn-text" onClick={() => { setParams({}); setPage(1); }}>{t("alerts_device_clear")}</button>
+          <button type="button" className="btn-text" onClick={() => updateView({ device: null, page: "1" })}>{t("alerts_device_clear")}</button>
         </p>
       )}
       <div className="filter-bar" data-role="alert-filters">
         <div className="chips-row" role="group" aria-label={t("alerts_type")}>
           {categories.map((k) => (
             <button key={k || "all"} type="button" className="chip-btn" aria-pressed={cat === k}
-                    data-category={k || "all"} onClick={() => { setCat(k); setPage(1); }}>
+                    data-category={k || "all"} onClick={() => updateView({ category: k || null, page: "1" })}>
               {k ? categoryWord(k) : t("alerts_all")}
             </button>
           ))}
@@ -160,7 +182,7 @@ export function AlertsHome() {
         <Segmented label={t("alerts_seen_filter")} role="alert-seen" value={onlyNew ? "new" : "all"}
                    options={[{ value: "all", label: t("alerts_all") },
                              { value: "new", label: t("alerts_only_new"), count: data?.new_matching || undefined }]}
-                   onChange={(v) => { setOnlyNew(v === "new"); setPage(1); }} />
+                   onChange={(v) => updateView({ only_new: v === "new" ? "true" : null, page: "1" })} />
       </div>
       {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
       {data && (
@@ -171,8 +193,8 @@ export function AlertsHome() {
               <DataTable<AlertItem>
                 rows={data.items}
                 rowKey={(a) => String(a.id)}
-                selected={selected === null ? null : String(selected)}
-                onRowClick={(a) => setSelected(a.id)}
+                selected={data.items.find((a) => a.group_ids.includes(Number(selectedId)))?.id.toString() ?? null}
+                onRowClick={(a) => updateView({ alert: String(a.id) })}
                 empty={onlyNew ? t("alerts_none_new") : t("alerts_none")}
                 columns={[
                   { key: "time", label: t("alerts_col_time"), kind: "time", render: (a) => (
@@ -183,8 +205,25 @@ export function AlertsHome() {
                   { key: "sev", label: t("alerts_col_severity"), render: (a) => <SeverityTag severity={a.severity} /> },
                   { key: "title", label: t("alerts_col_alert"), render: (a) => (
                     <div data-alert-id={a.id}>
-                      <div>{a.summary}</div>
+                      <div>{a.summary}{a.group_size > 1 && <> <button type="button" className="btn-text alert-group-toggle"
+                        aria-expanded={expanded.has(a.id)}
+                        aria-label={t(expanded.has(a.id) ? "alerts_group_collapse" : "alerts_group_expand", { n: String(a.group_size) })}
+                        onClick={(e) => { e.stopPropagation(); setExpanded((old) => {
+                          const next = new Set(old);
+                          if (next.has(a.id)) next.delete(a.id); else next.add(a.id);
+                          return next;
+                        }); }}>×{a.group_size}</button></>}</div>
                       <div className="hint">{categoryWord(a.category)} · {a.rule_name}</div>
+                      {expanded.has(a.id) && a.group_size > 1 && <div className="alert-group-members" data-role="alert-group-members">
+                        {a.group_ids_truncated && <p className="hint">{t("alerts_group_limit", { n: String(a.group_size) })}</p>}
+                        {a.group_members.map((member) => <button key={member.id} type="button" className="btn-text"
+                          data-member-id={member.id}
+                          aria-current={selectedId === String(member.id) ? "true" : undefined}
+                          onClick={(e) => { e.stopPropagation(); updateView({ alert: String(member.id) }); }}>
+                          <time dateTime={member.fired_at} title={formatTime(member.fired_at, lang)}>{shortTime(member.fired_at)}</time>
+                          {" · "}{member.summary}
+                        </button>)}
+                      </div>}
                     </div>
                   ) },
                   { key: "hosts", label: t("alerts_col_devices"), render: (a) => <AlertHosts a={a} /> },
@@ -194,15 +233,15 @@ export function AlertsHome() {
             </div>
             {pages > 1 && (
               <div className="row">
-                <button type="button" className="btn-quiet" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t("page_prev")}</button>
+                <button type="button" className="btn-quiet" disabled={page <= 1} onClick={() => updateView({ page: String(page - 1) })}>{t("page_prev")}</button>
                 <span className="hint">{t("page_of", { page: String(page), pages: String(pages) })}</span>
-                <button type="button" className="btn-quiet" disabled={page >= pages} onClick={() => setPage(page + 1)}>{t("page_next")}</button>
+                <button type="button" className="btn-quiet" disabled={page >= pages} onClick={() => updateView({ page: String(page + 1) })}>{t("page_next")}</button>
               </div>
             )}
           </div>
-          {selected !== null && (
-            <DetailPane label={t("alert_detail_title")}>
-              <Side key={selected} id={selected} />
+          {selectedId !== null && Number.isInteger(Number(selectedId)) && (
+              <DetailPane label={t("alert_detail_title")}>
+              <Side key={Number(selectedId)} id={Number(selectedId)} />
             </DetailPane>
           )}
         </div>

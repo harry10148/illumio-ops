@@ -728,6 +728,15 @@ role: ("source" | "destination" | "subject")
 }
 /**
  * This interface was referenced by `ContractRoot`'s JSON-Schema
+ * via the `definition` "AlertGroupMember".
+ */
+export interface AlertGroupMember {
+fired_at: string
+id: number
+summary: string
+}
+/**
+ * This interface was referenced by `ContractRoot`'s JSON-Schema
  * via the `definition` "DeliveryView".
  */
 export interface DeliveryView {
@@ -803,6 +812,10 @@ facts: {
 }
 fired_at: string
 first_seen: string
+group_ids: number[]
+group_ids_truncated: boolean
+group_members: AlertGroupMember[]
+group_size: number
 grouped: boolean
 host_section: (("status" | "tamper" | "connections") | null)
 id: number
@@ -850,6 +863,10 @@ devices: AlertDevice[]
 devices_more: number
 dst: (string | null)
 fired_at: string
+group_ids: number[]
+group_ids_truncated: boolean
+group_members: AlertGroupMember[]
+group_size: number
 grouped: boolean
 host_section: (("status" | "tamper" | "connections") | null)
 id: number

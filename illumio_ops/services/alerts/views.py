@@ -65,6 +65,12 @@ class AlertDevice(BaseModel):
     managed: bool   # a workload (an address is not)
 
 
+class AlertGroupMember(BaseModel):
+    id: int
+    fired_at: datetime
+    summary: str
+
+
 class AlertItem(BaseModel):
     id: int
     fired_at: datetime
@@ -88,6 +94,10 @@ class AlertItem(BaseModel):
     # Where on the host page this alert's hosts should land (purpose-led UI spec §6.3): "status" for a VEN gone
     # quiet or suspended, "tamper" for tampering, "connections" for a detection or a traffic rule; None: the top.
     host_section: Literal["status", "tamper", "connections"] | None
+    group_size: int
+    group_ids: list[int]
+    group_ids_truncated: bool
+    group_members: list[AlertGroupMember]
 
 
 class AlertCounts(BaseModel):
@@ -171,6 +181,7 @@ class AlertQuery(BaseModel):
     # the page keeps that time while it is open, so its own opening does not age the alerts it is showing.
     new_after: datetime | None = None
     only_new: bool = False
+    group: bool = False
     page: int = Field(default=1, ge=1, le=100000)
 
 
@@ -258,7 +269,10 @@ def _item(ctx: AppContext, row: sqlite3.Row, deliveries: list[sqlite3.Row],
                      pack_key=row["pack_key"], devices=_devices(found, names or {}),
                      devices_more=int(row["devices_more"]),
                      is_new=new_after is not None and v.fired_at > new_after,
-                     host_section=_host_section(rule_type, row["pack_key"], params))
+                     host_section=_host_section(rule_type, row["pack_key"], params), group_size=1,
+                     group_ids=[v.id], group_members=[AlertGroupMember(id=v.id, fired_at=v.fired_at,
+                                                                         summary=summary(v, lang))],
+                     group_ids_truncated=False)
 
 
 def mark_seen(ctx: AppContext, *, now: datetime | None = None) -> SeenBefore:
@@ -270,17 +284,68 @@ def mark_seen(ctx: AppContext, *, now: datetime | None = None) -> SeenBefore:
 
 
 def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) -> AlertList:
+    """List alerts, optionally grouped for the alerts home page.
+
+    Grouping is opt-in and runs after days, category, severity, only-new, unprocessed and rule filters. The key is
+    (rule_id, main host, display-zone clock hour); main host is the lowest subject key, falling back to the lowest
+    source key. Alerts with neither host remain separate. Groups sort by newest member (fired_at DESC, id DESC) and
+    page in PAGE-sized groups. A group carries the newest member's fields, highest member severity, and is_new when
+    any member is new. group_ids and expanded member summaries contain at most the newest 100 ids, with
+    group_ids_truncated reporting when more members exist. Counts remain period totals; group=False keeps alert
+    paging and row behavior unchanged.
+    """
     at = (now or datetime.now(UTC)).astimezone(UTC)
     url, org = _pce(ctx)
     since = at - timedelta(days=q.days)
     types, inside, outside = category_filter(q.category) if q.category else (None, None, None)
     with ctx.db() as conn:
-        rows, total = store.list_alerts(conn, pce_url=url, org_id=org, since=since,
-                                        rule_type=q.type.value if q.type else None, rule_types=types,
-                                        detectors_in=inside, detectors_not_in=outside, ungrouped_only=q.unprocessed,
-                                        severity=q.severity.value if q.severity else None, rule_id=q.rule,
-                                        device=q.device, fired_after=q.new_after if q.only_new else None,
-                                        limit=PAGE, offset=(q.page - 1) * PAGE)
+        if q.group:
+            # Filters run before grouping. Group by rule, selected main host, and the alert's own local clock hour;
+            # unhosted alerts remain singletons. Order groups by their newest member and page by group, not alert.
+            candidates = store.alert_group_candidates(
+                conn, pce_url=url, org_id=org, since=since, rule_type=q.type.value if q.type else None,
+                rule_types=types, detectors_in=inside, detectors_not_in=outside, ungrouped_only=q.unprocessed,
+                severity=q.severity.value if q.severity else None, rule_id=q.rule, device=q.device,
+                fired_after=q.new_after if q.only_new else None)
+            candidates.sort(key=lambda candidate: (datetime.fromisoformat(candidate["fired_at"]), candidate["id"]),
+                            reverse=True)
+            zone, _ = display_zone(ctx.settings.current().display)
+            severity_rank = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+            grouped: dict[tuple[str, str, int, int, int, int] | tuple[str, int], list[sqlite3.Row]] = {}
+            for candidate in candidates:
+                fired = datetime.fromisoformat(candidate["fired_at"])
+                if candidate["main_host"] is None:
+                    key: tuple[str, str, int, int, int, int] | tuple[str, int] = ("alert", int(candidate["id"]))
+                else:
+                    local = fired.astimezone(zone)
+                    key = (str(candidate["rule_id"]), str(candidate["main_host"]), local.year, local.month,
+                           local.day, local.hour)
+                grouped.setdefault(key, []).append(candidate)
+            groups = sorted(grouped.values(),
+                            key=lambda members: (datetime.fromisoformat(members[0]["fired_at"]), members[0]["id"]),
+                            reverse=True)
+            total = len(groups)
+            page_groups = groups[(q.page - 1) * PAGE:q.page * PAGE]
+            group_data = [(members, [int(m["id"]) for m in members][:100]) for members in page_groups]
+            wanted_ids = list(dict.fromkeys(alert_id for _, ids in group_data for alert_id in ids))
+            rows_by_id: dict[int, sqlite3.Row] = {}
+            for start in range(0, len(wanted_ids), 500):
+                batch = wanted_ids[start:start + 500]
+                placeholders = ",".join("?" for _ in batch)
+                for row in conn.execute(f"SELECT * FROM alerts WHERE id IN ({placeholders})", batch):
+                    rows_by_id[int(row["id"])] = row
+            rows = [rows_by_id[int(members[0]["id"])] for members, _ in group_data]
+            member_rows = [rows_by_id[alert_id] for alert_id in wanted_ids]
+            page_group_members = group_data
+        else:
+            rows, total = store.list_alerts(conn, pce_url=url, org_id=org, since=since,
+                                            rule_type=q.type.value if q.type else None, rule_types=types,
+                                            detectors_in=inside, detectors_not_in=outside, ungrouped_only=q.unprocessed,
+                                            severity=q.severity.value if q.severity else None, rule_id=q.rule,
+                                            device=q.device, fired_after=q.new_after if q.only_new else None,
+                                            limit=PAGE, offset=(q.page - 1) * PAGE)
+            member_rows = rows
+            page_group_members = []
         new = (store.count_new(conn, pce_url=url, org_id=org, after=q.new_after, since=since)
                if q.new_after is not None else 0)
         recorded = store.devices_recorded_since(conn, pce_url=url, org_id=org) if q.device else None
@@ -290,16 +355,29 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
             severity=q.severity.value if q.severity else None, rule_id=q.rule, device=q.device,
             fired_after=q.new_after) if q.new_after is not None else 0)
         found = store.deliveries(conn, [r["id"] for r in rows])
-        about = store.devices(conn, [r["id"] for r in rows])
+        about = store.devices(conn, [r["id"] for r in member_rows])
         counted = store.period_counts(conn, pce_url=url, org_id=org, since=since)
     by_alert: dict[int, list[sqlite3.Row]] = {}
     for d in found:
         by_alert.setdefault(d["alert_id"], []).append(d)
     counts = AlertCounts(**{k: counted.get(k, 0) for k in ("critical", "high", "medium", "low", "grouped")})
-    names = display_names(ctx, _hrefs(rows) | {d.key for ds in about.values() for d in ds}
+    names = display_names(ctx, _hrefs(member_rows) | {d.key for ds in about.values() for d in ds}
                           | ({q.device} if q.device and is_host_key(q.device) else set()))
-    return AlertList(items=[_item(ctx, r, by_alert.get(r["id"], []), names, about.get(r["id"], ()), q.new_after)
-                            for r in rows], new=new,
+    items = [_item(ctx, r, by_alert.get(r["id"], []), names, about.get(r["id"], ()), q.new_after) for r in rows]
+    if q.group:
+        members_by_id = {int(r["id"]): _item(ctx, r, [], names, about.get(r["id"], ()), q.new_after)
+                         for r in member_rows}
+        for item, (members, ids) in zip(items, page_group_members, strict=True):
+            loaded_members = [members_by_id[alert_id] for alert_id in ids]
+            item.group_size = len(members)
+            item.group_ids = ids
+            item.group_ids_truncated = len(members) > len(ids)
+            item.group_members = [AlertGroupMember(id=member.id, fired_at=member.fired_at, summary=member.summary)
+                                  for member in loaded_members]
+            item.severity = max((Severity(m["severity"]) for m in members), key=lambda s: severity_rank[s.value])
+            item.is_new = any(q.new_after is not None and datetime.fromisoformat(m["fired_at"]) > q.new_after
+                              for m in members)
+    return AlertList(items=items, new=new,
                      hosts_recorded_since=recorded if recorded is not None and recorded > since else None,
                      new_matching=matching, device_name=names.get(q.device) if q.device else None,
                      total=total, page=q.page,

@@ -98,6 +98,10 @@ p.badge, div.badge { display: block; padding: var(--space-2) var(--space-4); lin
              border: 1px solid var(--line); border-radius: var(--radius-l); overflow: hidden; background: var(--surface-1); }
 .kpi { background: var(--surface-1); border-left: 1px solid var(--line); padding: var(--space-5) var(--space-6) var(--space-4);
        min-width: 0; box-shadow: inset 0 -2px 0 var(--mark); }
+.kpi-button { width: 100%; color: inherit; font: inherit; text-align: left; cursor: pointer; appearance: none;
+             border-top: 0; border-right: 0; border-bottom: 0; }
+.kpi-button[aria-pressed="true"] { outline: 2px solid var(--line-strong); outline-offset: -2px; }
+.alert-group-members { display: grid; justify-items: start; gap: var(--space-1); margin-top: var(--space-2); }
 .kpi:first-child { border-left: 0; }
 .kpi[data-tone="muted"] { box-shadow: none; }
 .kpi-label { display: flex; align-items: center; gap: var(--space-3); color: var(--text-2); font-size: var(--fs-micro);

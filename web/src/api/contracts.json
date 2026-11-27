@@ -14657,6 +14657,30 @@
             "title": "AlertDevice",
             "type": "object"
           },
+          "AlertGroupMember": {
+            "properties": {
+              "fired_at": {
+                "format": "date-time",
+                "title": "Fired At",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "fired_at",
+              "summary"
+            ],
+            "title": "AlertGroupMember",
+            "type": "object"
+          },
           "AlertRuleType": {
             "enum": [
               "event",
@@ -14991,6 +15015,28 @@
             "title": "First Seen",
             "type": "string"
           },
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "group_ids_truncated": {
+            "title": "Group Ids Truncated",
+            "type": "boolean"
+          },
+          "group_members": {
+            "items": {
+              "$ref": "#/$defs/AlertGroupMember"
+            },
+            "title": "Group Members",
+            "type": "array"
+          },
+          "group_size": {
+            "title": "Group Size",
+            "type": "integer"
+          },
           "grouped": {
             "title": "Grouped",
             "type": "boolean"
@@ -15123,6 +15169,10 @@
           "devices_more",
           "is_new",
           "host_section",
+          "group_size",
+          "group_ids",
+          "group_ids_truncated",
+          "group_members",
           "params",
           "facts",
           "confidence",
@@ -15214,6 +15264,30 @@
             "title": "AlertDevice",
             "type": "object"
           },
+          "AlertGroupMember": {
+            "properties": {
+              "fired_at": {
+                "format": "date-time",
+                "title": "Fired At",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "fired_at",
+              "summary"
+            ],
+            "title": "AlertGroupMember",
+            "type": "object"
+          },
           "AlertItem": {
             "properties": {
               "category": {
@@ -15267,6 +15341,28 @@
                 "format": "date-time",
                 "title": "Fired At",
                 "type": "string"
+              },
+              "group_ids": {
+                "items": {
+                  "type": "integer"
+                },
+                "title": "Group Ids",
+                "type": "array"
+              },
+              "group_ids_truncated": {
+                "title": "Group Ids Truncated",
+                "type": "boolean"
+              },
+              "group_members": {
+                "items": {
+                  "$ref": "#/$defs/AlertGroupMember"
+                },
+                "title": "Group Members",
+                "type": "array"
+              },
+              "group_size": {
+                "title": "Group Size",
+                "type": "integer"
               },
               "grouped": {
                 "title": "Grouped",
@@ -15365,7 +15461,11 @@
               "devices",
               "devices_more",
               "is_new",
-              "host_section"
+              "host_section",
+              "group_size",
+              "group_ids",
+              "group_ids_truncated",
+              "group_members"
             ],
             "title": "AlertItem",
             "type": "object"
@@ -15680,6 +15780,30 @@
             "title": "AlertDevice",
             "type": "object"
           },
+          "AlertGroupMember": {
+            "properties": {
+              "fired_at": {
+                "format": "date-time",
+                "title": "Fired At",
+                "type": "string"
+              },
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "summary": {
+                "title": "Summary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "fired_at",
+              "summary"
+            ],
+            "title": "AlertGroupMember",
+            "type": "object"
+          },
           "AlertRuleType": {
             "enum": [
               "event",
@@ -16014,6 +16138,28 @@
             "title": "First Seen",
             "type": "string"
           },
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "group_ids_truncated": {
+            "title": "Group Ids Truncated",
+            "type": "boolean"
+          },
+          "group_members": {
+            "items": {
+              "$ref": "#/$defs/AlertGroupMember"
+            },
+            "title": "Group Members",
+            "type": "array"
+          },
+          "group_size": {
+            "title": "Group Size",
+            "type": "integer"
+          },
           "grouped": {
             "title": "Grouped",
             "type": "boolean"
@@ -16146,6 +16292,10 @@
           "devices_more",
           "is_new",
           "host_section",
+          "group_size",
+          "group_ids",
+          "group_ids_truncated",
+          "group_members",
           "params",
           "facts",
           "confidence",

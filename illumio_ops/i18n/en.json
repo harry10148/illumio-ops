@@ -4063,5 +4063,8 @@
   "rpt_det_delivery_unit": "Delivery outcomes count delivery records; pending deliveries are listed separately.",
   "rpt_det_alert_floor_unknown": "The complete-record start for alert history is unknown; alert counts may be incomplete.",
   "rpt_det_alert_floor_partial": "Alert records are complete only from {since}; this period starts earlier, so alert counts may be incomplete.",
-  "rpt_det_limits_suppressed": "Cooldown and throttle suppression counts have no timestamps, so this report does not assign them to the period."
+  "rpt_det_limits_suppressed": "Cooldown and throttle suppression counts have no timestamps, so this report does not assign them to the period.",
+  "alerts_group_expand": "Expand {n} alerts",
+  "alerts_group_collapse": "Collapse {n} alerts",
+  "alerts_group_limit": "Showing the newest 100 of {n} alerts."
 }

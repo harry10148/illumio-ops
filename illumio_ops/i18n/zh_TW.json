@@ -4063,5 +4063,8 @@
   "rpt_det_delivery_unit": "送出結果以各通道的送出紀錄計數；待處理的送出紀錄另列。",
   "rpt_det_alert_floor_unknown": "告警紀錄的完整起點未知；告警數可能不完整。",
   "rpt_det_alert_floor_partial": "告警紀錄僅能確認自 {since} 起完整；本期更早，因此告警數可能不完整。",
-  "rpt_det_limits_suppressed": "冷卻與頻率限制擋下的累計次數沒有時間，本報表不將它們歸入本期。"
+  "rpt_det_limits_suppressed": "冷卻與頻率限制擋下的累計次數沒有時間，本報表不將它們歸入本期。",
+  "alerts_group_expand": "展開 {n} 則告警",
+  "alerts_group_collapse": "收合 {n} 則告警",
+  "alerts_group_limit": "顯示最新 100 則，共 {n} 則告警。"
 }

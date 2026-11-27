@@ -162,6 +162,23 @@ def list_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: d
     return rows, int(total)
 
 
+def alert_group_candidates(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime,
+                           rule_type: str | None = None, severity: str | None = None, rule_id: str | None = None,
+                           rule_types: Sequence[str] | None = None, detectors_in: Sequence[str] | None = None,
+                           detectors_not_in: Sequence[str] | None = None, ungrouped_only: bool = False,
+                           device: str | None = None, fired_after: datetime | None = None) -> list[sqlite3.Row]:
+    """Light rows used to group the already-filtered alerts on the alerts home page."""
+    types = rule_types if rule_types else ((rule_type,) if rule_type else None)
+    where, params = _where(pce_url=pce_url, org_id=org_id, since=since, rule_types=types, severity=severity,
+                           rule_id=rule_id, detectors_in=detectors_in, detectors_not_in=detectors_not_in,
+                           ungrouped_only=ungrouped_only, device=device, fired_after=fired_after)
+    return conn.execute(
+        "SELECT alerts.id, alerts.rule_id, alerts.fired_at, alerts.severity, "
+        "COALESCE((SELECT MIN(d.key) FROM alert_devices d WHERE d.alert_id = alerts.id AND d.role = 'subject'), "
+        "(SELECT MIN(d.key) FROM alert_devices d WHERE d.alert_id = alerts.id AND d.role = 'source')) AS main_host "
+        f"FROM alerts WHERE {where} ORDER BY alerts.fired_at DESC, alerts.id DESC", params).fetchall()
+
+
 def period_alerts(conn: sqlite3.Connection, *, pce_url: str, org_id: str, since: datetime, until: datetime,
                   rule_types: Sequence[str] | None = None, detectors_in: Sequence[str] | None = None,
                   detectors_not_in: Sequence[str] | None = None) -> list[sqlite3.Row]:

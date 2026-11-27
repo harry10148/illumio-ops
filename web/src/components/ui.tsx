@@ -137,18 +137,25 @@ export interface KpiItem {
   delta?: string;
 }
 
-export function KpiStrip({ items }: { items: KpiItem[] }) {
+export function KpiStrip({ items, selectedKey, onSelect, selectableKeys }: {
+  items: KpiItem[]; selectedKey?: string | null; onSelect?: (key: string) => void; selectableKeys?: string[];
+}) {
   return (
     <div className="kpi-strip" data-role="kpi-strip">
-      {items.map((k) => (
-        <div key={k.key} className="kpi" data-tone={k.tone ?? "muted"} data-kpi={k.key}>
+      {items.map((k) => {
+        const contents = <>
           <div className="kpi-label">{k.label}</div>
           {k.value === null
             ? <div className="kpi-reason"><Reason text={k.reason ?? t("value_not_computed")} /></div>
             : <div className="kpi-value">{k.value}</div>}
           {k.delta && <div className="kpi-delta">{k.delta}</div>}
-        </div>
-      ))}
+        </>;
+        const selectable = onSelect && (!selectableKeys || selectableKeys.includes(k.key));
+        return selectable
+          ? <button key={k.key} type="button" className="kpi kpi-button" data-tone={k.tone ?? "muted"}
+                    data-kpi={k.key} aria-pressed={selectedKey === k.key} onClick={() => onSelect?.(k.key)}>{contents}</button>
+          : <div key={k.key} className="kpi" data-tone={k.tone ?? "muted"} data-kpi={k.key}>{contents}</div>;
+      })}
     </div>
   );
 }

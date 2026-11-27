@@ -3,6 +3,7 @@ detail's timeline, what the vendor's tools cannot show, and who can be quarantin
 import json
 from datetime import UTC, datetime, timedelta
 
+from illumio_ops.domain.alert_devices import Device
 from illumio_ops.domain.alerting import Confidence, Trigger
 from illumio_ops.domain.values import AlertRuleType, Severity
 from illumio_ops.services.alerts import views
@@ -57,6 +58,103 @@ def _alert(ctx, *, rule_type=AlertRuleType.SYSTEM, severity=Severity.HIGH, at=No
     with ctx.db() as conn:
         return store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="", pack_key=None, trigger=t,
                                   at=at, channels=[], hold=None)
+
+
+def _with_host(ctx, alert_id, key=WEB, role="subject"):
+    with ctx.db() as conn:
+        store._write_devices(conn, alert_id, [Device(key, role)])
+
+
+def test_grouped_alerts_merge_same_rule_host_and_display_hour(tmp_path):
+    ctx = _ctx(tmp_path)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["display"].update(timezone="Asia/Taipei"))
+    at = datetime(2026, 1, 10, 0, 10, tzinfo=UTC)
+    older = _alert(ctx, severity=Severity.LOW, at=at)
+    newest = _alert(ctx, severity=Severity.CRITICAL, at=at + timedelta(minutes=35))
+    _with_host(ctx, older)
+    _with_host(ctx, newest)
+
+    got = views.list_alerts(ctx, AlertQuery(group=True, days=3650), now=at + timedelta(days=1))
+    assert got.total == 1
+    [item] = got.items
+    assert item.id == newest and item.group_size == 2
+    assert item.group_ids == [newest, older] and not item.group_ids_truncated
+    assert item.severity is Severity.CRITICAL
+    assert [member.id for member in item.group_members] == [newest, older]
+
+
+def test_grouping_uses_display_zone_hour_boundary(tmp_path):
+    ctx = _ctx(tmp_path)
+    # 15:30 and 16:30 UTC are 23:30 and 00:30 in Taipei: the display clock crossed an hour and date boundary.
+    first_at = datetime(2026, 1, 10, 15, 30, tzinfo=UTC)
+    first = _alert(ctx, at=first_at)
+    second = _alert(ctx, at=first_at + timedelta(hours=1))
+    _with_host(ctx, first)
+    _with_host(ctx, second)
+    taipei = views.list_alerts(ctx, AlertQuery(group=True, days=3650), now=first_at + timedelta(days=1))
+    assert taipei.total == 2
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["display"].update(timezone="UTC"))
+    utc = views.list_alerts(ctx, AlertQuery(group=True, days=3650), now=first_at + timedelta(days=1))
+    assert utc.total == 2
+
+
+def test_grouping_converts_each_alert_through_dst_fallback(tmp_path):
+    ctx = _ctx(tmp_path)
+    ctx.settings.update(ctx.settings.current().revision, lambda d: d["display"].update(timezone="America/New_York"))
+    # These are distinct UTC hours but both display as 01:30, on either side of the fall-back transition.
+    at = datetime(2026, 11, 1, 5, 30, tzinfo=UTC)
+    first = _alert(ctx, at=at)
+    second = _alert(ctx, at=at + timedelta(hours=1))
+    _with_host(ctx, first)
+    _with_host(ctx, second)
+    got = views.list_alerts(ctx, AlertQuery(group=True, days=3650), now=at + timedelta(days=1))
+    assert got.total == 1 and got.items[0].group_ids == [second, first]
+
+
+def test_no_host_alerts_never_merge(tmp_path):
+    ctx = _ctx(tmp_path)
+    at = datetime(2026, 1, 10, 1, 0, tzinfo=UTC)
+    _alert(ctx, at=at)
+    _alert(ctx, at=at + timedelta(minutes=2))
+    assert views.list_alerts(ctx, AlertQuery(group=True, days=3650), now=at + timedelta(days=1)).total == 2
+
+
+def test_group_paging_counts_groups(tmp_path):
+    ctx = _ctx(tmp_path)
+    at = datetime(2026, 1, 10, 1, 0, tzinfo=UTC)
+    for hour in range(51):
+        alert_id = _alert(ctx, at=at - timedelta(hours=hour))
+        _with_host(ctx, alert_id, key=f"host:{hour}")
+    first = views.list_alerts(ctx, AlertQuery(group=True, days=3650, page=1), now=at + timedelta(days=1))
+    second = views.list_alerts(ctx, AlertQuery(group=True, days=3650, page=2), now=at + timedelta(days=1))
+    assert first.total == 51 and len(first.items) == 50 and len(second.items) == 1
+
+
+def test_severity_filter_is_applied_before_grouping_and_counts_stay_period_totals(tmp_path):
+    ctx = _ctx(tmp_path)
+    at = datetime(2026, 1, 10, 1, 0, tzinfo=UTC)
+    low = _alert(ctx, severity=Severity.LOW, at=at)
+    high = _alert(ctx, severity=Severity.HIGH, at=at + timedelta(minutes=10))
+    _with_host(ctx, low)
+    _with_host(ctx, high)
+    all_alerts = views.list_alerts(ctx, AlertQuery(group=True, days=3650), now=at + timedelta(days=1))
+    filtered = views.list_alerts(ctx, AlertQuery(group=True, days=3650, severity=Severity.HIGH),
+                                 now=at + timedelta(days=1))
+    assert all_alerts.total == 1 and all_alerts.items[0].group_size == 2
+    assert filtered.total == 1 and filtered.items[0].group_size == 1 and filtered.items[0].id == high
+    assert filtered.counts == all_alerts.counts
+
+
+def test_group_false_preserves_alert_rows(tmp_path):
+    ctx = _ctx(tmp_path)
+    at = datetime(2026, 1, 10, 1, 0, tzinfo=UTC)
+    first = _alert(ctx, at=at)
+    second = _alert(ctx, at=at + timedelta(minutes=2))
+    _with_host(ctx, first)
+    _with_host(ctx, second)
+    got = views.list_alerts(ctx, AlertQuery(days=3650), now=at + timedelta(days=1))
+    assert got.total == 2 and [item.id for item in got.items] == [second, first]
+    assert all(item.group_size == 1 and item.group_ids == [item.id] for item in got.items)
 
 
 def _lateral(ctx, detector, *, det_id=None, summary=None, at=None):
