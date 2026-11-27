@@ -44,7 +44,7 @@ h2 { font-size: var(--fs-ui); font-weight: 600; margin: 0 0 var(--space-4); }
 .nav-group { display: flex; flex-direction: column; gap: var(--space-1); }
 .nav-group:first-child .nav-section { padding-top: 0; }
 .nav-section { padding: var(--space-6) var(--space-5) var(--space-2); font-size: var(--fs-micro); font-weight: 600; color: var(--text-3);
-               text-transform: uppercase; letter-spacing: .08em; }
+               letter-spacing: .08em; }
 .nav-spacer { flex: 1; min-height: var(--space-6); }
 .nav-item {
   display: flex;
@@ -101,7 +101,7 @@ p.badge, div.badge { display: block; padding: var(--space-2) var(--space-4); lin
 .kpi:first-child { border-left: 0; }
 .kpi[data-tone="muted"] { box-shadow: none; }
 .kpi-label { display: flex; align-items: center; gap: var(--space-3); color: var(--text-2); font-size: var(--fs-micro);
-             font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+             font-weight: 600; letter-spacing: .08em; }
 .kpi-label::before { content: ""; width: 7px; height: 7px; background: var(--mark); flex: none; }
 .kpi[data-tone="muted"] .kpi-label { color: var(--text-3); }
 .kpi[data-tone="muted"] .kpi-label::before { background: var(--line-strong); }
@@ -125,9 +125,9 @@ p.badge, div.badge { display: block; padding: var(--space-2) var(--space-4); lin
 .panel { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius-l); min-width: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-5);
               padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--line); }
-/* section names are eyebrows: small, spaced capitals (Chinese is unaffected) */
+/* Section names are eyebrows: small, spaced labels in their original letter case. */
 .panel-head h2, .card > h2, .card > .row:first-child h2, .card h3, .rpt-tier > h2 {
-  font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+  font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; color: var(--text-2); }
 .panel-head h2 { margin: 0; }
 .panel-meta { color: var(--text-3); font-size: var(--fs-mini); }
 .panel-body { padding: var(--space-5) var(--space-6); }
@@ -243,7 +243,7 @@ button:disabled { cursor: progress; opacity: .7; }
 .table-wrap { overflow-x: auto; padding: 0; }
 .table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); }
 .table th, .table td { text-align: left; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
-.table th { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .08em; color: var(--text-2); font-weight: 600;
+.table th { font-size: var(--fs-micro); letter-spacing: .08em; color: var(--text-2); font-weight: 600;
             border-bottom-color: var(--line); white-space: nowrap; }
 /* what a cell holds may run to more lines, in full; a time, a figure or a state never breaks */
 .table td { overflow-wrap: break-word; }

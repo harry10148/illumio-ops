@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { DetectorStatusView, KnownView, LabelChoice, LabelSelector, LateralSettings, LateralView, PortClass, PortEntry } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import type { Tone } from "../../components/ui";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
@@ -25,7 +26,7 @@ export const STATE_KEYS: Record<string, string> = {
   collection_off: "detector_state_collection_off",
   incomplete: "detector_state_incomplete",
 };
-export const STATE_TONES: Record<string, string> = { ok: "ok", incomplete: "warn", no_data: "warn", accumulating: "info" };
+export const STATE_TONES: Record<string, Tone> = { ok: "ok", incomplete: "warn", no_data: "warn", accumulating: "info" };
 const SOURCE_KEYS: Record<string, string> = { builtin: "port_source_builtin", pce: "port_source_pce", added: "port_source_added" };
 const SETTING_KEYS: Record<string, string> = { critical_assets: "lateral_critical_title", admin_groups: "lateral_admin_title" };
 // Detector thresholds and graph settings, shown as text while edited.
@@ -116,6 +117,7 @@ function KnownMarks() {
   const lang = useLang();
   const [items, setItems] = useState<KnownView[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [confirming, setConfirming] = useState<number | null>(null);
   useEffect(() => {
     void call("system.lateral.known").then((env) => {
       if (env.ok && env.data) setItems(env.data.items);
@@ -124,7 +126,7 @@ function KnownMarks() {
   }, []);
   async function remove(id: number) {
     const env = await call("system.lateral.known_delete", undefined, { mark_id: String(id) });
-    if (env.ok && env.data) setItems(env.data.items);
+    if (env.ok && env.data) { setItems(env.data.items); setConfirming(null); }
     else setError(env.error);
   }
   return (
@@ -142,7 +144,10 @@ function KnownMarks() {
               <p>{m.reason}</p>
               <p className="hint">
                 {t("alert_note_by", { who: m.created_by, at: formatTime(m.created_at, lang) })}{" "}
-                <button type="button" className="btn-text" onClick={() => void remove(m.id)}>{t("lateral_known_remove")}</button>
+                {confirming === m.id ? <>
+                  <button type="button" className="btn-danger" data-role="known-delete-confirm" onClick={() => void remove(m.id)}>{t("btn_confirm")}</button>{" "}
+                  <button type="button" className="btn-quiet" onClick={() => setConfirming(null)}>{t("btn_cancel")}</button>
+                </> : <button type="button" className="btn-text" data-role="known-delete" onClick={() => setConfirming(m.id)}>{t("lateral_known_remove")}</button>}
               </p>
             </li>
           ))}

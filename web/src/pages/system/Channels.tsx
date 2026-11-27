@@ -33,12 +33,13 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
   const lang = useLang();
   const [view, setView] = useState<ChannelsView | null>(null);
   const [channels, setChannels] = useState<ChannelsInput | null>(null);
+  const [recipientText, setRecipientText] = useState("");
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [results, setResults] = useState<Partial<Record<Kind, Result>>>({});
   const [allNone, setAllNone] = useState(false);
 
-  const load = (v: ChannelsView) => { setView(v); setChannels(v.channels); };
+  const load = (v: ChannelsView) => { setView(v); setChannels(v.channels); setRecipientText(v.channels.smtp.recipients.join("\n")); };
   useEffect(() => {
     void call("system.channels.get").then((env) => {
       if (env.ok && env.data) load(env.data);
@@ -60,17 +61,26 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
     setSaved(false);
   };
 
+  const payload = () => channels && ({
+    ...channels,
+    smtp: { ...channels.smtp, recipients: recipientText.split(/[\s,;]+/).filter(Boolean) },
+  });
+
   async function save(e: FormEvent) {
     e.preventDefault();
     if (!view || !channels) return;
-    const env = await call("system.channels.update", { revision: view.revision, channels });
+    const current = payload();
+    if (!current) return;
+    const env = await call("system.channels.update", { revision: view.revision, channels: current });
     if (env.ok && env.data) { load(env.data); setError(null); setSaved(true); }
     else { setError(env.error); setSaved(false); }
   }
 
   async function test(kind: Kind) {
     if (!channels) return;
-    const env = await call("system.channels.test", { channel: kind, channels });
+    const current = payload();
+    if (!current) return;
+    const env = await call("system.channels.test", { channel: kind, channels: current });
     setResults({ ...results, [kind]: env.ok && env.data ? env.data : (env.error as ApiError) });
   }
 
@@ -78,7 +88,9 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
   async function testAll() {
     if (!channels) return;
     setAllNone(false);
-    const env = await call("system.channels.test_all", { channels });
+    const current = payload();
+    if (!current) return;
+    const env = await call("system.channels.test_all", { channels: current });
     if (!env.ok || !env.data) { setError(env.error); return; }
     setError(null);
     setAllNone(env.data.results.length === 0);
@@ -108,8 +120,8 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
                   <label key={field}>
                     {t(labelKey)}
                     {field === "recipients" ? (
-                      <textarea name={`${kind}_${field}`} rows={2} value={(c.recipients as string[]).join("\n")}
-                                onChange={(e) => set(kind, field, e.target.value.split(/[\s,;]+/).filter(Boolean))} />
+                      <textarea name={`${kind}_${field}`} rows={2} value={recipientText}
+                                onChange={(e) => { setRecipientText(e.target.value); setSaved(false); }} />
                     ) : (
                       <input name={`${kind}_${field}`} type={secret ? "password" : "text"} autoComplete="off"
                              value={String(c[field] ?? "")}

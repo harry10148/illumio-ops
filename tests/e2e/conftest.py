@@ -68,7 +68,12 @@ def narrow_context(browser):
 
 
 def no_horizontal_overflow(page) -> bool:
-    return bool(page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"))
+    return bool(page.evaluate("""(() => {
+      const doc = document.documentElement;
+      const content = document.querySelector('main.content');
+      return doc.scrollWidth <= doc.clientWidth + 1
+        && (!content || content.scrollWidth <= content.clientWidth + 1);
+    })()"""))
 
 
 def sign_in(page, base_url: str) -> None:

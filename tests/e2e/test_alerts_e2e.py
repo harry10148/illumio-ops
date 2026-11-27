@@ -76,6 +76,24 @@ def test_alert_note_persists(context, live_app):
     expect(page.locator("[data-role=notes] li")).to_contain_text("Checked: the backup job filled the disk.")
 
 
+def test_notification_recipients_keep_newlines_until_save(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(live_app.url + "/alert-rules?tab=channels")
+    form = page.locator("[data-role=channels]")
+    box = form.locator("textarea[name=smtp_recipients]")
+    box.fill("a@example.com")
+    box.press("Enter")
+    box.type("b@example.com")
+    expect(box).to_have_value("a@example.com\nb@example.com")
+    requests = []
+    page.on("request", lambda request: requests.append(request) if request.method == "PUT"
+            and request.url.endswith("/api/system/channels") else None)
+    form.get_by_role("button", name="Save").click()
+    expect.poll(lambda: len(requests)).to_be(1)
+    assert requests[0].post_data_json["channels"]["smtp"]["recipients"] == ["a@example.com", "b@example.com"]
+
+
 def test_rule_create_traffic_with_condition(context, live_app):
     page = context.new_page()
     sign_in(page, live_app.url)

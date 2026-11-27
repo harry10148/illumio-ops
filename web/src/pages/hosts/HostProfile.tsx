@@ -34,6 +34,9 @@ const CLASS_KEYS: Record<string, string> = {
 const DETAILS_KEYS: Record<string, string> = {
   stale: "hosts_rw_details_stale", missing: "hosts_rw_details_missing", not_rated: "hosts_rw_details_not_rated",
 };
+const PROTECTION_KEYS: Record<string, string> = {
+  protected: "rpt_rw_state_protected", unprotected: "rpt_rw_state_unprotected", unknown: "rpt_rw_state_unknown",
+};
 const ALLOW_KEYS: Record<string, string> = { error: "rpt_rw_allow_error", partial: "rpt_rw_allow_partial" };
 const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], ["wb_period_7d", 168]];
 const READINGS_SHOWN = 50;
@@ -189,6 +192,7 @@ function Tamper({ hostKey, href, tamper, onChange }: {
   const [reason, setReason] = useState("");
   const [process, setProcess] = useState("");
   const [onlyPattern, setOnlyPattern] = useState(true);
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const readings = [...tamper.readings].reverse();
   const notes = tamper.annotations.filter((a) => a.host_href === href || a.host_href === null);
@@ -207,7 +211,7 @@ function Tamper({ hostKey, href, tamper, onChange }: {
   };
   const remove = async (id: number) => {
     const env = await call("hosts.tamper_note_remove", { key: hostKey }, { note_id: String(id) });
-    if (env.ok && env.data) onChange(env.data);
+    if (env.ok && env.data) { onChange(env.data); setConfirmRemove(null); }
     else setError(env.error);
   };
 
@@ -277,7 +281,10 @@ function Tamper({ hostKey, href, tamper, onChange }: {
             {n.process && <span className="badge">{n.process}</span>}
             {n.host_href === null && <span className="badge">{t("hosts_tamper_note_all")}</span>}
             <span className="hint">{t("hosts_tamper_explains", { n: String(tamper.explained[String(n.id)] ?? 0) })}</span>
-            <button type="button" className="btn-text" onClick={() => void remove(n.id)}>{t("wb_remove")}</button>
+            {confirmRemove === n.id ? <>
+              <button type="button" className="btn-danger" data-role="tamper-remove-confirm" onClick={() => void remove(n.id)}>{t("btn_confirm")}</button>
+              <button type="button" className="btn-quiet" onClick={() => setConfirmRemove(null)}>{t("btn_cancel")}</button>
+            </> : <button type="button" className="btn-text" data-role="tamper-remove" onClick={() => setConfirmRemove(n.id)}>{t("wb_remove")}</button>}
           </li>
         ))}
       </ul>
@@ -334,7 +341,8 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
                   <tr key={k}>
                     <td>{s.name}</td><td className="nowrap">{portWord(s.port, s.proto)}</td>
                     <td>{s.severity ? word(SEVERITY_KEYS, s.severity.toLowerCase()) : "—"}</td>
-                    <td>{s.protection_state ?? "—"}{s.port_status ? ` · ${s.port_status}` : ""}</td>
+                    <td>{s.protection_state ? word(PROTECTION_KEYS, s.protection_state.toLowerCase()) : "—"}
+                      {s.port_status ? ` · ${s.port_status}` : ""}</td>
                     <td className="wb-num">{s.weight ?? "—"}</td>
                     <td className="wb-num">{s.coverage === null ? "—" : `${Math.round(s.coverage * 100)}%`}</td>
                     <td className="wb-num">{s.contribution === null ? "—" : s.contribution.toFixed(1)}</td>
@@ -597,7 +605,7 @@ export function HostProfile() {
           <p className="notice" data-role="rw-details">{word(DETAILS_KEYS, profile.ransomware_details)}</p>
         )}
         {profile.ransomware && profile.ransomware_details !== "not_rated" && profile.ransomware_details !== "missing" && (
-          <Ransomware hostKey={profile.key} initial={profile.ransomware} />
+          <Ransomware key={profile.key} hostKey={profile.key} initial={profile.ransomware} />
         )}
       </div>
       <div id="tamper" className="host-section">

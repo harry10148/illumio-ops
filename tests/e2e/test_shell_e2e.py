@@ -85,6 +85,26 @@ def test_no_horizontal_overflow_760(live_app, narrow_context):
     assert no_horizontal_overflow(page)
 
 
+def test_ui_labels_keep_their_authored_case(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(live_app.url + "/")
+    page.locator(".kpi-label").first.wait_for()
+    kpi = page.locator(".kpi-label").first.evaluate("el => getComputedStyle(el).textTransform")
+    page.goto(live_app.url + "/alert-rules?tab=channels")
+    page.locator("[data-role=channels]").wait_for()
+    eyebrow = page.locator(".card > h2, .panel-head h2, .card h3").first.evaluate("el => getComputedStyle(el).textTransform")
+    page.goto(live_app.url + "/reports?tab=schedules")
+    page.locator("[data-role=schedule-list] th").first.wait_for()
+    computed = {
+        "eyebrow": eyebrow,
+        "kpi": kpi,
+        "table": page.locator(".table th").first.evaluate("el => getComputedStyle(el).textTransform"),
+        "nav": page.locator(".nav-section").first.evaluate("el => getComputedStyle(el).textTransform"),
+    }
+    assert all(value is not None and value != "uppercase" for value in computed.values()), computed
+
+
 def test_fonts_offline(live_app, context):
     page = context.new_page()
     outside: list[str] = []

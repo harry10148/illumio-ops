@@ -3,6 +3,7 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-route
 
 import { call, setCsrfToken } from "../api/client";
 import type { Me, ShellStatus } from "../api/generated";
+import type { Tone } from "../components/ui";
 import { t } from "../i18n";
 import { NAV_GROUPS, allNavItems, navItems, type NavItem } from "./nav";
 import { ShellStatusContext, useShellStatusPoll } from "./status";
@@ -23,7 +24,7 @@ const COLLECTION_KEYS: Record<ShellStatus["collection"], string> = {
   ok: "shell_collection_ok", degraded: "shell_collection_degraded", failing: "shell_collection_failing",
   not_started: "shell_collection_not_started",
 };
-const COLLECTION_TONES: Record<ShellStatus["collection"], string> = {
+const COLLECTION_TONES: Record<ShellStatus["collection"], Tone> = {
   ok: "ok", degraded: "high", failing: "crit", not_started: "muted",
 };
 

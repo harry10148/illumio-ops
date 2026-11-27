@@ -82,6 +82,65 @@ def test_schedule_create_and_run_now(context, live_app):
     assert [s.name for s in live_app.ctx.settings.current().reports.schedules] == ["Daily lateral"]
 
 
+def test_editing_a_schedule_cannot_switch_the_editor_target(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(live_app.url + "/reports?tab=schedules")
+    page.wait_for_selector("[data-role=schedule-list]")
+    for name in ("Schedule A", "Schedule B"):
+        page.get_by_role("button", name="Add a schedule").click()
+        editor = page.locator("[data-role=schedule-editor]")
+        editor.locator("input[name=name]").fill(name)
+        editor.locator("select[name=frequency]").select_option("daily")
+        editor.get_by_role("button", name="Save").click()
+        expect(page.locator(f"[data-role=schedule-list] tr:has-text('{name}')")).to_be_visible()
+    row_a = page.locator("[data-role=schedule-list] tr:has-text('Schedule A')")
+    row_b = page.locator("[data-role=schedule-list] tr:has-text('Schedule B')")
+    row_a.get_by_role("button", name="Edit").click()
+    editor = page.locator("[data-role=schedule-editor]")
+    expect(editor.locator("input[name=name]")).to_have_value("Schedule A")
+    expect(row_b.get_by_role("button", name="Edit")).to_be_disabled()
+    editor.get_by_role("button", name="Save").click()
+    schedules = live_app.ctx.settings.current().reports.schedules
+    assert {s.name for s in schedules} == {"Schedule A", "Schedule B"}
+
+
+def test_report_single_delete_requires_confirmation(context, live_app):
+    ids = _made(live_app)
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(live_app.url + "/reports?tab=produced")
+    row = page.locator(f"[data-report-id='{ids[0]}']")
+    requests = []
+    page.on("request", lambda request: requests.append(request) if request.method == "DELETE" else None)
+    row.get_by_role("button", name="Delete").click()
+    expect(row.locator("[data-role=report-delete-confirm]")).to_be_visible()
+    assert requests == []
+    row.locator("[data-role=report-delete-confirm]").click()
+    expect(page.locator(f"[data-report-id='{ids[0]}']")).to_have_count(0)
+    assert len(requests) == 1
+
+
+def test_schedule_single_delete_requires_confirmation(context, live_app):
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(live_app.url + "/reports?tab=schedules")
+    page.get_by_role("button", name="Add a schedule").click()
+    editor = page.locator("[data-role=schedule-editor]")
+    editor.locator("input[name=name]").fill("Delete check")
+    editor.locator("select[name=frequency]").select_option("daily")
+    editor.get_by_role("button", name="Save").click()
+    row = page.locator("[data-role=schedule-list] tr:has-text('Delete check')")
+    requests = []
+    page.on("request", lambda request: requests.append(request) if request.method == "DELETE" else None)
+    row.get_by_role("button", name="Delete").click()
+    expect(row.locator("[data-role=schedule-delete-confirm]")).to_be_visible()
+    assert requests == []
+    row.locator("[data-role=schedule-delete-confirm]").click()
+    expect(row).to_have_count(0)
+    assert len(requests) == 1
+
+
 def _finance_inventory(ctx):
     from illumio_ops.store.flowdb import labels, workloads
     with ctx.flows().connect() as conn:

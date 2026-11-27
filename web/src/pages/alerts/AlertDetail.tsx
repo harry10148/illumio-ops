@@ -7,7 +7,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { HostLink } from "../../components/HostLink";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
-import { portWord } from "../../terms";
+import { decisionWord, portWord } from "../../terms";
 import { registerNav } from "../../shell/nav";
 import { AlertBody } from "./AlertBody";
 import { DELIVERY_TONES, deliveryText } from "./common";
@@ -34,6 +34,7 @@ function cell(row: Row, column: string, lang: string): string {
   if (column === "last_detected" || column === "timestamp") return formatTime(String(v), lang);
   if (column === "port") return portWord(typeof v === "number" ? v : null,
     typeof row.proto === "number" ? row.proto : null);
+  if (column === "policy_decision") return decisionWord(String(v));
   return String(v);
 }
 

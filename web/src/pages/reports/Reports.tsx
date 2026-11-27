@@ -271,6 +271,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   // Several reports deleted at once (5.x bulk delete): picked on this page, confirmed, then what happened to each said.
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [confirming, setConfirming] = useState(false);
+  const [confirmingOne, setConfirmingOne] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<BulkDeleted | null>(null);
   useEffect(() => {
     marked.current?.scrollIntoView({ block: "center" });
@@ -283,6 +284,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   async function remove(id: number) {
     const env = await call("reports.delete", undefined, { report_id: String(id) });
     if (env.ok) {
+      setConfirmingOne(null);
       setError(null);
       onChanged();
     } else setError(env.error);
@@ -398,8 +400,14 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                   {r.email_detail && <div className="hint">{r.email_detail}</div>}
                 </td>
                 <td>
-                  <button type="button" className="btn-danger" disabled={r.status === "running"}
-                    onClick={() => void remove(r.id)}>{t("gui_reports_delete")}</button>
+                  {confirmingOne === r.id ? <>
+                    <span>{t("gui_reports_delete_confirm", { n: "1" })}</span>{" "}
+                    <button type="button" className="btn-danger" data-role="report-delete-confirm" onClick={() => void remove(r.id)}>
+                      {t("btn_confirm")}
+                    </button>{" "}
+                    <button type="button" className="btn-quiet" onClick={() => setConfirmingOne(null)}>{t("btn_cancel")}</button>
+                  </> : <button type="button" className="btn-danger" disabled={r.status === "running"}
+                    onClick={() => setConfirmingOne(r.id)}>{t("gui_reports_delete")}</button>}
                 </td>
               </tr>
             ))}

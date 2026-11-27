@@ -6,6 +6,7 @@ import { type ApiError, call } from "../../api/client";
 import type {
   AggRow, DenySimulationView, QuarantineOutcome, QuarantinePreview, QuarantineRuleRef,
 } from "../../api/generated";
+import type { Tone } from "../../components/ui";
 import { t } from "../../i18n";
 import { word } from "../alerts/common";
 import { Pulled } from "../workbench/Workbench";
@@ -21,7 +22,7 @@ const STATE_HINT_KEYS: Record<string, string> = {
   active: "q_state_active_hint", disabled: "q_state_disabled_hint", draft_only: "q_state_draft_only_hint",
   none: "q_state_none_hint",
 };
-const STATE_TONES: Record<string, string> = { active: "ok", disabled: "warn", draft_only: "warn", none: "warn" };
+const STATE_TONES: Record<string, Tone> = { active: "ok", disabled: "warn", draft_only: "warn", none: "warn" };
 const RULE_KEYS: Record<string, string> = {
   allow: "q_rule_allow", deny: "q_rule_deny", override_deny: "q_rule_override_deny", scope: "q_rule_scope",
 };

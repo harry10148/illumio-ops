@@ -4,10 +4,11 @@ import { type ApiError, call } from "../../api/client";
 import type { LogLines, LogQuery } from "../../api/generated";
 import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
+import type { Tone } from "../../components/ui";
 import { registerNav } from "../../shell/nav";
 
 const LIMIT = 200;
-const LEVEL_TONES: Record<string, string> = { ERROR: "crit", CRITICAL: "crit", WARNING: "warn" };
+const LEVEL_TONES: Record<string, Tone> = { ERROR: "crit", CRITICAL: "crit", WARNING: "warn" };
 
 export function Logs() {
   const [level, setLevel] = useState<NonNullable<LogQuery["level"]> | "">("");

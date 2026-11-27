@@ -1,5 +1,6 @@
 // Words for the report value domains, shared by the report pages.
 import { t } from "../../i18n";
+import type { Tone } from "../../components/ui";
 
 export const TYPE_KEYS: Record<string, string> = {
   lateral_posture: "rpt_title_lateral_posture",
@@ -46,7 +47,7 @@ export const STATUS_KEYS: Record<string, string> = {
   queued: "gui_reports_status_queued", running: "gui_reports_status_running",
   done: "gui_reports_status_done", failed: "gui_reports_status_failed",
 };
-export const STATUS_TONES: Record<string, string> = { queued: "info", running: "info", done: "ok", failed: "danger" };
+export const STATUS_TONES: Record<string, Tone> = { queued: "info", running: "info", done: "ok", failed: "crit" };
 export const EMAIL_KEYS: Record<string, string> = {
   sending: "gui_reports_email_sending", sent: "gui_reports_email_sent", failed: "gui_reports_email_failed",
   skipped_no_smtp: "gui_reports_email_skipped", interrupted: "gui_reports_email_interrupted",

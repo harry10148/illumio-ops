@@ -6,7 +6,7 @@ import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { type ApiError, call } from "../../api/client";
 import type { AlertDetail, AlertItem, AlertList as AlertListData } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { DataTable, DetailPane, KpiStrip, PageHead, Segmented, SeverityTag, Tag, shortTime } from "../../components/ui";
+import { DataTable, DetailPane, KpiStrip, PageHead, Segmented, SeverityTag, Tag, shortTime, type Tone } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { notifyShellStatus, useBasicMode } from "../../shell/status";
@@ -18,7 +18,7 @@ type Category = "" | "lateral" | "anomaly" | "traffic" | "event" | "system";
 // Basic mode collects no traffic: lateral, anomaly and traffic alerts cannot happen there (spec §4.6).
 const BASIC_CATEGORIES: Category[] = ["", "event", "system"];
 const ALL_CATEGORIES: Category[] = ["", "lateral", "anomaly", "traffic", "event", "system"];
-const DELIVERY_TONE: Record<string, "ok" | "crit" | "accum" | "muted" | "high"> = {
+const DELIVERY_TONE: Record<string, Tone> = {
   sent: "ok", failed: "crit", pending: "accum", not_notified: "muted", grouped: "muted", no_channel: "high",
 };
 

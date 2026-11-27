@@ -28,6 +28,9 @@ const PROBLEM_KEYS: Record<string, string> = {
   sync_state: "rpt_ven_problem_sync_state", fw_stale: "rpt_ven_problem_fw_stale", behind: "rpt_ven_problem_behind",
   never_applied: "rpt_ven_problem_never_applied", health: "rpt_ven_problem_health",
 };
+const SYNC_KEYS: Record<string, string> = {
+  applied: "rpt_sync_applied", synced: "rpt_sync_applied", syncing: "rpt_sync_syncing", staged: "rpt_sync_staged",
+};
 const REASON_KEYS: Record<string, string> = {
   unmanaged: "fleet_reason_unmanaged", not_in_inventory: "fleet_reason_not_in_inventory",
 };
@@ -344,7 +347,7 @@ function Fleet() {
             { key: "online", label: t("fleet_tally_online"), nowrap: true, render: (h) => word(ONLINE_KEYS, h.online) },
             { key: "beat", label: t("fleet_col_heartbeat"), kind: "time", render: (h) => (h.last_heartbeat_at ? formatTime(h.last_heartbeat_at, lang) : "—") },
             { key: "sync", label: t("hosts_policy_sync"), render: (h) => (
-              <span>{h.policy_sync_state ?? "—"}{h.problems.length ? ` · ${h.problems.map((p) => word(PROBLEM_KEYS, p)).join("、")}` : ""}</span>) },
+              <span>{h.policy_sync_state ? word(SYNC_KEYS, h.policy_sync_state) : "—"}{h.problems.length ? ` · ${h.problems.map((p) => word(PROBLEM_KEYS, p)).join("、")}` : ""}</span>) },
             { key: "version", label: t("fleet_tally_versions"), nowrap: true, render: (h) => h.ven_version ?? "—" },
             { key: "os", label: t("fleet_tally_os"), render: (h) => h.os_id ?? "—" },
             { key: "env", label: t("fleet_col_env"), render: (h) => h.env ?? "—" },

@@ -53,6 +53,8 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   const [filterValid, setFilterValid] = useState(true);
   const entry = catalog.entries.find((c) => c.report_type === s.report_type);
   const [customs, setCustoms] = useState<CustomReport[] | null>(null);
+  const fieldError = (name: string) => error?.field === `schedule.${name}`
+    ? <span className="field-error" data-field={error.field}>{t(error.message_key, error.params)}</span> : null;
   useEffect(() => {
     if (s.report_type !== "custom" || customs) return;
     void call("custom_reports.list").then((env) => { if (env.ok && env.data) setCustoms(env.data.reports); });
@@ -96,6 +98,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           ))}
         </select>
       </label>
+      {fieldError("report_type")}
       {s.report_type === "custom" && (
         <label>
           {t("cust_which")}
@@ -106,6 +109,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           </select>
         </label>
       )}
+      {s.report_type === "custom" && fieldError("custom_id")}
       <label>
         {t("gui_reports_lookback")}
         <select name="lookback_days" value={s.period === "previous_month" ? MONTH : String(s.lookback_days)}
@@ -115,6 +119,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           {s.frequency === "monthly" && <option value={MONTH}>{t("gui_reports_period_previous_month")}</option>}
         </select>
       </label>
+      {fieldError("lookback_days")}
       <label>
         {t("gui_reports_frequency")}
         <select name="frequency" value={s.frequency} onChange={(e) => freq(e.target.value as ReportScheduleFields["frequency"])}>
@@ -135,6 +140,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
           <input name="day_of_month" type="number" min={1} max={31} value={s.day_of_month ?? 1}
             onChange={(e) => set({ day_of_month: Number(e.target.value) })} />
           <span className="hint">{t("gui_reports_day_of_month_hint")}</span>
+          {fieldError("day_of_month")}
         </label>
       )}
       <label>
@@ -157,6 +163,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
             onChange={(e) => toggleFormat(f, e.target.checked)} /> {f.toUpperCase()}</label>
         ))}
         <label><input type="checkbox" name="email" checked={s.email} onChange={(e) => set({ email: e.target.checked })} /> {t("gui_reports_email")}</label>
+        {fieldError("formats")}
         {s.email && !smtp && (
           <span className="hint">{t("gui_reports_email_needs_smtp")} <Link to="/system/channels">{t("gui_reports_channels_link")}</Link></span>
         )}
@@ -171,6 +178,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       {entry?.accepts_filter && (
         <ReportFilter value={filter} onChange={setFilter} requireApp={entry.requires_app} onValid={setFilterValid} />
       )}
+      {entry?.accepts_filter && fieldError("filter")}
       <label>
         {t("gui_reports_keep")}
         <input name="keep" type="number" min={1} max={365} value={s.keep} onChange={(e) => set({ keep: Number(e.target.value) })} />
@@ -178,7 +186,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       <label>
         <input type="checkbox" name="enabled" checked={s.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> {t("gui_reports_enabled")}
       </label>
-      {error && <p className="form-error span-all">{t(error.message_key, error.params)}{error.field ? ` (${error.field})` : ""}</p>}
+      {error && !error.field && <p className="form-error span-all">{t(error.message_key, error.params)}</p>}
       <div className="actions span-all">
         <button type="button" className="btn-primary" disabled={!filterValid}
           onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? filter : null,
@@ -195,6 +203,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   const [view, setView] = useState<SchedulesView | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; fields: ReportScheduleFields } | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const env = await call("report_schedules.list");
@@ -228,7 +237,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   async function remove(id: string) {
     if (!view) return;
     const env = await call("report_schedules.delete", { revision: view.revision }, { schedule_id: id });
-    if (env.ok && env.data) setView(env.data);
+    if (env.ok && env.data) { setView(env.data); setDeleting(null); }
     else setError(env.error);
   }
 
@@ -250,7 +259,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
         </div>
       )}
       {editing && (
-        <Editor initial={editing.fields} catalog={catalog} smtp={view.smtp_enabled} error={error}
+        <Editor key={editing.id ?? "new"} initial={editing.fields} catalog={catalog} smtp={view.smtp_enabled} error={error}
           onSave={(f) => void save(f)} onCancel={() => { setEditing(null); setError(null); }} />
       )}
       {!editing && error && <p className="form-error">{t(error.message_key, error.params)}</p>}
@@ -287,11 +296,17 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
                         <div className="hint">{t("gui_reports_failures", { n: String(item.consecutive_failures) })}</div>
                       )}
                     </td>
-                    <td><Switch label={t("gui_reports_enabled")} name="schedule_enabled" checked={s.enabled} onChange={() => toggle(item)} /></td>
+                    <td><Switch label={t("gui_reports_enabled")} name="schedule_enabled" checked={s.enabled} disabled={editing !== null}
+                      onChange={() => toggle(item)} /></td>
                     <td className="nowrap">
-                      <button type="button" className="btn-quiet" onClick={() => void runNow(s.id)}>{t("gui_reports_run_now")}</button>
-                      <button type="button" className="btn-quiet" onClick={() => { const { id, ...fields } = s; setEditing({ id, fields }); }}>{t("btn_edit")}</button>
-                      <button type="button" className="btn-danger" onClick={() => void remove(s.id)}>{t("gui_reports_delete")}</button>
+                      {deleting === s.id ? <>
+                        <button type="button" className="btn-danger" data-role="schedule-delete-confirm" onClick={() => void remove(s.id)}>{t("btn_confirm")}</button>
+                        <button type="button" className="btn-quiet" onClick={() => setDeleting(null)}>{t("btn_cancel")}</button>
+                      </> : <>
+                        <button type="button" className="btn-quiet" disabled={editing !== null} onClick={() => void runNow(s.id)}>{t("gui_reports_run_now")}</button>
+                        <button type="button" className="btn-quiet" disabled={editing !== null} onClick={() => { const { id, ...fields } = s; setEditing({ id, fields }); }}>{t("btn_edit")}</button>
+                        <button type="button" className="btn-danger" disabled={editing !== null} onClick={() => setDeleting(s.id)}>{t("gui_reports_delete")}</button>
+                      </>}
                     </td>
                   </tr>
                 );

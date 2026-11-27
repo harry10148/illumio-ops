@@ -16,6 +16,7 @@ function One({ rep, onChanged, generate }: {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(rep.name);
   const [making, setMaking] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
   async function act(p: Promise<{ ok: boolean; error: ApiError | null }>) {
@@ -38,8 +39,15 @@ function One({ rep, onChanged, generate }: {
         ) : <strong>{rep.name}</strong>}
         <div className="row">
           <button type="button" className="btn-quiet" onClick={() => setRenaming(!renaming)}>{t("cust_rename")}</button>
-          <button type="button" className="btn-danger" data-role="custom-delete"
-            onClick={() => void act(call("custom_reports.delete", undefined, { report_id: String(rep.id) }))}>{t("cust_delete")}</button>
+          {confirmDelete ? <>
+            <button type="button" className="btn-danger" data-role="custom-delete-confirm"
+              onClick={() => { setConfirmDelete(false); void act(call("custom_reports.delete", undefined, { report_id: String(rep.id) })); }}>
+              {t("btn_confirm")}
+            </button>
+            <button type="button" className="btn-quiet" onClick={() => setConfirmDelete(false)}>{t("btn_cancel")}</button>
+          </> : <button type="button" className="btn-danger" data-role="custom-delete" onClick={() => setConfirmDelete(true)}>
+            {t("cust_delete")}
+          </button>}
           <button type="button" className="btn-quiet" data-role="custom-generate-open" onClick={() => setMaking(!making)}>
             {t("gui_reports_generate_open")}
           </button>

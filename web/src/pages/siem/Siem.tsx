@@ -9,7 +9,7 @@ import type {
   SiemDestinationInput, SiemSettingsInput, SiemSettingsView, SiemSourceStatus, SiemStatusView, SiemTestView,
 } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
-import { Disclosure, Purpose } from "../../components/ui";
+import { Disclosure, Purpose, type Tone } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 import { decisionWord } from "../../terms";
@@ -32,8 +32,8 @@ const STATE_KEYS: Record<SiemSourceStatus["state"], string> = {
   waiting: "siem_state_waiting", needs_alert_mode: "siem_state_needs_alert_mode",
   baseline_building: "siem_state_baseline_building", off: "siem_state_off",
 };
-const STATE_TONES: Record<SiemSourceStatus["state"], string> = {
-  ok: "ok", behind: "warn", failing: "bad", dlq_full: "bad", waiting: "info", needs_alert_mode: "warn",
+const STATE_TONES: Record<SiemSourceStatus["state"], Tone> = {
+  ok: "ok", behind: "warn", failing: "crit", dlq_full: "crit", waiting: "info", needs_alert_mode: "warn",
   baseline_building: "info", off: "info",
 };
 const TRANSPORTS: SiemDestinationInput["transport"][] = ["udp", "tcp", "tls", "hec"];
@@ -163,7 +163,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
           </select>
         </label>
         <label>{t("siem_host")}
-          <input name="siem_host" value={d.host} onChange={(e) => set("host", e.target.value.trim())} />
+          <input name="siem_host" value={d.host} onChange={(e) => set("host", e.target.value)} />
         </label>
         <label>{t("siem_port")}
           <input name="siem_port" type="number" min={1} max={65535} value={d.port} onChange={(e) => set("port", Number(e.target.value))} />
@@ -191,7 +191,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
             </label>
             <label>{t("siem_ca_bundle")}
               <input name="siem_ca_bundle" value={caPath} placeholder="/etc/ssl/certs/siem-ca.pem" disabled={d.verify_tls === false}
-                     onChange={(e) => set("verify_tls", e.target.value.trim() || true)} />
+                     onChange={(e) => set("verify_tls", e.target.value || true)} />
             </label>
             {d.verify_tls === false && <p className="notice" data-role="siem-tls-warning">{t("siem_tls_unverified_warning")}</p>}
           </>
@@ -287,7 +287,10 @@ export function Siem() {
   async function save(e: FormEvent | null, confirmUnverified = false) {
     e?.preventDefault();
     if (!view || !siem) return;
-    const env = await call("siem.settings.update", { revision: view.revision, siem, confirm_tls_unverified: confirmUnverified });
+    const normalized = { ...siem, destinations: siem.destinations.map((d) => ({
+      ...d, host: d.host.trim(), verify_tls: typeof d.verify_tls === "string" ? d.verify_tls.trim() || true : d.verify_tls,
+    })) };
+    const env = await call("siem.settings.update", { revision: view.revision, siem: normalized, confirm_tls_unverified: confirmUnverified });
     if (env.ok && env.data) { setView(env.data); setSiem(env.data.siem); setError(null); setSaved(true); loadStatus(); }
     else { setError(env.error); setSaved(false); }
   }

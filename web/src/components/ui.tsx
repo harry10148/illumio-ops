@@ -94,7 +94,7 @@ export function HostName({ name }: { name: string }) {
   return ADDRESS.test(name.trim()) ? <span className="mono" data-role="address">{name}</span> : <>{name}</>;
 }
 
-export type Tone = "crit" | "high" | "med" | "low" | "ok" | "accum" | "adv" | "muted";
+export type Tone = "crit" | "high" | "med" | "low" | "ok" | "warn" | "info" | "neutral" | "accum" | "adv" | "muted";
 
 const SEVERITY_TONE: Record<string, Tone> = { critical: "crit", high: "high", medium: "med", low: "low", info: "low" };
 const SEVERITY_WORD: Record<string, string> = {
