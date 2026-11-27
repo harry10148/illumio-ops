@@ -69,7 +69,8 @@ export function word(keys: Record<string, string>, value: string): string {
 
 /** "2026-10-20 – 2026-10-26": the period's end is exclusive. */
 export function periodText(start: string, end: string, lang: string): string {
-  const fmt = (d: Date) => d.toLocaleDateString(lang === "zh_TW" ? "zh-TW" : "en");
-  const last = new Date(new Date(end).getTime() - 1);
-  return `${fmt(new Date(start))} – ${fmt(last)}`;
+  void lang;
+  const last = new Date(`${end.slice(0, 10)}T00:00:00Z`);
+  last.setUTCDate(last.getUTCDate() - 1);
+  return `${start.slice(0, 10)} – ${last.toISOString().slice(0, 10)}`;
 }

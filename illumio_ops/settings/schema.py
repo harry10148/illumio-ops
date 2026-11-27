@@ -42,7 +42,16 @@ from illumio_ops.domain.values import (
 )
 
 SCHEMA_VERSION: Literal[16] = 16
-_UTC_OFFSET = re.compile(r"UTC([+-]\d+(?:\.\d+)?)")
+_UTC_OFFSET = re.compile(r"UTC([+-])(\d+)(?::([0-5]\d)|\.(\d+))?")
+
+
+def _utc_offset_hours(match: re.Match[str]) -> float:
+    sign = 1 if match.group(1) == "+" else -1
+    if match.group(3) is not None:
+        hours = int(match.group(2)) + int(match.group(3)) / 60
+    else:
+        hours = float(f"{match.group(2)}.{match.group(4)}") if match.group(4) else float(match.group(2))
+    return sign * hours
 
 
 def _ip_or_network(v: str) -> str:
@@ -167,7 +176,7 @@ class DisplaySettings(StrictModel):
             return v
         m = _UTC_OFFSET.fullmatch(v)
         if m:
-            if abs(float(m.group(1))) >= 24:
+            if abs(_utc_offset_hours(m)) >= 24:
                 raise ValueError("a UTC offset must be less than 24 hours")
             return v
         try:
@@ -184,7 +193,7 @@ class DisplaySettings(StrictModel):
             return UTC
         m = _UTC_OFFSET.fullmatch(self.timezone)
         if m:
-            return timezone(timedelta(hours=float(m.group(1))))
+            return timezone(timedelta(hours=_utc_offset_hours(m)))
         return ZoneInfo(self.timezone)
 
 

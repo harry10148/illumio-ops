@@ -16225,6 +16225,10 @@
             "title": "Default Password In Use",
             "type": "boolean"
           },
+          "display_zone": {
+            "title": "Display Zone",
+            "type": "string"
+          },
           "language": {
             "$ref": "#/$defs/Language"
           },
@@ -16242,6 +16246,7 @@
           "must_change_password",
           "language",
           "default_password_in_use",
+          "display_zone",
           "csrf_token"
         ],
         "title": "LoginResult",
@@ -16278,6 +16283,10 @@
             "title": "Default Password In Use",
             "type": "boolean"
           },
+          "display_zone": {
+            "title": "Display Zone",
+            "type": "string"
+          },
           "language": {
             "$ref": "#/$defs/Language"
           },
@@ -16294,7 +16303,8 @@
           "username",
           "must_change_password",
           "language",
-          "default_password_in_use"
+          "default_password_in_use",
+          "display_zone"
         ],
         "title": "Me",
         "type": "object"

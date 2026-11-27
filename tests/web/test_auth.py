@@ -28,6 +28,21 @@ def test_login_ok_returns_csrf_and_flag(client):
     assert client.get("/api/auth/me", environ_overrides=LOCAL).get_json()["data"]["username"] == "illumio"
 
 
+def test_auth_me_returns_normalized_display_zone_for_each_setting_form(client, ctx, monkeypatch):
+    from illumio_ops.web import auth
+
+    monkeypatch.setattr(auth.os, "readlink", lambda path: "/usr/share/zoneinfo/Asia/Taipei")
+    login(client)
+    expected = {"local": "Asia/Taipei", "UTC": "UTC", "UTC+8": "+08:00", "UTC+05:30": "+05:30",
+                "UTC+5.5": "+05:30", "Asia/Taipei": "Asia/Taipei"}
+    for setting, zone in expected.items():
+        current = ctx.settings.current()
+        ctx.settings.update(current.revision, lambda data, setting=setting: data["display"].update(timezone=setting))
+        response = client.get("/api/auth/me", environ_overrides=LOCAL)
+        assert response.status_code == 200
+        assert response.get_json()["data"]["display_zone"] == zone
+
+
 def test_wrong_user_and_wrong_password_look_identical(client):
     a = login(client, password="nope-nope-nope")
     b = login(client, username="root")

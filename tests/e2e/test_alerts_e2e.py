@@ -9,8 +9,8 @@ from illumio_ops.store import alerts as store
 from tests.e2e.conftest import sign_in
 
 
-def seed(ctx, *, channels=("line",), hold=None):
-    now = datetime.now(UTC)
+def seed(ctx, *, channels=("line",), hold=None, at=None):
+    now = at or datetime.now(UTC)
     t = Trigger(rule_id="a" * 32, rule_type=AlertRuleType.SYSTEM, subject_key="disk_low", severity=Severity.HIGH,
                 first_seen=now, last_seen=now, late=False, message_key="alert_system_disk_low",
                 params={"free": "1 GB", "warn": "10 GB"}, facts={}, evidence=None, confidence=Confidence())
@@ -18,6 +18,23 @@ def seed(ctx, *, channels=("line",), hold=None):
     with ctx.db() as conn:
         return store.insert_alert(conn, pce_url=pce.url, org_id=pce.org_id, rule_name="", pack_key="rule_system_disk_low",
                                   trigger=t, at=now, channels=list(channels), hold=hold)
+
+
+def test_alert_times_use_the_configured_zone_and_render_midnight(browser, live_app):
+    saved_at = datetime(2026, 11, 26, 16, 0, tzinfo=UTC)
+    alert_id = seed(live_app.ctx, at=saved_at)
+    context = browser.new_context(locale="en-US", timezone_id="America/New_York")
+    try:
+        page = context.new_page()
+        sign_in(page, live_app.url)
+        page.goto(f"{live_app.url}/system/display")
+        page.locator("input[name=timezone]").fill("Asia/Taipei")
+        with page.expect_response(lambda response: response.url.endswith("/api/auth/me") and response.status == 200):
+            page.get_by_role("button", name="Save").click()
+        page.goto(f"{live_app.url}/alerts/{alert_id}")
+        expect(page.locator("[data-role=alert-body] .hint span.num")).to_have_text("2026-11-27 00:00")
+    finally:
+        context.close()
 
 
 def _new_rule_form(page, live_app, kind="event"):

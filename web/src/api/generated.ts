@@ -943,6 +943,7 @@ username: string
 export interface LoginResult {
 csrf_token: string
 default_password_in_use: boolean
+display_zone: string
 language: Language
 must_change_password: boolean
 username: string
@@ -960,6 +961,7 @@ export interface Empty {
  */
 export interface Me {
 default_password_in_use: boolean
+display_zone: string
 language: Language
 must_change_password: boolean
 username: string

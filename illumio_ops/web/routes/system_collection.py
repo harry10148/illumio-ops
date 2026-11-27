@@ -200,7 +200,11 @@ def clear_collected_data(body: ClearRequest) -> CollectedCleared:
 def query_logs(body: LogQuery) -> LogLines:
     entries, truncated = logs.tail(get_ctx().paths.logs_dir, level=body.level, module=body.module,
                                    contains=body.contains, limit=body.limit)
-    return LogLines(lines=[LogLine(ts=e.ts, level=e.level, module=e.module, message=e.message) for e in entries],
+    # Loguru writes wall time in the server's local zone. Attach that zone's offset so the console
+    # can render the same instant in its configured display zone, even when viewed remotely.
+    lines = [LogLine(ts=datetime.strptime(e.ts, "%Y-%m-%d %H:%M:%S.%f").astimezone().isoformat(),
+                     level=e.level, module=e.module, message=e.message) for e in entries]
+    return LogLines(lines=lines,
                     truncated=truncated)
 
 

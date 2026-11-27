@@ -1,15 +1,14 @@
 import type { ProbeItem } from "../api/generated";
 import { t, useLang } from "../i18n";
+import { formatTime } from "../time";
+
+export { formatTime } from "../time";
 
 const PROBE_LABEL_KEYS: Record<ProbeItem["name"], string> = {
   noop: "probe_name_noop",
   health: "probe_name_health",
   node_available: "probe_name_node_available",
 };
-
-export function formatTime(iso: string, lang: string): string {
-  return new Date(iso).toLocaleString(lang === "zh_TW" ? "zh-TW" : "en");
-}
 
 interface Props {
   checkedAt: string | null;

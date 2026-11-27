@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import hmac
+import os
 import secrets
 import threading
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Blueprint, Flask, current_app, g, session
 from flask_limiter import Limiter
@@ -16,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from illumio_ops.domain.values import Language
 from illumio_ops.services.context import AppContext
+from illumio_ops.settings.schema import DisplaySettings
 from illumio_ops.settings.secrets import (
     DEFAULT_ADMIN_PASSWORD,
     PASSWORD_MAX_LEN,
@@ -93,6 +98,7 @@ class Me(BaseModel):
     must_change_password: bool
     language: Language
     default_password_in_use: bool
+    display_zone: str
 
 
 class LoginResult(Me):
@@ -107,10 +113,53 @@ OP_PASSWORD = operation("auth.password", "POST", "/api/auth/password", PasswordC
 OP_USERNAME = operation("auth.username", "POST", "/api/auth/username", UsernameChangeRequest, CsrfToken)
 
 
+def _read_local_iana_zone() -> str | None:
+    """Return the server's IANA zone when /etc/localtime or TZ names one."""
+    try:
+        target = os.readlink("/etc/localtime")
+        parts = Path(target).parts
+        if "zoneinfo" in parts:
+            zone = "/".join(parts[parts.index("zoneinfo") + 1:])
+            if zone:
+                ZoneInfo(zone)
+                return zone
+    except (OSError, ValueError, ZoneInfoNotFoundError):
+        pass
+    env_zone = os.environ.get("TZ", "").lstrip(":")
+    try:
+        ZoneInfo(env_zone)
+    except (ValueError, ZoneInfoNotFoundError):
+        return None
+    return env_zone
+
+
+def _offset_name(offset: timedelta | None) -> str:
+    seconds = int((offset or timedelta()).total_seconds())
+    sign = "+" if seconds >= 0 else "-"
+    minutes = abs(seconds) // 60
+    return f"{sign}{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def resolve_display_zone(display: DisplaySettings) -> str:
+    """Resolve the display setting to an IANA name, UTC, or a normalized fixed offset."""
+    if display.timezone == "UTC":
+        return "UTC"
+    if display.timezone != "local":
+        zone = display.zone()
+        if zone is not None and not isinstance(zone, ZoneInfo):
+            return _offset_name(datetime.now(zone).utcoffset())
+        return display.timezone
+    named = _read_local_iana_zone()
+    if named:
+        return named
+    return _offset_name(datetime.now().astimezone().utcoffset())
+
+
 def _me() -> Me:
     s = get_ctx().settings.current()
     return Me(username=s.web.username, must_change_password=s.web.must_change_password,
-              language=s.display.language, default_password_in_use=bool(session.get("default_password")))
+              language=s.display.language, default_password_in_use=bool(session.get("default_password")),
+              display_zone=resolve_display_zone(s.display))
 
 
 def make_auth_blueprint(csrf: CSRFProtect, limiter: Limiter) -> Blueprint:

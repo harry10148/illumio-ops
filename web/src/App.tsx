@@ -7,6 +7,7 @@ import { LangContext, type Lang, fetchDictionary, initialLang, rememberLang, t, 
 import { Login } from "./pages/Login";
 import { PasswordChange } from "./pages/PasswordChange";
 import { ME_CHANGED_EVENT, Shell } from "./shell/Shell";
+import { setDisplayZone } from "./time";
 
 const DICTIONARY_TRIES = 4;
 
@@ -21,9 +22,11 @@ export function App() {
   const refreshMe = useCallback(async () => {
     const env = await call("auth.me");
     if (env.ok && env.data) {
+      setDisplayZone(env.data.display_zone);
       setAuth({ state: "signed-in", me: env.data });
       setLang(env.data.language); // the server-side display setting wins once signed in
     } else {
+      setDisplayZone(null);
       setAuth({ state: "signed-out" });
     }
   }, []);
@@ -69,7 +72,7 @@ export function App() {
 
   let body;
   if (auth.state === "signed-out") {
-    body = <Login onSignedIn={() => void refreshMe()} />;
+    body = <Login onSignedIn={(result) => { setDisplayZone(result.display_zone); void refreshMe(); }} />;
   } else if (auth.me.must_change_password) {
     body = (
       <div className="center-page">

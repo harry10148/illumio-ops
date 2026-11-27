@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { type ApiError, call } from "../../api/client";
 import type { CollectionMode, CollectionSettings, CollectionStatus, SourceStatus } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
+import { today } from "../../time";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
@@ -140,10 +141,6 @@ function settingsError(e: ApiError): string {
   if (e.field === "settings.retention") return t("err_retention_order");
   if (e.field === "settings.archive") return t("err_archive_retention_short");
   return t(e.message_key, e.params);
-}
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 export function Collection() {

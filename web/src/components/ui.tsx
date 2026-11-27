@@ -5,16 +5,7 @@ import { Link, type LinkProps } from "react-router-dom";
 
 import { t } from "../i18n";
 
-/** A time as the console lists it: HH:MM today, MM-DD HH:MM this year, else the date; 24-hour, in the browser's zone. */
-export function shortTime(iso: string, now: Date = new Date()): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  if (d.toDateString() === now.toDateString()) return hm;
-  const md = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  return d.getFullYear() === now.getFullYear() ? `${md} ${hm}` : `${d.getFullYear()}-${md}`;
-}
+export { shortTime } from "../time";
 
 /** The three levels of action, and the dangerous one (purpose-led UI spec §5.2): one primary in a region, the rest
  * secondary, text for going somewhere or for what is seldom done. */

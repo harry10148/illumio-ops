@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 
 import { type ApiError, call } from "../../api/client";
 import type { JobView } from "../../api/generated";
-import { formatTime } from "../../components/ProbeResults";
+import { formatTimeSeconds } from "../../time";
 import { Purpose } from "../../components/ui";
-import { t, useLang } from "../../i18n";
+import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
 
 const JOB_LABEL_KEYS: Record<string, string> = {
@@ -43,7 +43,6 @@ function result(job: JobView): { tone: string; text: string } {
 }
 
 export function Jobs() {
-  const lang = useLang();
   const [jobs, setJobs] = useState<JobView[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -78,7 +77,7 @@ export function Jobs() {
                   <tr key={job.job_id} data-job={job.job_id}>
                     <td>{labelKey ? t(labelKey) : job.job_id}</td>
                     <td>{every(job.interval_seconds)}</td>
-                    <td>{job.last_started_at ? formatTime(job.last_started_at, lang) : t("job_never_run")}</td>
+                    <td>{job.last_started_at ? formatTimeSeconds(job.last_started_at) : t("job_never_run")}</td>
                     <td>
                       <span className="badge" data-tone={r.tone}>{r.text}</span>
                       {job.last_ok === false && job.last_error && <div className="hint wrap">{job.last_error}</div>}

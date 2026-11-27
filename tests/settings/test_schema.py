@@ -135,7 +135,7 @@ def test_duplicate_rule_ids_rejected(initial):
 def test_timezone_accepts_the_5x_formats():
     from illumio_ops.settings.schema import DisplaySettings
 
-    for tz in ("local", "UTC", "UTC+8", "UTC-5", "UTC+5.5", "Asia/Taipei"):
+    for tz in ("local", "UTC", "UTC+8", "UTC-5", "UTC+05:30", "UTC+5.5", "Asia/Taipei"):
         assert DisplaySettings(language="en", timezone=tz).timezone == tz
     for bad in ("UTC+24", "Mars/Base", "../etc/passwd", "GMT+8x", ""):
         with pytest.raises(ValidationError):
@@ -157,6 +157,20 @@ def test_display_zone_resolves_every_accepted_format():
     assert at.astimezone(zone("UTC+8")).hour == 3 and at.astimezone(zone("UTC-5")).hour == 14
     assert at.astimezone(zone("UTC+5.5")).utcoffset() == timedelta(hours=5, minutes=30)
     assert zone("Asia/Taipei") == ZoneInfo("Asia/Taipei")
+
+
+def test_resolve_display_zone_normalizes_settings_and_local_symlink(monkeypatch):
+    from illumio_ops.settings.schema import DisplaySettings
+    from illumio_ops.web import auth
+
+    monkeypatch.setattr(auth.os, "readlink", lambda path: "/usr/share/zoneinfo/Asia/Taipei")
+    setting = lambda value: DisplaySettings(language="en", timezone=value)
+    assert auth.resolve_display_zone(setting("local")) == "Asia/Taipei"
+    assert auth.resolve_display_zone(setting("UTC")) == "UTC"
+    assert auth.resolve_display_zone(setting("UTC+8")) == "+08:00"
+    assert auth.resolve_display_zone(setting("UTC+05:30")) == "+05:30"
+    assert auth.resolve_display_zone(setting("UTC+5.5")) == "+05:30"
+    assert auth.resolve_display_zone(setting("Asia/Taipei")) == "Asia/Taipei"
 
 
 # ── final review fixes ─────────────────────────────────────────────────────

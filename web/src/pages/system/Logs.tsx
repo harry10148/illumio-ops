@@ -5,6 +5,7 @@ import type { LogLines, LogQuery } from "../../api/generated";
 import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import type { Tone } from "../../components/ui";
+import { formatTimeSeconds } from "../../time";
 import { registerNav } from "../../shell/nav";
 
 const LIMIT = 200;
@@ -83,7 +84,7 @@ export function Logs() {
             <tbody>
               {result.lines.map((line, i) => (
                 <tr key={`${line.ts}-${i}`}>
-                  <td className="nowrap">{line.ts}</td>
+                  <td className="nowrap">{formatTimeSeconds(line.ts)}</td>
                   <td><span className="badge" data-tone={LEVEL_TONES[line.level] ?? "neutral"}>{line.level}</span></td>
                   <td>{line.module}</td>
                   <td className="log-message">{line.message}</td>
