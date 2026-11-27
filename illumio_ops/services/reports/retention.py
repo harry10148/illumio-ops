@@ -35,13 +35,20 @@ def run_report_retention(ctx: AppContext, *, now: datetime | None = None) -> int
     return len(gone)
 
 
-def remove_report(ctx: AppContext, report_id: int, *, by: str) -> Literal["removed", "running", "missing"]:
+def remove_report(ctx: AppContext, report_id: int, *, by: str,
+                  created_at: datetime | None = None) -> Literal["removed", "running", "missing"]:
     with ctx.db() as conn:
         row = store.get(conn, report_id)
-        if row is None:
+        if row is None or (created_at is not None and row.created_at != created_at):
             return "missing"
-        if row.status is ReportStatus.RUNNING or not store.delete(conn, [report_id]):
-            return "running"  # claimed by the reports job between the read and the delete
+        if row.status is ReportStatus.RUNNING:
+            return "running"
+        gone = store.delete(conn, [report_id], created_at={report_id: created_at} if created_at is not None else None)
+        if not gone:
+            current = store.get(conn, report_id)
+            if current is not None and current.created_at == row.created_at and current.status is ReportStatus.RUNNING:
+                return "running"
+            return "missing"
     _remove_files(ctx, [report_id])
     logger.info("reports: #{} ({}) removed by {}", report_id, row.report_type, by)
     return "removed"

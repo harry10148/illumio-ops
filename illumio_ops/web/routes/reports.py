@@ -28,6 +28,7 @@ BULK_MAX = 500
 
 class BulkDelete(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=BULK_MAX)
+    created_at: dict[int, datetime] = Field(default_factory=dict)
 
 
 class BulkDeleted(BaseModel):
@@ -94,7 +95,12 @@ def generate(body: ReportParams) -> ReportItem:
 
 @api_route(bp, OP_DELETE)
 def delete_report(report_id: int) -> Empty:
-    outcome = retention.remove_report(get_ctx(), report_id, by=str(current_user.get_id()))
+    raw_created_at = request.args.get("created_at")
+    try:
+        created_at = datetime.fromisoformat(raw_created_at) if raw_created_at else None
+    except ValueError:
+        raise ApiFailure(400, "invalid_input", "err_invalid_input", field="created_at") from None
+    outcome = retention.remove_report(get_ctx(), report_id, by=str(current_user.get_id()), created_at=created_at)
     if outcome == "missing":
         raise ApiFailure(404, "not_found", "err_not_found")
     if outcome == "running":
@@ -107,7 +113,7 @@ def bulk_delete(body: BulkDelete) -> BulkDeleted:
     ctx = get_ctx()
     out: dict[str, list[int]] = {"removed": [], "running": [], "missing": []}
     for rid in dict.fromkeys(body.ids):
-        out[retention.remove_report(ctx, rid, by=str(current_user.get_id()))].append(rid)
+        out[retention.remove_report(ctx, rid, by=str(current_user.get_id()), created_at=body.created_at.get(rid))].append(rid)
     return BulkDeleted(**out)
 
 

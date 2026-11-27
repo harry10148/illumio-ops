@@ -1,5 +1,6 @@
 """Reports API (P5a Task 8): catalog, generate, list, one report, delete, and the file download."""
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode
 
 from illumio_ops.domain.values import ReportStatus, ReportType
 from illumio_ops.services.reports import generate
@@ -249,6 +250,52 @@ def test_bulk_delete(client, ctx):
     assert post(client, "/api/reports/bulk-delete", {"ids": list(range(1, 502))}).status_code == 400
     r = client.post("/api/reports/bulk-delete", json={"ids": [a]}, environ_overrides=LOCAL)
     assert r.status_code in (400, 403)  # CSRF
+
+
+def test_delete_report_created_at_match_and_mismatch(client, ctx):
+    _configure(ctx)
+    login(client)
+    matching, mismatch = _done_report(ctx), _done_report(ctx)
+    items = {item["id"]: item["created_at"] for item in get(client, "/api/reports").get_json()["data"]["items"]}
+
+    matched = delete(client, f"/api/reports/{matching}?{urlencode({'created_at': items[matching]})}")
+    assert matched.status_code == 200
+    assert get(client, f"/api/reports/{matching}").status_code == 404
+
+    stale = (datetime.fromisoformat(items[mismatch]) + timedelta(seconds=1)).isoformat()
+    missing = delete(client, f"/api/reports/{mismatch}?{urlencode({'created_at': stale})}")
+    assert missing.status_code == 404
+    assert missing.get_json()["error"]["message_key"] == "err_not_found"
+    assert get(client, f"/api/reports/{mismatch}").status_code == 200
+
+
+def test_delete_stale_report_id_does_not_delete_reused_id(client, ctx):
+    _configure(ctx)
+    login(client)
+    old_id = _done_report(ctx)
+    old_created_at = get(client, f"/api/reports/{old_id}").get_json()["data"]["created_at"]
+    assert delete(client, f"/api/reports/{old_id}").status_code == 200
+
+    new_id = _done_report(ctx)
+    assert new_id == old_id  # SQLite reuses the highest deleted INTEGER PRIMARY KEY.
+    missing = delete(client, f"/api/reports/{old_id}?{urlencode({'created_at': old_created_at})}")
+    assert missing.status_code == 404
+    assert missing.get_json()["error"]["message_key"] == "err_not_found"
+    assert get(client, f"/api/reports/{new_id}").status_code == 200
+
+
+def test_bulk_delete_report_created_at_match_and_mismatch(client, ctx):
+    _configure(ctx)
+    login(client)
+    matching, mismatch = _done_report(ctx), _done_report(ctx)
+    items = {item["id"]: item["created_at"] for item in get(client, "/api/reports").get_json()["data"]["items"]}
+    stale = (datetime.fromisoformat(items[mismatch]) + timedelta(seconds=1)).isoformat()
+    out = post(client, "/api/reports/bulk-delete", {
+        "ids": [matching, mismatch], "created_at": {str(matching): items[matching], str(mismatch): stale},
+    }).get_json()["data"]
+    assert out == {"removed": [matching], "running": [], "missing": [mismatch]}
+    assert get(client, f"/api/reports/{matching}").status_code == 404
+    assert get(client, f"/api/reports/{mismatch}").status_code == 200
 
 
 def test_the_common_templates_are_these_five(client, ctx):

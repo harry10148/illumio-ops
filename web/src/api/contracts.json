@@ -35561,6 +35561,14 @@
       "path": "/api/reports/bulk-delete",
       "request_schema": {
         "properties": {
+          "created_at": {
+            "additionalProperties": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Created At",
+            "type": "object"
+          },
           "ids": {
             "items": {
               "type": "integer"

@@ -143,11 +143,17 @@ def ids_created_before(conn: sqlite3.Connection, before: datetime) -> list[int]:
         "SELECT id FROM reports WHERE created_at < ? AND status != 'running' ORDER BY id", (_t(before),))]
 
 
-def delete(conn: sqlite3.Connection, report_ids: list[int]) -> list[int]:
+def delete(conn: sqlite3.Connection, report_ids: list[int], *, created_at: dict[int, datetime] | None = None) -> list[int]:
     """Delete the rows that are not running; returns the ids actually deleted (only their files may go)."""
     gone = []
     for i in report_ids:
-        if conn.execute("DELETE FROM reports WHERE id = ? AND status != 'running' RETURNING id", (i,)).fetchone():
+        expected = (created_at or {}).get(i)
+        if expected is None:
+            deleted = conn.execute("DELETE FROM reports WHERE id = ? AND status != 'running' RETURNING id", (i,))
+        else:
+            deleted = conn.execute("DELETE FROM reports WHERE id = ? AND created_at = ? AND status != 'running' RETURNING id",
+                                   (i, _t(expected)))
+        if deleted.fetchone():
             gone.append(i)
     conn.commit()
     return gone

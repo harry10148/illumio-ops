@@ -283,16 +283,20 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
     setPicked((now) => new Set([...now].filter((id) => data.items.some((r) => r.id === id && r.status !== "running"))));
   }, [data]);
 
-  async function remove(id: number) {
+  async function remove(report: ReportItem) {
+    const { id, created_at } = report;
     if (deletingId !== null) return;
     setDeletingId(id);
-    const env = await call("reports.delete", undefined, { report_id: String(id) });
+    const env = await call("reports.delete", undefined, { report_id: String(id) }, { created_at });
     setDeletingId(null);
     if (env.ok) {
       setConfirmingOne(null);
       setError(null);
       onChanged();
-    } else setError(env.error);
+    } else {
+      setError(env.error);
+      if (env.error?.code === "not_found") onChanged();
+    }
   }
 
   async function removePicked() {
@@ -301,7 +305,10 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
     const [first, ...rest] = [...picked];
     if (first === undefined) return;
     setBulkDeleting(true);
-    const env = await call("reports.bulk_delete", { ids: [first, ...rest] });
+    const ids: [number, ...number[]] = [first, ...rest];
+    const created_at = Object.fromEntries(data.items.filter((report) => ids.includes(report.id))
+      .map((report) => [String(report.id), report.created_at]));
+    const env = await call("reports.bulk_delete", { ids, created_at });
     setBulkDeleting(false);
     if (env.ok && env.data) {
       setError(null);
@@ -410,7 +417,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                 <td>
                   {confirmingOne === r.id ? <>
                     <span>{t("gui_reports_delete_confirm", { n: "1" })}</span>{" "}
-                    <button type="button" className="btn-danger" data-role="report-delete-confirm" disabled={deletingId !== null || bulkDeleting} aria-busy={deletingId === r.id || undefined} onClick={() => void remove(r.id)}>
+                    <button type="button" className="btn-danger" data-role="report-delete-confirm" disabled={deletingId !== null || bulkDeleting} aria-busy={deletingId === r.id || undefined} onClick={() => void remove(r)}>
                       {t("btn_confirm")}
                     </button>{" "}
                     <button type="button" className="btn-quiet" onClick={() => setConfirmingOne(null)}>{t("btn_cancel")}</button>

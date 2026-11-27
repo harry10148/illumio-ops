@@ -2265,6 +2265,9 @@ trigger: string
  * via the `definition` "BulkDelete".
  */
 export interface BulkDelete {
+created_at?: {
+[k: string]: string
+}
 /**
  * @minItems 1
  * @maxItems 500

@@ -125,6 +125,7 @@ def test_report_single_delete_requires_confirmation(context, live_app):
     row.locator("[data-role=report-delete-confirm]").click()
     expect(page.locator(f"[data-report-id='{ids[0]}']")).to_have_count(0)
     assert len(requests) == 1
+    assert "created_at=" in requests[0].url
 
 
 def test_schedule_errors_are_never_dropped(context, live_app):

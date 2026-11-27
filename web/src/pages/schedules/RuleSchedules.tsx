@@ -35,7 +35,26 @@ function word(map: Record<string, string>, value: string): string {
 }
 
 function runDetail(value: string): string {
-  return value === "rs_detail_draft_only" ? t(value) : value;
+  const keys: Record<string, string> = {
+    rs_detail_draft_only: "rs_detail_draft_only", draft_only: "rs_detail_draft_only",
+    draft_pending: "rs_detail_draft_pending", no_write_key: "rs_detail_no_write_key",
+    pce_switched: "rs_detail_pce_switched",
+  };
+  const translate = (detail: string): string => {
+    if (keys[detail]) return t(keys[detail] ?? detail);
+    const needs = "needs unprovisioned objects: ";
+    if (detail.startsWith(needs)) return t("rs_detail_needs_unprovisioned", { objects: detail.slice(needs.length) });
+    const remains = detail.match(/^draft change remains \(put back refused: (.*)\); needs unprovisioned objects: (.*)$/s);
+    if (remains) return t("rs_detail_draft_remains", { detail: remains[1] ?? "", objects: remains[2] ?? "" });
+    const note = "note not cleared: HTTP ";
+    if (detail.startsWith(note)) return t("rs_detail_note_not_cleared", { detail: detail.slice(note.length) });
+    return detail;
+  };
+  const separator = value.indexOf("; ");
+  if (separator >= 0 && value.slice(0, separator).startsWith("by ")) {
+    return `${value.slice(0, separator)}; ${translate(value.slice(separator + 2))}`;
+  }
+  return translate(value);
 }
 
 function daysText(days: string[]): string {

@@ -34,11 +34,17 @@ const CLASS_KEYS: Record<string, string> = {
 const DETAILS_KEYS: Record<string, string> = {
   stale: "hosts_rw_details_stale", missing: "hosts_rw_details_missing", not_rated: "hosts_rw_details_not_rated",
 };
+const PORT_STATUS_KEYS: Record<string, string> = { listening: "hosts_rw_port_listening", inactive: "hosts_rw_port_inactive" };
 /** A service's protection state in the ransomware report's words (services/reports/ransomware_report.py _state_key). */
 function protectionWord(state: string): string {
   const s = state.toLowerCase();
   return t(s.startsWith("protected") ? "rpt_rw_state_protected" : s === "unprotected" ? "rpt_rw_state_unprotected"
     : "rpt_rw_state_unknown");
+}
+
+function portStatusWord(status: string): string {
+  const key = PORT_STATUS_KEYS[status.toLowerCase()];
+  return key ? t(key) : status;
 }
 const ALLOW_KEYS: Record<string, string> = { error: "rpt_rw_allow_error", partial: "rpt_rw_allow_partial" };
 const PERIODS: [string, number][] = [["wb_period_1h", 1], ["wb_period_1d", 24], ["wb_period_7d", 168]];
@@ -345,7 +351,7 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
                     <td>{s.name}</td><td className="nowrap">{portWord(s.port, s.proto)}</td>
                     <td>{s.severity ? word(SEVERITY_KEYS, s.severity.toLowerCase()) : "—"}</td>
                     <td>{s.protection_state ? protectionWord(s.protection_state) : "—"}
-                      {s.port_status ? ` · ${s.port_status}` : ""}</td>
+                      {s.port_status ? ` · ${portStatusWord(s.port_status)}` : ""}</td>
                     <td className="wb-num">{s.weight ?? "—"}</td>
                     <td className="wb-num">{s.coverage === null ? "—" : `${Math.round(s.coverage * 100)}%`}</td>
                     <td className="wb-num">{s.contribution === null ? "—" : s.contribution.toFixed(1)}</td>
