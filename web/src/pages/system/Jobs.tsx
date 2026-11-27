@@ -56,7 +56,7 @@ export function Jobs() {
   return (
     <section className="page">
       <div className="page-title"><h1>{t("nav_system_jobs")}</h1><Purpose>{t("purpose_system_jobs")}</Purpose></div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {jobs && (
         <div className="card table-wrap">
           <table className="table">

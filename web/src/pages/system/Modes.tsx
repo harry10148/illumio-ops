@@ -42,7 +42,7 @@ export function Modes() {
       else setError(env.error);
     });
   }, []);
-  if (error) return <p className="form-error">{t(error.message_key, error.params)}</p>;
+  if (error) return <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>;
   if (!d) return <p className="muted">{t("loading")}</p>;
   const basicWhy = t("modes_basic_no_traffic");
   return (

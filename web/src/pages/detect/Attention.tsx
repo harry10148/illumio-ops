@@ -71,7 +71,7 @@ export function Attention() {
   return (
     <div className="card stack" data-role="focus" id="attention">
       <h2>{t("detect_attention_title")}</h2>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!view && !error && <p className="muted">{t("loading")}</p>}
       {view && view.computed_at === null && <p className="notice" data-role="focus-not-computed">{t("home_focus_not_computed")}</p>}
       {view?.computed_at && (

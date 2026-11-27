@@ -80,6 +80,16 @@ def test_no_write_key_greyed_out(context, live_app, fake_pce):
     expect(dialog.locator("[data-role=q-apply]")).to_be_disabled()
 
 
+def test_escape_closes_quarantine_and_returns_focus_to_opener(context, live_app, fake_pce):
+    _setup(live_app, fake_pce)
+    page, dialog = _open(context, live_app)
+    opener = page.locator("[data-role=q-open]")
+    expect(dialog.locator("#quarantine-heading")).to_be_focused()
+    page.keyboard.press("Escape")
+    expect(dialog).to_have_count(0)
+    expect(opener).to_be_focused()
+
+
 def test_history_unread_said(context, live_app, fake_pce):
     """P6d deferred: the host page left the record out when reading it failed, which reads as "nothing was done"."""
     _setup(live_app, fake_pce)

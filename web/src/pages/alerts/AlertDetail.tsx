@@ -59,7 +59,7 @@ function Rules({ titleKey, rules }: { titleKey: string; rules: RuleRef[] }) {
 }
 
 function Explanation({ e }: { e: PolicyExplanation }) {
-  if (e.pce_error) return <p className="form-error">{t("explain_failed", { error: e.pce_error })}</p>;
+  if (e.pce_error) return <p className="form-error" role="alert">{t("explain_failed", { error: e.pce_error })}</p>;
   if (e.source === "none") return <p className="hint">{t("explain_unplaced")}</p>;
   const none = e.allow.length + e.deny.length + e.override_deny.length === 0;
   return (
@@ -96,7 +96,7 @@ function Evidence({ alertId, kind }: { alertId: string; kind: string | null }) {
   }
 
   if (!kind) return <p className="muted">{t("evidence_none")}</p>;
-  if (error) return <p className="form-error">{t(error.message_key, error.params)}</p>;
+  if (error) return <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>;
   if (!ev) return <p className="muted">{t("loading")}</p>;
   const columns = ev.kind === "flow" ? FLOW_COLUMNS : EVENT_COLUMNS;
   const gaps = ev.coverage?.gaps ?? [];
@@ -127,7 +127,7 @@ function Evidence({ alertId, kind }: { alertId: string; kind: string | null }) {
                     <tr key={`e${i}`}>
                       <td colSpan={columns.length + 1}>
                         {"message_key" in result
-                          ? <p className="form-error">{t(result.message_key, result.params)}</p>
+                          ? <p className="form-error" role="alert">{t(result.message_key, result.params)}</p>
                           : <Explanation e={result} />}
                       </td>
                     </tr>
@@ -172,7 +172,7 @@ function MarkKnown({ alertId }: { alertId: string }) {
         <input type="radio" name="known_scope" checked={scope === "subject"} onChange={() => setScope("subject")} />
         {t("alert_known_scope_subject")}
       </label>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {done && <p className="form-ok" role="status">{t("alert_known_marked")}</p>}
       <div className="actions">
         <button type="submit" className="btn-primary" disabled={!reason.trim()}>{t("alert_known_mark")}</button>
@@ -210,7 +210,7 @@ export function AlertDetail() {
     return (
       <section className="page">
         <div className="page-title"><h1>{t("alert_detail_title")}</h1><Purpose>{t("purpose_alert_detail")}</Purpose></div>
-        {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+        {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       </section>
     );
   }
@@ -255,7 +255,7 @@ export function AlertDetail() {
           {t("alert_note_add_label")}
           <textarea name="note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={4000} />
         </label>
-        {noteError && <p className="form-error">{t(noteError.message_key, noteError.params)}</p>}
+        {noteError && <p className="form-error" role="alert">{t(noteError.message_key, noteError.params)}</p>}
         <div className="actions">
           <button type="submit" className="btn-primary" disabled={!note.trim()}>{t("alert_note_add")}</button>
         </div>

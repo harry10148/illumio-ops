@@ -110,13 +110,13 @@ function Username({ view, onChanged }: { view: SecurityView; onChanged: () => vo
         {t("login_username")}
         <input name="username" autoComplete="username" value={name} maxLength={256}
                onChange={(e) => { setName(e.target.value); setDone(false); }} />
-        {error?.field === "username" && <span className="field-error">{t(error.message_key, error.params)}</span>}
+        {error?.field === "username" && <span className="field-error" role="alert">{t(error.message_key, error.params)}</span>}
       </label>
       <label className="block">
         {t("pw_old")}
         <input name="current_password" type="password" autoComplete="current-password" value={password}
                onChange={(e) => setPassword(e.target.value)} />
-        {error?.field === "current_password" && <span className="field-error">{t(error.message_key, error.params)}</span>}
+        {error?.field === "current_password" && <span className="field-error" role="alert">{t(error.message_key, error.params)}</span>}
       </label>
       <p className="hint">{t("security_username_hint")}</p>
       <p className="hint">{t("security_shared_seen")}</p>
@@ -152,7 +152,7 @@ export function Security() {
   return (
     <section className="page stack">
       <div className="page-title"><h1>{t("nav_system_security")}</h1><Purpose>{t("purpose_system_security")}</Purpose></div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {view && (
         <>
           {/* a rename saves the settings too: reload so the next save is not stale */}

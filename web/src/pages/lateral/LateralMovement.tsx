@@ -70,7 +70,7 @@ export default function LateralMovement() {
 
   if (!page) {
     return <section className="page"><PageHead title={t("nav_detect")} purpose={t("purpose_detect")} />
-      {error ? <p className="form-error">{t(error.message_key, error.params)}</p> : <p className="muted">{t("loading")}</p>}
+      {error ? <p className="form-error" role="alert">{t(error.message_key, error.params)}</p> : <p className="muted">{t("loading")}</p>}
     </section>;
   }
 
@@ -126,7 +126,7 @@ export default function LateralMovement() {
             {busy && <p className="hint">{t("lat_computing_hint")}</p>}
           </div>
         )}
-        {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+        {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
         {ex && page.computed_at && (
           <p data-role="lat-computed">{t("lat_computed", { at: formatTime(page.computed_at, lang),
             start: formatTime(ex.observation_from, lang), end: formatTime(ex.observation_to, lang), hops: String(ex.hops) })}</p>
@@ -438,7 +438,7 @@ function Groups({ ex }: { ex: ExposureResult }) {
       <div className="row card-head">
         <h2>{t("lat_groups")}</h2>
         {fold.button}
-        <select name="group-by" value={by} onChange={(e) => setBy(e.target.value as (typeof GROUP_KEYS)[number])}>
+        <select name="group-by" aria-label={t("lat_groups")} value={by} onChange={(e) => setBy(e.target.value as (typeof GROUP_KEYS)[number])}>
           <option value="app">{t("lat_group_app")}</option>
           <option value="env">{t("lat_group_env")}</option>
         </select>
@@ -506,7 +506,7 @@ function Initiators() {
   );
   return (
     <FoldCard id="lat-initiators" section="initiators" title={t("lat_init_title")}>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!view && !error && <p className="muted">{t("loading")}</p>}
       {view && view.state === "lightweight" && <div data-role="initiators-need-mode"><NeedsAdvanced what={t("lat_init_need_mode")} /></div>}
       {view && view.state === "collection_off" && <p className="notice" data-role="initiators-off">{t("lat_init_collection_off")}</p>}

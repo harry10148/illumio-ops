@@ -103,7 +103,7 @@ export function ReportFilter({ value, onChange, requireApp, onValid }: {
           ? <ConditionEditor key={app} value={cond} choices={choices} onChange={set} onInvalid={setInvalid} />
           : <p className="hint">{t("loading")}</p>}
       </details>
-      {invalid && <p className="form-error" data-field={invalid}>{t("rule_ports_invalid")}</p>}
+      {invalid && <p className="form-error" data-field={invalid} role="alert">{t("rule_ports_invalid")}</p>}
     </div>
   );
 }

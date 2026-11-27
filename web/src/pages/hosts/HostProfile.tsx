@@ -116,7 +116,7 @@ function HostTop({ title, req, dimension, hostLinks, onPulled }: {
           {t("hosts_open_workbench")}
         </Link>
       </div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!top && !error && <p className="muted">{t("loading")}</p>}
       {top && <Caveats coverage={top.coverage} />}
       {top && top.rows.length === 0 && <p className="muted">{t("wb_dim_none")}</p>}
@@ -166,7 +166,7 @@ function Events({ href, span, onPulled }: { href: string; span: { start: string;
   return (
     <div className="card stack" data-section="events">
       <div className="row"><h3>{t("hosts_events")}</h3><Link to={investigate(req)}>{t("hosts_open_workbench")}</Link></div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!rows && !error && <p className="muted">{t("loading")}</p>}
       {caveat && <Caveats coverage={caveat.coverage} limitHit={caveat.limitHit} />}
       {rows && rows.length === 0 && <p className="muted">{t("wb_empty")}</p>}
@@ -275,7 +275,7 @@ function Tamper({ hostKey, href, tamper, onChange }: {
       )}
       <h3>{t("hosts_tamper_notes")}</h3>
       <p className="hint">{t("hosts_tamper_notes_hint")}</p>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       <ul className="stack" data-role="tamper-notes">
         {notes.map((n) => (
           <li key={n.id} className="row">
@@ -292,8 +292,8 @@ function Tamper({ hostKey, href, tamper, onChange }: {
         ))}
       </ul>
       <form className="row" onSubmit={(e) => void add(e)} data-role="tamper-note-form">
-        <input name="reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("hosts_tamper_reason")} required />
-        <input name="process" value={process} onChange={(e) => setProcess(e.target.value)} placeholder={t("hosts_tamper_process_opt")} />
+        <input name="reason" aria-label={t("hosts_tamper_reason")} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("hosts_tamper_reason")} required />
+        <input name="process" aria-label={t("hosts_tamper_process_opt")} value={process} onChange={(e) => setProcess(e.target.value)} placeholder={t("hosts_tamper_process_opt")} />
         <label className="row">
           <input type="checkbox" checked={onlyPattern} onChange={(e) => setOnlyPattern(e.target.checked)} />
           {t("hosts_tamper_only_pattern", { pattern: word(PATTERN_KEYS, kind) })}
@@ -365,7 +365,7 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
         </div>
       )}
       <p className="hint">{t("hosts_rw_allow_hint")}</p>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!asked && b.services.length > 0 && (
         <button type="button" className="btn-quiet" disabled={busy} onClick={() => void ask()} data-role="rw-allows">
           {busy ? t("loading") : t("hosts_rw_allow_button")}
@@ -428,12 +428,12 @@ function QuarantineSection({ hostKey, name, current, noEffect }: {
           </button>
         )}
       </div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {outcome && <Outcome outcome={outcome} />}
       {open && <QuarantineDialog hosts={[{ key: hostKey, name }]} onClose={() => setOpen(false)}
         onDone={() => setVersion((v) => v + 1)} />}
       {historyError && (
-        <p className="form-error" data-role="q-history-error">
+        <p className="form-error" data-role="q-history-error" role="alert">
           {t("q_history_unread")} {t(historyError.message_key, historyError.params)}
         </p>
       )}
@@ -528,7 +528,7 @@ export function HostProfile() {
   }, []);
   const gapNotes = Object.keys(gapCounts).filter((g) => (gapCounts[g] ?? 0) > 0);
 
-  if (error) return <section className="page"><p className="form-error">{t(error.message_key, error.params)}</p></section>;
+  if (error) return <section className="page"><p className="form-error" role="alert">{t(error.message_key, error.params)}</p></section>;
   if (!profile) return <section className="page"><p className="muted">{t("loading")}</p></section>;
 
   const side: EndpointFilter = profile.address ? { ips: [profile.address] } : { hrefs: [profile.key] };

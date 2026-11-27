@@ -63,7 +63,7 @@ export function Quarantine() {
           {idle > 0 && <> {t("q_page_conclusion_idle", { m: String(idle) })}</>}
         </p>
       )}
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {now && !now.write_key && (
         <p className="notice" data-role="q-no-write-key">{t("q_no_write_key")} <Link to="/system/pce">{t("nav_system_pce")}</Link></p>
       )}
@@ -117,7 +117,7 @@ export function Quarantine() {
         </div>
       )}
       <Panel title={t("q_page_history")} role="q-page-history">
-        {historyError && <p className="form-error">{t("q_history_unread")} {t(historyError.message_key, historyError.params)}</p>}
+        {historyError && <p className="form-error" role="alert">{t("q_history_unread")} {t(historyError.message_key, historyError.params)}</p>}
         {history && history.length === 0 && <p className="muted">{t("q_page_history_none")}</p>}
         {history && history.length > 0 && (
           <div className="table-wrap">

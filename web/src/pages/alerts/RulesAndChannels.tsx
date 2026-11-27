@@ -54,7 +54,7 @@ function RuleTest() {
           </select>
         </label>
       )}
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {result && (
         <DataTable
           rows={result.items}

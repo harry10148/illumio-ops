@@ -86,6 +86,7 @@ export function Shell({ me, onSignedOut }: Props) {
   return (
     <ShellStatusContext.Provider value={status}>
       <div className="shell">
+        <a className="skip-link" href="#main-content">{t("skip_to_main")}</a>
         <nav className="sidenav" aria-label={t("nav_main")} data-open={menuOpen || undefined}>
           <div className="nav-brand">
             <span className="brand">{t("app_name")}</span>
@@ -121,7 +122,7 @@ export function Shell({ me, onSignedOut }: Props) {
             )}
           </div>
         </nav>
-        <main className="content">
+        <main className="content" id="main-content" tabIndex={-1}>
           {me.default_password_in_use && (
             <p className="shell-banner banner" data-tone="high" role="status">
               {t("banner_default_password")} <Link to="/system/security">{t("banner_default_password_link")}</Link>

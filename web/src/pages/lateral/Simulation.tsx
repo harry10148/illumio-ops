@@ -93,7 +93,7 @@ export function Simulation({ suggestion, criticalSet, onClose }: {
       <p data-role="sim-rule"><strong>{suggestion.words}</strong></p>
       <p className="hint">{t("lat_sim_readonly")}</p>
       {suggestion.node && <p className="hint" data-role="sim-node">{t("lat_sim_node_inbound")}</p>}
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!sim && !error && <p className="muted">{t("lat_sim_running")}</p>}
       {sim && (
         <>

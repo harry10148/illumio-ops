@@ -157,7 +157,7 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
     (!same(rule.cooldown_minutes, reference.cooldown_minutes) || !same(rule.throttle, reference.throttle)));
   const set = (patch: Partial<Rule>) => { setRule((current) => current ? { ...current, ...patch } as Rule : current); setPreview(null); };
   const fieldError = (name: string): ReactElement | null => error?.field && error.field.includes(name)
-    ? <span className="field-error" data-field={error.field}>{t(error.message_key, error.params)}</span> : null;
+    ? <span className="field-error" data-field={error.field} role="alert">{t(error.message_key, error.params)}</span> : null;
 
   function close() {
     if (dirty && !window.confirm(t("rule_form_unsaved_confirm"))) return;
@@ -212,7 +212,7 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
     setParams({}, { replace: true });
     if (target) window.setTimeout(() => {
       const row = document.querySelector<HTMLElement>(`[data-rule-id="${target}"]`);
-      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+      row?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
       row?.classList.add("rule-form-flash");
       window.setTimeout(() => row?.classList.remove("rule-form-flash"), 1600);
     }, 80);
@@ -340,7 +340,7 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
         forceMoreOpen={Boolean(error?.field?.includes("condition."))}
         forceAdvancedOpen={Boolean(error?.field?.includes("condition."))}
         forceExclusionsOpen={Boolean(error?.field?.includes("exclude"))} />}
-      {localError && <p className="field-error" data-field={localError}>{t(localError === "event_severity_empty" ? "rule_event_severity_empty" : "rule_ports_invalid")}</p>}
+      {localError && <p className="field-error" data-field={localError} role="alert">{t(localError === "event_severity_empty" ? "rule_event_severity_empty" : "rule_ports_invalid")}</p>}
       {fieldError("condition")}
     </Step>
     <Step number={3} label={t("rule_form_step_threshold")}>
@@ -353,10 +353,10 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
           </label>)}
         </div>
         {eventRule.threshold === "immediate" ? <p className="sentence">{t("rule_form_event_same_check")}{" "}
-          <Num name="threshold_count" value={eventRule.threshold_count} onChange={(n) => set({ threshold_count: n })} /> {t("rule_unit_events")}</p>
+          <Num name="threshold_count" ariaLabel={t("rule_form_event_accumulate")} value={eventRule.threshold_count} onChange={(n) => set({ threshold_count: n })} /> {t("rule_unit_events")}</p>
           : <p className="sentence">{t("rule_window_in")}{" "}
-            <Num name="window_minutes" value={eventRule.window_minutes} onChange={(n) => set({ window_minutes: n })} /> {t("rule_minutes_at_least")}{" "}
-            <Num name="threshold_count" value={eventRule.threshold_count} onChange={(n) => set({ threshold_count: n })} /> {t("rule_unit_events")}</p>}
+            <Num name="window_minutes" ariaLabel={t("rule_minutes_at_least")} value={eventRule.window_minutes} onChange={(n) => set({ window_minutes: n })} /> {t("rule_minutes_at_least")}{" "}
+            <Num name="threshold_count" ariaLabel={t("rule_form_event_accumulate")} value={eventRule.threshold_count} onChange={(n) => set({ threshold_count: n })} /> {t("rule_unit_events")}</p>}
         {fieldError("threshold_count")}{eventRule.threshold === "count" && fieldError("window_minutes")}
       </div> : flowRule && <div className="rule-form-threshold">
         <div className="rule-form-segments" role="radiogroup" aria-label={t("rule_form_step_threshold")}>
@@ -366,11 +366,11 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
           </label>)}
         </div>
         <p className="sentence">{t("rule_form_flow_lookback")}{" "}
-          <Num name="window_minutes" value={flowRule.window_minutes} onChange={(n) => {
+          <Num name="window_minutes" ariaLabel={t("rule_form_flow_lookback")} value={flowRule.window_minutes} onChange={(n) => {
             setTouched((value) => ({ ...value, window: true })); set({ window_minutes: n });
           }} />{" "}
           {flowClause(flowRule.type)}{" "}
-          <Num name="threshold" value={flowRule.type === "traffic" ? flowRule.threshold_connections : flowRule.type === "bandwidth" ? flowRule.threshold_mbps : flowRule.threshold_mb}
+          <Num name="threshold" ariaLabel={t(flowRule.type === "traffic" ? "rule_form_flow_traffic_clause" : flowRule.type === "bandwidth" ? "rule_form_flow_bandwidth_clause" : "rule_form_flow_volume_clause")} value={flowRule.type === "traffic" ? flowRule.threshold_connections : flowRule.type === "bandwidth" ? flowRule.threshold_mbps : flowRule.threshold_mb}
             onChange={(n) => {
               setTouched((value) => ({ ...value, threshold: true }));
               if (flowRule.type === "traffic") set({ threshold_connections: n });

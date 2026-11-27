@@ -62,7 +62,7 @@ export function ReportSettings({ embedded = false }: { embedded?: boolean }) {
           </label>
           <div className="actions span-all">
             <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
-            {saved && <span className="form-ok">{t("saved_ok")}</span>}
+            {saved && <span className="form-ok" role="status">{t("saved_ok")}</span>}
           </div>
         </form>
       )}

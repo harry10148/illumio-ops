@@ -180,6 +180,7 @@ export function DataTable<R>({ columns, rows, rowKey, empty, onRowClick, selecte
   onRowClick?: (row: R) => void;
   selected?: string | null;
 }) {
+  const tabStopKey = selected && rows.some((row) => rowKey(row) === selected) ? selected : rows[0] ? rowKey(rows[0]) : null;
   return (
     <div className="table-wrap">
       <table className="table data-table">
@@ -194,7 +195,23 @@ export function DataTable<R>({ columns, rows, rowKey, empty, onRowClick, selecte
             return (
               <tr key={key} data-row={key} aria-selected={selected === key}
                   className={onRowClick ? "clickable" : undefined}
-                  onClick={onRowClick ? () => onRowClick(r) : undefined}>
+                  tabIndex={onRowClick ? (tabStopKey === key ? 0 : -1) : undefined}
+                  onClick={onRowClick ? (event) => {
+                    if (event.target instanceof Element && event.target.closest("a, button, input, select, textarea, [role='button']")) return;
+                    onRowClick(r);
+                  } : undefined}
+                  onKeyDown={onRowClick ? (event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                      event.preventDefault();
+                      const siblings = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLTableRowElement>("tr[data-row]") ?? []);
+                      const index = siblings.indexOf(event.currentTarget);
+                      siblings[Math.max(0, Math.min(siblings.length - 1, index + (event.key === "ArrowDown" ? 1 : -1)))]?.focus();
+                    } else if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onRowClick(r);
+                    }
+                  } : undefined}>
                 {columns.map((c) => <td key={c.key} data-kind={c.kind ?? "text"} data-nowrap={c.nowrap || undefined}>{c.render(r)}</td>)}
               </tr>
             );

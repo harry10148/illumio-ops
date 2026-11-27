@@ -51,7 +51,7 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
     return (
       <section className="page">
         {!embedded && <h1>{t("nav_system_channels")}</h1>}
-        {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+        {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       </section>
     );
   }
@@ -148,15 +148,15 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
               <div className="row">
                 <button type="button" className="btn-quiet" onClick={() => void test(kind)}>{t("channel_test")}</button>
                 {result && ("message_key" in result
-                  ? <span className="form-error" data-role="test-result">{t(result.message_key, result.params)}</span>
-                  : <span className={result.ok ? "form-ok" : "form-error"} data-role="test-result">
+                  ? <span className="form-error" data-role="test-result" role="status">{t(result.message_key, result.params)}</span>
+                  : <span className={result.ok ? "form-ok" : "form-error"} data-role="test-result" role="status">
                       {result.ok ? t("channel_test_ok") : t("channel_test_failed", { error: result.error ?? "" })}
                     </span>)}
               </div>
             </div>
           );
         })}
-        {error && <p className="form-error" data-field={error.field ?? ""}>{t(error.message_key, error.params)}</p>}
+        {error && <p className="form-error" data-field={error.field ?? ""} role="alert">{t(error.message_key, error.params)}</p>}
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
         {allNone && <p className="hint" role="status" data-role="test-all-none">{t("channels_test_all_none")}</p>}
         <div className="actions">

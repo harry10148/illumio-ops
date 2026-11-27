@@ -1,6 +1,6 @@
 // Quarantine (spec §6.5.1 防堵, P6d): which policy refers to each level, what the hosts' traffic was in the last week,
 // then the label put on — the whole batch checked and confirmed at once. One of the two writes v6.0 makes to the PCE.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { type ApiError, call } from "../../api/client";
 import type {
@@ -88,8 +88,16 @@ export function QuarantineDialog({ hosts, onClose, onDone }: {
   const [ack, setAck] = useState(false);
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<QuarantineOutcome | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
   const keys = hosts.map((h) => h.key);
   const body = JSON.stringify(keys);
+
+  useEffect(() => {
+    opener.current ??= document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    heading.current?.focus();
+    return () => { if (opener.current?.isConnected) opener.current.focus(); };
+  }, []);
 
   useEffect(() => {
     let live = true;  // a slower answer for the level left behind must not replace this one
@@ -123,9 +131,10 @@ export function QuarantineDialog({ hosts, onClose, onDone }: {
   const canApply = !!prev && prev.check.write_key && usable.length > 0 && (!needsAck || ack) && !busy && !outcome;
 
   return (
-    <div className="card stack" data-role="quarantine" role="dialog" aria-label={t("q_title")}>
+    <div className="card stack" data-role="quarantine" role="dialog" aria-labelledby="quarantine-heading"
+         onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); onClose(); } }}>
       <div className="row">
-        <h2>{t("q_title")}</h2>
+        <h2 id="quarantine-heading" ref={heading} tabIndex={-1}>{t("q_title")}</h2>
         <button type="button" className="btn-quiet" onClick={onClose}>{t("q_close")}</button>
       </div>
       <p className="hint">{t("q_intro")}</p>
@@ -140,7 +149,7 @@ export function QuarantineDialog({ hosts, onClose, onDone }: {
           ))}
         </select>
       </label>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!prev && !error && <p className="muted">{t("loading")}</p>}
       {prev && policy && (
         <>

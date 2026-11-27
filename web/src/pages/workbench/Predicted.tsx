@@ -85,7 +85,7 @@ export function Predicted({ req }: { req: Req }) {
         </button>
       </div>
       <p className="hint">{t("wb_pred_hint")}</p>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {pb && (
         <>
           <p className="hint" data-role="pred-at">{t("wb_pred_at", { at: formatTime(pb.computed_at, lang) })}</p>

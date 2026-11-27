@@ -30,7 +30,7 @@ export function ScenarioList() {
     <section className="page stack" data-role="scenario-list">
       <p><Link to="/alert-rules">{t("rules_back")}</Link></p>
       <div className="page-title"><h1>{t("rule_editor_new")}</h1><Purpose>{t("purpose_scenario_list")}</Purpose></div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {items && GROUPS.map(({ group, labelKey }) => (
         <section key={group} className="card stack" data-scenario-group={group}>
           <h2>{t(labelKey)}</h2>

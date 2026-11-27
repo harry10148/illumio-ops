@@ -122,7 +122,15 @@ function RateDialog({ chosen, onClose, onDone }: { chosen: FleetHost[]; onClose:
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<FleetOutcome | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
   const keys = JSON.stringify(chosen.map((h) => h.key));
+
+  useEffect(() => {
+    opener.current ??= document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    heading.current?.focus();
+    return () => { if (opener.current?.isConnected) opener.current.focus(); };
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -150,14 +158,15 @@ function RateDialog({ chosen, onClose, onDone }: { chosen: FleetHost[]; onClose:
 
   const usable = check?.targets.filter((x) => x.ok) ?? [];
   return (
-    <div className="card stack" data-role="fleet-rate" role="dialog" aria-label={t("fleet_rate_title")}>
+    <div className="card stack" data-role="fleet-rate" role="dialog" aria-labelledby="fleet-rate-heading"
+         onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); onClose(); } }}>
       <div className="row">
-        <h2>{t("fleet_rate_title")}</h2>
+        <h2 id="fleet-rate-heading" ref={heading} tabIndex={-1}>{t("fleet_rate_title")}</h2>
         <button type="button" className="btn-quiet" onClick={onClose}>{t("q_close")}</button>
       </div>
       {check && <p className="hint">{t("fleet_rate_intro", { minutes: String(check.minutes) })}</p>}
       {check && !check.write_key && <p className="notice" data-role="fleet-no-write-key">{t("fleet_no_write_key")}</p>}
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!check && !error && <p className="muted">{t("loading")}</p>}
       {check && <TargetsTable targets={check.targets} />}
       {check && usable.some((x) => x.online !== "online") && <p className="hint">{t("fleet_rate_offline")}</p>}
@@ -271,7 +280,7 @@ function Fleet() {
   return (
     <section className="page" data-role="fleet">
       <PageHead title={t("nav_fleet")} purpose={t("purpose_fleet")} />
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       <div className="fleet-find" data-role="fleet-find">
         <label>{t("fleet_search_label")}
           <input name="q" type="search" value={filter.q} placeholder={t("fleet_search_placeholder")} maxLength={200}

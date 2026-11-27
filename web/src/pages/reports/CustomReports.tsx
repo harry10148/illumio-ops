@@ -33,7 +33,7 @@ function One({ rep, onChanged, generate }: {
         {renaming ? (
           <form className="row" onSubmit={(e) => { e.preventDefault(); setRenaming(false);
             void act(call("custom_reports.rename", { name }, { report_id: String(rep.id) })); }}>
-            <input name="custom-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
+            <input name="custom-name" aria-label={t("cust_rename")} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
             <button type="submit" className="btn-quiet">{t("cust_save")}</button>
           </form>
         ) : <strong>{rep.name}</strong>}
@@ -69,7 +69,7 @@ function One({ rep, onChanged, generate }: {
           </li>
         ))}
       </ol>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {making && generate(rep.id)}
     </div>
   );
@@ -86,7 +86,7 @@ export function CustomReports({ generate }: { generate: (customId: number, done:
   }, []);
   useEffect(load, [load]);
 
-  if (error) return <p className="form-error">{t(error.message_key, error.params)}</p>;
+  if (error) return <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>;
   if (!reports) return <p className="muted">{t("loading")}</p>;
   return (
     <div className="stack" data-role="custom-reports">

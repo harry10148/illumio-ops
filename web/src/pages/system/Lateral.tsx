@@ -133,7 +133,7 @@ function KnownMarks() {
     <div className="card stack" data-role="known-detections">
       <h2>{t("lateral_known_title")}</h2>
       <p className="hint">{t("lateral_known_hint")}</p>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {items !== null && items.length === 0 && <p className="muted">{t("lateral_known_none")}</p>}
       {items !== null && items.length > 0 && (
         <ul className="stack">
@@ -274,7 +274,7 @@ export function Lateral() {
     return (
       <section className="page">
         <div className="page-title"><h1>{t("nav_system_lateral")}</h1><Purpose>{t("purpose_system_lateral")}</Purpose></div>
-        {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+        {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       </section>
     );
   }

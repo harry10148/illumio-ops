@@ -134,7 +134,7 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
       {entry.accepts_filter && (
         <ReportFilter value={filter} onChange={setFilter} requireApp={entry.requires_app} onValid={setFilterValid} />
       )}
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       <div className="actions">
         <button type="button" className="btn-primary"
           disabled={busy || formats.length === 0 || !filterValid || (entry.requires_app && !namesApp(filter))
@@ -205,7 +205,7 @@ function TierGrid({ entries, catalog, open, setOpen, onGenerated }: {
   const openEntry = openIndex >= 0 ? entries[openIndex] : undefined;
   const after = openIndex < 0 ? -1 : Math.min(entries.length - 1, Math.floor(openIndex / cols) * cols + cols - 1);
   useEffect(() => {
-    if (openEntry) panel.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (openEntry) panel.current?.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [openEntry]);
   return (
     <div className="rpt-grid" ref={grid}>
@@ -316,7 +316,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   }
   return (
     <>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       <div className="row" data-role="bulk-actions">
         {confirming ? (
           <>
@@ -333,7 +333,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
           </button>
         )}
         {outcome && (
-          <span className="hint" data-role="bulk-outcome">{t("gui_reports_bulk_result", {
+          <span className="hint" role="status" data-role="bulk-outcome">{t("gui_reports_bulk_result", {
             removed: String(outcome.removed.length), running: String(outcome.running.length),
             missing: String(outcome.missing.length) })}</span>
         )}
@@ -487,7 +487,7 @@ export function Reports() {
         {tabButton("schedules", "gui_reports_tab_schedules")}
         {tabButton("produced", "rpt_tab_produced")}
       </div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {tab === "schedules" && (
         <>
           {catalog && <Schedules catalog={catalog} />}

@@ -54,7 +54,7 @@ function fieldOf(error: ApiError | null): string | null {
 
 function FieldError({ name, error }: { name: string; error: ApiError | null }) {
   if (fieldOf(error) !== name || !error) return null;
-  return <span className="field-error">{t(error.message_key, error.params)}</span>;
+  return <span className="field-error" role="alert">{t(error.message_key, error.params)}</span>;
 }
 
 export function PceConnection() {
@@ -84,7 +84,7 @@ export function PceConnection() {
   }, [load]);
 
   if (!form || revision === null) {
-    return error ? <p className="form-error">{t(error.message_key, error.params)}</p> : <p className="muted">{t("loading")}</p>;
+    return error ? <p className="form-error" role="alert">{t(error.message_key, error.params)}</p> : <p className="muted">{t("loading")}</p>;
   }
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {

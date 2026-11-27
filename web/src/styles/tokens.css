@@ -13,7 +13,7 @@
 
    CONTRACT (components may use ONLY tokens declared here):
      --tone-{ok,warn,crit,high,med,low,accum,adv,info,neutral}-{bg,fg,border}
-     --surface-{0,1,2}  --text-{1,2,3}  --space-{1..8}  --font-{ui,display,num,mono}  --radius-{s,m,l}
+     --surface-{0,1,2}  --text-{1,2,3}  --line-control  --space-{1..8}  --font-{ui,display,num,mono}  --radius-{s,m,l}
    EXTENDED SET: --line, --line-soft, --surface-hover, --surface-active, --accent*, --brand-deep,
    --chrome*, --track, --overlay, --shadow-{1,2}, --fs-*, --row-h, --ctl-h, --chrome-h, --nav-w, --lead.
    ============================================================================ */
@@ -77,6 +77,7 @@
   --line: #E6E2DA;
   --line-soft: #F0EDE6;
   --line-strong: #D9D3C7;
+  --line-control: #8F897F;
   --track: #EEEAE2;
 
   /* Illumio orange is for actions and the current place only. Filled controls use the deeper

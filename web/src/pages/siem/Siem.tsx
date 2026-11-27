@@ -250,8 +250,8 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
       <div className="row">
         <button type="button" className="btn-quiet" disabled={busy} onClick={() => void test()} data-role="siem-test">{t("siem_test")}</button>
         {result && ("message_key" in result
-          ? <span className="form-error" data-role="siem-test-result">{t(result.message_key, result.params)}</span>
-          : <span className={result.ok ? "form-ok" : "form-error"} data-role="siem-test-result">
+          ? <span className="form-error" data-role="siem-test-result" role="status">{t(result.message_key, result.params)}</span>
+          : <span className={result.ok ? "form-ok" : "form-error"} data-role="siem-test-result" role="status">
               {result.ok ? t("siem_test_ok") : t("siem_test_failed", { error: result.error ?? "" })}
             </span>)}
       </div>
@@ -282,7 +282,7 @@ export function Siem() {
     return (
       <section className="page">
         <div className="page-title"><h1>{t("nav_siem")}</h1><Purpose>{t("purpose_siem")}</Purpose></div>
-        {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+        {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       </section>
     );
   }
@@ -349,7 +349,7 @@ export function Siem() {
           </div>
         </details>
         {error && (
-          <p className="form-error" data-field={error.field ?? ""}>
+          <p className="form-error" data-field={error.field ?? ""} role="alert">
             {t(error.message_key, error.params)}
             {error.code === "tls_unverified" && (
               <button type="button" className="btn-quiet inline-action" data-role="siem-save-anyway"

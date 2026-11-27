@@ -29,8 +29,10 @@ function advancedHolds(rule: Rule, start: Rule): boolean {
   return Object.keys(now).some((key) => !shown.includes(key) && !same(now[key], then[key]));
 }
 
-export function Num({ name, value, onChange }: { name: string; value: number; onChange: (n: number) => void }) {
-  return <input name={name} inputMode="decimal" className="narrow" value={String(value)}
+export function Num({ name, value, onChange, ariaLabel }: { name: string; value: number; onChange: (n: number) => void; ariaLabel?: string }) {
+  const labels: Record<string, string> = { cooldown_minutes: "rule_cooldown", throttle_count: "rule_throttle_at_most",
+    throttle_period: "rule_throttle", threshold_count: "rule_form_event_accumulate", window_minutes: "rule_form_flow_lookback", threshold: "rule_form_flow_traffic_clause" };
+  return <input name={name} aria-label={ariaLabel ?? t(labels[name] ?? "rule_form_flow_lookback")} inputMode="decimal" className="narrow" value={String(value)}
                 onChange={(e) => onChange(Number(e.target.value))} />;
 }
 
@@ -102,13 +104,13 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
     return (
       <section className="page">
         <div className="page-title"><h1>{t("rule_editor_title")}</h1><Purpose>{t("purpose_rule_editor")}</Purpose></div>
-        {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+        {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       </section>
     );
   }
   const set = (patch: Partial<Rule>) => { setRule({ ...rule, ...patch } as Rule); setPreview(null); };
   const fieldError = (name: string) => error?.field && error.field.includes(name)
-    ? <span className="form-error" data-field={error.field}>{t(error.message_key, error.params)}</span> : null;
+    ? <span className="form-error" data-field={error.field} role="alert">{t(error.message_key, error.params)}</span> : null;
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -282,8 +284,8 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
           </>
         )}
 
-        {error && !error.field && <p className="form-error">{t(error.message_key, error.params)}</p>}
-        {error?.field && <p className="form-error" data-field={error.field}>{t(error.message_key, error.params)}</p>}
+        {error && !error.field && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
+        {error?.field && <p className="form-error" data-field={error.field} role="alert">{t(error.message_key, error.params)}</p>}
         {preview && (
           <div className="card" data-role="preview">
             {preview.status === "not_applicable" ? <p>{t("rule_preview_na")}</p>

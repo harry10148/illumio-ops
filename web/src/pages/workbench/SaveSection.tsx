@@ -70,7 +70,7 @@ export function SaveSection({ req }: { req: Req }) {
           <input name="section-title" value={title} maxLength={120} required onChange={(e) => setTitle(e.target.value)} />
         </label>
       </div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {saved && (
         <p className="hint" data-role="save-section-done">
           {t("cust_saved", { name: saved.name, n: String(saved.sections.length) })} <Link to="/reports">{t("nav_reports")}</Link>

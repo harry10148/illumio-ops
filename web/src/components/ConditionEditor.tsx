@@ -182,10 +182,10 @@ export function Side({ name, value, choices, onChange }: {
       )}
       {labelChoices.length > 0 && (
         <div className="row">
-          <select name={`${name}_label_key`} value={key} onChange={(e) => { setKey(e.target.value); setVal(""); }}>
+          <select name={`${name}_label_key`} aria-label={t("lateral_label_key")} value={key} onChange={(e) => { setKey(e.target.value); setVal(""); }}>
             {labelChoices.map((c) => <option key={c.key} value={c.key}>{c.key}</option>)}
           </select>
-          <select name={`${name}_label_value`} value={val || choice?.values[0] || ""} onChange={(e) => setVal(e.target.value)}>
+          <select name={`${name}_label_value`} aria-label={t("lateral_label_value")} value={val || choice?.values[0] || ""} onChange={(e) => setVal(e.target.value)}>
             {(choice?.values ?? []).map((x) => <option key={x} value={x}>{x}</option>)}
           </select>
           <button type="button" className="btn-quiet" onClick={add}>{t("cond_add_label")}</button>

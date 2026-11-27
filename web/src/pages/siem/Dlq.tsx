@@ -95,7 +95,7 @@ export function Dlq() {
         </label>
         <a className="btn-quiet" href={exportHref} data-role="dlq-export">{filter ? t("siem_dlq_export_filtered") : t("siem_dlq_export")}</a>
       </div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {done && <p className="form-ok" role="status" data-role="dlq-done">{done}</p>}
       {page && page.total === 0 && <p className="muted" data-role="dlq-empty">{filter ? t("siem_dlq_none_match") : t("siem_dlq_empty")}</p>}
       {detail && (

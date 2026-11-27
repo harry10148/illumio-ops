@@ -264,7 +264,7 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
         </>
       )}
       {error && (
-        <p className="form-error" data-role="rs-error">
+        <p className="form-error" data-role="rs-error" role="alert">
           {t(error.message_key, error.params)}
         </p>
       )}
@@ -303,7 +303,7 @@ function EditSchedule({ schedule, writeKey, onDone }: { schedule: ScheduleView; 
         </button>
         <button type="button" className="btn-quiet" onClick={() => onDone(false)}>{t("btn_cancel")}</button>
       </div>
-      {error && <p className="form-error" data-role="rs-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" data-role="rs-error" role="alert">{t(error.message_key, error.params)}</p>}
     </div>
   );
 }
@@ -366,7 +366,7 @@ export function RuleSchedules() {
         <Link to="/rule-schedules/rulesets" data-role="rs-browse-rulesets">{t("rs_browse_rulesets")}</Link>
         <ModeMark needs="basic" />
       </PageHead>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {o && !o.write_key && <p className="notice" data-role="rs-no-write-key">{t("rs_no_write_key")}</p>}
       <KpiStrip items={[
         { key: "count", label: t("rs_kpi_schedules"), value: o ? o.schedules : null },

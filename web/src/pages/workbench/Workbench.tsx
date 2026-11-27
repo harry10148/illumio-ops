@@ -143,7 +143,7 @@ function DimensionBox({ req, dim, open, onToggle, onPick, names, onQuarantine }:
       <button type="button" className="wb-dim-head" aria-expanded={open} onClick={onToggle}>{title}</button>
       {open && (
         <div className="wb-dim-body">
-          {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+          {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
           {!top && !error && <p className="muted">{t("loading")}</p>}
           {top && top.rows.length === 0 && <p className="muted">{t("wb_dim_none")}</p>}
           {top && top.rows.map((row) => {
@@ -430,7 +430,7 @@ export function Workbench() {
             </select>
           </label>
           <form className="row" onSubmit={search}>
-            <input name="search" value={text} onChange={(e) => setText(e.target.value)}
+            <input name="search" aria-label={t(req.mode === "events" ? "wb_search_actor" : "wb_search")} value={text} onChange={(e) => setText(e.target.value)}
               placeholder={t(req.mode === "events" ? "wb_search_actor" : "wb_search")} />
             <button type="submit" className="btn-quiet">{t("wb_search_add")}</button>
           </form>

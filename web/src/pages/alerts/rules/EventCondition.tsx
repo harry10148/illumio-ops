@@ -216,10 +216,10 @@ export function EventCondition({ rule, set, fieldError, fieldsSeq, forceOpen, it
 
     <div className="event-filter-row">
       {severityVisible ? <fieldset><legend>{t("rule_event_severity")}</legend>{severity.kind === "raw"
-        ? <input name="event_severity" value={rule.event_severity} onChange={(event) => set({ event_severity: event.target.value })} />
+        ? <input name="event_severity" aria-label={t("rule_event_severity")} value={rule.event_severity} onChange={(event) => set({ event_severity: event.target.value })} />
         : SEVERITIES.map((value) => <label className="check" key={value}><input type="checkbox" name={`event_severity_${value}`}
           checked={!emptySeverity && severity.values.includes(value)} onChange={(event) => changeSeverity(value, event.target.checked)} />{severityLabels[value]}</label>)}
-        {emptySeverity && <span className="field-error">{t("rule_event_severity_empty")}</span>}
+        {emptySeverity && <span className="field-error" role="alert">{t("rule_event_severity_empty")}</span>}
         {fieldError("event_severity")}</fieldset>
         : <p className="hint">{t("rule_event_filter_unmarked_severity")}</p>}
       {statusVisible ? <label>{t("rule_event_status")}{status.kind === "raw"

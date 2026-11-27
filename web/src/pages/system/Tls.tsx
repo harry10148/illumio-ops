@@ -74,7 +74,7 @@ function SettingsCard({ status, onSaved }: { status: TlsStatus; onSaved: (s: Tls
   }
 
   const fieldError = (name: string) =>
-    error?.field === name ? <span className="field-error">{t(error.message_key, error.params)}</span> : null;
+    error?.field === name ? <span className="field-error" role="alert">{t(error.message_key, error.params)}</span> : null;
 
   return (
     <form className="card form-grid" onSubmit={save}>

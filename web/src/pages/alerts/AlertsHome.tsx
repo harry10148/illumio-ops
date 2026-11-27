@@ -66,9 +66,9 @@ function Side({ id }: { id: number }) {
     return () => { live = false; };
   }, [id]);
 
-  if (error) return <p className="form-error">{t(error.message_key, error.params)}</p>;
+  if (error) return <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>;
   if (!d) return <p className="muted">{t("loading")}</p>;
-  return <div className="alert-side" data-role="alert-side"><AlertBody d={d} full={false} /></div>;
+  return <div className="alert-side" data-role="alert-side" data-alert-id={id}><AlertBody d={d} full={false} /></div>;
 }
 
 export function AlertsHome() {
@@ -184,7 +184,7 @@ export function AlertsHome() {
                              { value: "new", label: t("alerts_only_new"), count: data?.new_matching || undefined }]}
                    onChange={(v) => updateView({ only_new: v === "new" ? "true" : null, page: "1" })} />
       </div>
-      {error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {data && (
         <div className="split">
           <div className="stack">

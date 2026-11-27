@@ -69,7 +69,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   const slot = errorField === null ? null : ERROR_SLOTS[errorField] ?? errorField;
   const inline = slot !== null && placed[slot] === true;
   const fieldError = (name: string) => error && inline && slot === name
-    ? <span className="field-error" data-field={error.field}>{t(error.message_key, error.params)}</span> : null;
+    ? <span className="field-error" data-field={error.field} role="alert">{t(error.message_key, error.params)}</span> : null;
   useEffect(() => {
     if (s.report_type !== "custom" || customs) return;
     void call("custom_reports.list").then((env) => { if (env.ok && env.data) setCustoms(env.data.reports); });
@@ -208,7 +208,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       <label>
         <input type="checkbox" name="enabled" checked={s.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> {t("gui_reports_enabled")}
       </label>
-      {error && !inline && <p className="form-error span-all">{t(error.message_key, error.params)}</p>}
+      {error && !inline && <p className="form-error span-all" role="alert">{t(error.message_key, error.params)}</p>}
       <div className="actions span-all">
         <button type="button" className="btn-primary" disabled={!filterValid}
           onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? filter : null,
@@ -269,7 +269,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
     else setError(env.error);
   }
 
-  if (!view) return error ? <p className="form-error">{t(error.message_key, error.params)}</p> : null;
+  if (!view) return error ? <p className="form-error" role="alert">{t(error.message_key, error.params)}</p> : null;
   const first = catalog.entries[0]?.report_type ?? "lateral_posture";
   return (
     <div className="stack" data-role="schedules">
@@ -284,7 +284,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
         <Editor key={editing.id ?? "new"} initial={editing.fields} catalog={catalog} smtp={view.smtp_enabled} error={error}
           onSave={(f) => void save(f)} onCancel={() => { setEditing(null); setError(null); }} />
       )}
-      {!editing && error && <p className="form-error">{t(error.message_key, error.params)}</p>}
+      {!editing && error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {view.items.length === 0 ? <p className="muted">{t("gui_reports_sched_none")}</p> : (
         <div className="table-wrap">
           <table className="table" data-role="schedule-list">
