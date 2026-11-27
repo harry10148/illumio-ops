@@ -596,7 +596,7 @@
   "alerts_none": "No alerts in this period.",
   "alerts_period": "Period",
   "alerts_period_days": "Last {n} days",
-  "alerts_total": "{n} alerts",
+  "alerts_total": "Alerts: {n}",
   "alerts_type": "Type",
   "btn_cancel": "Cancel",
   "btn_confirm": "Confirm",

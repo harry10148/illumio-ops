@@ -28,18 +28,18 @@ def test_severity_kpi_toggles_filter_and_aria_pressed(context, live_app):
     high.click()
     expect(high).to_have_attribute("aria-pressed", "true")
     assert "severity=high" in page.url
-    expect(page.locator("[data-role=alert-total]")).to_have_text("1 alert")
+    expect(page.locator("[data-role=alert-total]")).to_have_text("Alerts: 1")
     high.click()
     expect(high).to_have_attribute("aria-pressed", "false")
     assert "severity=high" not in page.url
-    expect(page.locator("[data-role=alert-total]")).to_have_text("2 alerts")
+    expect(page.locator("[data-role=alert-total]")).to_have_text("Alerts: 2")
 
 
 def test_url_restores_alert_view_after_reload(context, live_app):
     alert_id = seed(live_app.ctx)
     page = context.new_page()
     sign_in(page, live_app.url)
-    page.goto(f"{live_app.url}/?days=30&category=system&only_new=true&severity=high&page=1&alert={alert_id}")
+    page.goto(f"{live_app.url}/?days=30&category=system&severity=high&page=1&alert={alert_id}")
     expect(page.locator("[data-category=system]")).to_have_attribute("aria-pressed", "true")
     expect(page.locator("[data-kpi=high]")).to_have_attribute("aria-pressed", "true")
     expect(page.locator("[data-role=alert-side]")).to_be_visible()
@@ -60,6 +60,7 @@ def test_grouped_row_expands_and_member_selects_detail(context, live_app):
     sign_in(page, live_app.url)
     toggle = page.get_by_role("button", name="Expand 2 alerts")
     expect(toggle).to_be_visible()
+    expect(page.locator("[data-role=alert-total]")).to_have_text("Alerts: 2")  # alerts, not the one row they share
     toggle.click()
     members = page.locator("[data-role=alert-group-members]")
     expect(members.locator("[data-member-id]")).to_have_count(2)

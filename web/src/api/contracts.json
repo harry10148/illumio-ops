@@ -15542,6 +15542,10 @@
           }
         },
         "properties": {
+          "alerts_total": {
+            "title": "Alerts Total",
+            "type": "integer"
+          },
           "counts": {
             "$ref": "#/$defs/AlertCounts"
           },
@@ -15602,6 +15606,7 @@
         "required": [
           "items",
           "total",
+          "alerts_total",
           "page",
           "page_size",
           "counts",

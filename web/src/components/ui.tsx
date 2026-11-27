@@ -137,11 +137,12 @@ export interface KpiItem {
   delta?: string;
 }
 
-export function KpiStrip({ items, selectedKey, onSelect, selectableKeys }: {
+export function KpiStrip({ items, selectedKey, onSelect, selectableKeys, groupLabel }: {
   items: KpiItem[]; selectedKey?: string | null; onSelect?: (key: string) => void; selectableKeys?: string[];
+  groupLabel?: string;  // with onSelect: the strip is one control, a group of toggles, named by this
 }) {
   return (
-    <div className="kpi-strip" data-role="kpi-strip">
+    <div className="kpi-strip" data-role="kpi-strip" {...(onSelect ? { role: "group", "aria-label": groupLabel, "data-seg": "" } : {})}>
       {items.map((k) => {
         const contents = <>
           <div className="kpi-label">{k.label}</div>

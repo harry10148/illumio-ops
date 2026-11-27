@@ -162,7 +162,7 @@ export function AlertsHome() {
         { key: "medium", label: t("severity_medium"), value: c ? c.medium : null, tone: "med" },
         { key: "low", label: t("severity_low"), value: c ? c.low : null },
         { key: "grouped", label: t("alerts_kpi_grouped"), value: c ? c.grouped : null },
-      ]} selectedKey={severity || null} selectableKeys={["critical", "high", "medium", "low"]}
+      ]} selectedKey={severity || null} selectableKeys={["critical", "high", "medium", "low"]} groupLabel={t("alerts_col_severity")}
         onSelect={(key) => updateView({ severity: severity === key ? null : key, page: "1" })} />
       {device && (
         <p className="row" data-role="alert-device-filter">
@@ -188,7 +188,7 @@ export function AlertsHome() {
       {data && (
         <div className="split">
           <div className="stack">
-            <p className="hint" data-role="alert-total">{t("alerts_total", { n: String(data.total) })}</p>
+            <p className="hint" data-role="alert-total">{t("alerts_total", { n: String(data.alerts_total) })}</p>
             <div data-role="alert-list">
               <DataTable<AlertItem>
                 rows={data.items}

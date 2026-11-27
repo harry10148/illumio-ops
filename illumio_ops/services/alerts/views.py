@@ -111,7 +111,8 @@ class AlertCounts(BaseModel):
 
 class AlertList(BaseModel):
     items: list[AlertItem]
-    total: int
+    total: int  # rows: groups when grouped (what the pages count), else alerts
+    alerts_total: int  # alerts matching the filters, before grouping (what the page says it lists)
     page: int
     page_size: int
     counts: AlertCounts
@@ -325,6 +326,7 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
                             key=lambda members: (datetime.fromisoformat(members[0]["fired_at"]), members[0]["id"]),
                             reverse=True)
             total = len(groups)
+            alerts_total = len(candidates)
             page_groups = groups[(q.page - 1) * PAGE:q.page * PAGE]
             group_data = [(members, [int(m["id"]) for m in members][:100]) for members in page_groups]
             wanted_ids = list(dict.fromkeys(alert_id for _, ids in group_data for alert_id in ids))
@@ -344,6 +346,7 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
                                             severity=q.severity.value if q.severity else None, rule_id=q.rule,
                                             device=q.device, fired_after=q.new_after if q.only_new else None,
                                             limit=PAGE, offset=(q.page - 1) * PAGE)
+            alerts_total = total
             member_rows = rows
             page_group_members = []
         new = (store.count_new(conn, pce_url=url, org_id=org, after=q.new_after, since=since)
@@ -380,7 +383,7 @@ def list_alerts(ctx: AppContext, q: AlertQuery, *, now: datetime | None = None) 
     return AlertList(items=items, new=new,
                      hosts_recorded_since=recorded if recorded is not None and recorded > since else None,
                      new_matching=matching, device_name=names.get(q.device) if q.device else None,
-                     total=total, page=q.page,
+                     total=total, alerts_total=alerts_total, page=q.page,
                      page_size=PAGE, counts=counts)
 
 

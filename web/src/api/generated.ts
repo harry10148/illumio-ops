@@ -886,6 +886,7 @@ summary: string
  * via the `definition` "AlertList".
  */
 export interface AlertList {
+alerts_total: number
 counts: AlertCounts
 device_name?: (string | null)
 hosts_recorded_since?: (string | null)

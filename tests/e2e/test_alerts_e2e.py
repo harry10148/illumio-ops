@@ -56,7 +56,7 @@ def test_alerts_nav_and_list(context, live_app):
     expect(table).to_contain_text("Disk space is low: 1 GB left")
     expect(table.locator("[data-delivery=pending]")).to_have_text("LINE: waiting")
     expect(table.locator("[data-delivery=not_notified]")).to_have_text("recorded only (rule setting)")
-    expect(page.locator("[data-role=alert-total]")).to_have_text("2 alerts")
+    expect(page.locator("[data-role=alert-total]")).to_have_text("Alerts: 2")
 
 
 def test_alert_detail_shows_delivery_status(context, live_app):
