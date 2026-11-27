@@ -1,6 +1,10 @@
 """Keyboard and focus behavior for the signed-in UI."""
+from datetime import UTC, datetime, timedelta
+
 from playwright.sync_api import expect
 
+from illumio_ops.domain.alert_devices import Device
+from illumio_ops.store import alerts as alert_store
 from tests.e2e import test_alerts_e2e as alerts_e2e
 from tests.e2e.conftest import sign_in
 
@@ -27,8 +31,12 @@ def test_alert_rows_can_be_selected_with_the_keyboard(context, live_app):
 
 
 def test_alert_group_button_keeps_its_own_keyboard_behavior(context, live_app):
-    alerts_e2e._lateral(live_app.ctx, "new_process", subject="/orgs/1/workloads/keyboard")
-    alerts_e2e._lateral(live_app.ctx, "new_process", subject="/orgs/1/workloads/keyboard")
+    # two alerts of one rule about one host within one clock hour: one row marked ×2 (as test_alert_triage_e2e)
+    at = datetime.now(UTC).replace(minute=10, second=0, microsecond=0)
+    for when in (at, at + timedelta(minutes=20)):
+        alert_id = alerts_e2e.seed(live_app.ctx, at=when)
+        with live_app.ctx.db() as conn:
+            alert_store._write_devices(conn, alert_id, [Device("/orgs/1/workloads/keyboard", "subject")])
     page = context.new_page()
     sign_in(page, live_app.url)
     row = page.locator("[data-role=alert-list] tbody tr[data-row]").first
