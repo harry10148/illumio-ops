@@ -425,6 +425,31 @@ def _made(live_app, n=1):
     return ids
 
 
+def test_report_period_is_read_in_the_display_zone(browser, live_app):
+    """6.17.0: the list reads a report's period (stored in UTC) in the display zone, as the report itself does, not
+    in the browser's zone and not as the UTC date."""
+    from zoneinfo import ZoneInfo
+
+    from illumio_ops.domain.report import period_text
+    from illumio_ops.services.reports import views
+    context = browser.new_context(locale="en-US", timezone_id="America/New_York")
+    try:
+        page = context.new_page()
+        sign_in(page, live_app.url)
+        page.goto(f"{live_app.url}/system/display")
+        page.locator("input[name=timezone]").fill("Asia/Taipei")
+        with page.expect_response(lambda response: response.url.endswith("/api/auth/me") and response.status == 200):
+            page.get_by_role("button", name="Save").click()
+        ids = _made(live_app)
+        item = views.get_report(live_app.ctx, ids[0])
+        assert item is not None
+        expected = period_text(item.period_start, item.period_end, ZoneInfo("Asia/Taipei"))
+        page.goto(f"{live_app.url}/reports?tab=produced")
+        expect(page.locator(f"[data-report-id='{ids[0]}']")).to_contain_text(expected)
+    finally:
+        context.close()
+
+
 def test_open_report_in_browser_sandboxed(context, live_app):
     """5.x opened an HTML report in the browser: here in a new tab, its own script running, sealed off from the
     console (no session cookie, no API)."""

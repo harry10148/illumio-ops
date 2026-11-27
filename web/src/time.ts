@@ -48,6 +48,13 @@ export function formatTimeSeconds(iso: string): string {
   return `${datePart(p)} ${timePart(p, true)}`;
 }
 
+/** The calendar date of a time in the display zone ("YYYY-MM-DD"); anything unparsable is returned as given. */
+export function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return datePart(parts(date, zone()));
+}
+
 export function today(): string {
   return datePart(parts(new Date(), zone()));
 }
