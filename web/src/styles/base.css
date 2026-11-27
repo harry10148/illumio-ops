@@ -358,6 +358,8 @@ textarea { width: 100%; padding: var(--space-4); border: 1px solid var(--line-co
 .host-section[data-arrived] { box-shadow: -4px 0 0 var(--accent); transition: box-shadow .2s; }
 /* HostName supplies break opportunities at punctuation; only an overlong segment breaks within itself. */
 [data-role=host-link] { display: inline-block; max-width: 100%; overflow-wrap: break-word; vertical-align: top; }
+/* in a table an overlong segment (no . or - to break at) must not set the column's width: past 18em it breaks inside */
+td [data-role=host-link] { max-width: 18em; }
 .table td > .badge { white-space: nowrap; }
 /* the hosts an alert is about: a name to open, and what the inventory says of it */
 .device-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
