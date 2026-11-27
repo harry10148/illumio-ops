@@ -6,6 +6,7 @@ import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { notifyMeChanged } from "../../shell/Shell";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 
 // Suggestions only: any value the server accepts can be typed (an IANA name, UTC+N).
 const ZONES = ["local", "UTC", "Asia/Taipei", "Asia/Tokyo", "Asia/Seoul", "Asia/Shanghai", "Asia/Hong_Kong",
@@ -18,6 +19,7 @@ export function Display() {
   const [timezone, setTimezone] = useState("");
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  useUnsavedChanges(Boolean(view && (language !== view.language || timezone !== view.timezone)));
 
   useEffect(() => {
     void call("system.display.get").then((env) => {
@@ -66,7 +68,7 @@ export function Display() {
             <span className="hint">{t("display_timezone_hint", { zone: view.server_zone })}</span>
           </label>
           <div className="actions">
-            <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
+            <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("btn_save")}</button>
           </div>
         </form>
       )}

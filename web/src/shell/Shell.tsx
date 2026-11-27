@@ -7,6 +7,7 @@ import type { Tone } from "../components/ui";
 import { t } from "../i18n";
 import { NAV_GROUPS, allNavItems, navItems, type NavItem } from "./nav";
 import { ShellStatusContext, useShellStatusPoll } from "./status";
+import { hasUnsavedChanges } from "./unsaved";
 
 /** Pages fire this after changing something /api/auth/me reports (password, language). */
 export const ME_CHANGED_EVENT = "illumio-ops:me-changed";
@@ -42,7 +43,14 @@ function StatusLine({ status }: { status: ShellStatus | null }) {
   );
 }
 
-function Item({ item, status, onPick }: { item: NavItem; status: ShellStatus | null; onPick: () => void }) {
+function confirmNavigation(event: React.MouseEvent<HTMLAnchorElement>): void {
+  const target = new URL(event.currentTarget.href, window.location.href);
+  if (target.pathname === window.location.pathname && target.search === window.location.search &&
+      target.hash === window.location.hash) return;
+  if (hasUnsavedChanges() && !window.confirm(t("unsaved_leave_confirm"))) event.preventDefault();
+}
+
+function Item({ item, status, onPick }: { item: NavItem; status: ShellStatus | null; onPick: (event: React.MouseEvent<HTMLAnchorElement>) => void }) {
   const dimmed = item.needs === "advanced" && status?.mode === "basic";
   const count = item.badge === "new" ? status?.new_alerts ?? 0 : 0;
   return (
@@ -82,7 +90,10 @@ export function Shell({ me, onSignedOut }: Props) {
     onSignedOut();
   }
 
-  const close = () => setMenuOpen(false);
+  const close = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    confirmNavigation(event);
+    if (!event.defaultPrevented) setMenuOpen(false);
+  };
   return (
     <ShellStatusContext.Provider value={status}>
       <div className="shell">
@@ -104,7 +115,8 @@ export function Shell({ me, onSignedOut }: Props) {
                   <div className="nav-section">{t(titleKey)}</div>
                   {own.map((item) => <Item key={item.path} item={item} status={status} onPick={close} />)}
                   {system && (
-                    <NavLink to={system} className={inSystem ? "nav-item active" : "nav-item"} onClick={close}
+                    <NavLink to={system} className={inSystem ? "nav-item active" : "nav-item"}
+                             onClick={(event) => { confirmNavigation(event); if (!event.defaultPrevented) setMenuOpen(false); }}
                              data-nav="/system">
                       <span>{t("nav_system")}</span>
                     </NavLink>

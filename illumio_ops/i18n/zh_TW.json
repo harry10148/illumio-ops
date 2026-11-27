@@ -778,6 +778,7 @@
   "rule_form_unit_connections": "條連線",
   "rule_form_unit_mbps": "Mbps",
   "rule_form_unsaved_confirm": "要捨棄尚未儲存的變更並關閉表單嗎？",
+  "unsaved_leave_confirm": "要捨棄尚未儲存的變更並離開這一頁嗎？",
   "rule_form_conflict": "你編輯期間，這條規則已被修改。請重新載入後再儲存。",
   "rule_form_create": "建立規則",
   "rule_type": "類型",

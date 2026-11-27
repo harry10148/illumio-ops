@@ -62,7 +62,7 @@ export function PasswordChange({ requireOld, onChanged }: Props) {
           {t(error.message_key, error.params)}
         </p>
       )}
-      <button type="submit" className="btn-primary" disabled={busy}>
+      <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>
         {t("pw_submit")}
       </button>
     </form>

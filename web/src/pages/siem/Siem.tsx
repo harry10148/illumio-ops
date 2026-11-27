@@ -12,6 +12,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { Disclosure, Purpose, type Tone } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 import { decisionWord } from "../../terms";
 
 type Source = SiemDestinationInput["sources"][number];
@@ -248,7 +249,7 @@ function DestinationCard({ d, lightweight, onChange, onRemove }: {
         <span>{t("siem_mask_pii")} <span className="hint">{t("siem_mask_pii_hint")}</span></span>
       </label>
       <div className="row">
-        <button type="button" className="btn-quiet" disabled={busy} onClick={() => void test()} data-role="siem-test">{t("siem_test")}</button>
+        <button type="button" className="btn-quiet" disabled={busy} aria-busy={busy || undefined} onClick={() => void test()} data-role="siem-test">{t("siem_test")}</button>
         {result && ("message_key" in result
           ? <span className="form-error" data-role="siem-test-result" role="status">{t(result.message_key, result.params)}</span>
           : <span className={result.ok ? "form-ok" : "form-error"} data-role="siem-test-result" role="status">
@@ -265,6 +266,8 @@ export function Siem() {
   const [status, setStatus] = useState<SiemStatusView | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useUnsavedChanges(Boolean(view && siem && JSON.stringify(siem) !== JSON.stringify(view.siem)));
 
   const loadStatus = () => void call("siem.status").then((env) => {
     if (env.ok && env.data) setStatus(env.data);
@@ -292,8 +295,11 @@ export function Siem() {
   async function save(e: FormEvent | null, confirmUnverified = false) {
     e?.preventDefault();
     if (!view || !siem) return;
+    if (busy) return;
+    setBusy(true);
     const normalized = { ...siem, destinations: siem.destinations.map(trimmed) };
     const env = await call("siem.settings.update", { revision: view.revision, siem: normalized, confirm_tls_unverified: confirmUnverified });
+    setBusy(false);
     if (env.ok && env.data) { setView(env.data); setSiem(env.data.siem); setError(null); setSaved(true); loadStatus(); }
     else { setError(env.error); setSaved(false); }
   }
@@ -352,14 +358,14 @@ export function Siem() {
           <p className="form-error" data-field={error.field ?? ""} role="alert">
             {t(error.message_key, error.params)}
             {error.code === "tls_unverified" && (
-              <button type="button" className="btn-quiet inline-action" data-role="siem-save-anyway"
+              <button type="button" className="btn-quiet inline-action" disabled={busy} aria-busy={busy || undefined} data-role="siem-save-anyway"
                       onClick={() => void save(null, true)}>{t("siem_save_anyway")}</button>
             )}
           </p>
         )}
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
         <div className="actions">
-          <button type="submit" className="btn-primary">{t("btn_save")}</button>
+          <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("btn_save")}</button>
         </div>
       </form>
     </section>

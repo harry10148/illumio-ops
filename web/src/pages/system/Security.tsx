@@ -6,6 +6,7 @@ import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { notifyMeChanged } from "../../shell/Shell";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 import { PasswordChange } from "../PasswordChange";
 
 const toList = (text: string) => text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
@@ -21,6 +22,7 @@ function AllowedAddresses({ view, onSaved, onReload }: AllowedProps) {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  useUnsavedChanges(text !== view.allowed_ips.join("\n"));
 
   async function save(confirmLockout: boolean) {
     setBusy(true);
@@ -31,6 +33,7 @@ function AllowedAddresses({ view, onSaved, onReload }: AllowedProps) {
     if (env.ok && env.data) {
       setError(null);
       setSaved(true);
+      setText(env.data.allowed_ips.join("\n"));
       onSaved(env.data);
     } else {
       setSaved(false);
@@ -58,7 +61,7 @@ function AllowedAddresses({ view, onSaved, onReload }: AllowedProps) {
         <div className="form-error" role="alert">
           {t(error.message_key, error.params)}
           {error.code === "would_lock_out" && (
-            <button type="button" className="btn-quiet inline-action" disabled={busy} onClick={() => void save(true)}>
+            <button type="button" className="btn-quiet inline-action" disabled={busy} aria-busy={busy || undefined} onClick={() => void save(true)}>
               {t("security_save_anyway")}
             </button>
           )}
@@ -71,7 +74,7 @@ function AllowedAddresses({ view, onSaved, onReload }: AllowedProps) {
       )}
       {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
       <div className="actions spaced">
-        <button type="submit" className="btn-primary" disabled={busy}>{t("security_save_addresses")}</button>
+        <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("security_save_addresses")}</button>
       </div>
     </form>
   );
@@ -126,7 +129,7 @@ function Username({ view, onChanged }: { view: SecurityView; onChanged: () => vo
       {done && <p className="form-ok" role="status">{t("security_username_changed")}</p>}
       <div className="actions spaced">
         <button type="submit" className="btn-primary"
-                disabled={busy || !password || name.trim() === "" || name.trim() === view.username}>
+                disabled={busy || !password || name.trim() === "" || name.trim() === view.username} aria-busy={busy || undefined}>
           {t("security_username_save")}
         </button>
       </div>

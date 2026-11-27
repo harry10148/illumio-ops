@@ -8,6 +8,7 @@ import type { Tone } from "../../components/ui";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 import { portWord } from "../../terms";
 import { DETECTOR_KEYS } from "../alerts/common";
 
@@ -118,6 +119,7 @@ function KnownMarks() {
   const [items, setItems] = useState<KnownView[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [confirming, setConfirming] = useState<number | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
   useEffect(() => {
     void call("system.lateral.known").then((env) => {
       if (env.ok && env.data) setItems(env.data.items);
@@ -125,7 +127,10 @@ function KnownMarks() {
     });
   }, []);
   async function remove(id: number) {
+    if (busyId !== null) return;
+    setBusyId(id);
     const env = await call("system.lateral.known_delete", undefined, { mark_id: String(id) });
+    setBusyId(null);
     if (env.ok && env.data) { setItems(env.data.items); setConfirming(null); }
     else setError(env.error);
   }
@@ -145,7 +150,7 @@ function KnownMarks() {
               <p className="hint">
                 {t("alert_note_by", { who: m.created_by, at: formatTime(m.created_at, lang) })}{" "}
                 {confirming === m.id ? <>
-                  <button type="button" className="btn-danger" data-role="known-delete-confirm" onClick={() => void remove(m.id)}>{t("btn_confirm")}</button>{" "}
+                  <button type="button" className="btn-danger" data-role="known-delete-confirm" disabled={busyId !== null} aria-busy={busyId === m.id || undefined} onClick={() => void remove(m.id)}>{t("btn_confirm")}</button>{" "}
                   <button type="button" className="btn-quiet" onClick={() => setConfirming(null)}>{t("btn_cancel")}</button>
                 </> : <button type="button" className="btn-text" data-role="known-delete" onClick={() => setConfirming(m.id)}>{t("lateral_known_remove")}</button>}
               </p>
@@ -213,6 +218,7 @@ export function Lateral() {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  useUnsavedChanges(Boolean(view && settings && JSON.stringify(collect(settings)) !== JSON.stringify(view.settings)));
 
   const load = (v: LateralView) => {
     setView(v);
@@ -457,7 +463,7 @@ export function Lateral() {
         {error && <div className="form-error" role="alert" data-field={error.field ?? ""}>{t(error.message_key, error.params)}</div>}
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
         <div className="actions">
-          <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
+          <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("btn_save")}</button>
         </div>
       </form>
       <KnownMarks />

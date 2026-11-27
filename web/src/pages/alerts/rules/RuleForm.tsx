@@ -7,6 +7,7 @@ import { NO_CHOICES } from "../../../components/ConditionEditor";
 import { Disclosure } from "../../../components/ui";
 import { t } from "../../../i18n";
 import { CHANNEL_KEYS, SEVERITY_KEYS, TYPE_KEYS, word } from "../common";
+import { useUnsavedChanges } from "../../../shell/unsaved";
 import { Num } from "../RuleEditor";
 import { blank, differsFromPack, fromTemplate, restored, stateOf, switchMetric, withState, type FlowRule, type State } from "./model";
 import { EventCondition } from "./EventCondition";
@@ -147,6 +148,7 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
   }, [view, id, isNew, sharedState]);
 
   const dirty = Boolean(rule && baseline && (isNew ? !same(rule, baseline) : !same(comparableRule(rule), comparableRule(baseline))));
+  useUnsavedChanges(dirty);
   const flow = rule?.type === "traffic" || rule?.type === "bandwidth" || rule?.type === "volume";
   const reference = useMemo(() => {
     if (!rule) return null;
@@ -446,7 +448,7 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
         <button type="button" className="btn-quiet" onClick={() => setConfirmDelete(false)}>{t("btn_cancel")}</button>
       </> : <button type="button" className="btn-danger" onClick={() => setConfirmDelete(true)}>{t("rule_delete")}</button>)}
       <button type="button" className="btn-quiet" onClick={() => void runPreview()}>{t("rule_preview")}</button>
-      <button type="submit" className="btn-primary" disabled={busy || stateSaving || (customNameRequired && rule.name.trim() === "")}>{isNew ? t("rule_form_create") : t("btn_save")}</button>
+      <button type="submit" className="btn-primary" disabled={busy || stateSaving || (customNameRequired && rule.name.trim() === "")} aria-busy={busy || undefined}>{isNew ? t("rule_form_create") : t("btn_save")}</button>
     </footer>
   </form>;
 }

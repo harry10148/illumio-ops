@@ -7,6 +7,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { Switch } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { STATUS_KEYS, STATUS_TONES, TYPE_KEYS, lookbackChoices, word } from "./common";
+import { useUnsavedChanges } from "../../shell/unsaved";
 import { FilterSummary, ReportFilter } from "./ReportFilter";
 
 const WEEKDAY_KEYS = ["weekday_mon", "weekday_tue", "weekday_wed", "weekday_thu", "weekday_fri", "weekday_sat",
@@ -42,8 +43,9 @@ function when(s: ReportScheduleFields): string {
 /** Server fields that are shown by another field's control: their errors go there. */
 const ERROR_SLOTS: Record<string, string> = { period: "lookback_days", hour: "time", minute: "time", email: "formats" };
 
-function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
+function Editor({ initial, catalog, smtp, onSave, onCancel, error, busy }: {
   initial: ReportScheduleFields; catalog: Catalog; smtp: boolean; error: ApiError | null;
+  busy: boolean;
   onSave: (s: ReportScheduleFields) => void; onCancel: () => void;
 }) {
   const [s, setS] = useState<ReportScheduleFields>(() => ({
@@ -54,6 +56,10 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
   const [recipients, setRecipients] = useState(initial.recipients.join(", "));
   const [filter, setFilter] = useState<FlowCondition | null>(initial.filter ?? null);
   const [filterValid, setFilterValid] = useState(true);
+  const baseline = { ...initial, lookback_days: fitLookback(initial.lookback_days,
+    catalog.entries.find((c) => c.report_type === initial.report_type)?.max_lookback) };
+  useUnsavedChanges(JSON.stringify(s) !== JSON.stringify(baseline) || recipients !== initial.recipients.join(", ") ||
+    JSON.stringify(filter) !== JSON.stringify(initial.filter ?? null));
   const entry = catalog.entries.find((c) => c.report_type === s.report_type);
   const [customs, setCustoms] = useState<CustomReport[] | null>(null);
   // An error that names a field this form is showing goes next to that field. Any other error (none named, or one
@@ -210,7 +216,7 @@ function Editor({ initial, catalog, smtp, onSave, onCancel, error }: {
       </label>
       {error && !inline && <p className="form-error span-all" role="alert">{t(error.message_key, error.params)}</p>}
       <div className="actions span-all">
-        <button type="button" className="btn-primary" disabled={!filterValid}
+        <button type="button" className="btn-primary" disabled={!filterValid || busy} aria-busy={busy || undefined}
           onClick={() => onSave({ ...s, filter: entry?.accepts_filter ? filter : null,
                                   recipients: recipients.split(/[\s,;]+/).filter((r) => r !== "") })}>{t("btn_save")}</button>
         <button type="button" className="btn-quiet" onClick={onCancel}>{t("btn_cancel")}</button>
@@ -226,6 +232,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   const [editing, setEditing] = useState<{ id: string | null; fields: ReportScheduleFields } | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const env = await call("report_schedules.list");
@@ -235,10 +242,12 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   useEffect(() => { void load(); }, [load]);
 
   async function save(fields: ReportScheduleFields) {
-    if (!view || !editing) return;
+    if (!view || !editing || busy) return;
+    setBusy(true);
     const env = editing.id
       ? await call("report_schedules.update", { revision: view.revision, schedule: fields }, { schedule_id: editing.id })
       : await call("report_schedules.create", { revision: view.revision, schedule: fields });
+    setBusy(false);
     if (env.ok && env.data) {
       setView(env.data);
       setEditing(null);
@@ -247,24 +256,31 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   }
 
   async function toggle(item: ScheduleItem): Promise<boolean> {
-    if (!view) return false;
+    if (!view || busy) return false;
+    setBusy(true);
     const { id, ...fields } = item.schedule;
     const env = await call("report_schedules.update", { revision: view.revision, schedule: { ...fields, enabled: !fields.enabled } },
       { schedule_id: id });
+    setBusy(false);
     if (env.ok && env.data) setView(env.data);
     else setError(env.error);
     return env.ok;
   }
 
   async function remove(id: string) {
-    if (!view) return;
+    if (!view || busy) return;
+    setBusy(true);
     const env = await call("report_schedules.delete", { revision: view.revision }, { schedule_id: id });
+    setBusy(false);
     if (env.ok && env.data) { setView(env.data); setDeleting(null); }
     else setError(env.error);
   }
 
   async function runNow(id: string) {
+    if (busy) return;
+    setBusy(true);
     const env = await call("report_schedules.run_now", {}, { schedule_id: id });
+    setBusy(false);
     if (env.ok && env.data) navigate(`/reports?id=${env.data.id}`);
     else setError(env.error);
   }
@@ -275,13 +291,13 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
     <div className="stack" data-role="schedules">
       {!editing && (
         <div className="actions">
-          <button type="button" className="btn-primary" onClick={() => { setDeleting(null); setEditing({ id: null, fields: blank(first) }); }}>
+          <button type="button" className="btn-primary" disabled={busy} onClick={() => { setDeleting(null); setEditing({ id: null, fields: blank(first) }); }}>
             {t("gui_reports_sched_add")}
           </button>
         </div>
       )}
       {editing && (
-        <Editor key={editing.id ?? "new"} initial={editing.fields} catalog={catalog} smtp={view.smtp_enabled} error={error}
+        <Editor key={editing.id ?? "new"} initial={editing.fields} catalog={catalog} smtp={view.smtp_enabled} error={error} busy={busy}
           onSave={(f) => void save(f)} onCancel={() => { setEditing(null); setError(null); }} />
       )}
       {!editing && error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
@@ -322,11 +338,11 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
                       onChange={() => toggle(item)} /></td>
                     <td className="nowrap">
                       {deleting === s.id ? <>
-                        <button type="button" className="btn-danger" data-role="schedule-delete-confirm" disabled={editing !== null}
+                        <button type="button" className="btn-danger" data-role="schedule-delete-confirm" disabled={editing !== null || busy} aria-busy={busy || undefined}
                           onClick={() => void remove(s.id)}>{t("btn_confirm")}</button>
                         <button type="button" className="btn-quiet" onClick={() => setDeleting(null)}>{t("btn_cancel")}</button>
                       </> : <>
-                        <button type="button" className="btn-quiet" disabled={editing !== null} onClick={() => void runNow(s.id)}>{t("gui_reports_run_now")}</button>
+                        <button type="button" className="btn-quiet" disabled={editing !== null || busy} aria-busy={busy || undefined} onClick={() => void runNow(s.id)}>{t("gui_reports_run_now")}</button>
                         <button type="button" className="btn-quiet" disabled={editing !== null} onClick={() => { const { id, ...fields } = s; setDeleting(null); setEditing({ id, fields }); }}>{t("btn_edit")}</button>
                         <button type="button" className="btn-danger" disabled={editing !== null} onClick={() => setDeleting(s.id)}>{t("gui_reports_delete")}</button>
                       </>}

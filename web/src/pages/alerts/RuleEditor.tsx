@@ -302,7 +302,7 @@ function RuleForm({ id, scenario }: { id: string; scenario: Scenario | null }) {
             </>
           ) : <button type="button" className="btn-danger" onClick={() => setConfirmDelete(true)}>{t("rule_delete")}</button>)}
           {!noTrial && <button type="button" className="btn-quiet" onClick={() => void runPreview()}>{t("rule_preview")}</button>}
-          <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
+          <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("btn_save")}</button>
         </div>
       </form>
     </section>

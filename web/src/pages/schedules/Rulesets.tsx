@@ -60,7 +60,7 @@ export function Rulesets() {
           {t("rsb_search")}
           <input name="rsb_q" value={q} maxLength={200} onChange={(e) => setQ(e.target.value)} />
         </label>
-        <button type="submit" className="btn-quiet" disabled={busy}>{t("rs_search")}</button>
+        <button type="submit" className="btn-quiet" disabled={busy} aria-busy={busy || undefined}>{t("rs_search")}</button>
       </form>
       {busy && !view && <p className="muted">{t("loading")}</p>}
       {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}

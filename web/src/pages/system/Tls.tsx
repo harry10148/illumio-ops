@@ -6,6 +6,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 
 function ErrorLine({ error }: { error: ApiError | null }) {
   if (!error) return null;
@@ -50,6 +51,11 @@ function SettingsCard({ status, onSaved }: { status: TlsStatus; onSaved: (s: Tls
   });
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  useUnsavedChanges(JSON.stringify({ ...form, revision: status.revision }) !== JSON.stringify({
+    revision: status.revision, enabled: status.enabled, mode: status.mode, cert_file: status.cert_file,
+    key_file: status.key_file, auto_renew: status.auto_renew, auto_renew_days: status.auto_renew_days,
+    validity_days: status.validity_days, key_algorithm: status.key_algorithm, min_version: status.min_version,
+  }));
   const set = <K extends keyof TlsUpdate>(k: K, v: TlsUpdate[K]) => setForm({ ...form, [k]: v });
 
   async function save(e: FormEvent) {
@@ -140,9 +146,9 @@ function SettingsCard({ status, onSaved }: { status: TlsStatus; onSaved: (s: Tls
       </label>
       {error && !error.field && <div className="span-all"><ErrorLine error={error} /></div>}
       <div className="actions">
-        <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
+        <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("btn_save")}</button>
         {status.mode === "self_signed" && (
-          <button type="button" className="btn-quiet" disabled={busy} onClick={() => void renew()}>
+          <button type="button" className="btn-quiet" disabled={busy} aria-busy={busy || undefined} onClick={() => void renew()}>
             {t("tls_renew_now")}
           </button>
         )}
@@ -197,7 +203,7 @@ function CaSignedCard({ onImported }: { onImported: (s: TlsStatus) => void }) {
         <label>{t("tls_csr_san_dns")}<input name="san_dns" value={req.san_dns} onChange={(e) => setReq({ ...req, san_dns: e.target.value })} /></label>
         <label>{t("tls_csr_san_ip")}<input name="san_ip" value={req.san_ip} onChange={(e) => setReq({ ...req, san_ip: e.target.value })} /></label>
         <div className="actions">
-          <button type="submit" className="btn-quiet" disabled={busy}>{t("tls_csr_generate")}</button>
+          <button type="submit" className="btn-quiet" disabled={busy} aria-busy={busy || undefined}>{t("tls_csr_generate")}</button>
         </div>
       </form>
       {csr && (
@@ -213,7 +219,7 @@ function CaSignedCard({ onImported }: { onImported: (s: TlsStatus) => void }) {
                     placeholder="-----BEGIN CERTIFICATE-----" />
         </label>
         <div className="actions">
-          <button type="submit" className="btn-quiet" disabled={busy || !pem.trim()}>{t("tls_import")}</button>
+          <button type="submit" className="btn-quiet" disabled={busy || !pem.trim()} aria-busy={busy || undefined}>{t("tls_import")}</button>
         </div>
       </form>
       <ErrorLine error={error} />

@@ -119,7 +119,7 @@ export default function LateralMovement() {
                   {page.lightweight_days.map((d) => <option key={d} value={d}>{t(DAY_KEYS[d] ?? "lat_days_7")}</option>)}
                 </select>
               </label>
-              <button type="button" className="btn-primary" disabled={busy} onClick={() => void compute()} data-role="lat-compute">
+              <button type="button" className="btn-primary" disabled={busy} aria-busy={busy || undefined} onClick={() => void compute()} data-role="lat-compute">
                 {busy ? t("lat_computing") : t("lat_compute")}
               </button>
             </div>

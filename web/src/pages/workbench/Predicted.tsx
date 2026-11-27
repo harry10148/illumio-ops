@@ -80,7 +80,7 @@ export function Predicted({ req }: { req: Req }) {
     <div className="card stack" data-role="predicted">
       <div className="row">
         <h2>{t("wb_pred_title")}</h2>
-        <button type="button" className="btn-quiet" disabled={busy} onClick={() => void run()} data-role="pred-run">
+        <button type="button" className="btn-quiet" disabled={busy} aria-busy={busy || undefined} onClick={() => void run()} data-role="pred-run">
           {busy ? t("wb_pred_running") : view ? t("wb_pred_again") : t("wb_pred_run")}
         </button>
       </div>

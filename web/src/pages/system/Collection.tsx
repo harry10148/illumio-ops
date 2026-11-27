@@ -7,6 +7,7 @@ import { today } from "../../time";
 import { Purpose } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 import { Modes } from "./Modes";
 
 type BackfillSources = "both" | "events" | "traffic";
@@ -148,6 +149,7 @@ export function Collection() {
   const [status, setStatus] = useState<CollectionStatus | null>(null);
   const [revision, setRevision] = useState<number | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  const [loadedForm, setLoadedForm] = useState<Form | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -159,8 +161,11 @@ export function Collection() {
   const [cleared, setCleared] = useState<{ moved: string | null } | null>(null);
   const [clearError, setClearError] = useState<ApiError | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
+  const [runningRetention, setRunningRetention] = useState(false);
   const [backfillNote, setBackfillNote] = useState<string | null>(null);
   const [backfillError, setBackfillError] = useState<ApiError | null>(null);
+  useUnsavedChanges(Boolean(form && loadedForm && JSON.stringify(form) !== JSON.stringify(loadedForm)));
 
   const refresh = useCallback(async () => {
     const env = await call("system.collection.status");
@@ -172,6 +177,7 @@ export function Collection() {
       if (env.ok && env.data) {
         setRevision(env.data.revision);
         setForm(toForm(env.data.settings));
+        setLoadedForm(toForm(env.data.settings));
       } else setError(env.error);
     });
     void refresh();
@@ -194,6 +200,7 @@ export function Collection() {
     if (env.ok && env.data) {
       setRevision(env.data.revision);
       setForm(toForm(env.data.settings));
+      setLoadedForm(toForm(env.data.settings));
       setError(null);
       setSaved(true);
     } else {
@@ -204,7 +211,10 @@ export function Collection() {
 
   async function startBackfill(e: FormEvent) {
     e.preventDefault();
+    if (backfilling) return;
+    setBackfilling(true);
     const env = await call("system.collection.backfill", { start: range.start, end: range.end, sources: range.sources });
+    setBackfilling(false);
     if (env.ok && env.data) {
       setBackfillError(null);
       setBackfillNote(t("backfill_started", { start: range.start, end: range.end })
@@ -217,7 +227,10 @@ export function Collection() {
   }
 
   async function runRetention() {
+    if (runningRetention) return;
+    setRunningRetention(true);
     const env = await call("system.collection.retention_run", {});
+    setRunningRetention(false);
     setRetentionNote(Boolean(env.ok && env.data?.queued));
     setRetentionError(env.ok ? null : env.error);
   }
@@ -375,7 +388,7 @@ export function Collection() {
           )}
           {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
           <div className="actions">
-            <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
+            <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("btn_save")}</button>
           </div>
         </form>
       )}
@@ -402,7 +415,7 @@ export function Collection() {
         {backfillError && <div className="form-error" role="alert">{t(backfillError.message_key, backfillError.params)}</div>}
         {backfillNote && <p className="form-ok" role="status">{backfillNote}</p>}
         <div className="actions">
-          <button type="submit" className="btn-quiet">{t("btn_backfill")}</button>
+          <button type="submit" className="btn-quiet" disabled={backfilling} aria-busy={backfilling || undefined}>{t("btn_backfill")}</button>
         </div>
       </form>
       <div className="card stack" data-role="collection-maintenance">
@@ -412,7 +425,7 @@ export function Collection() {
           {retentionError && <div className="form-error" role="alert">{t(retentionError.message_key, retentionError.params)}</div>}
           {retentionNote && <p className="form-ok" role="status">{t("retention_run_queued")}</p>}
           <div className="actions">
-            <button type="button" className="btn-quiet" onClick={() => void runRetention()}>{t("btn_retention_run")}</button>
+            <button type="button" className="btn-quiet" disabled={runningRetention} aria-busy={runningRetention || undefined} onClick={() => void runRetention()}>{t("btn_retention_run")}</button>
           </div>
         </div>
         <form onSubmit={(e) => void clearCollected(e)} data-role="collection-clear">
@@ -429,7 +442,7 @@ export function Collection() {
             </p>
           )}
           <div className="actions">
-            <button type="submit" className="btn-danger" disabled={clearing || clearWord.trim() !== CLEAR_WORD}>
+            <button type="submit" className="btn-danger" disabled={clearing || clearWord.trim() !== CLEAR_WORD} aria-busy={clearing || undefined}>
               {t("btn_collection_clear")}
             </button>
           </div>

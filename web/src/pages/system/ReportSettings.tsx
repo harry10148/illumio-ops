@@ -5,6 +5,7 @@ import { type ApiError, call } from "../../api/client";
 import type { ReportSettingsView } from "../../api/generated";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 import { RhcSection } from "./RhcSection";
 
 export function ReportSettings({ embedded = false }: { embedded?: boolean }) {
@@ -14,6 +15,7 @@ export function ReportSettings({ embedded = false }: { embedded?: boolean }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  useUnsavedChanges(Boolean(view && (url !== view.gui_external_url || days !== view.retention_days)));
 
   useEffect(() => {
     void call("system.reports.get").then((env) => {
@@ -34,6 +36,7 @@ export function ReportSettings({ embedded = false }: { embedded?: boolean }) {
     if (env.ok && env.data) {
       setView(env.data);
       setUrl(env.data.gui_external_url);
+      setDays(env.data.retention_days);
       setError(null);
       setSaved(true);
     } else {
@@ -61,7 +64,7 @@ export function ReportSettings({ embedded = false }: { embedded?: boolean }) {
             <span className="hint">{t("gui_reports_retention_hint")}</span>
           </label>
           <div className="actions span-all">
-            <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
+            <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("btn_save")}</button>
             {saved && <span className="form-ok" role="status">{t("saved_ok")}</span>}
           </div>
         </form>

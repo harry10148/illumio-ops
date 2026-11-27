@@ -253,7 +253,10 @@ function Fleet() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { void loadList(filter); }, [filter, loadList]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadList(filter), 300);
+    return () => window.clearTimeout(timer);
+  }, [filter, loadList]);
 
   function toggle(h: FleetHost) {
     const next = new Map(chosen);

@@ -367,7 +367,7 @@ function Ransomware({ hostKey, initial }: { hostKey: string; initial: HostRansom
       <p className="hint">{t("hosts_rw_allow_hint")}</p>
       {error && <p className="form-error" role="alert">{t(error.message_key, error.params)}</p>}
       {!asked && b.services.length > 0 && (
-        <button type="button" className="btn-quiet" disabled={busy} onClick={() => void ask()} data-role="rw-allows">
+        <button type="button" className="btn-quiet" disabled={busy} aria-busy={busy || undefined} onClick={() => void ask()} data-role="rw-allows">
           {busy ? t("loading") : t("hosts_rw_allow_button")}
         </button>
       )}

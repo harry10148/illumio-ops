@@ -107,18 +107,18 @@ export function RhcSection() {
           </ol>
           {status?.ven_scopes !== true && <p className="notice">{t("rhc_confirm_provision")}</p>}
           <div className="row">
-            <button type="button" className="btn-primary" disabled={busy} onClick={() => void enable()}>{t("btn_confirm")}</button>
+            <button type="button" className="btn-primary" disabled={busy} aria-busy={busy || undefined} onClick={() => void enable()}>{t("btn_confirm")}</button>
             <button type="button" className="btn-quiet" onClick={() => setConfirming(false)}>{t("btn_cancel")}</button>
           </div>
         </div>
       ) : (
         <div className="row">
           {off && status?.write_key && (
-            <button type="button" className="btn-primary" disabled={busy} onClick={() => setConfirming(true)}>
+            <button type="button" className="btn-primary" disabled={busy} aria-busy={busy || undefined} onClick={() => setConfirming(true)}>
               {t("rhc_btn_enable")}
             </button>
           )}
-          <button type="button" className="btn-quiet" disabled={busy} onClick={() => void check()}>{t("rhc_btn_check")}</button>
+          <button type="button" className="btn-quiet" disabled={busy} aria-busy={busy || undefined} onClick={() => void check()}>{t("rhc_btn_check")}</button>
         </div>
       )}
     </div>

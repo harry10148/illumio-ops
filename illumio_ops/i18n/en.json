@@ -778,6 +778,7 @@
   "rule_form_unit_connections": "connections",
   "rule_form_unit_mbps": "Mbps",
   "rule_form_unsaved_confirm": "Discard unsaved changes and close this form?",
+  "unsaved_leave_confirm": "Discard unsaved changes and leave this page?",
   "rule_form_conflict": "This rule changed while you were editing. Reload it before saving.",
   "rule_form_create": "Create rule",
   "rule_type": "Type",

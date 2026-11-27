@@ -6,6 +6,7 @@ import type { ChannelsInput, ChannelsView } from "../../api/generated";
 import { formatTime } from "../../components/ProbeResults";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 
 type Kind = keyof ChannelsInput;
 const KINDS: Kind[] = ["smtp", "line", "telegram", "teams", "webhook"];
@@ -38,6 +39,11 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
   const [saved, setSaved] = useState(false);
   const [results, setResults] = useState<Partial<Record<Kind, Result>>>({});
   const [allNone, setAllNone] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState<Kind | null>(null);
+  const [testingAll, setTestingAll] = useState(false);
+  useUnsavedChanges(Boolean(view && channels && (JSON.stringify(channels) !== JSON.stringify(view.channels) ||
+    recipientText !== view.channels.smtp.recipients.join("\n"))));
 
   const load = (v: ChannelsView) => { setView(v); setChannels(v.channels); setRecipientText(v.channels.smtp.recipients.join("\n")); };
   useEffect(() => {
@@ -68,29 +74,35 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    if (!view || !channels) return;
+    if (!view || !channels || saving) return;
+    setSaving(true);
     const current = payload();
     if (!current) return;
     const env = await call("system.channels.update", { revision: view.revision, channels: current });
+    setSaving(false);
     if (env.ok && env.data) { load(env.data); setError(null); setSaved(true); }
     else { setError(env.error); setSaved(false); }
   }
 
   async function test(kind: Kind) {
-    if (!channels) return;
+    if (!channels || testing !== null) return;
+    setTesting(kind);
     const current = payload();
     if (!current) return;
     const env = await call("system.channels.test", { channel: kind, channels: current });
+    setTesting(null);
     setResults({ ...results, [kind]: env.ok && env.data ? env.data : (env.error as ApiError) });
   }
 
   /** Every enabled channel, with the values on the page; each answer lands beside its channel. */
   async function testAll() {
-    if (!channels) return;
+    if (!channels || testingAll) return;
+    setTestingAll(true);
     setAllNone(false);
     const current = payload();
     if (!current) return;
     const env = await call("system.channels.test_all", { channels: current });
+    setTestingAll(false);
     if (!env.ok || !env.data) { setError(env.error); return; }
     setError(null);
     setAllNone(env.data.results.length === 0);
@@ -146,7 +158,7 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
                 </p>
               )}
               <div className="row">
-                <button type="button" className="btn-quiet" onClick={() => void test(kind)}>{t("channel_test")}</button>
+                <button type="button" className="btn-quiet" disabled={testing !== null} aria-busy={testing === kind || undefined} onClick={() => void test(kind)}>{t("channel_test")}</button>
                 {result && ("message_key" in result
                   ? <span className="form-error" data-role="test-result" role="status">{t(result.message_key, result.params)}</span>
                   : <span className={result.ok ? "form-ok" : "form-error"} data-role="test-result" role="status">
@@ -160,10 +172,10 @@ export function Channels({ embedded = false }: { embedded?: boolean }) {
         {saved && <p className="form-ok" role="status">{t("saved_ok")}</p>}
         {allNone && <p className="hint" role="status" data-role="test-all-none">{t("channels_test_all_none")}</p>}
         <div className="actions">
-          <button type="button" className="btn-quiet" data-role="test-all" onClick={() => void testAll()}>
+          <button type="button" className="btn-quiet" disabled={testingAll} aria-busy={testingAll || undefined} data-role="test-all" onClick={() => void testAll()}>
             {t("channels_test_all")}
           </button>
-          <button type="submit" className="btn-primary">{t("btn_save")}</button>
+          <button type="submit" className="btn-primary" disabled={saving} aria-busy={saving || undefined}>{t("btn_save")}</button>
         </div>
       </form>
     </section>

@@ -138,7 +138,7 @@ function GenerateForm({ entry, catalog, onDone, customId }: {
       <div className="actions">
         <button type="button" className="btn-primary"
           disabled={busy || formats.length === 0 || !filterValid || (entry.requires_app && !namesApp(filter))
-            || (days === "custom" && (from === "" || to === ""))} onClick={() => void submit()}>
+            || (days === "custom" && (from === "" || to === ""))} aria-busy={busy || undefined} onClick={() => void submit()}>
           {t("gui_reports_generate")}
         </button>
       </div>
@@ -272,6 +272,8 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [confirmingOne, setConfirmingOne] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [outcome, setOutcome] = useState<BulkDeleted | null>(null);
   useEffect(() => {
     marked.current?.scrollIntoView({ block: "center" });
@@ -282,7 +284,10 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   }, [data]);
 
   async function remove(id: number) {
+    if (deletingId !== null) return;
+    setDeletingId(id);
     const env = await call("reports.delete", undefined, { report_id: String(id) });
+    setDeletingId(null);
     if (env.ok) {
       setConfirmingOne(null);
       setError(null);
@@ -291,10 +296,13 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   }
 
   async function removePicked() {
+    if (bulkDeleting) return;
     setConfirming(false);
     const [first, ...rest] = [...picked];
     if (first === undefined) return;
+    setBulkDeleting(true);
     const env = await call("reports.bulk_delete", { ids: [first, ...rest] });
+    setBulkDeleting(false);
     if (env.ok && env.data) {
       setError(null);
       setOutcome(env.data);
@@ -321,7 +329,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
         {confirming ? (
           <>
             <span>{t("gui_reports_delete_confirm", { n: String(picked.size) })}</span>
-            <button type="button" className="btn-danger" data-role="bulk-delete-confirm" onClick={() => void removePicked()}>
+            <button type="button" className="btn-danger" data-role="bulk-delete-confirm" disabled={bulkDeleting || deletingId !== null} aria-busy={bulkDeleting || undefined} onClick={() => void removePicked()}>
               {t("gui_reports_delete")}
             </button>
             <button type="button" className="btn-quiet" onClick={() => setConfirming(false)}>{t("btn_cancel")}</button>
@@ -402,7 +410,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                 <td>
                   {confirmingOne === r.id ? <>
                     <span>{t("gui_reports_delete_confirm", { n: "1" })}</span>{" "}
-                    <button type="button" className="btn-danger" data-role="report-delete-confirm" onClick={() => void remove(r.id)}>
+                    <button type="button" className="btn-danger" data-role="report-delete-confirm" disabled={deletingId !== null || bulkDeleting} aria-busy={deletingId === r.id || undefined} onClick={() => void remove(r.id)}>
                       {t("btn_confirm")}
                     </button>{" "}
                     <button type="button" className="btn-quiet" onClick={() => setConfirmingOne(null)}>{t("btn_cancel")}</button>

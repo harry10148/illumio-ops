@@ -6,6 +6,7 @@ import { ProbeResults } from "../../components/ProbeResults";
 import { Purpose } from "../../components/ui";
 import { t } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 
 type TlsMode = "system" | "bundle" | "off";
 
@@ -60,17 +61,20 @@ function FieldError({ name, error }: { name: string; error: ApiError | null }) {
 export function PceConnection() {
   const [revision, setRevision] = useState<number | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  const [loadedForm, setLoadedForm] = useState<Form | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [resetNote, setResetNote] = useState<{ moved: string | null } | null>(null);
   const [keptNote, setKeptNote] = useState(false);
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<ProbeRun | null>(null);
+  useUnsavedChanges(Boolean(form && loadedForm && JSON.stringify(form) !== JSON.stringify(loadedForm)));
 
   const load = useCallback(async () => {
     const [conn, latest] = await Promise.all([call("system.pce.get"), call("system.pce.latest")]);
     if (conn.ok && conn.data) {
       setForm(toForm(conn.data));
+      setLoadedForm(toForm(conn.data));
       setRevision(conn.data.revision);
       setError(null);
     } else {
@@ -120,6 +124,7 @@ export function PceConnection() {
     setBusy(false);
     if (env.ok && env.data) {
       setForm(toForm(env.data));
+      setLoadedForm(toForm(env.data));
       setRevision(env.data.revision);
       setError(null);
       setSaved(true);
@@ -251,10 +256,10 @@ export function PceConnection() {
           <div className="notice span-all" role="alert" data-role="pce-data-choice">
             <p>{t("pce_choice_intro", error.params)}</p>
             <div className="actions">
-              <button type="button" className="btn-primary" disabled={busy} onClick={() => void send("keep")}>
+              <button type="button" className="btn-primary" disabled={busy} aria-busy={busy || undefined} onClick={() => void send("keep")}>
                 {t("pce_choice_keep")}
               </button>
-              <button type="button" className="btn-danger" disabled={busy} onClick={() => void send("clear")}>
+              <button type="button" className="btn-danger" disabled={busy} aria-busy={busy || undefined} onClick={() => void send("clear")}>
                 {t("pce_choice_clear")}
               </button>
             </div>
@@ -270,8 +275,8 @@ export function PceConnection() {
           </p>
         )}
         <div className="actions">
-          <button type="submit" className="btn-primary" disabled={busy}>{t("btn_save")}</button>
-          <button type="button" className="btn-quiet" disabled={busy} onClick={() => void test()}>
+          <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy || undefined}>{t("btn_save")}</button>
+          <button type="button" className="btn-quiet" disabled={busy} aria-busy={busy || undefined} onClick={() => void test()}>
             {t("btn_test_connection")}
           </button>
           <span className="hint">{t("pce_test_hint")}</span>

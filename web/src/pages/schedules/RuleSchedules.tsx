@@ -9,6 +9,7 @@ import { formatTime } from "../../components/ProbeResults";
 import { DataTable, DetailPane, KpiStrip, ModeMark, PageHead, Panel, Tag, shortTime } from "../../components/ui";
 import { t, useLang } from "../../i18n";
 import { registerNav } from "../../shell/nav";
+import { useUnsavedChanges } from "../../shell/unsaved";
 
 type Day = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 const DAYS: Day[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -134,6 +135,9 @@ function usePlan(initial: Weekly | Expiry | null, provision: boolean) {
       { days: DAYS.filter((d) => days.includes(d)).join(","), start, end, next_day: start > end ? "1" : "0" }, provision)
     : expireAt ? previewText("rs_preview_expiry", { at: expireAt.replace("T", " "), timezone: zone }, provision) : "";
   const valid = kind === "weekly" ? days.length > 0 && start !== end : expireAt !== "";
+  const baseline: Weekly | Expiry = weekly ?? { kind: "weekly", days: ["mon", "tue", "wed", "thu", "fri"],
+    start: "09:00", end: "18:00", timezone: browserZone, action: "enable_in_window" };
+  useUnsavedChanges(JSON.stringify(plan) !== JSON.stringify(baseline));
   const fields = (
     <>
       <div className="chips-row" role="group">
