@@ -64,7 +64,7 @@ def test_alert_auto_selection_replaces_history(context, live_app):
     expect(page.locator("[data-role=fleet-list]")).to_be_visible()
     page.click("nav >> text=Alerts")
     expect(page.locator("[data-role=alerts-home]")).to_be_visible()
-    expect(page).to_have_url(re.compile(r"/alerts\?.*alert="))
+    expect(page).to_have_url(re.compile(r"\?(.*&)?alert=\d+"))  # the alerts home is "/"; the selection is in the URL
     page.go_back()
     expect(page.locator("[data-role=fleet-list]")).to_be_visible()
 
@@ -80,11 +80,15 @@ def test_latest_alert_filter_response_wins(context, live_app):
     page.click("nav >> text=Alerts")
     expect(page.locator("[data-role=alert-list] tbody tr[data-row]")).to_have_count(2)
     delayed = []
-    page.route("**/api/alerts?*", lambda route: delayed.append(route)
-               if "severity=high" in route.request.url else route.continue_())
+    # a predicate, not a glob: in a glob "?" is a wildcard, not the query's "?"
+    page.route(lambda url: "/api/alerts?" in url and "severity=high" in url, lambda route: delayed.append(route))
     with page.expect_request(lambda request: request.url.startswith(live_app.url + "/api/alerts?")
                              and "severity=high" in request.url):
         page.locator('[data-kpi="high"]').click()
+    for _ in range(40):  # the route handler runs when the event loop turns, after the request event
+        if delayed:
+            break
+        page.wait_for_timeout(50)
     assert len(delayed) == 1
     page.locator('[data-kpi="critical"]').click()
     expect(page.locator('[data-kpi="critical"]')).to_have_attribute("aria-pressed", "true")

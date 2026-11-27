@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [6.17.0] - 2026-11-27
+
+From the 6.16.1 UI evaluation (alongside 6.16.2's fixes); the owner chose each behaviour below.
+
+### Added
+
+- Alerts: the severity numbers above the list are filters. Clicking 嚴重, 高, 中 or 低 lists only that severity;
+  clicking it again clears it. The numbers and the sentence above them stay the period's totals.
+- Alerts: repeats are grouped. Alerts of one rule about one host within one clock hour (in the display time zone)
+  are one row marked ×N, which expands to each alert; the row opens the newest. "N alerts" above the list still
+  counts alerts. Host pages and a host's alert list are not grouped.
+- Alerts: the period, category, "only new", severity, page and selected alert are in the address, so a reload or
+  a shared link shows the same view.
+- Keyboard: a list's rows are one stop for Tab; the arrow keys move between them and Enter opens one. The
+  quarantine and VEN 總覽 confirmation cards take focus when they open, close with Escape and give focus back. A
+  "skip to main content" link comes first on every page.
+- Leaving a page from the navigation with unsaved settings asks first, and so does closing the browser tab.
+
+### Changed
+
+- Every time on screen is in the time zone set in System › Display, as reports and emails already are, and is
+  written one way: 2026-11-27 13:54 (24-hour). Before, the console used the browser's zone and its own format. The
+  rule-schedule editor still plans in the browser's zone, as before.
+- Form fields, segmented controls and secondary buttons have darker borders (3:1 against the page) so they can be
+  told apart; card lines are unchanged.
+- Error and result messages are announced to screen readers; unlabelled fields have names; disabled buttons no
+  longer show the busy cursor; motion is off when the system asks for reduced motion.
+
+### Fixed
+
+- Narrow windows: the alerts page, an alert, a host page and the rule schedules no longer scroll sideways at
+  phone width; below 1100 px, opening an alert brings its details into view.
+- Host names break only after a "." or "-", not in the middle of a word. Short status labels no longer break.
+- A button that saves or deletes cannot send its request twice. VEN 總覽 and the SIEM DLQ search ask the server
+  once typing pauses, not on every key.
+- Deleting a report sends the time it was made, so a newer report that reused its id is never deleted in its place.
+- Raw values shown to users now have words: a ransomware service's port state, and why a rule schedule's run was
+  held or failed.
+
 ## [6.16.2] - 2026-11-27
 
 ### Fixed
