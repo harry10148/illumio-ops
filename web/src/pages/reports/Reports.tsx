@@ -222,7 +222,8 @@ function TierGrid({ entries, catalog, open, setOpen, onGenerated }: {
             </div>
             <div className="row">
               {e.mode === "on_demand" &&
-                <Tag tone="muted" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</Tag>}
+                // a note, not a state tag: it may wrap (on CI's fonts it is wider than a card at 1440)
+                <span className="badge" data-tone="muted" title={t("rpt_mode_on_demand_hint")}>● {t("rpt_mode_on_demand")}</span>}
               <span className="hint" data-role="rpt-counts">
                 {t("rpt_card_counts", { schedules: String(e.schedules), copies: String(e.copies) })}
               </span>
