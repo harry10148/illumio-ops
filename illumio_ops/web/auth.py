@@ -114,7 +114,13 @@ OP_USERNAME = operation("auth.username", "POST", "/api/auth/username", UsernameC
 
 
 def _read_local_iana_zone() -> str | None:
-    """Return the server's IANA zone when /etc/localtime or TZ names one."""
+    """Return the server's IANA zone, preferring its explicit TZ override."""
+    env_zone = os.environ.get("TZ", "").lstrip(":")
+    try:
+        ZoneInfo(env_zone)
+        return env_zone
+    except (ValueError, ZoneInfoNotFoundError):
+        pass
     try:
         target = os.readlink("/etc/localtime")
         parts = Path(target).parts
@@ -125,12 +131,7 @@ def _read_local_iana_zone() -> str | None:
                 return zone
     except (OSError, ValueError, ZoneInfoNotFoundError):
         pass
-    env_zone = os.environ.get("TZ", "").lstrip(":")
-    try:
-        ZoneInfo(env_zone)
-    except (ValueError, ZoneInfoNotFoundError):
-        return None
-    return env_zone
+    return None
 
 
 def _offset_name(offset: timedelta | None) -> str:

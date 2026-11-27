@@ -9,9 +9,9 @@ from illumio_ops.store import alerts as store
 from tests.e2e.conftest import sign_in
 
 
-def seed(ctx, *, channels=("line",), hold=None, at=None):
+def seed(ctx, *, channels=("line",), hold=None, at=None, severity=Severity.HIGH, subject="disk_low"):
     now = at or datetime.now(UTC)
-    t = Trigger(rule_id="a" * 32, rule_type=AlertRuleType.SYSTEM, subject_key="disk_low", severity=Severity.HIGH,
+    t = Trigger(rule_id="a" * 32, rule_type=AlertRuleType.SYSTEM, subject_key=subject, severity=severity,
                 first_seen=now, last_seen=now, late=False, message_key="alert_system_disk_low",
                 params={"free": "1 GB", "warn": "10 GB"}, facts={}, evidence=None, confidence=Confidence())
     pce = ctx.settings.current().pce

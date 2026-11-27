@@ -163,6 +163,7 @@ def test_resolve_display_zone_normalizes_settings_and_local_symlink(monkeypatch)
     from illumio_ops.settings.schema import DisplaySettings
     from illumio_ops.web import auth
 
+    monkeypatch.delenv("TZ", raising=False)
     monkeypatch.setattr(auth.os, "readlink", lambda path: "/usr/share/zoneinfo/Asia/Taipei")
     setting = lambda value: DisplaySettings(language="en", timezone=value)
     assert auth.resolve_display_zone(setting("local")) == "Asia/Taipei"
@@ -171,6 +172,16 @@ def test_resolve_display_zone_normalizes_settings_and_local_symlink(monkeypatch)
     assert auth.resolve_display_zone(setting("UTC+05:30")) == "+05:30"
     assert auth.resolve_display_zone(setting("UTC+5.5")) == "+05:30"
     assert auth.resolve_display_zone(setting("Asia/Taipei")) == "Asia/Taipei"
+
+
+def test_local_display_zone_prefers_valid_tz_over_localtime_symlink(monkeypatch):
+    from illumio_ops.settings.schema import DisplaySettings
+    from illumio_ops.web import auth
+
+    monkeypatch.setenv("TZ", "Asia/Taipei")
+    monkeypatch.setattr(auth.os, "readlink", lambda path: "/usr/share/zoneinfo/UTC")
+    setting = DisplaySettings(language="en", timezone="local")
+    assert auth.resolve_display_zone(setting) == "Asia/Taipei"
 
 
 # ── final review fixes ─────────────────────────────────────────────────────

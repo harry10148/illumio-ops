@@ -98,6 +98,7 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
   const [channels, setChannels] = useState<ChannelsInput | null>(null);
   const [choices, setChoices] = useState<ConditionChoices>(NO_CHOICES);
   const [busy, setBusy] = useState(false);
+  const saveInFlight = useRef(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [fieldsSeq, setFieldsSeq] = useState(0);
@@ -184,17 +185,20 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!rule || revision === null || busy || localError) return;
+    if (!rule || revision === null || saveInFlight.current || localError) return;
+    saveInFlight.current = true;
     setBusy(true);
     setError(null);
     const latest = await call("alert_rules.list");
     if (!latest.ok || !latest.data) {
+      saveInFlight.current = false;
       setBusy(false);
       setError(latest.error);
       return;
     }
     const current = latest.data.items.find((item) => item.rule.id === id)?.rule;
     if (!isNew && (!current || !baseline || !same(comparableRule(current), comparableRule(baseline)))) {
+      saveInFlight.current = false;
       setBusy(false);
       setRevision(latest.data.revision);
       onView(latest.data);
@@ -205,6 +209,7 @@ export function RuleForm({ id, view, pack, onView, onStateChange, onCreated, sta
     const result = isNew
       ? await call("alert_rules.create", { revision: latest.data.revision, rule })
       : await call("alert_rules.update", { revision: latest.data.revision, rule }, { rule_id: id });
+    saveInFlight.current = false;
     setBusy(false);
     if (!result.ok || !result.data) { setError(result.error); return; }
     onView(result.data);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
@@ -233,6 +233,7 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const writeInFlight = useRef(false);
 
   const load = useCallback(async () => {
     const env = await call("report_schedules.list");
@@ -242,11 +243,13 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   useEffect(() => { void load(); }, [load]);
 
   async function save(fields: ReportScheduleFields) {
-    if (!view || !editing || busy) return;
+    if (!view || !editing || writeInFlight.current) return;
+    writeInFlight.current = true;
     setBusy(true);
     const env = editing.id
       ? await call("report_schedules.update", { revision: view.revision, schedule: fields }, { schedule_id: editing.id })
       : await call("report_schedules.create", { revision: view.revision, schedule: fields });
+    writeInFlight.current = false;
     setBusy(false);
     if (env.ok && env.data) {
       setView(env.data);
@@ -256,11 +259,13 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   }
 
   async function toggle(item: ScheduleItem): Promise<boolean> {
-    if (!view || busy) return false;
+    if (!view || writeInFlight.current) return false;
+    writeInFlight.current = true;
     setBusy(true);
     const { id, ...fields } = item.schedule;
     const env = await call("report_schedules.update", { revision: view.revision, schedule: { ...fields, enabled: !fields.enabled } },
       { schedule_id: id });
+    writeInFlight.current = false;
     setBusy(false);
     if (env.ok && env.data) setView(env.data);
     else setError(env.error);
@@ -268,18 +273,22 @@ export function Schedules({ catalog }: { catalog: Catalog }) {
   }
 
   async function remove(id: string) {
-    if (!view || busy) return;
+    if (!view || writeInFlight.current) return;
+    writeInFlight.current = true;
     setBusy(true);
     const env = await call("report_schedules.delete", { revision: view.revision }, { schedule_id: id });
+    writeInFlight.current = false;
     setBusy(false);
     if (env.ok && env.data) { setView(env.data); setDeleting(null); }
     else setError(env.error);
   }
 
   async function runNow(id: string) {
-    if (busy) return;
+    if (writeInFlight.current) return;
+    writeInFlight.current = true;
     setBusy(true);
     const env = await call("report_schedules.run_now", {}, { schedule_id: id });
+    writeInFlight.current = false;
     setBusy(false);
     if (env.ok && env.data) navigate(`/reports?id=${env.data.id}`);
     else setError(env.error);

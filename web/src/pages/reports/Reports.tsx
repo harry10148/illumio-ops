@@ -269,9 +269,9 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   const marked = useRef<HTMLTableRowElement | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   // Several reports deleted at once (5.x bulk delete): picked on this page, confirmed, then what happened to each said.
-  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [picked, setPicked] = useState<Map<number, string>>(new Map());
   const [confirming, setConfirming] = useState(false);
-  const [confirmingOne, setConfirmingOne] = useState<number | null>(null);
+  const [confirmingOne, setConfirmingOne] = useState<{ id: number; created_at: string } | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [outcome, setOutcome] = useState<BulkDeleted | null>(null);
@@ -280,10 +280,13 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
   }, [highlight, data]);
   // a report that left the list (deleted, another page) is no longer picked
   useEffect(() => {
-    setPicked((now) => new Set([...now].filter((id) => data.items.some((r) => r.id === id && r.status !== "running"))));
+    setPicked((now) => new Map([...now].filter(([id, createdAt]) =>
+      data.items.some((r) => r.id === id && r.created_at === createdAt && r.status !== "running"))));
+    setConfirmingOne((now) => now && data.items.some((r) => r.id === now.id && r.created_at === now.created_at)
+      ? now : null);
   }, [data]);
 
-  async function remove(report: ReportItem) {
+  async function remove(report: { id: number; created_at: string }) {
     const { id, created_at } = report;
     if (deletingId !== null) return;
     setDeletingId(id);
@@ -301,27 +304,37 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
 
   async function removePicked() {
     if (bulkDeleting) return;
+    const current = new Map([...picked].filter(([id, createdAt]) =>
+      data.items.some((report) => report.id === id && report.created_at === createdAt && report.status !== "running")));
+    if (current.size !== picked.size) {
+      setPicked(current);
+      setConfirming(false);
+      return;
+    }
     setConfirming(false);
-    const [first, ...rest] = [...picked];
+    const [first, ...rest] = [...current.keys()];
     if (first === undefined) return;
     setBulkDeleting(true);
     const ids: [number, ...number[]] = [first, ...rest];
-    const created_at = Object.fromEntries(data.items.filter((report) => ids.includes(report.id))
-      .map((report) => [String(report.id), report.created_at]));
+    const created_at = Object.fromEntries(ids.flatMap((id) => {
+      const captured = current.get(id);
+      return captured === undefined ? [] : [[String(id), captured]];
+    }));
     const env = await call("reports.bulk_delete", { ids, created_at });
     setBulkDeleting(false);
     if (env.ok && env.data) {
       setError(null);
       setOutcome(env.data);
-      setPicked(new Set());
+      setPicked(new Map());
       onChanged();
     } else setError(env.error);
   }
 
   const pickable = data.items.filter((r) => r.status !== "running");
   const toggle = (id: number, on: boolean) => {
-    const next = new Set(picked);
-    if (on) next.add(id); else next.delete(id);
+    const next = new Map(picked);
+    const row = data.items.find((item) => item.id === id);
+    if (on && row) next.set(id, row.created_at); else next.delete(id);
     setPicked(next);
     setConfirming(false);
   };
@@ -359,8 +372,8 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
             <tr>
               <th>
                 <input type="checkbox" name="pick-all" aria-label={t("gui_reports_select_all")}
-                  checked={pickable.length > 0 && pickable.every((r) => picked.has(r.id))} disabled={pickable.length === 0}
-                  onChange={(e) => { setPicked(new Set(e.target.checked ? pickable.map((r) => r.id) : [])); setConfirming(false); }} />
+                  checked={pickable.length > 0 && pickable.every((r) => picked.get(r.id) === r.created_at)} disabled={pickable.length === 0}
+                  onChange={(e) => { setPicked(new Map(e.target.checked ? pickable.map((r) => [r.id, r.created_at]) : [])); setConfirming(false); }} />
               </th>
               <th>{t("gui_reports_col_report")}</th><th>{t("gui_reports_col_period")}</th>
               <th>{t("gui_reports_col_trigger")}</th><th>{t("gui_reports_col_status")}</th>
@@ -373,7 +386,7 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                 ref={r.id === highlight ? marked : undefined} className={r.id === highlight ? "notice" : undefined}>
                 <td>
                   <input type="checkbox" name={`pick-${r.id}`} aria-label={t("gui_reports_select_one")}
-                    checked={picked.has(r.id)} disabled={r.status === "running"}
+                    checked={picked.get(r.id) === r.created_at} disabled={r.status === "running"}
                     onChange={(e) => toggle(r.id, e.target.checked)} />
                 </td>
                 <td>
@@ -415,14 +428,14 @@ function History({ data, highlight, onChanged }: { data: ReportPage; highlight: 
                   {r.email_detail && <div className="hint">{r.email_detail}</div>}
                 </td>
                 <td>
-                  {confirmingOne === r.id ? <>
+                  {confirmingOne?.id === r.id ? <>
                     <span>{t("gui_reports_delete_confirm", { n: "1" })}</span>{" "}
-                    <button type="button" className="btn-danger" data-role="report-delete-confirm" disabled={deletingId !== null || bulkDeleting} aria-busy={deletingId === r.id || undefined} onClick={() => void remove(r)}>
+                    <button type="button" className="btn-danger" data-role="report-delete-confirm" disabled={deletingId !== null || bulkDeleting} aria-busy={deletingId === r.id || undefined} onClick={() => void remove(confirmingOne)}>
                       {t("btn_confirm")}
                     </button>{" "}
                     <button type="button" className="btn-quiet" onClick={() => setConfirmingOne(null)}>{t("btn_cancel")}</button>
                   </> : <button type="button" className="btn-danger" disabled={r.status === "running"}
-                    onClick={() => setConfirmingOne(r.id)}>{t("gui_reports_delete")}</button>}
+                    onClick={() => setConfirmingOne({ id: r.id, created_at: r.created_at })}>{t("gui_reports_delete")}</button>}
                 </td>
               </tr>
             ))}

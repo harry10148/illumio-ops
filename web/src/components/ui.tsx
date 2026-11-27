@@ -183,7 +183,9 @@ export function DataTable<R>({ columns, rows, rowKey, empty, onRowClick, selecte
   onRowClick?: (row: R) => void;
   selected?: string | null;
 }) {
-  const tabStopKey = selected && rows.some((row) => rowKey(row) === selected) ? selected : rows[0] ? rowKey(rows[0]) : null;
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  const tabStopKey = focusedKey && rows.some((row) => rowKey(row) === focusedKey) ? focusedKey
+    : selected && rows.some((row) => rowKey(row) === selected) ? selected : rows[0] ? rowKey(rows[0]) : null;
   return (
     <div className="table-wrap">
       <table className="table data-table">
@@ -199,6 +201,7 @@ export function DataTable<R>({ columns, rows, rowKey, empty, onRowClick, selecte
               <tr key={key} data-row={key} aria-selected={selected === key}
                   className={onRowClick ? "clickable" : undefined}
                   tabIndex={onRowClick ? (tabStopKey === key ? 0 : -1) : undefined}
+                  onFocus={onRowClick ? () => setFocusedKey(key) : undefined}
                   onClick={onRowClick ? (event) => {
                     if (event.target instanceof Element && event.target.closest("a, button, input, select, textarea, [role='button']")) return;
                     onRowClick(r);

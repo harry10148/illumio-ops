@@ -1,6 +1,7 @@
 """Reports in a browser (P5a Tasks 8–9): generate, wait, download, land on a linked report, schedule and run."""
 import json
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from playwright.sync_api import expect
@@ -51,6 +52,57 @@ def test_linked_report_is_marked(context, live_app):
     sign_in(page, live_app.url)
     page.goto(f"{live_app.url}/reports?id={rid}")
     expect(page.locator(f"[data-report-id='{rid}']")).to_have_attribute("data-highlight", "true")
+
+
+def test_report_delete_sends_the_timestamp_captured_before_confirmation(context, live_app):
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.values import ReportType
+    from illumio_ops.services.reports.registry import ReportParams
+    rid = generate.enqueue(live_app.ctx, ReportParams(report_type=ReportType.NEW_CONNECTIONS), trigger="manual",
+                           schedule_id=None, now=datetime.now(UTC))
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    with page.expect_response(lambda response: response.url.startswith(live_app.url + "/api/reports?")
+                              and response.request.method == "GET") as listed:
+        page.goto(live_app.url + "/reports?tab=produced")
+    initial = next(item for item in listed.value.json()["data"]["items"] if item["id"] == rid)["created_at"]
+    row = page.locator(f"[data-report-id='{rid}']")
+    row.locator("button.btn-danger").click()
+    with page.expect_request(lambda request: request.method == "DELETE"
+                             and request.url.startswith(f"{live_app.url}/api/reports/{rid}?")) as deleting:
+        row.locator("[data-role=report-delete-confirm]").click()
+    assert parse_qs(urlparse(deleting.value.url).query)["created_at"] == [initial]
+
+
+def test_report_replacement_clears_pending_delete_confirmation(context, live_app):
+    from datetime import UTC, datetime
+
+    from illumio_ops.domain.values import ReportType
+    from illumio_ops.services.reports.registry import ReportParams
+    rid = generate.enqueue(live_app.ctx, ReportParams(report_type=ReportType.NEW_CONNECTIONS), trigger="manual",
+                           schedule_id=None, now=datetime.now(UTC))
+    page = context.new_page()
+    sign_in(page, live_app.url)
+    page.goto(live_app.url + "/reports?tab=produced")
+    row = page.locator(f"[data-report-id='{rid}']")
+    expect(row).to_be_visible()
+    row.locator("button.btn-danger").click()
+    changed = []
+
+    def replace_timestamp(route):
+        response = route.fetch()
+        body = response.json()
+        for item in body["data"]["items"]:
+            if item["id"] == rid:
+                item["created_at"] = "2099-01-01T00:00:00Z"
+                changed.append(True)
+        route.fulfill(response=response, json=body)
+
+    page.route("**/api/reports?*", replace_timestamp)
+    # The queued report list polls every five seconds. A replacement identity invalidates the pending confirmation.
+    expect(row.locator("[data-role=report-delete-confirm]")).to_have_count(0, timeout=7000)
+    assert changed
 
 
 def test_lightweight_mode_flow_reports_available(context, live_app):

@@ -154,9 +154,11 @@ function usePlan(initial: Weekly | Expiry | null, provision: boolean) {
       { days: DAYS.filter((d) => days.includes(d)).join(","), start, end, next_day: start > end ? "1" : "0" }, provision)
     : expireAt ? previewText("rs_preview_expiry", { at: expireAt.replace("T", " "), timezone: zone }, provision) : "";
   const valid = kind === "weekly" ? days.length > 0 && start !== end : expireAt !== "";
-  const baseline: Weekly | Expiry = weekly ?? { kind: "weekly", days: ["mon", "tue", "wed", "thu", "fri"],
+  const defaultPlan: Weekly = { kind: "weekly", days: ["mon", "tue", "wed", "thu", "fri"],
     start: "09:00", end: "18:00", timezone: browserZone, action: "enable_in_window" };
-  useUnsavedChanges(JSON.stringify(plan) !== JSON.stringify(baseline));
+  const baseline: Weekly | Expiry = weekly ?? (initial && "expire_at" in initial
+    ? { kind: "expiry", expire_at: expireAt ? new Date(expireAt).toISOString() : "", timezone: browserZone }
+    : defaultPlan);
   const fields = (
     <>
       <div className="chips-row" role="group">
@@ -194,7 +196,7 @@ function usePlan(initial: Weekly | Expiry | null, provision: boolean) {
       {preview && <p data-role="rs-preview">{t("rs_preview_label")}{preview}{t("rs_preview_note")}</p>}
     </>
   );
-  return { plan, valid, fields };
+  return { plan, baseline, valid, fields };
 }
 
 function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: () => void }) {
@@ -206,7 +208,9 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [provision, setProvision] = useState(false);
-  const { plan, valid: planValid, fields } = usePlan(null, provision);
+  const { plan, baseline, valid: planValid, fields } = usePlan(null, provision);
+  useUnsavedChanges(JSON.stringify({ target: target?.href ?? null, provision, plan }) !==
+    JSON.stringify({ target: null, provision: false, plan: baseline }));
 
   async function search(e: FormEvent) {
     e.preventDefault();
@@ -298,7 +302,8 @@ function NewSchedule({ writeKey, onCreated }: { writeKey: boolean; onCreated: ()
 /** 5.x edited a schedule in place: the new plan's note is written to the PCE first (as a new schedule's is). */
 function EditSchedule({ schedule, writeKey, onDone }: { schedule: ScheduleView; writeKey: boolean; onDone: (saved: boolean) => void }) {
   const [provision, setProvision] = useState(schedule.provision);
-  const { plan, valid, fields } = usePlan(schedule.plan, provision);
+  const { plan, baseline, valid, fields } = usePlan(schedule.plan, provision);
+  useUnsavedChanges(JSON.stringify({ provision, plan }) !== JSON.stringify({ provision: schedule.provision, plan: baseline }));
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
 

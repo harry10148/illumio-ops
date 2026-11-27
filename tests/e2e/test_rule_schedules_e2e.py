@@ -119,6 +119,49 @@ def _scheduled(live_app, *, provision=True):
     return sid
 
 
+def _scheduled_expiry(live_app):
+    from datetime import UTC, datetime, timedelta
+
+    from illumio_ops.domain.rule_schedule import Expiry
+    from illumio_ops.store import rule_schedules as store
+    pce = live_app.ctx.settings.current().pce
+    plan = Expiry(expire_at=datetime.now(UTC) + timedelta(days=2), timezone="UTC")
+    with live_app.ctx.db() as conn:
+        sid = store.create(conn, pce_url=pce.url, org_id=pce.org_id, href=RS, is_ruleset=True, name="Backups",
+                           ruleset_name="Backups", summary="2 rules", plan_json=plan.model_dump_json(), paused=False,
+                           pce_status="active", by="a", at=datetime.now(UTC), provision=True)
+        conn.commit()
+    return sid
+
+
+def test_new_target_and_provision_are_dirty(context, live_app, monkeypatch):
+    _write_key(live_app)
+    _targets(monkeypatch)
+    page = _open(context, live_app)
+    page.fill("input[name=rs_q]", "back")
+    page.get_by_role("button", name="Search").click()
+    page.locator("[data-role=rs-targets] input[name=rs_target]").nth(0).check()
+    page.locator("input[name=rs_provision]").check()
+    dialogs = []
+    page.once("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.dismiss()))
+    page.click(".sidenav .nav-item[data-nav='/fleet']")
+    assert dialogs
+    expect(page.locator("[data-role=rs-new]")).to_be_visible()
+
+
+def test_opening_existing_expiry_schedule_is_not_dirty(context, live_app):
+    _write_key(live_app)
+    _scheduled_expiry(live_app)
+    page = _open(context, live_app)
+    page.locator("[data-role=rs-edit-open]").click()
+    expect(page.locator("[data-role=rs-edit] input[name=rs_expire_at]")).to_be_visible()
+    dialogs = []
+    page.on("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.dismiss()))
+    page.click(".sidenav .nav-item[data-nav='/fleet']")
+    expect(page.locator("[data-role=fleet-list]")).to_be_visible()
+    assert not dialogs
+
+
 def test_edit_prefills_the_plan_and_check_now_says_what_happened(context, live_app, monkeypatch):
     """5.x edited a schedule in place and checked on demand (parity 2026-11-06)."""
     _write_key(live_app)

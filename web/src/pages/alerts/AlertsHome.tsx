@@ -84,7 +84,7 @@ export function AlertsHome() {
   const page = Math.max(1, Number(params.get("page") ?? 1) || 1);
   const selectedId = params.get("alert");
   const scrollDetailOnSelection = useRef(false);
-  const updateView = (changes: Record<string, string | null>) => {
+  const updateView = (changes: Record<string, string | null>, replace = false) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
       for (const [key, value] of Object.entries(changes)) {
@@ -92,7 +92,7 @@ export function AlertsHome() {
         else next.set(key, value);
       }
       return next;
-    });
+    }, { replace });
   };
   const scrollDetailIntoView = useCallback(() => {
     const pane = document.querySelector<HTMLElement>("[data-role=alert-detail-pane]");
@@ -137,12 +137,15 @@ export function AlertsHome() {
     if (severity) query.severity = severity;
     if (device) query.device = device;
     else query.group = "true";
+    let live = true;
     void call("alerts.list", undefined, undefined, query).then((env) => {
+      if (!live) return;
       if (env.ok && env.data) {
         setData(env.data);
         setError(null);
       } else setError(env.error);
     });
+    return () => { live = false; };
   }, [days, cat, onlyNew, severity, page, seenBefore, device]);
 
   useEffect(() => {
@@ -150,7 +153,7 @@ export function AlertsHome() {
     const chosen = selectedId === null ? null : Number(selectedId);
     if (chosen !== null && data.items.some((item) => item.group_ids.includes(chosen))) return;
     const first = data.items[0]?.id;
-    if (String(first ?? "") !== selectedId) updateView({ alert: first === undefined ? null : String(first) });
+    if (String(first ?? "") !== selectedId) updateView({ alert: first === undefined ? null : String(first) }, true);
   }, [data, selectedId]);
 
   const c = data?.counts;

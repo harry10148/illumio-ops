@@ -1,7 +1,7 @@
 // SIEM forwarding (spec §6.5 SIEM 轉送, P7): where each destination stands, then the destinations themselves. Three
 // sources — PCE audit events, this product's detections and alerts, and (optional) new connections; never traffic
 // records. In lightweight mode the traffic-made sources say they need alert mode instead of showing 0.
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { type ApiError, call } from "../../api/client";
@@ -267,6 +267,7 @@ export function Siem() {
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const saveInFlight = useRef(false);
   useUnsavedChanges(Boolean(view && siem && JSON.stringify(siem) !== JSON.stringify(view.siem)));
 
   const loadStatus = () => void call("siem.status").then((env) => {
@@ -295,10 +296,12 @@ export function Siem() {
   async function save(e: FormEvent | null, confirmUnverified = false) {
     e?.preventDefault();
     if (!view || !siem) return;
-    if (busy) return;
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
     setBusy(true);
     const normalized = { ...siem, destinations: siem.destinations.map(trimmed) };
     const env = await call("siem.settings.update", { revision: view.revision, siem: normalized, confirm_tls_unverified: confirmUnverified });
+    saveInFlight.current = false;
     setBusy(false);
     if (env.ok && env.data) { setView(env.data); setSiem(env.data.siem); setError(null); setSaved(true); loadStatus(); }
     else { setError(env.error); setSaved(false); }
